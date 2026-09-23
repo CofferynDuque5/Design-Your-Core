@@ -9,6 +9,7 @@
    - `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/core_dev`
    - `NODE_ENV=development` (así no exige `JWT_SECRET` ni bloquea orígenes en CORS)
 5. `pnpm build` una vez (compila `@dyc/core` y `@dyc/tokens`) y después `pnpm dev:api`. Al arrancar, la API aplica las migraciones pendientes de `apps/api/migrations/`.
+6. En otra terminal, `pnpm dev:web` y abre http://localhost:5173. Vite reenvía `/api` a la API local (cámbialo con `DYC_API_PROXY`).
 
 ## Pruebas
 
@@ -16,7 +17,11 @@
 pnpm test                                   # todo
 pnpm --filter @dyc/api test                 # solo la API
 pnpm --filter @dyc/tokens test              # contraste y tokens
+pnpm --filter @dyc/web test                 # componentes y pantallas (sin API)
+pnpm e2e                                    # punta a punta: web compilada + API real (requiere pnpm build)
 ```
+
+El recorrido de punta a punta (`apps/web/e2e/`) arranca la API compilada y `vite preview`, y usa la misma base de datos de pruebas (`E2E_DATABASE_URL` o `TEST_DATABASE_URL`). La primera vez instala Chromium con `pnpm --filter @dyc/web exec playwright install chromium`.
 
 La CI de GitHub Actions (`.github/workflows/ci.yml`) ejecuta typecheck, pruebas con un PostgreSQL 16 y build en cada PR.
 
@@ -46,6 +51,17 @@ Para cambiar el esquema: edita `prisma/schema.prisma`, genera el SQL con `prisma
 | `ALLOWED_ROOT_DOMAINS` | No | Dominios propios cuyos subdominios pueden usar la API (por defecto `nvcorx.com`) |
 | `SMTP_*` | No | Correo de invitación y recuperación. Sin `SMTP_HOST` los enlaces solo se registran en el log |
 | `PORT` | No | Puerto o socket; cPanel lo define solo |
+
+## Despliegue de la app web (estática)
+
+La web es una PWA estática: se compila una vez y se sube como archivos.
+
+1. Crea `apps/web/.env.production` a partir de `apps/web/.env.example` con `VITE_API_URL` apuntando a la API pública.
+2. `pnpm build`. El resultado queda en `apps/web/dist/`.
+3. Sube el **contenido** de `dist/` a la carpeta pública del dominio de la app (por ejemplo `public_html` del subdominio). Incluye `.htaccess`, que hace que rutas como `/progreso` funcionen al recargar y evita que el navegador guarde versiones viejas.
+4. En la API, añade el dominio de la web a `CLIENT_ORIGIN` si no es un subdominio de `nvcorx.com`.
+
+La app anterior puede seguir publicada en su dominio mientras tanto: ambas usan la misma cuenta. Si quieres enlazarla desde la sección "Más", pon su URL en `VITE_LEGACY_APP_URL`.
 
 ### Antes del primer despliegue de esta versión
 

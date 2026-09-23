@@ -12,3 +12,8 @@ core-config.env
 
 # Paquete de despliegue de la API
 apps/api/release/
+
+# Web: resultados de Playwright
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/dev-dist/

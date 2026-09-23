@@ -6,10 +6,11 @@ Plataforma de bienestar personal construida alrededor de seis pilares: energía 
 
 | Parte | Carpeta | Estado |
 |---|---|---|
+| Cliente de la API | `packages/api-client` | Cliente tipado de la API, compartido por la web y la app móvil |
 | API | `apps/api` | v1 compatible con la app actual + v2 con pilares, check-ins, hábitos con historial, retos, panel y recomendaciones. Pruebas de integración |
 | Lógica compartida | `packages/core` | Pilares, fechas, validación, puntuaciones, catálogo de retos y recomendaciones. La usan la API, la web y la app móvil |
 | Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html) |
-| App web | `apps/web` | Pendiente (etapa 3) |
+| App web | `apps/web` | PWA en React: acceso, onboarding, Hoy, check-in, hábitos, retos, progreso día/semana/mes, perfil y ajustes, sección Más. Pruebas de componentes y de punta a punta |
 | Sitio de marca | `apps/site` | Pendiente (etapa 4) |
 | App móvil | `apps/mobile` | Pendiente (etapa 5, Expo) |
 
@@ -48,6 +49,16 @@ cp apps/api/core-config.env.example apps/api/core-config.env   # y edítalo
 pnpm dev:api                                                   # http://localhost:4600/api/health
 ```
 
+### App web en local
+
+Con la API en marcha:
+
+```bash
+pnpm dev:web                                                   # http://localhost:5173
+```
+
+Vite reenvía `/api` a `localhost:4600`, así que no hace falta configurar CORS en desarrollo.
+
 Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de endpoints en [docs/api.md](docs/api.md).
 
 ## Estructura
@@ -55,7 +66,9 @@ Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de e
 ```
 apps/
   api/            Express + Prisma + PostgreSQL (migrations/ se aplican al arrancar)
+  web/            React + Vite + PWA (TanStack Query, React Router)
 packages/
+  api-client/     Cliente tipado de la API (web y móvil)
   core/           Dominio compartido (sin dependencias de UI)
   tokens/         Design tokens → CSS y tema para React Native
 docs/

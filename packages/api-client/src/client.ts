@@ -115,6 +115,11 @@ export function createClient(opts: ClientOptions) {
       remove: (password: string) => request<{ ok: true }>('DELETE', '/api/v2/account', { password }),
     },
 
+    /** Datos de la app anterior (v1): un documento JSON por persona. Solo lectura desde la app nueva. */
+    legacy: {
+      get: () => request<{ data: Record<string, unknown>; updatedAt: string | null }>('GET', '/api/sync'),
+    },
+
     partner: {
       get: () => request<PartnerView>('GET', '/api/partner'),
       invite: () => request<{ code: string }>('POST', '/api/partner/invite'),
