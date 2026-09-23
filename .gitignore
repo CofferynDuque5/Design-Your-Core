@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Secretos: la configuración real nunca se sube al repositorio
+.env
+.env.*
+!.env.example
+core-config.env

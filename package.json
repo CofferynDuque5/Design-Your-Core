@@ -1,0 +1,16 @@
+{
+  "name": "design-your-core",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Design Your Core: plataforma de bienestar (API, web, sitio y app móvil)",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "dev:api": "pnpm --filter @dyc/api dev"
+  }
+}

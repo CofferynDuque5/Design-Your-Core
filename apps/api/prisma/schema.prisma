@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "rhel-openssl-1.0.x", "rhel-openssl-1.1.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A cloud account. Cross-device sync + optional partner link live here.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  inviteCode   String?  @unique // short code the user shares to invite a partner
+  partnerId    String? // the linked partner's user id (set on both sides)
+  gender       String? // 'mujer' | 'hombre' | 'otro' — personaliza la app
+  showCycle    Boolean  @default(false) // muestra la sección Ciclo
+  tokenVersion Int      @default(0) // se incrementa para revocar todas las sesiones
+  resetTokenHash String? @unique // hash del token de recuperación de contraseña
+  resetExpires   DateTime? // caducidad del token de recuperación
+  createdAt    DateTime @default(now())
+  blob         Blob?
+  images       Image[]
+}
+
+// Imágenes de los apuntes (sincronizadas entre dispositivos). Guardadas como
+// data URL. El id lo genera el cliente (uuid).
+model Image {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// The whole app state for a user, stored as one JSON document (local-first sync).
+model Blob {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt
+}
