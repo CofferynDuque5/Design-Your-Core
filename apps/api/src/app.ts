@@ -12,6 +12,7 @@ import { imageRoutes } from './routes/images.js';
 import { partnerRoutes } from './routes/partner.js';
 import { resetRoutes } from './routes/reset.js';
 import { syncRoutes } from './routes/sync.js';
+import { v2Routes } from './v2/index.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -57,6 +58,7 @@ export function createApp({ prisma, config, mailer, limits = { general: 600, str
   app.use('/api', syncRoutes({ prisma, requireAuth }));
   app.use('/api', imageRoutes({ prisma, requireAuth }));
   app.use('/api', partnerRoutes({ prisma, requireAuth, strict, mailer, config }));
+  app.use('/api/v2', v2Routes({ prisma, requireAuth, strict }));
   app.use(resetRoutes({ prisma, strict }));
 
   // fallback 404 para /api

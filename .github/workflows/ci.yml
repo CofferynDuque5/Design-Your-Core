@@ -31,6 +31,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Primero build: la API y los tests usan los paquetes internos compilados.
+      - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm build
+      - run: pnpm --filter @dyc/api bundle

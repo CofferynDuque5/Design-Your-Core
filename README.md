@@ -6,7 +6,8 @@ Plataforma de bienestar personal construida alrededor de seis pilares: energía 
 
 | Parte | Carpeta | Estado |
 |---|---|---|
-| API | `apps/api` | Reconstruida en TypeScript desde la versión en producción, compatible con la app actual, con pruebas de integración |
+| API | `apps/api` | v1 compatible con la app actual + v2 con pilares, check-ins, hábitos con historial, retos, panel y recomendaciones. Pruebas de integración |
+| Lógica compartida | `packages/core` | Pilares, fechas, validación, puntuaciones, catálogo de retos y recomendaciones. La usan la API, la web y la app móvil |
 | Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html) |
 | App web | `apps/web` | Pendiente (etapa 3) |
 | Sitio de marca | `apps/site` | Pendiente (etapa 4) |
@@ -25,9 +26,9 @@ El diagnóstico completo, la arquitectura y el plan por etapas están en [docs/d
 ```bash
 corepack enable
 pnpm install
+pnpm build       # primero: la API usa los paquetes internos compilados
 pnpm typecheck
 pnpm test        # necesita PostgreSQL, ver abajo
-pnpm build
 ```
 
 ### Base de datos para pruebas
@@ -53,8 +54,9 @@ Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de e
 
 ```
 apps/
-  api/            Express + Prisma + PostgreSQL
+  api/            Express + Prisma + PostgreSQL (migrations/ se aplican al arrancar)
 packages/
+  core/           Dominio compartido (sin dependencias de UI)
   tokens/         Design tokens → CSS y tema para React Native
 docs/
   design-system/  Guía visual generada desde los tokens

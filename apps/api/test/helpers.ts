@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { loadConfig, type Config } from '../src/config.js';
-import { ensureSchema } from '../src/db/ensureSchema.js';
+import { migrate } from '../src/db/migrate.js';
 import type { Mailer } from '../src/lib/mailer.js';
 
 // Base de datos real de pruebas. Nunca apuntes esto a producción: se vacía en cada prueba.
@@ -48,9 +48,13 @@ export function makeApp(opts: { config?: Partial<Config>; mailer?: ReturnType<ty
   return { app, mailer, api: request(app) };
 }
 
+let migrated = false;
 export async function resetDb() {
-  await ensureSchema(prisma);
-  await prisma.$executeRawUnsafe('TRUNCATE "Image", "Blob", "User" CASCADE');
+  if (!migrated) {
+    await migrate(prisma);
+    migrated = true;
+  }
+  await prisma.$executeRawUnsafe('TRUNCATE "User" CASCADE');
 }
 
 let counter = 0;

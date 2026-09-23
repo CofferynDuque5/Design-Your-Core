@@ -9,3 +9,6 @@ coverage/
 .env.*
 !.env.example
 core-config.env
+
+# Paquete de despliegue de la API
+apps/api/release/

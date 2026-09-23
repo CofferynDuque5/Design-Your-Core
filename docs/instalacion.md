@@ -8,7 +8,7 @@
 4. Copia `apps/api/core-config.env.example` a `apps/api/core-config.env` y rellena:
    - `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/core_dev`
    - `NODE_ENV=development` (así no exige `JWT_SECRET` ni bloquea orígenes en CORS)
-5. `pnpm dev:api`. Al arrancar, la API crea las tablas si no existen.
+5. `pnpm build` una vez (compila `@dyc/core` y `@dyc/tokens`) y después `pnpm dev:api`. Al arrancar, la API aplica las migraciones pendientes de `apps/api/migrations/`.
 
 ## Pruebas
 
@@ -24,10 +24,16 @@ La CI de GitHub Actions (`.github/workflows/ci.yml`) ejecuta typecheck, pruebas 
 
 Es el mismo esquema que ya usa la versión en producción.
 
-1. Compila: `pnpm --filter @dyc/api build`. Se genera `apps/api/dist/`.
-2. Sube a la carpeta de la aplicación Node en cPanel: `dist/`, `prisma/`, `package.json` y tu `core-config.env`.
+1. Genera el paquete: `pnpm build && pnpm --filter @dyc/api bundle`. Se crea `apps/api/release/` con `dist/`, `prisma/`, `migrations/` y un `package.json` sin dependencias internas.
+2. Sube el **contenido** de `release/` a la carpeta de la aplicación Node en cPanel, junto con tu `core-config.env` (parte de `core-config.env.example`).
 3. En "Setup Node.js App": versión de Node 20 o 22, archivo de inicio `dist/index.js`. Pulsa "Run NPM Install" (instala dependencias y genera Prisma).
 4. Reinicia la aplicación y comprueba `https://TU-API/api/health` → `{"ok":true,"service":"core-cloud"}`.
+
+### Migraciones
+
+Al arrancar, la API aplica en orden los archivos de `migrations/` que aún no estén registrados en la tabla `_dyc_migrations`, cada uno en una transacción. En una base que ya tenía la versión original, `001_base` no cambia nada (las tablas ya existen) y `002_pillars` añade las tablas nuevas sin tocar cuentas ni datos. Hay una prueba que simula exactamente esa actualización.
+
+Para cambiar el esquema: edita `prisma/schema.prisma`, genera el SQL con `prisma migrate diff --from-url <base local migrada> --to-schema-datamodel prisma/schema.prisma --script`, guárdalo como el siguiente `NNN_nombre.sql` y ejecuta las pruebas: una de ellas falla si la base migrada no coincide con el esquema.
 
 ### Configuración (`core-config.env`)
 

@@ -55,3 +55,65 @@ Esta versión es compatible con la app publicada actualmente. El plan añade `/a
 ## Errores
 
 `{ error: "mensaje para mostrar" }` con 400 (datos), 401 (sesión), 404, 409 (conflicto), 429 (demasiados intentos) o 500.
+
+# API v2: pilares
+
+Base `/api/v2`, todas las rutas con 🔒. Las fechas son el día local de la persona en formato `AAAA-MM-DD`; "hoy" se calcula con la zona horaria del perfil. Los pilares son `movimiento`, `descanso`, `alimentacion`, `enfoque`, `relaciones` y `proposito`, siempre en ese orden. La validación compartida está en `@dyc/core` (`packages/core/src/schemas.ts`). Un error de validación responde 400 con `{ error, issues }`.
+
+## Perfil y onboarding
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/profile` | | `{ profile }` |
+| PUT | `/profile` | Cualquier subconjunto de `focusPillars` (máx. 3), `intention`, `energyLevel` (1–5), `activityLevel` (`sedentaria`\|`ligera`\|`moderada`\|`alta`), `wakeTime`/`bedTime` (`HH:MM`), `timezone` (IANA), `baseline` ({pilar: 1–5}), `completeOnboarding` | `{ profile }` con `onboarded` |
+
+## Check-in diario
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/checkins?from=&to=` | (por defecto, últimos 30 días; máx. un año) | `{ from, to, checkIns }` |
+| PUT | `/checkins/:date` | Cualquier subconjunto de `mood`, `energy`, `stress`, `sleepQuality`, `nutrition`, `connection`, `purpose` (1–5), `sleepHours` (0–24), `activeMinutes`, `water` (vasos), `note`, `gratitude`. Se fusiona con lo existente; `null` borra un campo | `{ checkIn }` |
+| DELETE | `/checkins/:date` | | `{ ok }` |
+
+## Hábitos
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/habits` (`?archived=1` incluye archivados) | | `{ today, habits }` con `recent` (últimos 7 días) |
+| POST | `/habits` | `{ title, pillar, days? }` (`days` ISO, "12345" = entre semana) | 201 `{ habit }` |
+| PATCH | `/habits/:id` | `{ title?, pillar?, days?, archived? }` | `{ habit }` |
+| DELETE | `/habits/:id` | | `{ ok }`. Borra también el historial |
+| PUT | `/habits/:id/logs/:date` | `{ done }` | `{ log }` |
+
+## Retos
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/challenges/catalog` | | `{ challenges }`: 24 retos, 4 por pilar, con niveles 1–3 |
+| GET | `/challenges` | | `{ today, active, past }` con progreso (`dayNumber`, `doneDays`, `doneToday`, `log`) |
+| POST | `/challenges` | `{ key, startOn?, replaces? }` | 201 `{ challenge }`. Máx. 3 activos; `replaces` cambia uno activo por otro (subir o bajar de nivel) |
+| PATCH | `/challenges/:id` | `{ status: 'completed' \| 'abandoned' }` | `{ challenge }` |
+| PUT | `/challenges/:id/logs/:date` | `{ done }` | `{ challenge }` |
+
+Los retos cuyo plazo terminó pasan solos a `completed`.
+
+## Panel y recomendaciones
+
+| Método | Ruta | Respuesta |
+|---|---|---|
+| GET | `/dashboard?period=day\|week\|month&date=` | `overall`, `pillars` (puntuación 0–100, anterior y variación), `series` diaria, `habits`, `checkIns` (cantidad y racha), `todayStatus`, `challenges` activos, `recommendations`, `onboarded` |
+| GET | `/recommendations` | `{ recommendations }`: hasta 3, cada una con `reason` (el dato que la motiva) y `action` |
+| POST | `/recommendations/:key/dismiss` | `{ ok, until }`. La oculta 7 días |
+
+**Puntuación.** Cada pilar sale del check-in del día (sueño y calidad para descanso; minutos activos y energía para movimiento; alimentación y agua; ánimo y estrés para enfoque; conexión para relaciones; propósito y reflexión escrita para propósito) combinado con sus hábitos: 70 % check-in y 30 % hábitos cuando hay ambos. Lo que no se registró queda en `null` y no baja la media. Ver `packages/core/src/scoring.ts`.
+
+## Cuenta
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/account/export` | | JSON descargable con todos los datos, incluido el documento v1 |
+| DELETE | `/account` (estricta) | `{ password }` | `{ ok }`. Borra la cuenta y sus datos y desvincula a la pareja |
+
+## Cambio en v1: sincronización sin sobrescrituras
+
+`PUT /api/sync` acepta ahora `baseUpdatedAt` (el `updatedAt` que el cliente leyó). Si el documento cambió desde entonces en otro dispositivo, responde 409 con `{ error, data, updatedAt }` en lugar de pisarlo. Sin ese campo se comporta como antes, así que la app publicada sigue funcionando.

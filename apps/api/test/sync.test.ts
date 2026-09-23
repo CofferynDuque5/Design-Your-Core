@@ -66,3 +66,28 @@ describe('imágenes', () => {
     expect(peek.body.images).toEqual({});
   });
 });
+
+describe('sincronización sin sobrescrituras', () => {
+  it('rechaza guardar sobre una versión que cambió en otro dispositivo', async () => {
+    const { api } = makeApp();
+    const { token } = await registerUser(api);
+    const first = await api.get('/api/sync').set(bearer(token)).expect(200);
+    const base = first.body.updatedAt;
+
+    const phone = await api.put('/api/sync').set(bearer(token)).send({ data: { desde: 'móvil' }, baseUpdatedAt: base }).expect(200);
+    const laptop = await api.put('/api/sync').set(bearer(token)).send({ data: { desde: 'portátil' }, baseUpdatedAt: base }).expect(409);
+    expect(laptop.body.data).toEqual({ desde: 'móvil' });
+    expect(laptop.body.updatedAt).toBe(phone.body.updatedAt);
+
+    await api.put('/api/sync').set(bearer(token)).send({ data: { desde: 'portátil' }, baseUpdatedAt: laptop.body.updatedAt }).expect(200);
+    expect((await api.get('/api/sync').set(bearer(token))).body.data).toEqual({ desde: 'portátil' });
+  });
+
+  it('sin baseUpdatedAt se comporta como antes', async () => {
+    const { api } = makeApp();
+    const { token } = await registerUser(api);
+    await api.put('/api/sync').set(bearer(token)).send({ data: { a: 1 } }).expect(200);
+    await api.put('/api/sync').set(bearer(token)).send({ data: { a: 2 } }).expect(200);
+    expect((await api.get('/api/sync').set(bearer(token))).body.data).toEqual({ a: 2 });
+  });
+});

@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "rhel-openssl-1.0.x", "rhel-openssl-1.1.x", "rhel-openssl-3.0.x"]
 }
 
@@ -10,20 +10,25 @@ datasource db {
 
 // A cloud account. Cross-device sync + optional partner link live here.
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  inviteCode   String?  @unique // short code the user shares to invite a partner
-  partnerId    String? // the linked partner's user id (set on both sides)
-  gender       String? // 'mujer' | 'hombre' | 'otro' — personaliza la app
-  showCycle    Boolean  @default(false) // muestra la sección Ciclo
-  tokenVersion Int      @default(0) // se incrementa para revocar todas las sesiones
-  resetTokenHash String? @unique // hash del token de recuperación de contraseña
+  id             String          @id @default(cuid())
+  email          String          @unique
+  name           String
+  passwordHash   String
+  inviteCode     String?         @unique // short code the user shares to invite a partner
+  partnerId      String? // the linked partner's user id (set on both sides)
+  gender         String? // 'mujer' | 'hombre' | 'otro' — personaliza la app
+  showCycle      Boolean         @default(false) // muestra la sección Ciclo
+  tokenVersion   Int             @default(0) // se incrementa para revocar todas las sesiones
+  resetTokenHash String?         @unique // hash del token de recuperación de contraseña
   resetExpires   DateTime? // caducidad del token de recuperación
-  createdAt    DateTime @default(now())
-  blob         Blob?
-  images       Image[]
+  createdAt      DateTime        @default(now())
+  blob           Blob?
+  images         Image[]
+  profile        Profile?
+  checkIns       CheckIn[]
+  habits         Habit[]
+  challenges     UserChallenge[]
+  dismissals     Dismissal[]
 }
 
 // Imágenes de los apuntes (sincronizadas entre dispositivos). Guardadas como
@@ -44,4 +49,115 @@ model Blob {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   data      Json     @default("{}")
   updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────── v2: pilares ───────────────────────────
+// Las fechas de calendario (@db.Date) son el día local de la persona.
+
+// Respuestas del onboarding y preferencias.
+model Profile {
+  userId        String    @id
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  focusPillars  String[]  @default([])
+  intention     String?
+  energyLevel   Int?
+  activityLevel String?
+  wakeTime      String?
+  bedTime       String?
+  timezone      String    @default("UTC")
+  baseline      Json      @default("{}")
+  onboardedAt   DateTime?
+  updatedAt     DateTime  @updatedAt
+}
+
+// Check-in diario: una fila por persona y día.
+model CheckIn {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          DateTime @db.Date
+  mood          Int?
+  energy        Int?
+  stress        Int?
+  sleepHours    Float?
+  sleepQuality  Int?
+  activeMinutes Int?
+  nutrition     Int?
+  water         Int?
+  connection    Int?
+  purpose       Int?
+  note          String?
+  gratitude     String?
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
+model Habit {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pillar     String
+  title      String
+  days       String     @default("1234567") // días ISO: 1 = lunes … 7 = domingo
+  startsOn   DateTime   @db.Date // día local en que se creó: cuenta desde ahí
+  archivedAt DateTime?
+  createdAt  DateTime   @default(now())
+  logs       HabitLog[]
+
+  @@index([userId])
+}
+
+model HabitLog {
+  habitId String
+  habit   Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date    DateTime @db.Date
+  done    Boolean
+
+  @@id([habitId, date])
+}
+
+// Reto aceptado por la persona (el catálogo vive en @dyc/core).
+model UserChallenge {
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeKey String
+  pillar       String
+  startedOn    DateTime       @db.Date
+  durationDays Int
+  status       String         @default("active") // active | completed | abandoned
+  endedAt      DateTime?
+  createdAt    DateTime       @default(now())
+  logs         ChallengeLog[]
+
+  @@index([userId, status])
+}
+
+model ChallengeLog {
+  userChallengeId String
+  userChallenge   UserChallenge @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
+  date            DateTime      @db.Date
+  done            Boolean
+
+  @@id([userChallengeId, date])
+}
+
+// Recomendación descartada hasta una fecha.
+model Dismissal {
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key    String
+  until  DateTime
+
+  @@id([userId, key])
+}
+
+// Registro de migraciones aplicadas (src/db/migrate.ts). No se usa desde el cliente.
+model DycMigration {
+  id        String   @id
+  appliedAt DateTime @default(now())
+
+  @@map("_dyc_migrations")
+  @@ignore
 }
