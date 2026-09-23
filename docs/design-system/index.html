@@ -1,0 +1,1758 @@
+<!-- Generado por `pnpm --filter @dyc/tokens docs`. Edita template.html o los tokens, no este archivo. -->
+<title>Sistema de diseño Design Your Core</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<style>
+/* Generado por @dyc/tokens a partir de src/tokens.ts. No editar a mano. */
+
+:root {
+  color-scheme: light;
+  --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-sans: 'Figtree', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --text-caption: 0.75rem;
+  --text-small: 0.875rem;
+  --text-body: 1rem;
+  --text-lead: 1.125rem;
+  --text-title: 1.25rem;
+  --text-h3: 1.5rem;
+  --text-h2: 2rem;
+  --text-h1: 2.75rem;
+  --text-display: 3.75rem;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --leading-tight: 1.1;
+  --leading-snug: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+  --tracking-display: -0.02em;
+  --tracking-normal: 0;
+  --tracking-label: 0.08em;
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --color-bg: #F4F3EF;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #ECEAE4;
+  --color-surface-raised: #FFFFFF;
+  --color-ink: #1B2230;
+  --color-ink-muted: #4A5263;
+  --color-ink-subtle: #646B78;
+  --color-line: #DDDAD2;
+  --color-line-strong: #C3BFB5;
+  --color-primary: #1E3A5F;
+  --color-primary-hover: #152C4A;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #E2E8F0;
+  --color-sage: #50705A;
+  --color-sage-soft: #E3EBE4;
+  --color-sand: #C9B28C;
+  --color-sand-soft: #F1EADC;
+  --color-terracotta: #A9573A;
+  --color-terracotta-soft: #F4E2D9;
+  --color-success: #3C7350;
+  --color-success-soft: #E0EDE4;
+  --color-warning: #8A6116;
+  --color-warning-soft: #F5EBD6;
+  --color-danger: #AE3D2C;
+  --color-danger-soft: #F7E1DC;
+  --color-focus: #2F6FB5;
+  --color-scrim: rgba(20, 24, 32, 0.45);
+  --pillar-movimiento: #974A2E;
+  --pillar-movimiento-soft: #F4E2D9;
+  --pillar-movimiento-chart: #B85C37;
+  --pillar-descanso: #2E4D78;
+  --pillar-descanso-soft: #E1E7F0;
+  --pillar-descanso-chart: #2B5C97;
+  --pillar-alimentacion: #4C6D55;
+  --pillar-alimentacion-soft: #E3EBE4;
+  --pillar-alimentacion-chart: #298B68;
+  --pillar-enfoque: #85621F;
+  --pillar-enfoque-soft: #F3EAD6;
+  --pillar-enfoque-chart: #BC8C30;
+  --pillar-relaciones: #9A5064;
+  --pillar-relaciones-soft: #F4E1E5;
+  --pillar-relaciones-chart: #C1657C;
+  --pillar-proposito: #5F5086;
+  --pillar-proposito-soft: #E9E5F2;
+  --pillar-proposito-chart: #634590;
+  --shadow-sm: 0 1px 2px rgba(27, 34, 48, 0.06);
+  --shadow-md: 0 2px 4px rgba(27, 34, 48, 0.04), 0 8px 24px rgba(27, 34, 48, 0.07);
+  --shadow-lg: 0 4px 8px rgba(27, 34, 48, 0.05), 0 24px 56px rgba(27, 34, 48, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: #111418;
+    --color-surface: #181C22;
+    --color-surface-sunken: #0D1014;
+    --color-surface-raised: #20252D;
+    --color-ink: #ECE8E1;
+    --color-ink-muted: #BDB9B1;
+    --color-ink-subtle: #9A9891;
+    --color-line: #2A3039;
+    --color-line-strong: #3C4450;
+    --color-primary: #9DB9E0;
+    --color-primary-hover: #B6CCEA;
+    --color-on-primary: #0E1A2B;
+    --color-primary-soft: #1E2A3A;
+    --color-sage: #A3C1A9;
+    --color-sage-soft: #1D2A22;
+    --color-sand: #D9C6A5;
+    --color-sand-soft: #2A251C;
+    --color-terracotta: #E39C80;
+    --color-terracotta-soft: #33221B;
+    --color-success: #8CC7A0;
+    --color-success-soft: #18291F;
+    --color-warning: #E2BD72;
+    --color-warning-soft: #2E2615;
+    --color-danger: #F0A092;
+    --color-danger-soft: #34201C;
+    --color-focus: #8DB8F0;
+    --color-scrim: rgba(0, 0, 0, 0.6);
+    --pillar-movimiento: #E39C80;
+    --pillar-movimiento-soft: #33221B;
+    --pillar-movimiento-chart: #D3754F;
+    --pillar-descanso: #98B3DC;
+    --pillar-descanso-soft: #1D2838;
+    --pillar-descanso-chart: #4B7CBA;
+    --pillar-alimentacion: #A3C1A9;
+    --pillar-alimentacion-soft: #1D2A22;
+    --pillar-alimentacion-chart: #44A781;
+    --pillar-enfoque: #DDBA78;
+    --pillar-enfoque-soft: #2D2617;
+    --pillar-enfoque-chart: #A27825;
+    --pillar-relaciones: #DDA0AF;
+    --pillar-relaciones-soft: #33202A;
+    --pillar-relaciones-chart: #D1748F;
+    --pillar-proposito: #B7A9DA;
+    --pillar-proposito-soft: #26223A;
+    --pillar-proposito-chart: #7A5DA9;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.3), 0 24px 56px rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #111418;
+  --color-surface: #181C22;
+  --color-surface-sunken: #0D1014;
+  --color-surface-raised: #20252D;
+  --color-ink: #ECE8E1;
+  --color-ink-muted: #BDB9B1;
+  --color-ink-subtle: #9A9891;
+  --color-line: #2A3039;
+  --color-line-strong: #3C4450;
+  --color-primary: #9DB9E0;
+  --color-primary-hover: #B6CCEA;
+  --color-on-primary: #0E1A2B;
+  --color-primary-soft: #1E2A3A;
+  --color-sage: #A3C1A9;
+  --color-sage-soft: #1D2A22;
+  --color-sand: #D9C6A5;
+  --color-sand-soft: #2A251C;
+  --color-terracotta: #E39C80;
+  --color-terracotta-soft: #33221B;
+  --color-success: #8CC7A0;
+  --color-success-soft: #18291F;
+  --color-warning: #E2BD72;
+  --color-warning-soft: #2E2615;
+  --color-danger: #F0A092;
+  --color-danger-soft: #34201C;
+  --color-focus: #8DB8F0;
+  --color-scrim: rgba(0, 0, 0, 0.6);
+  --pillar-movimiento: #E39C80;
+  --pillar-movimiento-soft: #33221B;
+  --pillar-movimiento-chart: #D3754F;
+  --pillar-descanso: #98B3DC;
+  --pillar-descanso-soft: #1D2838;
+  --pillar-descanso-chart: #4B7CBA;
+  --pillar-alimentacion: #A3C1A9;
+  --pillar-alimentacion-soft: #1D2A22;
+  --pillar-alimentacion-chart: #44A781;
+  --pillar-enfoque: #DDBA78;
+  --pillar-enfoque-soft: #2D2617;
+  --pillar-enfoque-chart: #A27825;
+  --pillar-relaciones: #DDA0AF;
+  --pillar-relaciones-soft: #33202A;
+  --pillar-relaciones-chart: #D1748F;
+  --pillar-proposito: #B7A9DA;
+  --pillar-proposito-soft: #26223A;
+  --pillar-proposito-chart: #7A5DA9;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.3), 0 24px 56px rgba(0, 0, 0, 0.5);
+}
+
+
+/*
+ * Componentes base de Design Your Core (web).
+ * Requiere dist/tokens.css. Todo color sale de una variable: ningún
+ * componente define colores propios, así funcionan en claro y oscuro.
+ */
+
+@layer dyc.base, dyc.components;
+
+@layer dyc.base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--leading-normal);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: var(--weight-regular);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-display);
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  h1 {
+    font-size: var(--text-h1);
+    line-height: var(--leading-tight);
+  }
+
+  h2 {
+    font-size: var(--text-h2);
+  }
+
+  h3 {
+    font-size: var(--text-h3);
+  }
+
+  h4 {
+    font-size: var(--text-title);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
+    margin: 0;
+  }
+
+  p {
+    margin: 0;
+    max-width: 65ch;
+  }
+
+  a {
+    color: var(--color-primary);
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  a:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer dyc.components {
+  /* ---------- Tipografía utilitaria ---------- */
+
+  .display {
+    font-family: var(--font-display);
+    font-size: clamp(var(--text-h1), 7vw, var(--text-display));
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-display);
+  }
+
+  .lead {
+    font-size: var(--text-lead);
+    line-height: var(--leading-relaxed);
+    color: var(--color-ink-muted);
+  }
+
+  .eyebrow {
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-ink-subtle);
+  }
+
+  .muted {
+    color: var(--color-ink-muted);
+  }
+
+  .numeric {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Botones ---------- */
+
+  .btn {
+    --btn-bg: var(--color-primary);
+    --btn-fg: var(--color-on-primary);
+    --btn-border: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding-inline: var(--space-5);
+    border: 1px solid var(--btn-border);
+    border-radius: var(--radius-md);
+    background: var(--btn-bg);
+    color: var(--btn-fg);
+    font: inherit;
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      transform var(--duration-fast) var(--ease-standard);
+  }
+
+  .btn:hover {
+    --btn-bg: var(--color-primary-hover);
+  }
+
+  .btn:active {
+    transform: translateY(1px);
+  }
+
+  .btn:disabled,
+  .btn[aria-disabled='true'] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn--secondary {
+    --btn-bg: var(--color-surface);
+    --btn-fg: var(--color-ink);
+    --btn-border: var(--color-line-strong);
+  }
+
+  .btn--secondary:hover {
+    --btn-bg: var(--color-surface-sunken);
+  }
+
+  .btn--ghost {
+    --btn-bg: transparent;
+    --btn-fg: var(--color-primary);
+  }
+
+  .btn--ghost:hover {
+    --btn-bg: var(--color-primary-soft);
+  }
+
+  .btn--danger {
+    --btn-bg: var(--color-danger);
+    --btn-fg: var(--color-surface);
+  }
+
+  .btn--danger:hover {
+    --btn-bg: var(--color-danger);
+    filter: brightness(0.92);
+  }
+
+  .btn--sm {
+    min-height: 36px;
+    padding-inline: var(--space-3);
+    font-size: var(--text-small);
+    border-radius: var(--radius-sm);
+  }
+
+  .btn--block {
+    width: 100%;
+  }
+
+  .btn[aria-busy='true']::before {
+    content: '';
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: dyc-spin 0.7s linear infinite;
+  }
+
+  /* ---------- Tarjetas ---------- */
+
+  .card {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-6);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-lg);
+  }
+
+  .card--raised {
+    border-color: transparent;
+    box-shadow: var(--shadow-md);
+  }
+
+  .card--quiet {
+    background: transparent;
+  }
+
+  .card__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  /* ---------- Formularios ---------- */
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .field__label {
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    color: var(--color-ink);
+  }
+
+  .field__hint {
+    font-size: var(--text-small);
+    color: var(--color-ink-subtle);
+  }
+
+  .field__error {
+    font-size: var(--text-small);
+    color: var(--color-danger);
+  }
+
+  .input {
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-md);
+    color: var(--color-ink);
+    font: inherit;
+    transition: border-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .input::placeholder {
+    color: var(--color-ink-subtle);
+  }
+
+  .input:hover {
+    border-color: var(--color-ink-subtle);
+  }
+
+  .input:focus-visible {
+    border-color: var(--color-focus);
+    outline-offset: 0;
+  }
+
+  .input[aria-invalid='true'] {
+    border-color: var(--color-danger);
+  }
+
+  textarea.input {
+    min-height: 120px;
+    line-height: var(--leading-relaxed);
+    resize: vertical;
+  }
+
+  /* Escala de valoración (ánimo, energía): 1 a 5 */
+  .scale {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .scale__option {
+    position: relative;
+  }
+
+  .scale__option input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .scale__option span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-height: 64px;
+    padding: var(--space-2);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-size: var(--text-caption);
+    color: var(--color-ink-muted);
+    text-align: center;
+  }
+
+  .scale__option b {
+    font-family: var(--font-display);
+    font-size: var(--text-h3);
+    font-weight: var(--weight-regular);
+    color: var(--color-ink);
+    line-height: 1;
+  }
+
+  .scale__option input:checked + span {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    color: var(--color-ink);
+  }
+
+  .scale__option input:focus-visible + span {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Control segmentado (Día / Semana / Mes) */
+  .segmented {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    background: var(--color-surface-sunken);
+    border-radius: var(--radius-md);
+  }
+
+  .segmented button {
+    min-height: 36px;
+    padding-inline: var(--space-4);
+    border: 0;
+    border-radius: calc(var(--radius-md) - 3px);
+    background: transparent;
+    color: var(--color-ink-muted);
+    font: inherit;
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+  }
+
+  .segmented button[aria-pressed='true'] {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ---------- Chips y pilares ---------- */
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 28px;
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-sunken);
+    color: var(--color-ink-muted);
+    font-size: var(--text-small);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+  }
+
+  /* Cada pilar fija --pillar (texto), --pillar-soft (fondo) y --pillar-chart (gráficos). */
+  [data-pillar='movimiento'] {
+    --pillar: var(--pillar-movimiento);
+    --pillar-soft: var(--pillar-movimiento-soft);
+    --pillar-chart: var(--pillar-movimiento-chart);
+  }
+
+  [data-pillar='descanso'] {
+    --pillar: var(--pillar-descanso);
+    --pillar-soft: var(--pillar-descanso-soft);
+    --pillar-chart: var(--pillar-descanso-chart);
+  }
+
+  [data-pillar='alimentacion'] {
+    --pillar: var(--pillar-alimentacion);
+    --pillar-soft: var(--pillar-alimentacion-soft);
+    --pillar-chart: var(--pillar-alimentacion-chart);
+  }
+
+  [data-pillar='enfoque'] {
+    --pillar: var(--pillar-enfoque);
+    --pillar-soft: var(--pillar-enfoque-soft);
+    --pillar-chart: var(--pillar-enfoque-chart);
+  }
+
+  [data-pillar='relaciones'] {
+    --pillar: var(--pillar-relaciones);
+    --pillar-soft: var(--pillar-relaciones-soft);
+    --pillar-chart: var(--pillar-relaciones-chart);
+  }
+
+  [data-pillar='proposito'] {
+    --pillar: var(--pillar-proposito);
+    --pillar-soft: var(--pillar-proposito-soft);
+    --pillar-chart: var(--pillar-proposito-chart);
+  }
+
+  .pillar-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 28px;
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--pillar-soft, var(--color-surface-sunken));
+    color: var(--pillar, var(--color-ink-muted));
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+  }
+
+  .pillar-tag::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* ---------- Progreso ---------- */
+
+  .progress {
+    --value: 0;
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-sunken);
+    overflow: hidden;
+  }
+
+  .progress::after {
+    content: '';
+    display: block;
+    height: 100%;
+    width: calc(var(--value) * 1%);
+    border-radius: inherit;
+    background: var(--pillar-chart, var(--color-primary));
+    transition: width var(--duration-slow) var(--ease-standard);
+  }
+
+  /* Anillo: <svg class="ring" viewBox="0 0 36 36"><circle class="ring__track" …/><circle class="ring__value" pathLength="100" …/></svg> */
+  .ring {
+    --value: 0;
+    width: 56px;
+    height: 56px;
+    transform: rotate(-90deg);
+  }
+
+  .ring__track,
+  .ring__value {
+    fill: none;
+    stroke-width: 3;
+  }
+
+  .ring__track {
+    stroke: var(--color-surface-sunken);
+  }
+
+  .ring__value {
+    stroke: var(--pillar-chart, var(--color-primary));
+    stroke-linecap: round;
+    stroke-dasharray: var(--value) 100;
+    transition: stroke-dasharray var(--duration-slow) var(--ease-standard);
+  }
+
+  /* Cifra destacada */
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .stat__value {
+    font-family: var(--font-display);
+    font-size: var(--text-h2);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat__label {
+    font-size: var(--text-small);
+    color: var(--color-ink-muted);
+  }
+
+  .delta--up {
+    color: var(--color-success);
+  }
+
+  .delta--down {
+    color: var(--color-danger);
+  }
+
+  /* ---------- Estados ---------- */
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-8) var(--space-6);
+    border: 1px dashed var(--color-line-strong);
+    border-radius: var(--radius-lg);
+    color: var(--color-ink-muted);
+  }
+
+  .empty-state h4 {
+    color: var(--color-ink);
+  }
+
+  .skeleton {
+    display: block;
+    min-height: 1em;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-sunken) 0%,
+      var(--color-line) 50%,
+      var(--color-surface-sunken) 100%
+    );
+    background-size: 200% 100%;
+    animation: dyc-shimmer 1.4s ease-in-out infinite;
+  }
+
+  .alert {
+    --alert-fg: var(--color-primary);
+    --alert-bg: var(--color-primary-soft);
+    display: block;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--alert-bg);
+    color: var(--alert-fg);
+    font-size: var(--text-small);
+  }
+
+  .alert strong {
+    font-weight: var(--weight-semibold);
+  }
+
+  .alert--success {
+    --alert-fg: var(--color-success);
+    --alert-bg: var(--color-success-soft);
+  }
+
+  .alert--warning {
+    --alert-fg: var(--color-warning);
+    --alert-bg: var(--color-warning-soft);
+  }
+
+  .alert--danger {
+    --alert-fg: var(--color-danger);
+    --alert-bg: var(--color-danger-soft);
+  }
+
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    max-width: 420px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-ink);
+    color: var(--color-bg);
+    font-size: var(--text-small);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .toast .btn--ghost {
+    --btn-fg: var(--color-bg);
+    margin-left: auto;
+  }
+
+  /* ---------- Iconos ---------- */
+
+  /* Iconos de trazo (Lucide): 1.75 de grosor, heredan el color del texto. */
+  .icon {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+
+  .icon--lg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@keyframes dyc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dyc-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+
+/* ---------- Maquetación de la guía ---------- */
+body {
+  padding-inline: var(--space-4);
+}
+
+.page {
+  max-width: 1080px;
+  margin-inline: auto;
+  padding-block: var(--space-12) var(--space-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.masthead {
+  display: grid;
+  gap: var(--space-6);
+  padding-bottom: var(--space-10);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.masthead__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.masthead h1 {
+  font-size: clamp(2.75rem, 8vw, 5.5rem);
+  line-height: 0.95;
+  max-width: 12ch;
+}
+
+.masthead h1 em {
+  font-style: italic;
+  color: var(--color-primary);
+}
+
+.masthead .lead {
+  max-width: 56ch;
+}
+
+.section {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.section__head {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 62ch;
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.grid > *,
+.card {
+  min-width: 0;
+}
+
+.grid--3 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+
+.grid--2 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sub {
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink-muted);
+}
+
+/* Pilares */
+.pillar-card {
+  gap: var(--space-3);
+}
+
+.pillar-card__icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--pillar-soft);
+  color: var(--pillar);
+}
+
+.pillar-card h3 {
+  font-size: var(--text-h3);
+}
+
+.pillar-card p {
+  color: var(--color-ink-muted);
+  font-size: var(--text-small);
+}
+
+.pillar-card__swatches {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.mini-swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-swatch i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+
+/* Semana: barras por pilar */
+.week {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.week li {
+  display: grid;
+  grid-template-columns: minmax(96px, 9rem) 1fr 3.5rem 3.5rem;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-small);
+}
+
+.week__bar {
+  height: 12px;
+  border-radius: 0 4px 4px 0;
+  background: var(--color-surface-sunken);
+  position: relative;
+  overflow: hidden;
+}
+
+.week__bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--v) * 1%);
+  background: var(--pillar-chart);
+  border-radius: 0 4px 4px 0;
+}
+
+.week__name {
+  color: var(--color-ink);
+  font-weight: var(--weight-medium);
+}
+
+.week__value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-semibold);
+}
+
+.week__delta {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-caption);
+}
+
+.week-axis {
+  display: grid;
+  grid-template-columns: minmax(96px, 9rem) 1fr 3.5rem 3.5rem;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.week-axis div {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Color */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-3);
+}
+
+.swatch {
+  display: grid;
+  grid-template-rows: 72px auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.swatch__chip {
+  background: var(--c);
+}
+
+.swatch__meta {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.swatch__meta b {
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink);
+}
+
+/* Tipografía */
+.type-row {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: var(--space-4);
+  align-items: baseline;
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+
+.type-row__meta {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.type-row__meta b {
+  display: block;
+  color: var(--color-ink-muted);
+  font-size: var(--text-small);
+}
+
+/* Espaciado y radios */
+.space-scale {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.space-scale div {
+  display: grid;
+  grid-template-columns: 4rem 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.space-scale i {
+  display: block;
+  height: 10px;
+  width: var(--w);
+  background: var(--color-sand);
+  border-radius: 2px;
+}
+
+.radii {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.radii div {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.radii i {
+  width: 64px;
+  height: 64px;
+  border: 1.5px solid var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--r);
+}
+
+/* Ejemplo "Hoy" */
+.today {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.today__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.today__ring {
+  position: relative;
+  flex: none;
+}
+
+.today__ring .ring {
+  width: 88px;
+  height: 88px;
+}
+
+.today__ring b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  font-weight: var(--weight-regular);
+  font-variant-numeric: tabular-nums;
+}
+
+.challenge {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+
+.challenge__check {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-line-strong);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  color: var(--color-on-primary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.challenge__check[aria-pressed='true'] {
+  background: var(--pillar);
+  border-color: var(--pillar);
+  color: var(--color-surface);
+}
+
+.challenge__check svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+}
+
+.challenge__check[aria-pressed='true'] svg {
+  opacity: 1;
+}
+
+.challenge__title {
+  font-weight: var(--weight-medium);
+}
+
+.challenge__title small {
+  display: block;
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-small);
+}
+
+.challenge[data-done='true'] .challenge__title {
+  color: var(--color-ink-subtle);
+}
+
+.recommendation {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--pillar-soft);
+}
+
+.recommendation p {
+  font-family: var(--font-display);
+  font-size: var(--text-lead);
+  line-height: var(--leading-snug);
+}
+
+.code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: var(--text-small);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--color-ink);
+}
+
+@media (max-width: 560px) {
+  .type-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+
+  .week li,
+  .week-axis {
+    grid-template-columns: 6.5rem 1fr 2.5rem 2.75rem;
+    gap: var(--space-2);
+  }
+}
+</style>
+
+<div class="page">
+  <header class="masthead">
+    <div class="masthead__top">
+      <span class="eyebrow">Sistema de diseño · v0.1</span>
+      <div class="segmented" role="group" aria-label="Tema de la guía">
+        <button type="button" id="theme-system" data-theme-choice="system" aria-pressed="true">Sistema</button>
+        <button type="button" id="theme-light" data-theme-choice="light" aria-pressed="false">Claro</button>
+        <button type="button" id="theme-dark" data-theme-choice="dark" aria-pressed="false">Oscuro</button>
+      </div>
+    </div>
+    <h1>Design Your <em>Core</em></h1>
+    <p class="lead">Base neutra de piedra, acentos naturales y tipografía editorial. Las mismas reglas para la app web, el sitio de marca y la app móvil, en claro y en oscuro.</p>
+  </header>
+
+  <section class="section" aria-labelledby="pilares">
+    <div class="section__head">
+      <span class="eyebrow">Identidad</span>
+      <h2 id="pilares">Los seis pilares</h2>
+      <p class="muted">Cada pilar tiene un color para texto y etiquetas y otro, algo más vivo, para gráficos. Siempre aparecen en este orden y se acompañan de su nombre o icono, nunca del color solo.</p>
+    </div>
+    <div class="grid grid--3">
+      <article class="card pillar-card" data-pillar="movimiento">
+        <span class="pillar-card__icon"><svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+        <h3>Energía y movimiento</h3>
+        <p>Actividad física, pasos, entrenamiento y cómo se siente tu energía durante el día.</p>
+        <div class="pillar-card__swatches">
+          <span class="mini-swatch"><i style="--c: var(--pillar-movimiento)"></i>Texto</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-movimiento-chart)"></i>Gráfico</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-movimiento-soft)"></i>Fondo</span>
+        </div>
+      </article>
+      <article class="card pillar-card" data-pillar="descanso">
+        <span class="pillar-card__icon"><svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+        <h3>Descanso</h3>
+        <p>Sueño, pausas y recuperación.</p>
+        <div class="pillar-card__swatches">
+          <span class="mini-swatch"><i style="--c: var(--pillar-descanso)"></i>Texto</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-descanso-chart)"></i>Gráfico</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-descanso-soft)"></i>Fondo</span>
+        </div>
+      </article>
+      <article class="card pillar-card" data-pillar="alimentacion">
+        <span class="pillar-card__icon"><svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg></span>
+        <h3>Alimentación</h3>
+        <p>Comidas, hidratación y la relación con lo que comes.</p>
+        <div class="pillar-card__swatches">
+          <span class="mini-swatch"><i style="--c: var(--pillar-alimentacion)"></i>Texto</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-alimentacion-chart)"></i>Gráfico</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-alimentacion-soft)"></i>Fondo</span>
+        </div>
+      </article>
+      <article class="card pillar-card" data-pillar="enfoque">
+        <span class="pillar-card__icon"><svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+        <h3>Enfoque mental</h3>
+        <p>Concentración, estado de ánimo, estrés y espacio mental.</p>
+        <div class="pillar-card__swatches">
+          <span class="mini-swatch"><i style="--c: var(--pillar-enfoque)"></i>Texto</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-enfoque-chart)"></i>Gráfico</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-enfoque-soft)"></i>Fondo</span>
+        </div>
+      </article>
+      <article class="card pillar-card" data-pillar="relaciones">
+        <span class="pillar-card__icon"><svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span>
+        <h3>Relaciones</h3>
+        <p>Tiempo de calidad con pareja, familia y amistades.</p>
+        <div class="pillar-card__swatches">
+          <span class="mini-swatch"><i style="--c: var(--pillar-relaciones)"></i>Texto</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-relaciones-chart)"></i>Gráfico</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-relaciones-soft)"></i>Fondo</span>
+        </div>
+      </article>
+      <article class="card pillar-card" data-pillar="proposito">
+        <span class="pillar-card__icon"><svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg></span>
+        <h3>Propósito personal</h3>
+        <p>Metas, valores, aprendizaje y reflexión.</p>
+        <div class="pillar-card__swatches">
+          <span class="mini-swatch"><i style="--c: var(--pillar-proposito)"></i>Texto</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-proposito-chart)"></i>Gráfico</span>
+          <span class="mini-swatch"><i style="--c: var(--pillar-proposito-soft)"></i>Fondo</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="semana">
+    <div class="section__head">
+      <span class="eyebrow">Visualización</span>
+      <h2 id="semana">Tu semana en seis pilares</h2>
+      <p class="muted">Barras horizontales con el valor escrito al lado: se leen de un vistazo y funcionan igual en el móvil. La variación frente a la semana anterior lleva signo y color de estado.</p>
+    </div>
+    <div class="card">
+      <div class="card__header">
+        <h4>Semana del 14 al 20 de septiembre</h4>
+        <span class="chip">Datos de ejemplo</span>
+      </div>
+      <ul class="week" aria-label="Puntuación semanal por pilar, de 0 a 100">
+        <li data-pillar="movimiento" title="Energía y movimiento: 72 de 100 (+8 frente a la semana anterior)">
+          <span class="week__name">Movimiento</span>
+          <span class="week__bar"><span style="--v: 72"></span></span>
+          <span class="week__value">72</span>
+          <span class="week__delta delta--up">+8</span>
+        </li>
+        <li data-pillar="descanso" title="Descanso: 64 de 100 (+5 frente a la semana anterior)">
+          <span class="week__name">Descanso</span>
+          <span class="week__bar"><span style="--v: 64"></span></span>
+          <span class="week__value">64</span>
+          <span class="week__delta delta--up">+5</span>
+        </li>
+        <li data-pillar="alimentacion" title="Alimentación: 58 de 100 (−4 frente a la semana anterior)">
+          <span class="week__name">Alimentación</span>
+          <span class="week__bar"><span style="--v: 58"></span></span>
+          <span class="week__value">58</span>
+          <span class="week__delta delta--down">−4</span>
+        </li>
+        <li data-pillar="enfoque" title="Enfoque mental: 81 de 100 (+12 frente a la semana anterior)">
+          <span class="week__name">Enfoque</span>
+          <span class="week__bar"><span style="--v: 81"></span></span>
+          <span class="week__value">81</span>
+          <span class="week__delta delta--up">+12</span>
+        </li>
+        <li data-pillar="relaciones" title="Relaciones: 45 de 100 (±0 frente a la semana anterior)">
+          <span class="week__name">Relaciones</span>
+          <span class="week__bar"><span style="--v: 45"></span></span>
+          <span class="week__value">45</span>
+          <span class="week__delta muted">±0</span>
+        </li>
+        <li data-pillar="proposito" title="Propósito personal: 69 de 100 (+3 frente a la semana anterior)">
+          <span class="week__name">Propósito</span>
+          <span class="week__bar"><span style="--v: 69"></span></span>
+          <span class="week__value">69</span>
+          <span class="week__delta delta--up">+3</span>
+        </li>
+      </ul>
+      <div class="week-axis" aria-hidden="true"><span></span><div><span>0</span><span>50</span><span>100</span></div><span></span><span>vs. anterior</span></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="color">
+    <div class="section__head">
+      <span class="eyebrow">Fundamentos</span>
+      <h2 id="color">Color</h2>
+      <p class="muted">El azul profundo es la acción principal. Salvia, arena y terracota acompañan, no compiten. La proporción indica el contraste con las tarjetas del tema activo; el texto necesita 4.5:1 como mínimo.</p>
+    </div>
+    <div class="stack">
+      <span class="sub">Neutros</span>
+      <div class="swatches">
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-bg)"></span><span class="swatch__meta"><b>Fondo</b><span>--color-bg</span><span>Claro #F4F3EF · 1.1:1</span><span>Oscuro #111418 · 1.1:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-surface)"></span><span class="swatch__meta"><b>Tarjeta</b><span>--color-surface</span><span>Claro #FFFFFF · 1.0:1</span><span>Oscuro #181C22 · 1.0:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-surface-sunken)"></span><span class="swatch__meta"><b>Hundida</b><span>--color-surface-sunken</span><span>Claro #ECEAE4 · 1.2:1</span><span>Oscuro #0D1014 · 1.1:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-line)"></span><span class="swatch__meta"><b>Línea</b><span>--color-line</span><span>Claro #DDDAD2 · 1.4:1</span><span>Oscuro #2A3039 · 1.3:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-ink-subtle)"></span><span class="swatch__meta"><b>Texto terciario</b><span>--color-ink-subtle</span><span>Claro #646B78 · 5.4:1</span><span>Oscuro #9A9891 · 5.9:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-ink-muted)"></span><span class="swatch__meta"><b>Texto secundario</b><span>--color-ink-muted</span><span>Claro #4A5263 · 7.8:1</span><span>Oscuro #BDB9B1 · 8.7:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-ink)"></span><span class="swatch__meta"><b>Texto</b><span>--color-ink</span><span>Claro #1B2230 · 15.9:1</span><span>Oscuro #ECE8E1 · 14.0:1</span></span></div>
+      </div>
+    </div>
+    <div class="stack">
+      <span class="sub">Acentos</span>
+      <div class="swatches">
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-primary)"></span><span class="swatch__meta"><b>Azul profundo</b><span>--color-primary</span><span>Claro #1E3A5F · 11.5:1</span><span>Oscuro #9DB9E0 · 8.5:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-primary-soft)"></span><span class="swatch__meta"><b>Azul suave</b><span>--color-primary-soft</span><span>Claro #E2E8F0 · 1.2:1</span><span>Oscuro #1E2A3A · 1.2:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-sage)"></span><span class="swatch__meta"><b>Salvia</b><span>--color-sage</span><span>Claro #50705A · 5.5:1</span><span>Oscuro #A3C1A9 · 8.8:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-sand)"></span><span class="swatch__meta"><b>Arena</b><span>--color-sand</span><span>Claro #C9B28C · 2.1:1</span><span>Oscuro #D9C6A5 · 10.2:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-terracotta)"></span><span class="swatch__meta"><b>Terracota</b><span>--color-terracotta</span><span>Claro #A9573A · 5.1:1</span><span>Oscuro #E39C80 · 7.6:1</span></span></div>
+      </div>
+    </div>
+    <div class="stack">
+      <span class="sub">Estados</span>
+      <div class="swatches">
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-success)"></span><span class="swatch__meta"><b>Éxito</b><span>--color-success</span><span>Claro #3C7350 · 5.6:1</span><span>Oscuro #8CC7A0 · 8.8:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-warning)"></span><span class="swatch__meta"><b>Aviso</b><span>--color-warning</span><span>Claro #8A6116 · 5.5:1</span><span>Oscuro #E2BD72 · 9.6:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-danger)"></span><span class="swatch__meta"><b>Error</b><span>--color-danger</span><span>Claro #AE3D2C · 6.0:1</span><span>Oscuro #F0A092 · 8.3:1</span></span></div>
+        <div class="swatch"><span class="swatch__chip" style="--c: var(--color-focus)"></span><span class="swatch__meta"><b>Foco</b><span>--color-focus</span><span>Claro #2F6FB5 · 5.2:1</span><span>Oscuro #8DB8F0 · 8.3:1</span></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="tipografia">
+    <div class="section__head">
+      <span class="eyebrow">Fundamentos</span>
+      <h2 id="tipografia">Tipografía</h2>
+      <p class="muted">Newsreader para titulares y momentos de reflexión; Figtree para la interfaz y la lectura. En la app móvil se cargan con expo-google-fonts.</p>
+    </div>
+    <div>
+      <div class="type-row"><span class="type-row__meta"><b>display</b>60 px · Newsreader</span><span style="font-family: var(--font-display); font-size: var(--text-display); line-height: 1.1; letter-spacing: var(--tracking-display);">Una versión más equilibrada de ti</span></div>
+      <div class="type-row"><span class="type-row__meta"><b>h1</b>44 px · Newsreader</span><span style="font-family: var(--font-display); font-size: var(--text-h1); line-height: 1.1; letter-spacing: var(--tracking-display);">Tu semana, en seis pilares</span></div>
+      <div class="type-row"><span class="type-row__meta"><b>h2</b>32 px · Newsreader</span><span style="font-family: var(--font-display); font-size: var(--text-h2); line-height: 1.25; letter-spacing: var(--tracking-display);">Descanso que se nota</span></div>
+      <div class="type-row"><span class="type-row__meta"><b>h3</b>24 px · Newsreader</span><span style="font-family: var(--font-display); font-size: var(--text-h3); line-height: 1.25; letter-spacing: var(--tracking-display);">Buenas tardes, Nathan</span></div>
+      <div class="type-row"><span class="type-row__meta"><b>title</b>20 px · Figtree</span><span style="font-family: var(--font-sans); font-size: var(--text-title); line-height: 1.25; font-weight: 600;">Retos de hoy</span></div>
+      <div class="type-row"><span class="type-row__meta"><b>lead</b>18 px · Figtree</span><span style="font-family: var(--font-sans); font-size: var(--text-lead); line-height: 1.65;">Pequeños cambios, sostenidos en el tiempo, construyen el equilibrio que buscas.</span></div>
+      <div class="type-row"><span class="type-row__meta"><b>body</b>16 px · Figtree</span><span style="font-family: var(--font-sans); font-size: var(--text-body); line-height: 1.5;">Anota cómo dormiste y a qué hora te levantaste. Con tres noches registradas verás tu ritmo.</span></div>
+      <div class="type-row"><span class="type-row__meta"><b>small</b>14 px · Figtree</span><span style="font-family: var(--font-sans); font-size: var(--text-small); line-height: 1.5;">Basado en tus check-ins de las últimas dos semanas.</span></div>
+      <div class="type-row"><span class="type-row__meta"><b>caption</b>12 px · Figtree</span><span style="font-family: var(--font-sans); font-size: var(--text-caption); line-height: 1.5; letter-spacing: var(--tracking-label); font-weight: 600;">ACTUALIZADO HACE 2 MIN</span></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="espacio">
+    <div class="section__head">
+      <span class="eyebrow">Fundamentos</span>
+      <h2 id="espacio">Espaciado y radios</h2>
+      <p class="muted">Todo espacio es múltiplo de 4. Los radios son contenidos para mantener el tono editorial; el de píldora queda para etiquetas y chips.</p>
+    </div>
+    <div class="grid grid--2">
+      <div class="card card--quiet">
+        <span class="sub">Espaciado</span>
+        <div class="space-scale">
+          <div><span>1 · 4px</span><i style="--w: 4px"></i></div>
+          <div><span>2 · 8px</span><i style="--w: 8px"></i></div>
+          <div><span>3 · 12px</span><i style="--w: 12px"></i></div>
+          <div><span>4 · 16px</span><i style="--w: 16px"></i></div>
+          <div><span>5 · 20px</span><i style="--w: 20px"></i></div>
+          <div><span>6 · 24px</span><i style="--w: 24px"></i></div>
+          <div><span>8 · 32px</span><i style="--w: 32px"></i></div>
+          <div><span>10 · 40px</span><i style="--w: 40px"></i></div>
+          <div><span>12 · 48px</span><i style="--w: 48px"></i></div>
+          <div><span>16 · 64px</span><i style="--w: 64px"></i></div>
+          <div><span>20 · 80px</span><i style="--w: 80px"></i></div>
+          <div><span>24 · 96px</span><i style="--w: 96px"></i></div>
+        </div>
+      </div>
+      <div class="card card--quiet">
+        <span class="sub">Radios</span>
+        <div class="radii">
+          <div><i style="--r: 4px"></i><span>xs · 4px</span></div>
+          <div><i style="--r: 6px"></i><span>sm · 6px</span></div>
+          <div><i style="--r: 10px"></i><span>md · 10px</span></div>
+          <div><i style="--r: 16px"></i><span>lg · 16px</span></div>
+          <div><i style="--r: 999px"></i><span>pill · píldora</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="componentes">
+    <div class="section__head">
+      <span class="eyebrow">Componentes</span>
+      <h2 id="componentes">Componentes base</h2>
+      <p class="muted">Objetivos táctiles de 44 px como mínimo, foco siempre visible y estados de carga, vacío y error diseñados desde el principio.</p>
+    </div>
+
+    <div class="grid grid--2">
+      <div class="card">
+        <span class="sub">Botones</span>
+        <div class="row">
+          <button type="button" class="btn">Empezar el día</button>
+          <button type="button" class="btn btn--secondary">Ver mi semana</button>
+          <button type="button" class="btn btn--ghost">Saltar por hoy</button>
+        </div>
+        <div class="row">
+          <button type="button" class="btn btn--sm">Guardar</button>
+          <button type="button" class="btn btn--sm btn--secondary" aria-busy="true">Guardando</button>
+          <button type="button" class="btn btn--sm" disabled>No disponible</button>
+          <button type="button" class="btn btn--sm btn--danger">Eliminar reto</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="sub">Etiquetas y filtros</span>
+        <div class="row">
+          <span class="pillar-tag" data-pillar="movimiento">Movimiento</span>
+          <span class="pillar-tag" data-pillar="descanso">Descanso</span>
+          <span class="pillar-tag" data-pillar="alimentacion">Alimentación</span>
+          <span class="pillar-tag" data-pillar="enfoque">Enfoque</span>
+          <span class="pillar-tag" data-pillar="relaciones">Relaciones</span>
+          <span class="pillar-tag" data-pillar="proposito">Propósito</span>
+        </div>
+        <div class="row">
+          <div class="segmented" role="group" aria-label="Periodo">
+            <button type="button" id="period-day" aria-pressed="false">Día</button>
+            <button type="button" id="period-week" aria-pressed="true">Semana</button>
+            <button type="button" id="period-month" aria-pressed="false">Mes</button>
+          </div>
+          <span class="chip">3 retos activos</span>
+        </div>
+      </div>
+
+      <form class="card" id="demo-form">
+        <span class="sub">Formulario</span>
+        <div class="field">
+          <label class="field__label" for="demo-goal">¿Qué quieres cuidar este mes?</label>
+          <input class="input" id="demo-goal" type="text" value="Dormir antes de las 23:30">
+          <span class="field__hint">Una frase basta. Puedes cambiarla cuando quieras.</span>
+        </div>
+        <div class="field">
+          <label class="field__label" for="demo-email">Correo</label>
+          <input class="input" id="demo-email" type="email" value="nathan@" aria-invalid="true" aria-describedby="demo-email-error">
+          <span class="field__error" id="demo-email-error">Falta el dominio del correo, por ejemplo nathan@correo.com.</span>
+        </div>
+        <div class="field">
+          <label class="field__label" for="demo-note">Reflexión del día</label>
+          <textarea class="input" id="demo-note">Hoy caminé después de comer y la tarde se sintió más ligera.</textarea>
+        </div>
+      </form>
+
+      <div class="card">
+        <span class="sub">Check-in diario</span>
+        <fieldset class="scale">
+          <legend class="field__label" style="margin-bottom: var(--space-3)">¿Cómo está tu energía hoy?</legend>
+          <label class="scale__option"><input type="radio" name="energy" id="energy-1" value="1"><span><b>1</b>Agotada</span></label>
+          <label class="scale__option"><input type="radio" name="energy" id="energy-2" value="2"><span><b>2</b>Baja</span></label>
+          <label class="scale__option"><input type="radio" name="energy" id="energy-3" value="3" checked><span><b>3</b>Estable</span></label>
+          <label class="scale__option"><input type="radio" name="energy" id="energy-4" value="4"><span><b>4</b>Buena</span></label>
+          <label class="scale__option"><input type="radio" name="energy" id="energy-5" value="5"><span><b>5</b>Plena</span></label>
+        </fieldset>
+        <span class="field__hint">Registrar en menos de diez segundos es la meta de cada check-in.</span>
+      </div>
+
+      <div class="card">
+        <span class="sub">Progreso</span>
+        <div class="row" style="gap: var(--space-6)">
+          <div class="stat">
+            <span class="stat__value">6 h 50</span>
+            <span class="stat__label">Sueño medio · <span class="delta--up">+25 min</span></span>
+          </div>
+          <div class="stat">
+            <span class="stat__value">4 / 5</span>
+            <span class="stat__label">Retos cumplidos</span>
+          </div>
+        </div>
+        <div class="stack" style="gap: var(--space-3)">
+          <div data-pillar="descanso" class="stack" style="gap: var(--space-2)">
+            <div class="row" style="justify-content: space-between"><span class="field__hint">Descanso</span><span class="numeric field__hint">82%</span></div>
+            <div class="progress" style="--value: 82" role="progressbar" aria-valuenow="82" aria-valuemin="0" aria-valuemax="100" aria-label="Descanso"></div>
+          </div>
+          <div data-pillar="alimentacion" class="stack" style="gap: var(--space-2)">
+            <div class="row" style="justify-content: space-between"><span class="field__hint">Alimentación</span><span class="numeric field__hint">54%</span></div>
+            <div class="progress" style="--value: 54" role="progressbar" aria-valuenow="54" aria-valuemin="0" aria-valuemax="100" aria-label="Alimentación"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="sub">Mensajes</span>
+        <div class="alert"><strong>Sincronizado.</strong> Tus datos están al día en todos tus dispositivos.</div>
+        <div class="alert alert--success"><strong>Reto completado.</strong> Llevas cuatro días seguidos moviéndote después de comer.</div>
+        <div class="alert alert--warning"><strong>Sin conexión.</strong> Guardamos tus cambios en este dispositivo y los subimos al volver la red.</div>
+        <div class="alert alert--danger"><strong>No pudimos guardar.</strong> Revisa tu conexión e inténtalo de nuevo.</div>
+        <div class="toast" role="status">Check-in guardado <button type="button" class="btn btn--sm btn--ghost">Deshacer</button></div>
+      </div>
+
+      <div class="card">
+        <span class="sub">Vacío y carga</span>
+        <div class="empty-state">
+          <h4>Aún no hay registros de sueño</h4>
+          <p>Cuando anotes a qué hora te acuestas y te levantas, verás aquí tu ritmo semanal.</p>
+          <button type="button" class="btn btn--sm btn--secondary">Registrar anoche</button>
+        </div>
+        <div class="stack" style="gap: var(--space-2)" aria-hidden="true">
+          <span class="skeleton" style="width: 40%; height: 20px"></span>
+          <span class="skeleton" style="width: 90%"></span>
+          <span class="skeleton" style="width: 70%"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="ejemplo">
+    <div class="section__head">
+      <span class="eyebrow">Composición</span>
+      <h2 id="ejemplo">Así se ve el día</h2>
+      <p class="muted">Una pantalla "Hoy" armada solo con los componentes anteriores: progreso del día, tres retos pequeños y una recomendación con su motivo. Toca un reto para marcarlo.</p>
+    </div>
+    <div class="grid grid--2">
+      <article class="card card--raised today" aria-label="Ejemplo de pantalla Hoy">
+        <div class="today__head">
+          <div class="today__ring" data-pillar="descanso">
+            <svg class="ring" viewBox="0 0 36 36" aria-hidden="true" id="today-ring" style="--value: 33">
+              <circle class="ring__track" cx="18" cy="18" r="15.5"></circle>
+              <circle class="ring__value" cx="18" cy="18" r="15.5" pathLength="100"></circle>
+            </svg>
+            <b id="today-count">1/3</b>
+          </div>
+          <div class="stack" style="gap: var(--space-1)">
+            <span class="eyebrow">Miércoles 23 de septiembre</span>
+            <h3>Buenas tardes, Nathan</h3>
+            <span class="muted" style="font-size: var(--text-small)">Hoy toca cuidar el descanso y el movimiento.</span>
+          </div>
+        </div>
+        <div>
+          <div class="challenge" data-pillar="movimiento" data-done="true">
+            <button type="button" class="challenge__check" id="challenge-1" aria-pressed="true" aria-label="Marcar como hecho: caminar 10 minutos después de comer"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg></button>
+            <span class="challenge__title">Camina 10 minutos después de comer<small>Reto de 7 días · día 4</small></span>
+            <span class="pillar-tag" data-pillar="movimiento">Movimiento</span>
+          </div>
+          <div class="challenge" data-pillar="descanso" data-done="false">
+            <button type="button" class="challenge__check" id="challenge-2" aria-pressed="false" aria-label="Marcar como hecho: pantallas fuera a las 22:45"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg></button>
+            <span class="challenge__title">Pantallas fuera a las 22:45<small>Nuevo · más fácil que ayer</small></span>
+            <span class="pillar-tag" data-pillar="descanso">Descanso</span>
+          </div>
+          <div class="challenge" data-pillar="relaciones" data-done="false">
+            <button type="button" class="challenge__check" id="challenge-3" aria-pressed="false" aria-label="Marcar como hecho: escribirle a alguien que extrañas"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg></button>
+            <span class="challenge__title">Escríbele a alguien que extrañas<small>2 minutos</small></span>
+            <span class="pillar-tag" data-pillar="relaciones">Relaciones</span>
+          </div>
+        </div>
+      </article>
+
+      <aside class="stack">
+        <div class="recommendation" data-pillar="descanso">
+          <span class="pillar-tag" data-pillar="descanso">Recomendación</span>
+          <p>Tus tres noches con mejor energía al día siguiente empezaron antes de las 23:30.</p>
+          <span class="field__hint">Basado en tus check-ins de las últimas dos semanas.</span>
+          <div class="row">
+            <button type="button" class="btn btn--sm">Probar esta semana</button>
+            <button type="button" class="btn btn--sm btn--ghost">Ahora no</button>
+          </div>
+        </div>
+        <div class="card card--quiet">
+          <span class="sub">Cómo usarlo en código</span>
+          <div class="code">import '@dyc/tokens/tokens.css';
+import '@dyc/tokens/components.css';
+
+// React Native / Expo
+import { color, pillars, space } from '@dyc/tokens';</div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var buttons = document.querySelectorAll('[data-theme-choice]');
+  function apply(choice) {
+    if (choice === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', choice);
+    buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice)); });
+    try { localStorage.setItem('dyc-guide-theme', choice); } catch (e) {}
+  }
+  var saved = 'system';
+  try { saved = localStorage.getItem('dyc-guide-theme') || 'system'; } catch (e) {}
+  apply(saved);
+  buttons.forEach(function (b) { b.addEventListener('click', function () { apply(b.dataset.themeChoice); }); });
+
+  document.querySelectorAll('.segmented[aria-label="Periodo"] button').forEach(function (b, _, all) {
+    b.addEventListener('click', function () { all.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); });
+  });
+
+  document.getElementById('demo-form').addEventListener('submit', function (e) { e.preventDefault(); });
+
+  var checks = document.querySelectorAll('.challenge__check');
+  function refresh() {
+    var done = 0;
+    checks.forEach(function (c) {
+      var on = c.getAttribute('aria-pressed') === 'true';
+      c.closest('.challenge').dataset.done = String(on);
+      if (on) done++;
+    });
+    document.getElementById('today-count').textContent = done + '/' + checks.length;
+    document.getElementById('today-ring').style.setProperty('--value', String(Math.round((done / checks.length) * 100)));
+  }
+  checks.forEach(function (c) {
+    c.addEventListener('click', function () {
+      c.setAttribute('aria-pressed', String(c.getAttribute('aria-pressed') !== 'true'));
+      refresh();
+    });
+  });
+  refresh();
+})();
+</script>
