@@ -11,14 +11,14 @@ Plataforma de bienestar personal construida alrededor de seis pilares: energía 
 | Lógica compartida | `packages/core` | Pilares, fechas, validación, puntuaciones, catálogo de retos y recomendaciones. La usan la API, la web y la app móvil |
 | Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html) |
 | App web | `apps/web` | PWA en React: acceso, onboarding, Hoy, check-in, hábitos, retos, progreso día/semana/mes, perfil y ajustes, sección Más. Pruebas de componentes y de punta a punta |
-| Sitio de marca | `apps/site` | Pendiente (etapa 4) |
+| Sitio de marca | `apps/site` | Astro estático: portada con los seis pilares, cómo funciona, principios, privacidad y 404. Pruebas del HTML generado (enlaces, títulos, accesibilidad básica) |
 | App móvil | `apps/mobile` | Pendiente (etapa 5, Expo) |
 
 El diagnóstico completo, la arquitectura y el plan por etapas están en [docs/diagnostico.md](docs/diagnostico.md).
 
 ## Requisitos
 
-- Node.js 20 o superior (recomendado 22, ver `.nvmrc`)
+- Node.js 22.12 o superior (ver `.nvmrc`; el sitio usa Astro 7)
 - pnpm 10 (`corepack enable`)
 - PostgreSQL 14+ para desarrollo y pruebas (en producción se usa Neon)
 
@@ -59,6 +59,12 @@ pnpm dev:web                                                   # http://localhos
 
 Vite reenvía `/api` a `localhost:4600`, así que no hace falta configurar CORS en desarrollo.
 
+### Sitio de marca en local
+
+```bash
+pnpm dev:site                                                  # http://localhost:4321
+```
+
 Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de endpoints en [docs/api.md](docs/api.md).
 
 ## Estructura
@@ -67,6 +73,7 @@ Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de e
 apps/
   api/            Express + Prisma + PostgreSQL (migrations/ se aplican al arrancar)
   web/            React + Vite + PWA (TanStack Query, React Router)
+  site/           Sitio de marca (Astro, estático)
 packages/
   api-client/     Cliente tipado de la API (web y móvil)
   core/           Dominio compartido (sin dependencias de UI)

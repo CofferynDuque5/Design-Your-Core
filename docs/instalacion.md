@@ -63,6 +63,17 @@ La web es una PWA estática: se compila una vez y se sube como archivos.
 
 La app anterior puede seguir publicada en su dominio mientras tanto: ambas usan la misma cuenta. Si quieres enlazarla desde la sección "Más", pon su URL en `VITE_LEGACY_APP_URL`.
 
+## Despliegue del sitio de marca (estático)
+
+1. Crea `apps/site/.env.production` a partir de `apps/site/.env.example`:
+   - `SITE_URL`: el dominio del sitio (se usa en el sitemap y en los enlaces para compartir).
+   - `PUBLIC_APP_URL`: la dirección de la app web; los botones «Entrar» y «Crear cuenta» llevan ahí.
+   - `PUBLIC_CONTACT_EMAIL` (opcional): si lo pones, aparece en la página de privacidad.
+2. `pnpm build`. El resultado queda en `apps/site/dist/`.
+3. Sube el **contenido** de `dist/` a la carpeta pública del dominio del sitio. El `.htaccess` incluido hace que `/privacidad` funcione sin `.html` y usa `404.html` para las páginas que no existen.
+
+La imagen para compartir (`public/og.png`) se regenera con `pnpm --filter @dyc/site og`. El texto de privacidad describe lo que la app guarda hoy; conviene que lo revise alguien con criterio legal antes de publicarlo.
+
 ### Antes del primer despliegue de esta versión
 
 - **Genera un `JWT_SECRET` nuevo.** El anterior viajó dentro de un ZIP y debe considerarse expuesto. Todos los usuarios tendrán que volver a iniciar sesión una vez.

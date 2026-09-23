@@ -1,0 +1,48 @@
+---
+import { appLink } from '../config';
+import Base from '../layouts/Base.astro';
+
+const contact = import.meta.env.PUBLIC_CONTACT_EMAIL;
+---
+
+<Base title="Privacidad" description="Qué datos guarda Design Your Core, para qué los usa y cómo descargarlos o borrarlos.">
+  <article class="container prose">
+    <p class="eyebrow">Privacidad</p>
+    <h1>Tus datos, explicados sin letra pequeña</h1>
+    <p class="muted">Última actualización: 23 de septiembre de 2026.</p>
+
+    <h2>Qué guardamos</h2>
+    <ul>
+      <li><strong>Tu cuenta:</strong> nombre, correo y contraseña. La contraseña se guarda cifrada con un algoritmo de un solo sentido; nadie puede leerla.</li>
+      <li><strong>Tus respuestas del inicio:</strong> los pilares en los que te enfocas, tu punto de partida, tu ritmo, tu intención y tu zona horaria.</li>
+      <li><strong>Lo que registras:</strong> check-ins (ánimo, energía, sueño, actividad, alimentación, conexión, propósito, reflexiones y gratitud), hábitos con los días cumplidos y retos.</li>
+      <li><strong>Los datos de la app anterior</strong>, si la usabas, tal como estaban, para que no pierdas nada.</li>
+    </ul>
+
+    <h2>Para qué los usamos</h2>
+    <p>
+      Solo para que la app funcione: mostrarte tu progreso por pilar y proponerte retos. Las recomendaciones se calculan en nuestro servidor con reglas simples a partir de tus propios datos, y cada una explica en qué se basa. No usamos tus datos para publicidad y no los vendemos.
+    </p>
+
+    <h2>Con quién se comparten</h2>
+    <ul>
+      <li><strong>Tu pareja, si la vinculas:</strong> ve el nombre de tus hábitos y si los cumpliste hoy. Nada más, y puedes desvincularla cuando quieras.</li>
+      <li><strong>Proveedores técnicos:</strong> el alojamiento de la app, la base de datos en la nube y el servicio de correo que envía los enlaces para recuperar la contraseña o invitar a tu pareja. Solo procesan los datos para prestar ese servicio.</li>
+    </ul>
+
+    <h2>Cookies y almacenamiento</h2>
+    <p>
+      La app guarda en tu navegador la sesión iniciada y tu preferencia de tema claro u oscuro. No usamos cookies de publicidad ni herramientas de seguimiento. Este sitio tampoco.
+    </p>
+
+    <h2>Tus derechos</h2>
+    <p>
+      Desde <a href={appLink('/entrar')}>la app</a>, en Perfil › Tus datos, puedes descargar todos tus datos en un archivo o borrar tu cuenta. El borrado elimina tu perfil, check-ins, hábitos, retos y los datos de la app anterior, y no se puede deshacer.
+    </p>
+    {contact && (
+      <p>
+        Para cualquier consulta sobre tus datos, escríbenos a <a href={`mailto:${contact}`}>{contact}</a>.
+      </p>
+    )}
+  </article>
+</Base>

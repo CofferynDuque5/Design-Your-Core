@@ -1,0 +1,148 @@
+---
+import PillarIcon from '../components/PillarIcon.astro';
+import { appLink } from '../config';
+import { PILLARS, PRINCIPLES, STEPS } from '../content';
+import Base from '../layouts/Base.astro';
+
+const mockRings = [
+  { id: 'movimiento', v: 62 },
+  { id: 'descanso', v: 48 },
+  { id: 'alimentacion', v: 81 },
+  { id: 'enfoque', v: 70 },
+  { id: 'relaciones', v: 88 },
+  { id: 'proposito', v: 57 },
+] as const;
+const short: Record<string, string> = { movimiento: 'Movimiento', descanso: 'Descanso', alimentacion: 'Alimentación', enfoque: 'Enfoque', relaciones: 'Relaciones', proposito: 'Propósito' };
+---
+
+<Base title="Design Your Core" description="Una app de bienestar personal en seis pilares: movimiento, descanso, alimentación, enfoque mental, relaciones y propósito. Un minuto al día y retos pequeños a tu medida.">
+  <section class="hero">
+    <div class="container hero__inner">
+      <div class="hero__copy">
+        <p class="eyebrow">Bienestar personal, en seis pilares</p>
+        <h1 class="display">Diseña tu forma de <em>estar bien</em>.</h1>
+        <p class="lead">
+          Design Your Core ordena tu bienestar en seis pilares y te acompaña con un check-in de un minuto, hábitos pequeños y retos que se adaptan a ti. Sin culpa y sin rachas que te persigan.
+        </p>
+        <div class="hero__actions">
+          <a class="btn" href={appLink('/registro')}>Crear mi cuenta</a>
+          <a class="btn btn--secondary" href="#como-funciona">Ver cómo funciona</a>
+        </div>
+      </div>
+
+      <div class="mock" aria-hidden="true">
+        <div class="mock__card card card--raised">
+          <p class="eyebrow">Tu semana</p>
+          <div class="mock__overall">
+            <svg class="ring" viewBox="0 0 36 36" aria-hidden="true" style="--value: 68; width: 76px; height: 76px">
+              <circle class="ring__track" cx="18" cy="18" r="15.5"></circle>
+              <circle class="ring__value" cx="18" cy="18" r="15.5" pathLength="100"></circle>
+            </svg>
+            <span class="mock__score">68</span>
+            <div class="stack-xs">
+              <span>5 días seguidos con check-in</span>
+              <span class="muted small">9 de 12 hábitos cumplidos</span>
+            </div>
+          </div>
+          <ul class="mock__rings">
+            {
+              mockRings.map((r) => (
+                <li data-pillar={r.id}>
+                  <svg class="ring" viewBox="0 0 36 36" aria-hidden="true" style={`--value: ${r.v}; width: 40px; height: 40px`}>
+                    <circle class="ring__track" cx="18" cy="18" r="15.5" />
+                    <circle class="ring__value" cx="18" cy="18" r="15.5" pathLength="100" />
+                  </svg>
+                  <span>{short[r.id]}</span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+        <div class="mock__card mock__card--small card card--raised" data-pillar="descanso">
+          <span class="pillar-tag">Descanso</span>
+          <strong class="mock__title">Pantallas fuera 30 minutos antes de dormir</strong>
+          <div class="progress" style="--value: 57"></div>
+          <span class="muted small">Día 4 de 7</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pilares" class="section">
+    <div class="container">
+      <div class="section__intro">
+        <p class="eyebrow">Los seis pilares</p>
+        <h2>Todo lo que te sostiene, en un solo lugar.</h2>
+        <p class="lead">No se trata de optimizar cada minuto. Se trata de ver el conjunto y elegir el siguiente paso pequeño.</p>
+      </div>
+      <ul class="pillars">
+        {
+          PILLARS.map((p) => (
+            <li class="pillar card" data-pillar={p.id}>
+              <span class="pillar__icon">
+                <PillarIcon pillar={p.id} />
+              </span>
+              <h3>{p.name}</h3>
+              <p class="muted">{p.description}</p>
+              <p class="pillar__example">
+                <span class="eyebrow">Un reto para empezar</span>
+                <span>{p.example.title}</span>
+              </p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section id="como-funciona" class="section section--tinted">
+    <div class="container">
+      <div class="section__intro">
+        <p class="eyebrow">Cómo funciona</p>
+        <h2>Poco a poco, y con datos que entiendes.</h2>
+      </div>
+      <ol class="steps">
+        {
+          STEPS.map((s, i) => (
+            <li class="step">
+              <span class="step__num" aria-hidden="true">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3>{s.title}</h3>
+              <p class="muted">{s.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section id="principios" class="section">
+    <div class="container principles">
+      <blockquote class="quote">
+        <p>«Lo importante no es hacerlo todo, sino hacer hoy un poco de lo que de verdad te importa.»</p>
+      </blockquote>
+      <ul class="principles__list">
+        {
+          PRINCIPLES.map((p) => (
+            <li>
+              <h3>{p.title}</h3>
+              <p class="muted">{p.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="section cta">
+    <div class="container cta__inner">
+      <h2>Empieza con un minuto.</h2>
+      <p class="lead">Funciona en el navegador de tu teléfono o tu computadora, y se instala como app. La versión para iOS y Android está en camino.</p>
+      <div class="hero__actions">
+        <a class="btn btn--light" href={appLink('/registro')}>Crear mi cuenta</a>
+        <a class="btn btn--outline-light" href={appLink('/entrar')}>Ya tengo cuenta</a>
+      </div>
+    </div>
+  </section>
+</Base>

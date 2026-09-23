@@ -1,0 +1,15 @@
+---
+import { Activity, Compass, Heart, Leaf, Moon, Target } from '@lucide/astro';
+import type { PillarId } from '@dyc/core';
+
+interface Props {
+  pillar: PillarId;
+  size?: number;
+}
+
+const ICONS = { movimiento: Activity, descanso: Moon, alimentacion: Leaf, enfoque: Target, relaciones: Heart, proposito: Compass };
+const { pillar, size = 22 } = Astro.props;
+const Icon = ICONS[pillar];
+---
+
+<Icon size={size} stroke-width={1.75} aria-hidden="true" />
