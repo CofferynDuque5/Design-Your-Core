@@ -15,7 +15,10 @@ if (isPlaceholderDatabaseUrl(config.databaseUrl)) {
 }
 
 const prisma = new PrismaClient();
-const app = createApp({ prisma, config, mailer: createMailer(config.smtp) });
+// Las pruebas de punta a punta crean muchas cuentas desde la misma IP: con
+// NODE_ENV=test los límites de peticiones se relajan. Nunca en producción.
+const limits = process.env.NODE_ENV === 'test' ? { general: 10_000, strict: 1_000 } : undefined;
+const app = createApp({ prisma, config, mailer: createMailer(config.smtp), limits });
 
 // No dejar caer el proceso por un rechazo/excepción no controlados.
 process.on('unhandledRejection', (r) => console.error('[core-cloud] unhandledRejection:', r));
