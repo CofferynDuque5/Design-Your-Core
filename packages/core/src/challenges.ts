@@ -1,4 +1,4 @@
-import type { PillarId } from './pillars.js';
+import { PILLAR_IDS, type PillarId } from './pillars.js';
 
 export interface Challenge {
   key: string;
@@ -61,3 +61,9 @@ export function adjacentLevel(key: string, step: 1 | -1): Challenge | undefined 
 
 export const starterChallenge = (pillar: PillarId): Challenge =>
   CHALLENGES.find((c) => c.pillar === pillar && c.level === 1) as Challenge;
+
+/** Pilar para el primer reto: el de enfoque con el punto de partida más bajo. */
+export function suggestedPillar(focus: PillarId[], baseline: Partial<Record<PillarId, number>>): PillarId {
+  const pool = focus.length ? focus : [...PILLAR_IDS];
+  return [...pool].sort((a, b) => (baseline[a] ?? 3) - (baseline[b] ?? 3))[0];
+}

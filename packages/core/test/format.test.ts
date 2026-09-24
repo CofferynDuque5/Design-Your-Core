@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysLabel, greeting, longDay, rangeLabel, shortDay } from './format';
+import { daysLabel, greeting, longDay, rangeLabel, shortDay } from '../src/format.js';
 
 describe('formato de fechas', () => {
   it('escribe el día completo en español', () => {

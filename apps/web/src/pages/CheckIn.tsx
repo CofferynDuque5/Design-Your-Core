@@ -1,5 +1,4 @@
-import type { CheckIn as CheckInData } from '@dyc/api-client';
-import { addDays, todayIn, type CheckInInput, type Day, type PillarId } from '@dyc/core';
+import { addDays, fromCheckIn, parseNumber, todayIn, toCheckInPayload, type CheckInValues, type Day, type PillarId } from '@dyc/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
@@ -14,38 +13,7 @@ import { PillarIcon } from '../components/PillarIcon';
 import { ErrorState, errorMessage, Loading } from '../components/States';
 import { longDay } from '../lib/format';
 
-type Values = { [K in keyof CheckInInput]-?: CheckInInput[K] | null };
-
-const EMPTY: Values = {
-  mood: null,
-  energy: null,
-  stress: null,
-  sleepHours: null,
-  sleepQuality: null,
-  activeMinutes: null,
-  nutrition: null,
-  water: null,
-  connection: null,
-  purpose: null,
-  note: null,
-  gratitude: null,
-};
-
-export function fromCheckIn(c: CheckInData | undefined): Values {
-  if (!c) return EMPTY;
-  return Object.fromEntries(Object.keys(EMPTY).map((k) => [k, c[k as keyof Values] ?? null])) as Values;
-}
-
-/** Lo que se envía: vacíos como null (la API los borra), textos recortados. */
-export function toPayload(v: Values) {
-  const text = (s: string | null) => (s && s.trim() ? s.trim() : null);
-  return { ...v, note: text(v.note), gratitude: text(v.gratitude) };
-}
-
-const num = (s: string) => {
-  const n = Number(s.replace(',', '.'));
-  return s.trim() === '' || !Number.isFinite(n) ? null : n;
-};
+type Values = CheckInValues;
 
 export function CheckIn() {
   const profile = useProfile();
@@ -100,7 +68,7 @@ function CheckInForm({ date, initial, isToday }: { date: Day; initial: Values; i
   const set = <K extends keyof Values>(k: K) => (value: Values[K]) => setV((s) => ({ ...s, [k]: value }));
 
   const save = useMutation({
-    mutationFn: () => api.checkIns.save(date, toPayload(v)),
+    mutationFn: () => api.checkIns.save(date, toCheckInPayload(v)),
     onSuccess: async () => {
       await refresh('checkins');
       toast('Check-in guardado.');
@@ -132,19 +100,19 @@ function CheckInForm({ date, initial, isToday }: { date: Day; initial: Values; i
           min={0}
           max={1440}
           value={v.activeMinutes ?? ''}
-          onChange={(e) => set('activeMinutes')(num(e.target.value))}
+          onChange={(e) => set('activeMinutes')(parseNumber(e.target.value))}
           hint="Caminar cuenta. La referencia son 30 minutos."
         />
       </Section>
 
       <Section pillar="descanso">
-        <TextField label="Horas de sueño" type="number" inputMode="decimal" step={0.5} min={0} max={24} value={v.sleepHours ?? ''} onChange={(e) => set('sleepHours')(num(e.target.value))} />
+        <TextField label="Horas de sueño" type="number" inputMode="decimal" step={0.5} min={0} max={24} value={v.sleepHours ?? ''} onChange={(e) => set('sleepHours')(parseNumber(e.target.value))} />
         <Scale legend="Calidad del sueño" value={v.sleepQuality} onChange={set('sleepQuality')} low="Mala" high="Reparador" />
       </Section>
 
       <Section pillar="alimentacion">
         <Scale legend="¿Cómo comiste?" value={v.nutrition} onChange={set('nutrition')} low="Desordenado" high="Muy bien" />
-        <TextField label="Vasos de agua" type="number" inputMode="numeric" min={0} max={40} value={v.water ?? ''} onChange={(e) => set('water')(num(e.target.value))} hint="Referencia: 8 vasos." />
+        <TextField label="Vasos de agua" type="number" inputMode="numeric" min={0} max={40} value={v.water ?? ''} onChange={(e) => set('water')(parseNumber(e.target.value))} hint="Referencia: 8 vasos." />
       </Section>
 
       <Section pillar="relaciones">

@@ -82,3 +82,9 @@ export function daysIn(range: Range): Day[] {
   for (let d = range.from; d <= range.to; d = addDays(d, 1)) out.push(d);
   return out;
 }
+
+/** Una fecha dentro del periodo anterior (-1) o siguiente (1). */
+export function shiftPeriod(period: Period, d: Day, step: 1 | -1): Day {
+  const r = periodRange(period, d);
+  return step === -1 ? addDays(r.from, -1) : addDays(r.to, 1);
+}

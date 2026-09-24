@@ -1,5 +1,5 @@
 import { ApiError, type Profile } from '@dyc/api-client';
-import { ACTIVITY_LEVELS, PILLAR_IDS, starterChallenge, type PillarId, type ProfileInput } from '@dyc/core';
+import { ACTIVITY_LEVELS, PILLAR_IDS, starterChallenge, suggestedPillar, type PillarId, type ProfileInput } from '@dyc/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Check } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -24,12 +24,6 @@ const ACTIVITY_LABELS: Record<(typeof ACTIVITY_LEVELS)[number], string> = {
   moderada: 'Moderada',
   alta: 'Alta',
 };
-
-/** Pilar para el primer reto: el de enfoque con el punto de partida más bajo. */
-export function suggestedPillar(focus: PillarId[], baseline: Partial<Record<PillarId, number>>): PillarId {
-  const pool = focus.length ? focus : [...PILLAR_IDS];
-  return [...pool].sort((a, b) => (baseline[a] ?? 3) - (baseline[b] ?? 3))[0];
-}
 
 export function Onboarding() {
   const profile = useProfile();

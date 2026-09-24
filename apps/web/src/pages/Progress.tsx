@@ -1,5 +1,5 @@
 import type { Dashboard } from '@dyc/api-client';
-import { addDays, periodRange, type Period, type PillarId } from '@dyc/core';
+import { shiftPeriod, type Period, type PillarId } from '@dyc/core';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -19,12 +19,6 @@ const PERIODS: Array<{ value: Period; label: string }> = [
   { value: 'month', label: 'Mes' },
 ];
 const PREVIOUS: Record<Period, string> = { day: 'que ayer', week: 'que la semana anterior', month: 'que el mes anterior' };
-
-/** Fecha dentro del periodo anterior o siguiente. */
-export function shiftPeriod(period: Period, date: string, step: 1 | -1): string {
-  const r = periodRange(period, date);
-  return step === -1 ? addDays(r.from, -1) : addDays(r.to, 1);
-}
 
 export function Progress() {
   const [params, setParams] = useSearchParams();
