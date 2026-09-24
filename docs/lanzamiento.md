@@ -36,9 +36,9 @@ Al arrancar, la API nueva aplica las migraciones pendientes. Son aditivas: crean
 
 ## 4. Desplegar
 
-`pnpm package` compila todo con los dominios de producción y deja tres ZIP en `release/`: la API, la app web y el sitio. Cada ZIP se sube a su carpeta en el Administrador de archivos de cPanel y se pulsa «Extraer». El de la API trae la carpeta `core-api` (con un `LEEME.txt` con los pasos) y se extrae en la carpeta de inicio; el de la web y el del sitio llevan los archivos sueltos y se extraen en la carpeta del dominio. Ningún secreto va dentro: `core-config.env` se completa en el servidor.
+`pnpm package` compila todo con los dominios de producción y deja tres ZIP en `release/`: la API, la app web y el sitio. Cada ZIP se sube a su carpeta en el Administrador de archivos de cPanel y se pulsa «Extraer». El de la API trae la carpeta `core-api` (con un `LEEME.txt` con los pasos) y el `.htaccess` que conecta su dominio con la app Node, y se extrae en la carpeta de inicio; el de la web y el del sitio llevan los archivos sueltos y se extraen en la carpeta del dominio. Ningún secreto va dentro: `core-config.env` se completa en el servidor.
 
-Los dominios salen de `DYC_API_URL`, `DYC_APP_URL`, `DYC_SITE_URL` y `DYC_CONTACT_EMAIL`. Sin ellas se usan los valores provisionales de la tabla del paso 1:
+Los dominios salen de `DYC_API_URL`, `DYC_APP_URL`, `DYC_SITE_URL` y `DYC_CONTACT_EMAIL`; la carpeta de inicio del servidor, de `DYC_SERVER_HOME` (hoy `/home/nvcorxco`), y la versión de Node, de `DYC_NODE_MAJOR` (20). Sin ellas se usan los valores provisionales de la tabla del paso 1:
 
 ```bash
 DYC_SITE_URL=https://midominio.com DYC_APP_URL=https://app.midominio.com pnpm package
