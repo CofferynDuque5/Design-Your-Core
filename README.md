@@ -11,7 +11,7 @@ Plataforma de bienestar personal construida alrededor de seis pilares: energía 
 | Lógica compartida | `packages/core` | Pilares, fechas, validación, puntuaciones, catálogo de retos y recomendaciones. La usan la API, la web y la app móvil |
 | Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html) |
 | App web | `apps/web` | PWA en React: acceso, onboarding, Hoy, check-in, hábitos, retos, progreso día/semana/mes, perfil y ajustes, sección Más. Pruebas de componentes y de punta a punta |
-| Sitio de marca | `apps/site` | Astro estático: portada con los seis pilares, cómo funciona, principios, privacidad y 404. Pruebas del HTML generado (enlaces, títulos, accesibilidad básica) |
+| Sitio de marca | `apps/site` | Astro estático: portada con los seis pilares, cómo funciona, principios, privacidad y 404. Pruebas del HTML generado y de accesibilidad con axe |
 | App móvil | `apps/mobile` | Expo (iOS y Android): acceso con sesión renovable guardada en el llavero, bienvenida, Hoy, check-in, hábitos, retos, progreso, perfil, tema claro/oscuro y recordatorio diario. Pruebas de sesión, recordatorio y recorridos con el enrutador real |
 
 El diagnóstico completo, la arquitectura y el plan por etapas están en [docs/diagnostico.md](docs/diagnostico.md).
@@ -74,6 +74,17 @@ pnpm dev:mobile                                                # abre Expo; esca
 El teléfono necesita llegar a la API: en desarrollo la app usa la IP del ordenador que sirve Expo (puerto 4600). Ver [apps/mobile/README.md](apps/mobile/README.md).
 
 Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de endpoints en [docs/api.md](docs/api.md).
+
+## Publicar
+
+La lista ordenada para salir a producción (decisiones pendientes, configuración, copia de seguridad, despliegue, comprobaciones y cómo volver atrás) está en [docs/lanzamiento.md](docs/lanzamiento.md).
+
+## Calidad
+
+- Pruebas unitarias y de integración en cada paquete (`pnpm test`), con la API contra un PostgreSQL real.
+- Recorridos de punta a punta de la web contra la API real, en escritorio y en móvil (`pnpm e2e`).
+- Accesibilidad: contraste WCAG AA comprobado en los tokens, axe en cada pantalla de la web y cada página del sitio, en tema claro y oscuro, y roles y nombres de cada control en la app móvil.
+- Todo corre en la CI de GitHub en cada PR.
 
 ## Estructura
 

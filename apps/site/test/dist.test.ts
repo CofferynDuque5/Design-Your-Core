@@ -11,7 +11,7 @@ const attrs = (src: string, tag: string, attr: string) =>
 
 describe('sitio compilado', () => {
   it('existe (ejecuta pnpm build antes)', () => {
-    expect(pages).toEqual(expect.arrayContaining(['index.html', 'privacidad.html', '404.html']));
+    expect(pages).toEqual(expect.arrayContaining(['index.html', 'privacidad.html', 'condiciones.html', '404.html']));
   });
 
   it.each(pages)('%s tiene idioma, título, descripción y un solo h1', (f) => {

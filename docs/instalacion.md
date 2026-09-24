@@ -1,5 +1,7 @@
 # Instalación y despliegue
 
+Para publicar esta versión paso a paso, empieza por [lanzamiento.md](lanzamiento.md).
+
 ## Desarrollo local
 
 1. Instala Node.js 22 y activa pnpm: `corepack enable`.
@@ -18,13 +20,18 @@ pnpm test                                   # todo
 pnpm --filter @dyc/api test                 # solo la API
 pnpm --filter @dyc/tokens test              # contraste y tokens
 pnpm --filter @dyc/web test                 # componentes y pantallas (sin API)
-pnpm --filter @dyc/mobile test              # sesión, recordatorio y recorridos de la app móvil (sin API)
-pnpm e2e                                    # punta a punta: web compilada + API real (requiere pnpm build)
+pnpm --filter @dyc/mobile test              # sesión, recordatorio, recorridos y accesibilidad de la app móvil (sin API)
+pnpm e2e                                    # punta a punta y accesibilidad (requiere pnpm build)
 ```
 
-El recorrido de punta a punta (`apps/web/e2e/`) arranca la API compilada y `vite preview`, y usa la misma base de datos de pruebas (`E2E_DATABASE_URL` o `TEST_DATABASE_URL`). La primera vez instala Chromium con `pnpm --filter @dyc/web exec playwright install chromium`.
+`pnpm e2e` ejecuta dos conjuntos de pruebas con Playwright, cada uno en escritorio con tema claro y en móvil con tema oscuro:
 
-La CI de GitHub Actions (`.github/workflows/ci.yml`) ejecuta typecheck, pruebas con un PostgreSQL 16 y build en cada PR.
+- `apps/web/e2e/`: arranca la API compilada y `vite preview`, y usa la misma base de datos de pruebas (`E2E_DATABASE_URL` o `TEST_DATABASE_URL`). Cubre el recorrido completo de una persona nueva, retos, hábitos, descarga de datos, cambio de contraseña, vinculación de pareja, la sección Más y el borrado de cuenta. `a11y.spec.ts` pasa [axe](https://github.com/dequelabs/axe-core) (WCAG 2.2 A y AA) por cada pantalla y cada diálogo.
+- `apps/site/e2e/`: pasa axe por cada página del sitio compilado y comprueba el enlace para saltar al contenido.
+
+La primera vez instala Chromium con `pnpm --filter @dyc/web exec playwright install chromium`.
+
+La CI de GitHub Actions (`.github/workflows/ci.yml`) ejecuta typecheck, pruebas con un PostgreSQL 16, build y los dos conjuntos de Playwright en cada PR.
 
 ## Despliegue de la API en cPanel (Node.js App) + Neon
 

@@ -33,6 +33,7 @@ pnpm --filter @dyc/mobile typecheck
 - `src/lib/auth.test.ts`: guardar, recuperar, renovar y cerrar la sesión.
 - `src/lib/notifications.test.ts`: programar y quitar el recordatorio, y el caso sin permiso.
 - `src/test/app.test.tsx`: recorridos con el enrutador real y una API falsa (entrar, bienvenida, error de acceso, renovación automática del token caducado).
+- `src/test/a11y.test.tsx`: en cada pantalla, todo lo que se puede tocar tiene un rol y un nombre que VoiceOver y TalkBack pueden leer, y cada campo tiene etiqueta.
 
 ## Iconos
 
@@ -40,9 +41,18 @@ pnpm --filter @dyc/mobile typecheck
 
 ## Publicar en las tiendas
 
-Pendiente de decidir con el equipo:
+`eas.json` ya define dos perfiles de compilación, los dos contra la API de producción:
 
-1. **Identificadores**: `app.json` usa `com.nvcorx.designyourcore` como provisional para iOS y Android. Cámbialo antes de la primera compilación; después no se puede cambiar sin publicar una app nueva.
-2. **Cuenta de Expo (EAS)**: `npx eas-cli init` añade `extra.eas.projectId` a la configuración. Con eso la app registra el token push del dispositivo en la API (`PUT /api/v2/devices`) al activar el recordatorio. Sin él, el recordatorio local funciona igual y el registro push se omite.
-3. **Compilar**: `npx eas-cli build --platform all` (en la nube; no hay carpetas `ios/` ni `android/` en el repositorio).
-4. **Textos de la ficha**: la política de privacidad del sitio de marca sirve de base, pero conviene revisarla con criterio legal.
+- `preview`: instalable directamente (APK en Android, distribución interna en iOS) para probar con personas reales antes de publicar.
+- `production`: la versión para Google Play y App Store. El número de compilación sube solo en cada build.
+
+Pasos, en orden:
+
+1. **Identificador de la app**: `app.json` usa `com.nvcorx.designyourcore` para iOS y Android. Es el nombre interno único de la app en las tiendas y no se puede cambiar después de la primera publicación.
+2. **Cuenta de Expo (EAS)**: `npx eas-cli login` y después `npx eas-cli init`, que añade `extra.eas.projectId` a `app.json`. Con eso la app registra el token push del dispositivo en la API (`PUT /api/v2/devices`) al activar el recordatorio. Sin él, el recordatorio local funciona igual y el registro push se omite.
+3. **Prueba interna**: `npx eas-cli build --profile preview --platform android` genera un APK para instalar en cualquier Android.
+4. **Compilar para las tiendas**: `npx eas-cli build --profile production --platform all` (en la nube; no hay carpetas `ios/` ni `android/` en el repositorio). EAS pide las credenciales de Apple la primera vez y genera los certificados.
+5. **Enviar**: `npx eas-cli submit --platform ios` y `--platform android`. Google Play exige que la primera subida se haga a mano desde su consola.
+6. **Ficha de la tienda**: la política de privacidad es la página `/privacidad` del sitio de marca. Las dos tiendas piden poder borrar la cuenta desde la app: está en Perfil → Borrar mi cuenta.
+
+La lista completa para salir a producción (API, web, sitio y app) está en [docs/lanzamiento.md](../../docs/lanzamiento.md).

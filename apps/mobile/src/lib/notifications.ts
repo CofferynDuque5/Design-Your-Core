@@ -58,10 +58,12 @@ export async function setReminder(prefs: ReminderPrefs): Promise<'scheduled' | '
   const time = parseTime(prefs.time);
   if (!prefs.enabled || !time) {
     await writeJson(PREFS_KEY, { ...prefs, enabled: false });
+    await unregisterPushDevice();
     return 'off';
   }
   if (!(await ensurePermission())) {
     await writeJson(PREFS_KEY, { ...prefs, enabled: false });
+    await unregisterPushDevice();
     return 'denied';
   }
   if (Platform.OS === 'android') {
@@ -91,12 +93,18 @@ export async function registerPushDevice(): Promise<void> {
   await storage.set(PUSH_KEY, token);
 }
 
+/** Quita el token push de la API: sin recordatorio, el servidor no guarda nada del teléfono. */
+async function unregisterPushDevice(): Promise<void> {
+  const token = await storage.get(PUSH_KEY).catch(() => null);
+  if (!token) return;
+  await api.devices.remove(token).catch(() => undefined);
+  await storage.set(PUSH_KEY, null);
+}
+
 /** Al cerrar sesión: el dispositivo deja de recibir avisos de esta cuenta. */
 export async function forgetDevice(): Promise<void> {
   if (!notificationsSupported) return;
-  const token = await storage.get(PUSH_KEY).catch(() => null);
-  if (token) await api.devices.remove(token).catch(() => undefined);
-  await storage.set(PUSH_KEY, null);
+  await unregisterPushDevice();
   await Notifications.cancelScheduledNotificationAsync(REMINDER_ID).catch(() => undefined);
   await writeJson(PREFS_KEY, DEFAULT_REMINDER);
 }
