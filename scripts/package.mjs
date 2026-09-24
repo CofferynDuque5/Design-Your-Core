@@ -6,7 +6,8 @@
 //   pnpm package
 //
 // Los dominios se toman de estas variables (por defecto, los provisionales de
-// docs/lanzamiento.md): DYC_API_URL, DYC_APP_URL, DYC_SITE_URL, DYC_CONTACT_EMAIL.
+// docs/lanzamiento.md): DYC_API_URL, DYC_APP_URL, DYC_SITE_URL, DYC_CONTACT_EMAIL,
+// DYC_LEGACY_APP_URL.
 // Ningún secreto entra en los paquetes: core-config.env se rellena en el servidor.
 import { execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,8 +22,10 @@ const API_URL = url(process.env.DYC_API_URL || 'https://designyourcorebackend.nv
 const APP_URL = url(process.env.DYC_APP_URL || 'https://app.designyourcore.nvcorx.com');
 const SITE_URL = url(process.env.DYC_SITE_URL || 'https://designyourcore.nvcorx.com');
 const CONTACT = process.env.DYC_CONTACT_EMAIL || '';
-// Dominio donde sigue la app anterior: se mantiene en CORS para no cortarla.
-const LEGACY_APP_URL = 'https://desingyourcore.nvcorx.com';
+// Dominios de la app anterior: siguen en CORS para no cortarla, y la sección
+// «Más» de la app nueva enlaza a DYC_LEGACY_APP_URL (hoy, designyourcorepanel).
+const LEGACY_APP_URL = url(process.env.DYC_LEGACY_APP_URL || 'https://designyourcorepanel.nvcorx.com');
+const LEGACY_ORIGINS = [...new Set([LEGACY_APP_URL, 'https://desingyourcore.nvcorx.com'])];
 
 const host = (u) => new URL(u).host;
 const version = `${JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version}-${execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim()}`;
@@ -40,14 +43,14 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(STAGE, { recursive: true });
 
 // 1. Compilar con los dominios de producción.
-run('pnpm build', { VITE_API_URL: API_URL, SITE_URL, PUBLIC_APP_URL: APP_URL, PUBLIC_CONTACT_EMAIL: CONTACT });
+run('pnpm build', { VITE_API_URL: API_URL, VITE_LEGACY_APP_URL: LEGACY_APP_URL, SITE_URL, PUBLIC_APP_URL: APP_URL, PUBLIC_CONTACT_EMAIL: CONTACT });
 run('pnpm --filter @dyc/api bundle');
 
 // 2. API: se extrae en la carpeta raíz de la app Node (Application root en «Setup Node.js App»).
 const apiDir = join(STAGE, 'api');
 cpSync(join(ROOT, 'apps/api/release'), apiDir, { recursive: true });
 const config = readFileSync(join(apiDir, 'core-config.env.example'), 'utf8')
-  .replace(/^CLIENT_ORIGIN=.*$/m, `CLIENT_ORIGIN=${APP_URL},${LEGACY_APP_URL}`)
+  .replace(/^CLIENT_ORIGIN=.*$/m, `CLIENT_ORIGIN=${[APP_URL, ...LEGACY_ORIGINS].join(',')}`)
   .replace(/^PUBLIC_URL=.*$/m, `PUBLIC_URL=${API_URL}`);
 writeFileSync(join(apiDir, 'core-config.env.example'), config);
 writeFileSync(
