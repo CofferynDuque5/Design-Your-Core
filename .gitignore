@@ -1,0 +1,27 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Secretos: la configuración real nunca se sube al repositorio
+.env
+.env.*
+!.env.example
+core-config.env
+
+# Paquete de despliegue de la API
+apps/api/release/
+
+# Paquetes para subir al hosting (pnpm package)
+/release/
+
+# Web: resultados de Playwright
+apps/web/test-results/
+apps/web/playwright-report/
+apps/site/test-results/
+apps/site/playwright-report/
+apps/web/dev-dist/
+
+# Sitio: tipos generados por Astro
+apps/site/.astro/

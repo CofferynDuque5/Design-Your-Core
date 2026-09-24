@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Design Your Core",
+    "slug": "design-your-core",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "designyourcore",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F4F3EF",
+    "ios": {
+      "bundleIdentifier": "com.nvcorx.designyourcore",
+      "supportsTablet": true,
+      "config": { "usesNonExemptEncryption": false }
+    },
+    "android": {
+      "package": "com.nvcorx.designyourcore",
+      "adaptiveIcon": {
+        "backgroundColor": "#1E3A5F",
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Design Your Core",
+      "themeColor": "#1E3A5F"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      ["expo-notifications", { "color": "#1E3A5F" }],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1E3A5F",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

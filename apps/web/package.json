@@ -1,0 +1,44 @@
+{
+  "name": "@dyc/web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "App web de Design Your Core (PWA)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "icons": "node scripts/icons.mjs",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@dyc/api-client": "workspace:*",
+    "@dyc/core": "workspace:*",
+    "@dyc/tokens": "workspace:*",
+    "@fontsource/figtree": "^5.2.0",
+    "@fontsource/newsreader": "^5.2.0",
+    "@tanstack/react-query": "^5.90.0",
+    "lucide-react": "^1.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router": "^7.9.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.56.1",
+    "@testing-library/jest-dom": "^6.9.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "jsdom": "^27.0.0",
+    "typescript": "^5.6.3",
+    "vite": "^8.0.0",
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.0.0",
+    "workbox-window": "^7.4.1"
+  }
+}

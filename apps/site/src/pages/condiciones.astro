@@ -1,0 +1,52 @@
+---
+import { appLink } from '../config';
+import Base from '../layouts/Base.astro';
+
+const contact = import.meta.env.PUBLIC_CONTACT_EMAIL;
+---
+
+<Base title="Condiciones de uso" description="Las reglas para usar Design Your Core: qué ofrece, qué no sustituye y qué esperamos de cada persona.">
+  <article class="container prose">
+    <p class="eyebrow">Condiciones de uso</p>
+    <h1>Lo que acordamos al usar Design Your Core</h1>
+    <p class="muted">Última actualización: 24 de septiembre de 2026.</p>
+
+    <h2>Qué es Design Your Core</h2>
+    <p>
+      Una herramienta para cuidar tu bienestar en seis pilares: registrar cómo estás, sostener hábitos, aceptar retos pequeños y ver tu progreso. Puedes usarla en la web y en la app móvil con la misma cuenta.
+    </p>
+
+    <h2>No sustituye a un profesional</h2>
+    <p>
+      Los retos, puntuaciones y recomendaciones son orientativos y se calculan con reglas simples a partir de lo que registras. No son un diagnóstico ni un tratamiento. Si tienes un problema de salud física o mental, consulta a un profesional. Si estás en una situación de emergencia, llama a los servicios de emergencia de tu país.
+    </p>
+
+    <h2>Tu cuenta</h2>
+    <ul>
+      <li>Usa datos reales y una contraseña que no uses en otros sitios. Eres responsable de lo que se haga con tu cuenta.</li>
+      <li>La cuenta es personal. Si vinculas a tu pareja, esa persona verá el nombre de tus hábitos y si los cumpliste; nada más.</li>
+      <li>Puedes descargar tus datos o borrar tu cuenta cuando quieras desde <a href={appLink('/entrar')}>la app</a>, en Perfil › Tus datos.</li>
+    </ul>
+
+    <h2>Uso aceptable</h2>
+    <p>
+      No uses el servicio para dañar a otras personas, acceder a cuentas ajenas, sobrecargar el servidor o intentar saltarte sus medidas de seguridad. Podemos suspender una cuenta que lo haga.
+    </p>
+
+    <h2>Tus datos son tuyos</h2>
+    <p>
+      Lo que registras te pertenece. Solo lo usamos para que la app funcione, como explica la <a href="/privacidad">página de privacidad</a>.
+    </p>
+
+    <h2>Cambios y disponibilidad</h2>
+    <p>
+      Trabajamos para que el servicio esté siempre disponible, pero puede haber interrupciones por mantenimiento o fallos. Si cambiamos estas condiciones de forma importante, lo avisaremos en la app antes de que se apliquen.
+    </p>
+
+    {contact && (
+      <p>
+        Para cualquier duda sobre estas condiciones, escríbenos a <a href={`mailto:${contact}`}>{contact}</a>.
+      </p>
+    )}
+  </article>
+</Base>

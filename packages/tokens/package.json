@@ -1,0 +1,33 @@
+{
+  "name": "@dyc/tokens",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Design tokens de Design Your Core: una sola fuente para web (CSS) y móvil (React Native)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tokens.css": "./dist/tokens.css",
+    "./components.css": "./css/components.css"
+  },
+  "files": [
+    "dist",
+    "css"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsx scripts/build.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "docs": "tsx scripts/build-docs.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

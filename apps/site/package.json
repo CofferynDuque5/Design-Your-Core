@@ -1,0 +1,32 @@
+{
+  "name": "@dyc/site",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Sitio de marca de Design Your Core (estático)",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "test": "vitest run",
+    "og": "node scripts/og.mjs",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@dyc/core": "workspace:*",
+    "@dyc/tokens": "workspace:*",
+    "@fontsource/figtree": "^5.2.0",
+    "@fontsource/newsreader": "^5.2.0",
+    "@lucide/astro": "^1.0.0",
+    "astro": "^7.3.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/sitemap": "^3.7.0",
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.56.1",
+    "typescript": "^5.6.3",
+    "vitest": "^4.0.0"
+  }
+}

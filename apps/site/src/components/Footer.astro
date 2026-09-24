@@ -1,0 +1,25 @@
+---
+import { appLink } from '../config';
+import Logo from './Logo.astro';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container site-footer__inner">
+    <div class="stack-sm">
+      <Logo />
+      <p class="muted small">Bienestar personal en seis pilares, con pasos pequeños.</p>
+    </div>
+    <nav aria-label="Pie de página" class="site-footer__nav">
+      <a href="/#pilares">Pilares</a>
+      <a href="/#como-funciona">Cómo funciona</a>
+      <a href={appLink('/entrar')}>Entrar</a>
+      <a href="/privacidad">Privacidad</a>
+      <a href="/condiciones">Condiciones</a>
+    </nav>
+  </div>
+  <div class="container">
+    <p class="muted small site-footer__legal">© {year} Design Your Core.</p>
+  </div>
+</footer>
