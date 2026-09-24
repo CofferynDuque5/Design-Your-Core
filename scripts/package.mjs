@@ -1,13 +1,14 @@
 // Genera los paquetes para subir a cPanel: release/design-your-core-{api,web,sitio}-<versión>.zip.
-// Los archivos van en la raíz del ZIP: se sube a la carpeta de destino y se usa
-// «Extraer» del Administrador de archivos, sin mover nada después. El de la API
-// trae además LEEME.txt con los pasos (esa carpeta no es pública).
+// Se usa «Extraer» del Administrador de archivos, sin mover nada después:
+// - API: trae la carpeta core-api/ (DYC_API_FOLDER). Se extrae en la carpeta de
+//   inicio y queda en el «Application root» de la app Node. Incluye LEEME.txt.
+// - Web y sitio: los archivos van en la raíz del ZIP y se extraen en la carpeta del dominio.
 //
 //   pnpm package
 //
 // Los dominios se toman de estas variables (por defecto, los provisionales de
 // docs/lanzamiento.md): DYC_API_URL, DYC_APP_URL, DYC_SITE_URL, DYC_CONTACT_EMAIL,
-// DYC_LEGACY_APP_URL.
+// DYC_LEGACY_APP_URL. DYC_API_FOLDER es el nombre de la carpeta de la API (core-api).
 // Ningún secreto entra en los paquetes: core-config.env se rellena en el servidor.
 import { execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,6 +23,7 @@ const API_URL = url(process.env.DYC_API_URL || 'https://designyourcorebackend.nv
 const APP_URL = url(process.env.DYC_APP_URL || 'https://app.designyourcore.nvcorx.com');
 const SITE_URL = url(process.env.DYC_SITE_URL || 'https://designyourcore.nvcorx.com');
 const CONTACT = process.env.DYC_CONTACT_EMAIL || '';
+const API_FOLDER = process.env.DYC_API_FOLDER || 'core-api';
 // Dominios de la app anterior: siguen en CORS para no cortarla, y la sección
 // «Más» de la app nueva enlaza a DYC_LEGACY_APP_URL (hoy, designyourcorepanel).
 const LEGACY_APP_URL = url(process.env.DYC_LEGACY_APP_URL || 'https://designyourcorepanel.nvcorx.com');
@@ -46,8 +48,9 @@ mkdirSync(STAGE, { recursive: true });
 run('pnpm build', { VITE_API_URL: API_URL, VITE_LEGACY_APP_URL: LEGACY_APP_URL, SITE_URL, PUBLIC_APP_URL: APP_URL, PUBLIC_CONTACT_EMAIL: CONTACT });
 run('pnpm --filter @dyc/api bundle');
 
-// 2. API: se extrae en la carpeta raíz de la app Node (Application root en «Setup Node.js App»).
-const apiDir = join(STAGE, 'api');
+// 2. API: el ZIP trae la carpeta ${API_FOLDER}/ y se extrae en la carpeta de inicio,
+// igual que el ZIP original del backend.
+const apiDir = join(STAGE, 'api', API_FOLDER);
 cpSync(join(ROOT, 'apps/api/release'), apiDir, { recursive: true });
 const config = readFileSync(join(apiDir, 'core-config.env.example'), 'utf8')
   .replace(/^CLIENT_ORIGIN=.*$/m, `CLIENT_ORIGIN=${[APP_URL, ...LEGACY_ORIGINS].join(',')}`)
@@ -60,9 +63,11 @@ Design Your Core · API ${version}
 Dominio: ${API_URL}
 
 1. En Neon crea una rama (Branch) de la base de datos: es tu copia de seguridad.
-2. En cPanel, «Setup Node.js App»: mira qué carpeta es el «Application root» de ${host(API_URL)}.
-   En el Administrador de archivos, comprime esa carpeta y descarga el ZIP: es tu copia para volver atrás.
-3. Sube este ZIP a esa carpeta, selecciónalo y pulsa «Extraer». Acepta reemplazar los archivos.
+2. En cPanel, «Setup Node.js App»: comprueba que el «Application root» de ${host(API_URL)} sea ${API_FOLDER}.
+   Si ya existe la carpeta ${API_FOLDER}, en el Administrador de archivos comprímela y descarga el ZIP:
+   es tu copia para volver atrás.
+3. Sube este ZIP a tu carpeta de inicio (la de arriba del todo, donde está public_html), selecciónalo
+   y pulsa «Extraer». Crea o actualiza la carpeta ${API_FOLDER}; acepta reemplazar los archivos.
    Tu core-config.env no se toca: este ZIP no trae uno.
 4. Edita core-config.env tomando como guía core-config.env.example:
    - DATABASE_URL: la misma de siempre.
@@ -75,7 +80,7 @@ Dominio: ${API_URL}
 Al arrancar, la API añade sus tablas nuevas a la base de datos sin tocar las cuentas ni los datos.
 `.trimStart(),
 );
-zip('api', apiDir);
+zip('api', join(STAGE, 'api'));
 
 // 3. App web: se extrae en la carpeta raíz de ${APP_URL}.
 const webDir = join(STAGE, 'web');

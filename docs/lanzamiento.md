@@ -36,7 +36,7 @@ Al arrancar, la API nueva aplica las migraciones pendientes. Son aditivas: crean
 
 ## 4. Desplegar
 
-`pnpm package` compila todo con los dominios de producción y deja tres ZIP en `release/`: la API, la app web y el sitio. Los archivos van en la raíz de cada ZIP: se sube a la carpeta de destino en el Administrador de archivos de cPanel y se pulsa «Extraer». El de la API trae además un `LEEME.txt` con los pasos. Ningún secreto va dentro: `core-config.env` se completa en el servidor.
+`pnpm package` compila todo con los dominios de producción y deja tres ZIP en `release/`: la API, la app web y el sitio. Cada ZIP se sube a su carpeta en el Administrador de archivos de cPanel y se pulsa «Extraer». El de la API trae la carpeta `core-api` (con un `LEEME.txt` con los pasos) y se extrae en la carpeta de inicio; el de la web y el del sitio llevan los archivos sueltos y se extraen en la carpeta del dominio. Ningún secreto va dentro: `core-config.env` se completa en el servidor.
 
 Los dominios salen de `DYC_API_URL`, `DYC_APP_URL`, `DYC_SITE_URL` y `DYC_CONTACT_EMAIL`. Sin ellas se usan los valores provisionales de la tabla del paso 1:
 
@@ -46,7 +46,7 @@ DYC_SITE_URL=https://midominio.com DYC_APP_URL=https://app.midominio.com pnpm pa
 
 Súbelos en este orden, porque la web y la app dependen de la API:
 
-1. **API**: en «Setup Node.js App» mira el «Application root» de la API (en el servidor actual parece ser `core-api`, en la carpeta de inicio). Comprime esa carpeta y descárgala como copia. Extrae el ZIP dentro, completa `core-config.env`, pulsa «Run NPM Install» y reinicia. Comprueba `https://TU-API/api/health`.
+1. **API**: en «Setup Node.js App» comprueba que el «Application root» de la API sea `core-api`. Comprime esa carpeta y descárgala como copia. Sube el ZIP a la carpeta de inicio (donde está `public_html`) y extráelo ahí: actualiza `core-api`. Completa `core-config.env` (o las variables de la app en el panel), pulsa «Run NPM Install» y reinicia. Comprueba `https://TU-API/api/health`.
 2. **App web**: crea el subdominio de la app en «Dominios» si no existe y extrae el ZIP en su carpeta raíz. Incluye un `.htaccess` oculto.
 3. **Sitio de marca**: comprime y descarga lo que haya en la carpeta del dominio, bórralo y extrae el ZIP ahí.
 
