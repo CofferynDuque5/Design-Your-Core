@@ -36,7 +36,8 @@ function zip(name, folder, readme) {
   console.log(`✓ ${file.replace(ROOT + '/', '')}  (${folder})`);
 }
 
-rmSync(STAGE, { recursive: true, force: true });
+// Empezar de cero: solo quedan los paquetes de esta versión.
+rmSync(OUT, { recursive: true, force: true });
 mkdirSync(STAGE, { recursive: true });
 
 // 1. Compilar con los dominios de producción.
