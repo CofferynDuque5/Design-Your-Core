@@ -13,6 +13,9 @@ core-config.env
 # Paquete de despliegue de la API
 apps/api/release/
 
+# Paquetes para subir al hosting (pnpm package)
+/release/
+
 # Web: resultados de Playwright
 apps/web/test-results/
 apps/web/playwright-report/

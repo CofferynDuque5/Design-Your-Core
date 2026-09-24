@@ -1,6 +1,6 @@
 # Instalación y despliegue
 
-Para publicar esta versión paso a paso, empieza por [lanzamiento.md](lanzamiento.md).
+Para publicar esta versión paso a paso, empieza por [lanzamiento.md](lanzamiento.md). `pnpm package` genera los tres ZIP listos para subir a cPanel (API, web y sitio); los pasos manuales de abajo explican qué hay dentro de cada uno.
 
 ## Desarrollo local
 

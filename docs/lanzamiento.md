@@ -36,11 +36,19 @@ Al arrancar, la API nueva aplica las migraciones pendientes. Son aditivas: crean
 
 ## 4. Desplegar
 
-En este orden, porque la web y la app dependen de la API:
+`pnpm package` compila todo con los dominios de producción y deja tres ZIP en `release/`: la API, la app web y el sitio. Cada uno trae una carpeta con lo que hay que subir y un `LEEME.txt` con los pasos en cPanel. Ningún secreto va dentro: `core-config.env` se completa en el servidor.
 
-1. **API**: `pnpm build && pnpm --filter @dyc/api bundle`, sube `apps/api/release/` y reinicia. Comprueba `https://TU-API/api/health`. Guarda la carpeta de la versión anterior para poder volver.
-2. **App web**: `pnpm build` y sube `apps/web/dist/` a su dominio.
-3. **Sitio de marca**: sube `apps/site/dist/` a su dominio.
+Los dominios salen de `DYC_API_URL`, `DYC_APP_URL`, `DYC_SITE_URL` y `DYC_CONTACT_EMAIL`. Sin ellas se usan los valores provisionales de la tabla del paso 1:
+
+```bash
+DYC_SITE_URL=https://midominio.com DYC_APP_URL=https://app.midominio.com pnpm package
+```
+
+Súbelos en este orden, porque la web y la app dependen de la API:
+
+1. **API**: sube la carpeta del ZIP a la app Node de cPanel, completa `core-config.env`, pulsa «Run NPM Install» y reinicia. Comprueba `https://TU-API/api/health`. Guarda la carpeta de la versión anterior para poder volver.
+2. **App web**: sube la carpeta del ZIP a la raíz de su dominio, incluido el `.htaccess` oculto.
+3. **Sitio de marca**: igual que la web, en su dominio.
 
 ## 5. Comprobar después de desplegar
 

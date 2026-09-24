@@ -22,6 +22,9 @@ describe('sitio compilado', () => {
     expect(src.match(/<h1\b/g)).toHaveLength(1);
     expect(src).toContain('href="#main"');
     expect(src).toMatch(/<main id="main"/);
+    // La URL canónica es la pública, igual que en el sitemap (sin .html).
+    expect(src).toMatch(/<link rel="canonical" href="https?:\/\/[^"]+"/);
+    expect(src).not.toMatch(/<link rel="canonical" href="[^"]*\.html"/);
   });
 
   it.each(pages)('%s: los enlaces internos llevan a páginas y secciones que existen', (f) => {

@@ -17,7 +17,8 @@ interface Props {
 
 const { title, description } = Astro.props;
 const fullTitle = title === 'Design Your Core' ? title : `${title} · Design Your Core`;
-const canonical = new URL(Astro.url.pathname, Astro.site);
+// Con build.format 'file' la ruta llega como /privacidad.html; la URL pública no lleva .html.
+const canonical = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ''), Astro.site);
 const ogImage = new URL('/og.png', Astro.site);
 ---
 
