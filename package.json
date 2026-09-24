@@ -15,6 +15,6 @@
     "dev:web": "pnpm --filter @dyc/web dev",
     "dev:site": "pnpm --filter @dyc/site dev",
     "dev:mobile": "pnpm --filter @dyc/mobile start",
-    "e2e": "pnpm --filter @dyc/web e2e"
+    "e2e": "pnpm --filter @dyc/web e2e && pnpm --filter @dyc/site e2e"
   }
 }

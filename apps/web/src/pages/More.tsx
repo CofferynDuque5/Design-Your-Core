@@ -65,9 +65,9 @@ export function More() {
         ) : legacy.isError ? (
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
-          LEGACY_GROUPS.map((g) => (
-            <section key={g.title} className="card stack" aria-labelledby={`g-${g.title}`}>
-              <h2 id={`g-${g.title}`} className="section-title">
+          LEGACY_GROUPS.map((g, i) => (
+            <section key={g.title} className="card stack" aria-labelledby={`legacy-group-${i}`}>
+              <h2 id={`legacy-group-${i}`} className="section-title">
                 {g.title}
               </h2>
               <ul className="legacy-list">

@@ -183,7 +183,7 @@ function CatalogCard({ c, active }: { c: Challenge; active: UserChallenge[] }) {
     <article className="card catalog-card" data-pillar={c.pillar}>
       <div className="challenge__head">
         <PillarTag pillar={c.pillar} />
-        <span className="level-dots" aria-label={`Nivel ${c.level} de 3`}>
+        <span className="level-dots" role="img" aria-label={`Nivel ${c.level} de 3`}>
           {[1, 2, 3].map((n) => (
             <span key={n} className={n <= c.level ? 'on' : ''} />
           ))}

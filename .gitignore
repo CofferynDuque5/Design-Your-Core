@@ -16,6 +16,8 @@ apps/api/release/
 # Web: resultados de Playwright
 apps/web/test-results/
 apps/web/playwright-report/
+apps/site/test-results/
+apps/site/playwright-report/
 apps/web/dev-dist/
 
 # Sitio: tipos generados por Astro

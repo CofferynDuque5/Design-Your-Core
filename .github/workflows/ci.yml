@@ -36,7 +36,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @dyc/api bundle
-      # Punta a punta: la web compilada contra la API real.
+      # Punta a punta: la web compilada contra la API real, y accesibilidad
+      # (axe) de cada pantalla de la web y del sitio.
       - run: pnpm --filter @dyc/web exec playwright install --with-deps chromium
       - run: pnpm e2e
         env:
@@ -45,5 +46,7 @@ jobs:
         if: failure()
         with:
           name: playwright-report
-          path: apps/web/playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/site/playwright-report
           retention-days: 7

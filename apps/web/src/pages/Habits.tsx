@@ -199,7 +199,7 @@ function HabitForm({ habit, onDone }: { habit: Habit | null; onDone: () => void 
     <form className="stack" onSubmit={submit}>
       <TextField label="¿Qué vas a hacer?" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required autoFocus placeholder="Caminar 10 minutos después de comer" />
       {!habit && (
-        <div className="chips" aria-label="Ideas">
+        <div className="chips" role="group" aria-label="Ideas">
           {IDEAS.map((i) => (
             <button
               key={i.title}

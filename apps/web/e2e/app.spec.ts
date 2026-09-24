@@ -1,37 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { onboard, PASSWORD, register } from './helpers';
 
 // Una persona nueva: registro, onboarding, check-in, hábito, reto, progreso,
 // ajustes y cierre de sesión, todo contra la API real.
-
-const email = (tag: string) => `e2e-${tag}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
-const PASSWORD = 'contraseña-segura';
-
-async function register(page: Page, tag: string) {
-  const address = email(tag);
-  await page.goto('/');
-  await expect(page).toHaveURL(/\/entrar$/);
-  await page.getByRole('link', { name: 'Crea una' }).click();
-  await page.getByLabel('Tu nombre').fill('Nathan');
-  await page.getByLabel('Correo').fill(address);
-  await page.getByLabel('Contraseña').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Crear cuenta' }).click();
-  await expect(page).toHaveURL(/\/bienvenida$/);
-  return address;
-}
-
-async function onboard(page: Page) {
-  await page.getByRole('button', { name: 'Empezar' }).click();
-  await page.getByRole('checkbox', { name: /^Descanso/ }).check();
-  await page.getByRole('checkbox', { name: /^Enfoque mental/ }).check();
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await page.getByRole('group', { name: /Descanso/ }).getByRole('radio', { name: /^2/ }).check();
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await page.getByLabel('Tu intención (opcional)').fill('Dormir mejor.');
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByRole('heading', { name: 'Tu primer reto' })).toBeVisible();
-  await page.getByRole('button', { name: 'Empezar este reto' }).click();
-  await expect(page).toHaveURL(/\/$/);
-}
 
 test('recorrido completo de una persona nueva', async ({ page }) => {
   const address = await register(page, 'flujo');

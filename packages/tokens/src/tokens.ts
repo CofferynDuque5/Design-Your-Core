@@ -62,7 +62,7 @@ export const color: Record<ThemeName, ColorScheme> = {
     surfaceRaised: '#FFFFFF',
     ink: '#1B2230',
     inkMuted: '#4A5263',
-    inkSubtle: '#646B78',
+    inkSubtle: '#5E6572',
     line: '#DDDAD2',
     lineStrong: '#C3BFB5',
     primary: '#1E3A5F',

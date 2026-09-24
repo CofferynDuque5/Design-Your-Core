@@ -38,6 +38,15 @@ describe.each(themes)('contraste en tema %s', (theme) => {
     expect(contrast(c.danger, c.dangerSoft)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it.each<[string, string]>([
+    ['surfaceSunken', c.surfaceSunken],
+    ['primarySoft', c.primarySoft],
+    ...pillars.map((p): [string, string] => [`${p.id}.soft`, p.soft[theme]]),
+  ])('el texto secundario se lee también sobre %s', (_name, bg) => {
+    expect(contrast(c.inkMuted, bg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(c.inkSubtle, bg)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('el anillo de foco se distingue del fondo', () => {
     expect(contrast(c.focus, c.bg)).toBeGreaterThanOrEqual(3);
   });
