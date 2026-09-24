@@ -58,7 +58,7 @@ Esta versión es compatible con la app publicada actualmente. El plan añade `/a
 
 # API v2: pilares
 
-Base `/api/v2`, todas las rutas con 🔒. Las fechas son el día local de la persona en formato `AAAA-MM-DD`; "hoy" se calcula con la zona horaria del perfil. Los pilares son `movimiento`, `descanso`, `alimentacion`, `enfoque`, `relaciones` y `proposito`, siempre en ese orden. La validación compartida está en `@dyc/core` (`packages/core/src/schemas.ts`). Un error de validación responde 400 con `{ error, issues }`.
+Base `/api/v2`, todas las rutas con 🔒 salvo las de sesión. Las fechas son el día local de la persona en formato `AAAA-MM-DD`; "hoy" se calcula con la zona horaria del perfil. Los pilares son `movimiento`, `descanso`, `alimentacion`, `enfoque`, `relaciones` y `proposito`, siempre en ese orden. La validación compartida está en `@dyc/core` (`packages/core/src/schemas.ts`). Un error de validación responde 400 con `{ error, issues }`.
 
 ## Perfil y onboarding
 
@@ -113,6 +113,24 @@ Los retos cuyo plazo terminó pasan solos a `completed`.
 |---|---|---|---|
 | GET | `/account/export` | | JSON descargable con todos los datos, incluido el documento v1 |
 | DELETE | `/account` (estricta) | `{ password }` | `{ ok }`. Borra la cuenta y sus datos y desvincula a la pareja |
+
+## Sesiones renovables (app móvil)
+
+La app móvil no guarda un token de 60 días: recibe un **token de acceso de 15 minutos** (JWT, vale en todas las rutas 🔒, también las de v1) y un **token de renovación** opaco de 90 días que cambia en cada uso. El servidor solo guarda su hash. Si se usa un token de renovación ya cambiado, se cierra toda esa sesión. Cambiar la contraseña o «cerrar sesión en otros dispositivos» también invalida las renovaciones.
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| POST | `/auth/register` (estricta) | `{ email, password (8+), name?, device? }` | 201 `{ accessToken, refreshToken, expiresIn, user }` |
+| POST | `/auth/session` (estricta) | `{ email, password, device? }` | `{ accessToken, refreshToken, expiresIn, user }` |
+| POST | `/auth/refresh` | `{ refreshToken }` | Un par nuevo. 401 si caducó, se revocó o se reutilizó |
+| POST | `/auth/logout` | `{ refreshToken }` | `{ ok }`. Cierra esa sesión |
+
+## Dispositivos (notificaciones push)
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| PUT | `/devices` 🔒 | `{ token, platform: ios\|android\|web }` | `{ ok }`. Si el token ya era de otra cuenta, pasa a esta |
+| DELETE | `/devices/:token` 🔒 | | `{ ok }` |
 
 ## Cambio en v1: sincronización sin sobrescrituras
 

@@ -14,8 +14,9 @@ interface TokenPayload {
 // Si luego se incrementa tokenVersion (cambio de contraseña o "cerrar sesión en
 // otros dispositivos"), los tokens antiguos dejan de validar.
 export function createAuth(prisma: PrismaClient, secret: string) {
-  const signToken = (userId: string, ver: number) =>
-    jwt.sign({ sub: userId, ver }, secret, { algorithm: 'HS256', issuer: JWT_ISS, audience: JWT_AUD, expiresIn: '60d' });
+  // v1 usa tokens de 60 días; las sesiones renovables (v2) usan tokens de acceso cortos.
+  const signToken = (userId: string, ver: number, expiresIn: jwt.SignOptions['expiresIn'] = '60d') =>
+    jwt.sign({ sub: userId, ver }, secret, { algorithm: 'HS256', issuer: JWT_ISS, audience: JWT_AUD, expiresIn });
 
   const requireAuth: RequestHandler = (req, res, next) => {
     const h = req.headers.authorization || '';

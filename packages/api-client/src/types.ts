@@ -15,6 +15,15 @@ export interface Session {
   user: User;
 }
 
+/** Sesión renovable: acceso corto + renovación que rota en cada uso. */
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+  /** Segundos de validez del token de acceso. */
+  expiresIn: number;
+  user: User;
+}
+
 export interface Profile {
   focusPillars: PillarId[];
   intention: string | null;

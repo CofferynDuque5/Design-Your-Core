@@ -68,6 +68,45 @@ describe('@dyc/api-client', () => {
     await expect(api.health()).rejects.toMatchObject({ status: 0, isNetwork: true });
   });
 
+  it('con sesión renovable, un token de acceso caducado se renueva solo y la petición se repite', async () => {
+    let access: string | null = null;
+    let refresh: string | null = null;
+    let expired = 0;
+    const api: ApiClient = createClient({
+      baseUrl,
+      getToken: () => access,
+      onUnauthorized: () => expired++,
+      refresh: async () => {
+        if (!refresh) return null;
+        const pair = await api.session.refresh(refresh).catch(() => null);
+        access = pair?.accessToken ?? null;
+        refresh = pair?.refreshToken ?? null;
+        return access;
+      },
+    });
+    const s = await api.session.register({ email: 'movil@example.com', password: 'contraseña-segura', name: 'Ana', device: 'Pixel' });
+    ({ accessToken: access, refreshToken: refresh } = s);
+    const firstRefresh = refresh;
+
+    access = 'token-de-acceso-caducado';
+    const [me, profile] = await Promise.all([api.auth.me(), api.profile.get()]);
+    expect(me.email).toBe('movil@example.com');
+    expect(profile.timezone).toBe('UTC');
+    expect(refresh).not.toBe(firstRefresh);
+    expect(expired).toBe(0);
+
+    // Sin sesión renovable válida: avisa una vez y no entra en bucle.
+    await api.session.logout(refresh as string);
+    access = 'token-de-acceso-caducado';
+    await expect(api.auth.me()).rejects.toMatchObject({ status: 401 });
+    expect(expired).toBe(1);
+
+    // Los dispositivos se registran con la sesión.
+    const again = await api.session.login({ email: 'movil@example.com', password: 'contraseña-segura' });
+    access = again.accessToken;
+    await expect(api.devices.register('ExponentPushToken[prueba-123456]', 'android')).resolves.toEqual({ ok: true });
+  });
+
   it('recorre onboarding, check-in, hábitos, retos y panel', async () => {
     const api = await signedIn();
     const today = todayIn('UTC');

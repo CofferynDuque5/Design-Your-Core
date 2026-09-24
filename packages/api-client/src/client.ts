@@ -1,5 +1,5 @@
 import type { CheckInInput, Day, HabitInput, HabitPatch, Period, ProfileInput } from '@dyc/core';
-import type { AccountExport, Challenge, CheckIn, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
+import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
 export class ApiError extends Error {
@@ -22,8 +22,13 @@ export interface ClientOptions {
   baseUrl: string;
   /** Devuelve el token guardado (o null). */
   getToken: () => string | null | Promise<string | null>;
-  /** Se llama cuando la sesión deja de ser válida (401 con token). */
+  /** Se llama cuando la sesión deja de ser válida (401 con token y sin renovación posible). */
   onUnauthorized?: () => void;
+  /**
+   * Sesiones renovables (app móvil): ante un 401, obtiene un token de acceso
+   * nuevo y repite la petición una vez. Devuelve null si ya no hay sesión.
+   */
+  refresh?: () => Promise<string | null>;
   fetch?: typeof fetch;
 }
 
@@ -33,7 +38,16 @@ export function createClient(opts: ClientOptions) {
   const base = opts.baseUrl.replace(/\/+$/, '');
   const doFetch = opts.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
 
-  async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  // Una sola renovación en vuelo aunque fallen varias peticiones a la vez.
+  let refreshing: Promise<string | null> | null = null;
+  const refreshOnce = () => {
+    refreshing ??= (opts.refresh as () => Promise<string | null>)().finally(() => {
+      refreshing = null;
+    });
+    return refreshing;
+  };
+
+  async function request<T>(method: Method, path: string, body?: unknown, retried = false): Promise<T> {
     const token = await opts.getToken();
     let res: Response;
     try {
@@ -50,7 +64,14 @@ export function createClient(opts: ClientOptions) {
     }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-      if (res.status === 401 && token) opts.onUnauthorized?.();
+      // Un 401 en las rutas de sesión (contraseña mala, renovación caducada)
+      // es la respuesta en sí, no una sesión que se cae.
+      const sessionLost = res.status === 401 && !!token && !path.startsWith('/api/v2/auth/');
+      if (sessionLost && opts.refresh && !retried) {
+        const fresh = await refreshOnce().catch(() => null);
+        if (fresh) return request<T>(method, path, body, true);
+      }
+      if (sessionLost) opts.onUnauthorized?.();
       const msg = (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' && data.error) || 'Algo salió mal. Inténtalo de nuevo.';
       throw new ApiError(msg, res.status, data);
     }
@@ -73,6 +94,19 @@ export function createClient(opts: ClientOptions) {
       forgotPassword: (email: string) => request<{ ok: true; message: string }>('POST', '/api/auth/forgot-password', { email }),
       changePassword: (current: string, next: string) => request<{ ok: true; token: string }>('POST', '/api/auth/change-password', { current, next }),
       logoutOthers: () => request<{ ok: true; token: string }>('POST', '/api/auth/logout-others'),
+    },
+
+    /** Sesiones renovables (app móvil). */
+    session: {
+      register: (b: { email: string; password: string; name?: string; device?: string }) => request<TokenPair>('POST', '/api/v2/auth/register', b),
+      login: (b: { email: string; password: string; device?: string }) => request<TokenPair>('POST', '/api/v2/auth/session', b),
+      refresh: (refreshToken: string) => request<TokenPair>('POST', '/api/v2/auth/refresh', { refreshToken }),
+      logout: (refreshToken: string) => request<{ ok: true }>('POST', '/api/v2/auth/logout', { refreshToken }),
+    },
+
+    devices: {
+      register: (token: string, platform: 'ios' | 'android' | 'web') => request<{ ok: true }>('PUT', '/api/v2/devices', { token, platform }),
+      remove: (token: string) => request<{ ok: true }>('DELETE', `/api/v2/devices/${encodeURIComponent(token)}`),
     },
 
     profile: {

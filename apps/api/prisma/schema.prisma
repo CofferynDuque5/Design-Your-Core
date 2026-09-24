@@ -29,6 +29,8 @@ model User {
   habits         Habit[]
   challenges     UserChallenge[]
   dismissals     Dismissal[]
+  refreshTokens  RefreshToken[]
+  pushDevices    PushDevice[]
 }
 
 // Imágenes de los apuntes (sincronizadas entre dispositivos). Guardadas como
@@ -160,4 +162,37 @@ model DycMigration {
 
   @@map("_dyc_migrations")
   @@ignore
+}
+
+// Sesiones renovables (app móvil): token de acceso corto + token de renovación
+// opaco que rota en cada uso. Solo se guarda el hash. Si se reutiliza un token
+// ya rotado, se revoca toda la familia (posible robo).
+model RefreshToken {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  family       String
+  tokenVersion Int
+  deviceName   String?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+  replacedById String?
+
+  @@index([userId])
+  @@index([family])
+}
+
+// Dispositivos para notificaciones push (token de Expo).
+model PushDevice {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String // ios | android | web
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
