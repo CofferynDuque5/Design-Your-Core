@@ -19,3 +19,6 @@ export type PillarRecord<T> = Record<PillarId, T>;
 export function pillarRecord<T>(fn: (id: PillarId) => T): PillarRecord<T> {
   return Object.fromEntries(PILLAR_IDS.map((id) => [id, fn(id)])) as PillarRecord<T>;
 }
+
+/** Nivel de actividad física que la persona declara en el onboarding. */
+export const ACTIVITY_LEVELS = ['sedentaria', 'ligera', 'moderada', 'alta'] as const;

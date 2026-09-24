@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isDay, isValidTimeZone } from './dates.js';
-import { PILLAR_IDS } from './pillars.js';
+import { ACTIVITY_LEVELS, PILLAR_IDS } from './pillars.js';
 
 // Validación compartida por la API, la web y la app móvil.
 
@@ -13,8 +13,6 @@ const weekdays = z
   .string()
   .regex(/^[1-7]{1,7}$/, 'Días no válidos')
   .transform((s) => [...new Set(s)].sort().join(''));
-
-export const ACTIVITY_LEVELS = ['sedentaria', 'ligera', 'moderada', 'alta'] as const;
 
 /** Respuestas del onboarding y ajustes del perfil. Todo es opcional para poder guardarlo por pasos. */
 export const profileInputSchema = z
