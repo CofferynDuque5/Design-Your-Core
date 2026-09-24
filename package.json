@@ -13,7 +13,8 @@
     "test": "pnpm -r test",
     "dev:api": "pnpm --filter @dyc/api dev",
     "dev:web": "pnpm --filter @dyc/web dev",
-    "e2e": "pnpm --filter @dyc/web e2e",
-    "dev:site": "pnpm --filter @dyc/site dev"
+    "dev:site": "pnpm --filter @dyc/site dev",
+    "dev:mobile": "pnpm --filter @dyc/mobile start",
+    "e2e": "pnpm --filter @dyc/web e2e"
   }
 }

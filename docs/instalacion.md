@@ -18,6 +18,7 @@ pnpm test                                   # todo
 pnpm --filter @dyc/api test                 # solo la API
 pnpm --filter @dyc/tokens test              # contraste y tokens
 pnpm --filter @dyc/web test                 # componentes y pantallas (sin API)
+pnpm --filter @dyc/mobile test              # sesión, recordatorio y recorridos de la app móvil (sin API)
 pnpm e2e                                    # punta a punta: web compilada + API real (requiere pnpm build)
 ```
 
@@ -73,6 +74,14 @@ La app anterior puede seguir publicada en su dominio mientras tanto: ambas usan 
 3. Sube el **contenido** de `dist/` a la carpeta pública del dominio del sitio. El `.htaccess` incluido hace que `/privacidad` funcione sin `.html` y usa `404.html` para las páginas que no existen.
 
 La imagen para compartir (`public/og.png`) se regenera con `pnpm --filter @dyc/site og`. El texto de privacidad describe lo que la app guarda hoy; conviene que lo revise alguien con criterio legal antes de publicarlo.
+
+## App móvil (Expo)
+
+La app vive en `apps/mobile` y usa la misma API (rutas `/api/v2`, con sesiones renovables). Instrucciones completas en [apps/mobile/README.md](../apps/mobile/README.md). En resumen:
+
+1. Crea `apps/mobile/.env` con `EXPO_PUBLIC_API_URL` apuntando a la API pública (en desarrollo no hace falta: usa la IP del ordenador).
+2. Para probar en el teléfono: `pnpm dev:mobile` y abre el QR con Expo Go.
+3. Para publicar en las tiendas hace falta una cuenta de Expo (EAS) y las cuentas de desarrollador de Apple y Google. `eas build` compila en la nube; no hay carpetas `ios/` ni `android/` en el repositorio.
 
 ### Antes del primer despliegue de esta versión
 

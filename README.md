@@ -12,7 +12,7 @@ Plataforma de bienestar personal construida alrededor de seis pilares: energía 
 | Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html) |
 | App web | `apps/web` | PWA en React: acceso, onboarding, Hoy, check-in, hábitos, retos, progreso día/semana/mes, perfil y ajustes, sección Más. Pruebas de componentes y de punta a punta |
 | Sitio de marca | `apps/site` | Astro estático: portada con los seis pilares, cómo funciona, principios, privacidad y 404. Pruebas del HTML generado (enlaces, títulos, accesibilidad básica) |
-| App móvil | `apps/mobile` | Pendiente (etapa 5, Expo) |
+| App móvil | `apps/mobile` | Expo (iOS y Android): acceso con sesión renovable guardada en el llavero, bienvenida, Hoy, check-in, hábitos, retos, progreso, perfil, tema claro/oscuro y recordatorio diario. Pruebas de sesión, recordatorio y recorridos con el enrutador real |
 
 El diagnóstico completo, la arquitectura y el plan por etapas están en [docs/diagnostico.md](docs/diagnostico.md).
 
@@ -65,6 +65,14 @@ Vite reenvía `/api` a `localhost:4600`, así que no hace falta configurar CORS 
 pnpm dev:site                                                  # http://localhost:4321
 ```
 
+### App móvil en local
+
+```bash
+pnpm dev:mobile                                                # abre Expo; escanea el QR con Expo Go
+```
+
+El teléfono necesita llegar a la API: en desarrollo la app usa la IP del ordenador que sirve Expo (puerto 4600). Ver [apps/mobile/README.md](apps/mobile/README.md).
+
 Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de endpoints en [docs/api.md](docs/api.md).
 
 ## Estructura
@@ -74,6 +82,7 @@ apps/
   api/            Express + Prisma + PostgreSQL (migrations/ se aplican al arrancar)
   web/            React + Vite + PWA (TanStack Query, React Router)
   site/           Sitio de marca (Astro, estático)
+  mobile/         App móvil (Expo, Expo Router, TanStack Query)
 packages/
   api-client/     Cliente tipado de la API (web y móvil)
   core/           Dominio compartido (sin dependencias de UI)
