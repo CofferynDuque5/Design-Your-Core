@@ -3164,6 +3164,684 @@
   .page-header__actions > .chip {
     min-height: 32px;
   }
+
+  /* ---------- Herramientas, tanda 3: Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario y Rutina ---------- */
+
+  :root {
+    --legacy-period: #E5484D;
+    --legacy-predicted: #F3A7BB;
+  }
+
+  /* Barra lateral: subgrupos plegables */
+  .sidebar__tools {
+    gap: var(--space-2);
+  }
+
+  .sidebar__group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 36px;
+    margin: 0;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .sidebar__group:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-ink);
+  }
+
+  .sidebar__group svg {
+    transition: transform var(--duration-fast) var(--ease-standard);
+  }
+
+  .sidebar__group[aria-expanded='false'] svg {
+    transform: rotate(-90deg);
+  }
+
+  .sidebar__group + .sidebar__nav {
+    margin-top: 2px;
+  }
+
+  /* Ajuste con interruptor (Perfil y Ciclo) */
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-line);
+  }
+
+  .setting-row__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .form-actions--split {
+    justify-content: space-between;
+  }
+
+  .checkin-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    color: var(--color-ink-muted);
+  }
+
+  .checkin-note svg {
+    flex: none;
+    margin-top: 2px;
+  }
+
+  /* Ánimo con emoji */
+  .mood-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .mood-option {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 64px;
+    padding: var(--space-2) var(--space-1);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-size: 1.5rem;
+    line-height: 1.1;
+    cursor: pointer;
+  }
+
+  .mood-option input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .mood-option__label {
+    color: var(--color-ink-muted);
+    font-size: var(--text-caption);
+  }
+
+  .mood-option:hover {
+    border-color: var(--color-line-strong);
+  }
+
+  .mood-option:has(input:checked) {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  .mood-option:has(input:checked) .mood-option__label {
+    color: var(--color-ink);
+    font-weight: var(--weight-semibold);
+  }
+
+  .mood-option:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Finanzas */
+  .month-card {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .amount {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .amount--income {
+    color: var(--color-success);
+  }
+
+  .amount--negative {
+    color: var(--color-danger);
+  }
+
+  .stats .amount {
+    font-size: clamp(1.125rem, 4.5vw, var(--text-h3));
+  }
+
+  .finance-layout {
+    display: grid;
+    gap: var(--space-6);
+    align-items: start;
+  }
+
+  @media (min-width: 960px) {
+    .finance-layout {
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    }
+  }
+
+  .tx-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 60px;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .tx-row:last-child {
+    border-bottom: 0;
+  }
+
+  .tx-row__icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--color-surface-sunken);
+    color: var(--color-ink-muted);
+  }
+
+  .tx-row__icon--income {
+    background: var(--color-success-soft);
+    color: var(--color-success);
+  }
+
+  .tx-row__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    padding-block: var(--space-2);
+    overflow-wrap: anywhere;
+  }
+
+  .tx-row .amount {
+    font-weight: var(--weight-semibold);
+  }
+
+  .tx-row .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* En móvil, una sola fila: el icono sobra porque el importe ya lleva + o −. */
+  @media (max-width: 479px) {
+    .tx-row {
+      gap: var(--space-1);
+    }
+
+    .tx-row__icon {
+      display: none;
+    }
+
+    .tx-row .amount {
+      margin-right: var(--space-1);
+    }
+  }
+
+  .bar-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .bar-list li {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .bar-list__label {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .bar-list .progress {
+    height: 8px;
+  }
+
+  /* Metas */
+  .goal-count {
+    margin: 0;
+  }
+
+  .goal-count__value {
+    font-family: var(--font-display);
+    font-size: var(--text-h3);
+  }
+
+  .goal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .goal-actions .btn[aria-pressed='true'] {
+    color: var(--color-success);
+  }
+
+  /* Mascotas */
+  .pet-card__who {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .pet-card__avatar {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    flex: none;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--c) 16%, var(--color-surface));
+    font-size: 1.75rem;
+  }
+
+  .care-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .care-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 56px;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .care-row:last-child {
+    border-bottom: 0;
+  }
+
+  .care-row__check {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    margin: 0 var(--space-1) 0 0;
+    accent-color: var(--color-success);
+  }
+
+  .care-row__emoji {
+    font-size: 1.25rem;
+  }
+
+  .care-row__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    padding-block: var(--space-2);
+    overflow-wrap: anywhere;
+  }
+
+  .care-row--done .care-row__text strong {
+    color: var(--color-ink-muted);
+    text-decoration: line-through;
+  }
+
+  .care-row--off .care-row__text {
+    opacity: 0.7;
+  }
+
+  .care-row .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Ciclo */
+  .privacy-card {
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .privacy-card__text {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    color: var(--color-ink-muted);
+  }
+
+  .privacy-card__text svg {
+    flex: none;
+    margin-top: 2px;
+    color: var(--color-ink);
+  }
+
+  .estimate-note {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-left: 3px solid var(--legacy-predicted);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-sunken);
+    color: var(--color-ink-muted);
+  }
+
+  .estimate-note strong {
+    color: var(--color-ink);
+  }
+
+  .cycle-day {
+    border-width: 2px;
+  }
+
+  .cycle-day--period {
+    border-color: var(--c);
+    background: color-mix(in srgb, var(--c) 28%, var(--color-surface));
+    font-weight: var(--weight-semibold);
+  }
+
+  .cycle-day--predicted {
+    border: 2px dashed color-mix(in srgb, var(--legacy-period) 70%, var(--color-surface));
+  }
+
+  .cycle-day--fertile {
+    background: color-mix(in srgb, var(--color-success) 14%, var(--color-surface));
+  }
+
+  .cycle-day.month__day--today {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+  }
+
+  .cycle-day[aria-pressed='true'] {
+    border-color: var(--color-primary);
+  }
+
+  .cycle-key {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border-radius: 4px;
+  }
+
+  .cycle-key--period {
+    border: 2px solid #E5487D;
+    background: color-mix(in srgb, #E5487D 28%, var(--color-surface));
+  }
+
+  .cycle-key--predicted {
+    border: 2px dashed color-mix(in srgb, var(--legacy-period) 70%, var(--color-surface));
+  }
+
+  .cycle-key--fertile {
+    background: color-mix(in srgb, var(--color-success) 24%, var(--color-surface));
+  }
+
+  .mark--period {
+    background: var(--legacy-period);
+  }
+
+  .mark--predicted {
+    background: var(--legacy-predicted);
+  }
+
+  /* Ejercicio */
+  .plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    gap: var(--space-3);
+  }
+
+  .plan-card {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .plan-card__icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--legacy-green) 16%, var(--color-surface));
+    color: var(--color-ink);
+  }
+
+  .plan-card__title {
+    font-size: var(--text-body);
+  }
+
+  .plan-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    gap: var(--space-2);
+  }
+
+  /* Sueño: una barra por noche; la línea discontinua marca 8 h */
+  .sleep-bars {
+    position: relative;
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    align-items: end;
+    gap: 4px;
+    height: 180px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background: linear-gradient(to top, transparent calc(24px + (100% - 44px) * 8 / 10 - 1px), var(--color-line-strong) calc(24px + (100% - 44px) * 8 / 10 - 1px), var(--color-line-strong) calc(24px + (100% - 44px) * 8 / 10), transparent calc(24px + (100% - 44px) * 8 / 10));
+  }
+
+  .sleep-bars li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    height: 100%;
+    min-width: 0;
+  }
+
+  .sleep-bars__value {
+    color: var(--color-ink-muted);
+    font-size: var(--text-caption);
+    line-height: 16px;
+  }
+
+  /* Con 14 barras en un móvil las cifras se pisan: quedan en el título de cada barra y en el historial. */
+  @media (max-width: 599px) {
+    .sleep-bars__value {
+      visibility: hidden;
+    }
+  }
+
+  .sleep-bars__bar {
+    width: min(100%, 28px);
+    height: calc((100% - 44px) * var(--h));
+    min-height: 2px;
+    border-radius: 4px 4px 0 0;
+    background: color-mix(in srgb, var(--legacy-violet) 45%, var(--color-surface));
+  }
+
+  .sleep-bars li[data-quality='4'] .sleep-bars__bar {
+    background: color-mix(in srgb, var(--legacy-violet) 72%, var(--color-surface));
+  }
+
+  .sleep-bars li[data-quality='5'] .sleep-bars__bar {
+    background: var(--legacy-violet);
+  }
+
+  .sleep-bars li[data-quality='1'] .sleep-bars__bar,
+  .sleep-bars li[data-quality='2'] .sleep-bars__bar {
+    background: color-mix(in srgb, var(--legacy-violet) 28%, var(--color-surface));
+  }
+
+  .sleep-bars__day {
+    color: var(--color-ink-subtle);
+    font-size: var(--text-caption);
+    line-height: 20px;
+  }
+
+  .sleep-q {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--legacy-violet) 16%, var(--color-surface));
+    font-weight: var(--weight-semibold);
+  }
+
+  /* Emoji siempre en color: sin esto, en algunos sistemas la fuente de reserva los dibuja en blanco y negro. */
+  .emoji {
+    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+    font-variant-emoji: emoji;
+  }
+
+  /* Diario */
+  .journal-layout {
+    display: grid;
+    gap: var(--space-6);
+    align-items: start;
+  }
+
+  @media (min-width: 960px) {
+    .journal-layout {
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    }
+  }
+
+  .journal-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .journal-head__date {
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+  }
+
+  .journal-head__nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-2);
+  }
+
+  .journal-list__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .journal-list__item:last-child {
+    border-bottom: 0;
+  }
+
+  .journal-list__open {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    min-height: 60px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-ink);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .journal-list__open:hover,
+  .journal-list__item--on .journal-list__open {
+    background: var(--color-surface-sunken);
+  }
+
+  .journal-list__mood {
+    width: 1.75rem;
+    flex: none;
+    font-size: 1.375rem;
+    text-align: center;
+  }
+
+  /* Rutina */
+  .day-chip {
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .routine-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .routine-row,
+  .day-items .routine-row__time {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .routine-row {
+    min-height: 60px;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .routine-row:last-child {
+    border-bottom: 0;
+  }
+
+  .routine-row__time {
+    width: 3.2em;
+    flex: none;
+    font-weight: var(--weight-semibold);
+  }
+
+  .routine-row--off .day-item__text strong,
+  .routine-row--off .routine-row__time {
+    color: var(--color-ink-muted);
+  }
+
+  .routine-row .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .water-card__count {
+    margin: 0;
+  }
+
+  .water-card__count .numeric {
+    font-family: var(--font-display);
+    font-size: var(--text-h2);
+  }
+
+  .water-card__actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .water-card__actions .btn:last-child {
+    flex: 1;
+  }
 }
 
 @keyframes dyc-toast-in {

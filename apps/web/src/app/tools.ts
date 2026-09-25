@@ -1,12 +1,35 @@
 import { legacyList, type LegacyData } from '@dyc/core';
-import { BookOpen, CalendarClock, CalendarDays, Clapperboard, FolderKanban, GraduationCap, Lightbulb, ListTodo, Route, School, Timer, type LucideIcon } from 'lucide-react';
+import {
+  AlarmClock,
+  BookOpen,
+  CalendarClock,
+  CalendarDays,
+  Clapperboard,
+  Dumbbell,
+  Flower2,
+  FolderKanban,
+  GraduationCap,
+  Lightbulb,
+  ListTodo,
+  Moon,
+  NotebookPen,
+  PawPrint,
+  Route,
+  School,
+  Target,
+  Timer,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 
-export type ToolGroup = 'organizacion' | 'estudio';
+export type ToolGroup = 'organizacion' | 'estudio' | 'personal' | 'salud';
 
 /** Subgrupos de «Herramientas» en la barra lateral y en «Más». */
 export const TOOL_GROUPS: Array<{ id: ToolGroup; label: string }> = [
   { id: 'organizacion', label: 'Organización' },
   { id: 'estudio', label: 'Estudio y trabajo' },
+  { id: 'personal', label: 'Vida personal' },
+  { id: 'salud', label: 'Salud' },
 ];
 
 export interface Tool {
@@ -17,9 +40,11 @@ export interface Tool {
   description: string;
   count: (d: LegacyData) => number;
   unit: [string, string];
+  /** Solo aparece en el menú si la persona lo activa (Ciclo, como `showCycle` en la app anterior). */
+  optIn?: 'cycle';
 }
 
-/** Herramientas de la app anterior ya reconstruidas en la app nueva (tandas 1 y 2). */
+/** Herramientas de la app anterior ya reconstruidas en la app nueva (tandas 1, 2 y 3). */
 export const TOOLS: Tool[] = [
   {
     to: '/agenda',
@@ -119,5 +144,78 @@ export const TOOLS: Tool[] = [
     description: 'Tu banco de ideas de apps, webs y marketing',
     count: (d) => legacyList(d, 'ideas').length,
     unit: ['idea', 'ideas'],
+  },
+  {
+    to: '/finanzas',
+    label: 'Finanzas',
+    icon: Wallet,
+    group: 'personal',
+    description: 'Ingresos, gastos por categoría y presupuesto del mes',
+    count: (d) => legacyList(d, 'transactions').length,
+    unit: ['movimiento', 'movimientos'],
+  },
+  {
+    to: '/metas',
+    label: 'Metas',
+    icon: Target,
+    group: 'personal',
+    description: 'Objetivos con progreso y fecha límite',
+    count: (d) => legacyList(d, 'goals').filter((g) => !g.done).length,
+    unit: ['en curso', 'en curso'],
+  },
+  {
+    to: '/mascotas',
+    label: 'Mascotas',
+    icon: PawPrint,
+    group: 'personal',
+    description: 'Tus mascotas y sus cuidados de cada día',
+    count: (d) => legacyList(d, 'pets').length,
+    unit: ['mascota', 'mascotas'],
+  },
+  {
+    to: '/ejercicio',
+    label: 'Ejercicio',
+    icon: Dumbbell,
+    group: 'salud',
+    description: 'Planes de entreno y tu historial',
+    count: (d) => legacyList(d, 'workouts').length,
+    unit: ['entreno', 'entrenos'],
+  },
+  {
+    to: '/sueno',
+    label: 'Sueño',
+    icon: Moon,
+    group: 'salud',
+    description: 'Horas y calidad de tus noches',
+    count: (d) => legacyList(d, 'sleep').length,
+    unit: ['noche', 'noches'],
+  },
+  {
+    to: '/diario',
+    label: 'Diario',
+    icon: NotebookPen,
+    group: 'salud',
+    description: 'Ánimo, gratitud y notas de cada día',
+    count: (d) => legacyList(d, 'journal').length,
+    unit: ['entrada', 'entradas'],
+  },
+  {
+    to: '/rutina',
+    label: 'Rutina',
+    icon: AlarmClock,
+    group: 'salud',
+    description: 'Rutinas por hora y día, comidas y agua',
+    count: (d) => legacyList(d, 'routines').length,
+    unit: ['rutina', 'rutinas'],
+  },
+  {
+    to: '/ciclo',
+    label: 'Ciclo',
+    icon: Flower2,
+    group: 'salud',
+    description: 'Registro de tu regla y previsión del próximo periodo',
+    count: (d) => legacyList(d, 'period').length,
+    unit: ['día registrado', 'días registrados'],
+    optIn: 'cycle',
   },
 ];

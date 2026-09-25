@@ -1,4 +1,4 @@
-import { reorderById, utcDayKey } from '@dyc/core';
+import { addDays, reorderById, utcDayKey } from '@dyc/core';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -6,8 +6,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { tokenStore } from '../app/api';
 import { AppRoutes, makeQueryClient, Providers } from '../app/App';
 import { fakeFetch, legacyDoc, profile, USER, type Handler } from '../test/fakeApi';
+import { localDayKey } from '../lib/tools';
 
-// Herramientas de la app anterior (tandas 1 y 2) contra una API falsa.
+// Herramientas de la app anterior (tandas 1, 2 y 3) contra una API falsa.
 
 function renderAt(path: string) {
   const client = makeQueryClient();
@@ -52,8 +53,17 @@ function withApi(extra: Record<string, Handler> = {}) {
       doc[key] = doc[key].filter((x) => x.id !== id);
       if (key === 'todos') doc.subtasks = doc.subtasks.filter((x) => x.todoId !== id);
       if (key === 'notebooks') doc.noteBoxes = doc.noteBoxes.filter((x) => x.notebookId !== id);
+      if (key === 'pets') doc.petCares = doc.petCares.filter((x) => x.petId !== id);
       return { ok: true, updatedAt: at };
     },
+    // Claves que son un objeto (cycle, dayLog, budget).
+    'PATCH /api/v2/modules/:key': (b, url) => {
+      const [key] = parts(url);
+      const value = { ...(doc[key] as unknown as object), ...(b as object) };
+      (doc as Record<string, unknown>)[key] = value;
+      return { value, updatedAt: at };
+    },
+    'PATCH /api/v2/me': (b) => ({ user: { ...USER, ...(b as object) } }),
     ...extra,
   });
 }
@@ -273,8 +283,17 @@ describe('Más', () => {
     expect(within(study).getByRole('link', { name: /Proyectos.*1 activo/ })).toHaveAttribute('href', '/proyectos');
     expect(within(study).getByRole('link', { name: /Cuadernos.*2 cuadernos/ })).toBeInTheDocument();
     expect(within(study).getByRole('link', { name: /Ideas.*2 ideas/ })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Vida personal' })).toHaveTextContent('1 movimiento');
-    expect(screen.queryByRole('region', { name: 'Trabajo y estudio' })).not.toBeInTheDocument();
+    const personal = within(tools).getByRole('list', { name: 'Vida personal' });
+    expect(within(personal).getByRole('link', { name: /Finanzas.*3 movimientos/ })).toHaveAttribute('href', '/finanzas');
+    expect(within(personal).getByRole('link', { name: /Metas.*1 en curso/ })).toHaveAttribute('href', '/metas');
+    expect(within(personal).getByRole('link', { name: /Mascotas.*1 mascota/ })).toHaveAttribute('href', '/mascotas');
+    const health = within(tools).getByRole('list', { name: 'Salud' });
+    expect(within(health).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/ejercicio', '/sueno', '/diario', '/rutina', '/ciclo']);
+    // Ciclo siempre se abre desde Más, aunque esté oculto en el menú.
+    expect(within(health).getByRole('link', { name: /Ciclo.*oculto en el menú.*Vacío/ })).toBeInTheDocument();
+    // Lo que aún no está en la app nueva sigue en «Llegan pronto».
+    expect(screen.getByRole('region', { name: 'Organización y trabajo' })).toHaveTextContent('Notas (Bodega)');
+    expect(screen.queryByRole('region', { name: 'Vida personal' })).not.toBeInTheDocument();
   });
 });
 
@@ -531,5 +550,312 @@ describe('Ideas', () => {
     await userEvent.tab();
     expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/ideas/i2', body: { tags: 'diseño, web' } });
     expect(within(card).getByText('#diseño')).toBeInTheDocument();
+  });
+});
+
+// ---------- Tanda 3 ----------
+
+const withCycle = (extra: Record<string, Handler> = {}) => withApi({ 'GET /api/me': () => ({ user: { ...USER, showCycle: true } }), ...extra });
+
+describe('Barra lateral', () => {
+  it('agrupa las herramientas en subgrupos plegables y solo muestra Ciclo si está activado', async () => {
+    withApi();
+    renderAt('/ejercicio');
+    const nav = await screen.findByRole('navigation', { name: 'Herramientas' });
+    const salud = within(nav).getByRole('button', { name: 'Salud' });
+    expect(salud).toHaveAttribute('aria-expanded', 'true');
+    const list = within(nav).getByRole('list', { name: 'Salud' });
+    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Ejercicio', 'Sueño', 'Diario', 'Rutina']);
+    // Los demás grupos empiezan plegados y se abren al pulsarlos.
+    const personal = within(nav).getByRole('button', { name: 'Vida personal' });
+    expect(personal).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(personal);
+    expect(within(within(nav).getByRole('list', { name: 'Vida personal' })).getByRole('link', { name: 'Finanzas' })).toBeInTheDocument();
+  });
+
+  it('con Ciclo activado aparece en Salud', async () => {
+    withCycle();
+    renderAt('/ciclo');
+    const nav = await screen.findByRole('navigation', { name: 'Herramientas' });
+    await waitFor(() => expect(within(within(nav).getByRole('list', { name: 'Salud' })).getByRole('link', { name: 'Ciclo' })).toHaveAttribute('href', '/ciclo'));
+  });
+});
+
+describe('Finanzas', () => {
+  it('resume el mes, define el presupuesto y añade un gasto', async () => {
+    const api = withApi();
+    renderAt('/finanzas');
+    expect(await screen.findByText('+1200', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(screen.getByText('−45,5', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(screen.getByText('1154,5', { selector: '.stat__value *' })).toBeInTheDocument();
+    // El movimiento antiguo de otro mes no cuenta.
+    expect(within(screen.getByRole('region', { name: /Movimientos/ })).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByRole('progressbar', { name: 'Comida: 100 % de los gastos' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Definir' }));
+    const budget = screen.getByRole('dialog', { name: 'Presupuesto mensual' });
+    await userEvent.type(within(budget).getByLabelText('Cuánto quieres gastar al mes'), '500');
+    await userEvent.click(within(budget).getByRole('button', { name: 'Guardar' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/budget', body: { monthly: 500 } });
+    expect(await screen.findByRole('progressbar', { name: 'Presupuesto gastado' })).toHaveAttribute('aria-valuenow', '9');
+    expect(screen.getByText(/Quedan 454,5/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nuevo movimiento' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo movimiento' });
+    await userEvent.type(within(dialog).getByLabelText('Monto'), '12,30');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Categoría'), 'Transporte');
+    await userEvent.type(within(dialog).getByLabelText('Nota (opcional)'), 'Metro');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir movimiento' }));
+    expect(writes(api)[1]).toMatchObject({
+      method: 'POST',
+      path: '/api/v2/modules/transactions',
+      body: { item: { type: 'expense', amount: 12.3, category: 'Transporte', note: 'Metro', date: utcDayKey() } },
+    });
+    expect(await screen.findByRole('button', { name: 'Editar: Gasto de 12,3 en Transporte (Metro)' })).toBeInTheDocument();
+  });
+
+  it('un ingreso cambia las categorías y se puede borrar con deshacer', async () => {
+    const api = withApi();
+    renderAt('/finanzas');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo movimiento' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo movimiento' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ingreso' }));
+    expect(within(within(dialog).getByLabelText('Categoría')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Sueldo', 'Freelance', 'Contenido', 'Regalo', 'Otro']);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Borrar: Gasto de 45,5 en Comida (Mercado)' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'DELETE', path: '/api/v2/modules/transactions/x2' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Deshacer' }));
+    expect(writes(api)[1]).toMatchObject({ method: 'POST', body: { item: { id: 'x2', amount: 45.5 } } });
+    await waitFor(() => expect(writes(api)[2]).toMatchObject({ method: 'PUT', path: '/api/v2/modules/transactions/order' }));
+    expect((writes(api)[2].body as { ids: string[] }).ids).toEqual(['x1', 'x2', 'x3']);
+  });
+});
+
+describe('Metas', () => {
+  it('suma avances, se logra al llegar y filtra por categoría', async () => {
+    const api = withApi();
+    renderAt('/metas');
+    const card = await screen.findByRole('article', { name: 'Publicar 8 videos' });
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '88');
+    await userEvent.click(within(card).getByRole('button', { name: 'Sumar 1 a «Publicar 8 videos»' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/goals/g1', body: { current: 8, done: true } });
+    expect(await screen.findByText('2/2')).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('article', { name: 'Leer 12 libros' })).getByRole('button', { name: 'Lograda' }));
+    expect(writes(api)[1]).toMatchObject({ body: { done: false } });
+
+    await userEvent.click(within(screen.getByRole('group', { name: 'Categoría' })).getByRole('button', { name: 'Estudio' }));
+    expect(screen.queryByRole('article', { name: 'Publicar 8 videos' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Nueva meta' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nueva meta' });
+    await userEvent.type(within(dialog).getByLabelText('Meta'), 'Aprobar Cálculo');
+    const target = within(dialog).getByLabelText('Objetivo');
+    await userEvent.clear(target);
+    await userEvent.type(target, '1');
+    await userEvent.type(within(dialog).getByLabelText('Fecha límite (opcional)'), '2026-12-15');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir meta' }));
+    expect(writes(api)[2]).toMatchObject({
+      method: 'POST',
+      path: '/api/v2/modules/goals',
+      body: { item: { title: 'Aprobar Cálculo', target: 1, current: 0, unit: '', deadline: '2026-12-15', category: 'estudio', done: false } },
+    });
+  });
+});
+
+describe('Mascotas', () => {
+  it('marca un cuidado como hecho hoy, añade otro y borra la mascota con sus cuidados', async () => {
+    const api = withApi();
+    renderAt('/mascotas');
+    const card = await screen.findByRole('article', { name: 'Luna' });
+    expect(within(card).getByText(/Gato · 3 años/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('checkbox', { name: 'Hecho hoy: «Darle de comer» de Luna' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/petCares/pc1', body: { lastDone: utcDayKey() } });
+    expect(await within(card).findByText(/Hecho hoy · Todos los días/)).toBeInTheDocument();
+
+    await userEvent.click(within(card).getByRole('button', { name: /Añadir cuidado/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo cuidado de Luna' });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Tipo'), 'paseo');
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'sábado' }));
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'domingo' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir cuidado' }));
+    expect(writes(api)[1]).toMatchObject({
+      method: 'POST',
+      path: '/api/v2/modules/petCares',
+      body: { item: { petId: 'pet1', kind: 'paseo', title: 'Paseo', time: '', days: '12345', sound: true, enabled: true, lastDone: '' } },
+    });
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Editar a Luna' }));
+    const edit = screen.getByRole('dialog', { name: 'Editar mascota' });
+    await userEvent.click(within(edit).getByRole('button', { name: 'Borrar' }));
+    expect(within(edit).getByRole('alert')).toHaveTextContent('Se borrará a Luna con 2 cuidados.');
+    await userEvent.click(within(edit).getByRole('button', { name: 'Borrar definitivamente' }));
+    expect(writes(api)[2]).toMatchObject({ method: 'DELETE', path: '/api/v2/modules/pets/pet1' });
+    expect(await screen.findByRole('heading', { name: 'Aún no tienes mascotas' })).toBeInTheDocument();
+  });
+});
+
+describe('Ciclo', () => {
+  it('registra un día de regla con fecha local, estima el próximo periodo y dice dónde se guarda', async () => {
+    const api = withApi();
+    renderAt('/ciclo');
+    expect(await screen.findByRole('heading', { name: 'Registra tu primer día de regla' })).toBeInTheDocument();
+    expect(screen.getByText(/se guardan en tu cuenta de Design Your Core y se sincronizan/)).toBeInTheDocument();
+    expect(screen.getByText(/Es una estimación, no un consejo médico/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Marcar como día de regla' }));
+    const today = localDayKey(new Date());
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/period', body: { item: { date: today, flow: 'medium', symptoms: '', mood: '', note: '' } } });
+    expect(await screen.findByText('Día 1')).toBeInTheDocument();
+    expect(screen.getByText('En 28 días')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abundante' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cólicos' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Fatiga' }));
+    expect(writes(api).slice(1).map((w) => w.body)).toEqual([{ flow: 'heavy' }, { symptoms: 'Cólicos' }, { symptoms: 'Cólicos, Fatiga' }]);
+
+    const settings = screen.getByRole('form', { name: 'Tu ciclo' });
+    const length = within(settings).getByLabelText('Duración del ciclo (días)');
+    await userEvent.clear(length);
+    await userEvent.type(length, '30');
+    await userEvent.click(within(settings).getByRole('button', { name: 'Guardar' }));
+    expect(writes(api)[4]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/cycle', body: { cycleLength: 30, periodLength: 5 } });
+    expect(await screen.findByText('En 30 días')).toBeInTheDocument();
+
+    await userEvent.click(within(settings).getByRole('button', { name: 'Recordarme el próximo periodo' }));
+    const next = addDays(today, 30);
+    expect(writes(api)[5]).toMatchObject({ method: 'POST', path: '/api/v2/modules/reminders', body: { item: { day: Number(next.slice(8)), title: '🩸 Posible inicio del periodo', color: '#EC6A9C', on: true } } });
+  });
+
+  it('se muestra u oculta en el menú con el ajuste de la cuenta', async () => {
+    const api = withApi();
+    renderAt('/ciclo');
+    const toggle = await screen.findByRole('switch', { name: 'Mostrar Ciclo en el menú y en el Calendario' });
+    expect(toggle).not.toBeChecked();
+    await userEvent.click(toggle);
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/me', body: { showCycle: true } });
+    await waitFor(() => expect(within(screen.getByRole('navigation', { name: 'Herramientas' })).getByRole('link', { name: 'Ciclo' })).toBeInTheDocument());
+  });
+});
+
+describe('Calendario con Ciclo', () => {
+  it('marca los días de regla y la regla prevista solo si Ciclo está activado', async () => {
+    const start = localDayKey(new Date());
+    const period = [0, 1].map((i) => ({ id: `pd${i}`, date: addDays(start, -i), flow: 'medium', symptoms: '', mood: '', note: '' }));
+    withCycle({ 'GET /api/v2/modules': () => ({ data: { ...legacyDoc(), period }, updatedAt: null }) });
+    renderAt('/calendario');
+    const todayBtn = await screen.findByRole('button', { name: /: .*regla/, pressed: true });
+    expect(todayBtn.getAttribute('aria-label')).toMatch(/regla$/);
+    expect(screen.getByRole('list', { name: 'Leyenda' })).toHaveTextContent('Regla prevista');
+    expect(screen.getByText('Ver en Ciclo')).toHaveAttribute('href', '/ciclo');
+  });
+
+  it('sin Ciclo activado no muestra nada del ciclo', async () => {
+    const period = [{ id: 'pd0', date: localDayKey(new Date()), flow: 'medium', symptoms: '', mood: '', note: '' }];
+    withApi({ 'GET /api/v2/modules': () => ({ data: { ...legacyDoc(), period }, updatedAt: null }) });
+    renderAt('/calendario');
+    expect(await screen.findByRole('list', { name: 'Leyenda' })).not.toHaveTextContent('Regla');
+    expect(screen.queryByRole('button', { name: /regla/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Ejercicio', () => {
+  it('registra un plan hecho hoy, lo agenda en la Rutina y edita el historial', async () => {
+    const api = withApi();
+    renderAt('/ejercicio');
+    await userEvent.click(await screen.findByRole('button', { name: 'Hecho hoy: Full body' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/workouts', body: { item: { date: utcDayKey(), plan: 'Full body', minutes: 30 } } });
+    const week = screen.getByText(/Entrenos? esta semana/).previousElementSibling;
+    await waitFor(() => expect(week).toHaveTextContent(/[1-9]/));
+    await userEvent.click(screen.getByRole('button', { name: 'Agendar Full body en tu Rutina' }));
+    expect(writes(api)[1]).toMatchObject({ method: 'POST', path: '/api/v2/modules/routines', body: { item: { title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', enabled: true } } });
+
+    await userEvent.click(screen.getByRole('button', { name: /Editar Core express del/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Editar entreno' });
+    const minutes = within(dialog).getByLabelText('Minutos');
+    await userEvent.clear(minutes);
+    await userEvent.type(minutes, '20');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    expect(writes(api)[2]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/workouts/w1', body: { plan: 'Core express', minutes: 20, date: '2026-09-20' } });
+  });
+});
+
+describe('Sueño', () => {
+  it('registra una noche y muestra la media', async () => {
+    const api = withApi();
+    renderAt('/sueno');
+    expect(await screen.findByText('Media de las últimas 1 noche')).toBeInTheDocument();
+    expect(screen.getAllByText('7 h 45 min').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar noche' }));
+    const dialog = screen.getByRole('dialog', { name: 'Registrar noche' });
+    const bed = within(dialog).getByLabelText('Te acostaste');
+    await userEvent.clear(bed);
+    await userEvent.type(bed, '00:30');
+    expect(within(dialog).getByText('Dormiste 6 h 30 min.')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('radio', { name: /^5/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/sleep', body: { item: { date: utcDayKey(), bedtime: '00:30', waketime: '07:00', quality: 5, note: '' } } });
+    expect(await screen.findByText('Media de las últimas 2 noches')).toBeInTheDocument();
+  });
+});
+
+describe('Diario', () => {
+  it('crea la entrada de hoy con lo primero que escribes y después la actualiza', async () => {
+    const api = withApi();
+    renderAt('/diario');
+    expect(await screen.findByText(/se crea con lo primero que escribas/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /Genial/ }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/journal', body: { item: { date: utcDayKey(), mood: '😄', gratitude: '', note: '' } } });
+    const id = (writes(api)[0].body as { item: { id: string } }).item.id;
+    await userEvent.type(screen.getByLabelText('Hoy agradezco…'), 'El sol');
+    await waitFor(() => expect(writes(api)).toHaveLength(2), { timeout: 2000 });
+    expect(writes(api)[1]).toMatchObject({ method: 'PATCH', path: `/api/v2/modules/journal/${id}`, body: { gratitude: 'El sol' } });
+
+    // Una entrada anterior se abre desde la lista.
+    await userEvent.click(screen.getByRole('button', { name: /^19 sept/ }));
+    expect(screen.getByLabelText('Notas del día')).toHaveValue('Buen día');
+  });
+});
+
+describe('Rutina', () => {
+  it('cuenta el agua de hoy empezando de cero si el registro es de otro día', async () => {
+    const api = withApi();
+    renderAt('/rutina');
+    expect(await screen.findByText('de 8 vasos')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Quitar un vaso' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Un vaso' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/dayLog', body: { dateKey: utcDayKey(), water: 1 } });
+    await userEvent.selectOptions(screen.getByLabelText('Meta diaria'), '10');
+    expect(writes(api)[1]).toMatchObject({ body: { waterGoal: 10 } });
+    expect(await screen.findByText('de 10 vasos')).toBeInTheDocument();
+  });
+
+  it('filtra las rutinas por día, las desactiva y anota comidas', async () => {
+    const api = withApi();
+    renderAt('/rutina');
+    expect(await screen.findByText('Tomar vitaminas')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('switch', { name: 'Activa: «Tomar vitaminas»' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/routines/rt1', body: { enabled: false } });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nueva rutina' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nueva rutina' });
+    await userEvent.type(within(dialog).getByLabelText('Qué haces'), 'Leer');
+    const time = within(dialog).getByLabelText('Hora');
+    await userEvent.clear(time);
+    await userEvent.type(time, '22:00');
+    for (const d of ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']) await userEvent.click(within(dialog).getByRole('checkbox', { name: d }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir rutina' }));
+    expect(writes(api)[1]).toMatchObject({ method: 'POST', path: '/api/v2/modules/routines', body: { item: { title: 'Leer', time: '22:00', days: '67', icon: 'bell', sound: true, enabled: true } } });
+    await userEvent.click(within(screen.getByRole('group', { name: 'Día de la semana' })).getByRole('button', { name: 'Lunes' }));
+    expect(screen.queryByText('Leer')).not.toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('group', { name: 'Día de la semana' })).getByRole('button', { name: 'Domingo' }));
+    expect(screen.getByText('Leer')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir comida' }));
+    const meal = screen.getByRole('dialog', { name: 'Nueva comida' });
+    await userEvent.selectOptions(within(meal).getByLabelText('Comida'), 'Desayuno');
+    await userEvent.type(within(meal).getByLabelText('Qué comiste (opcional)'), 'Avena');
+    await userEvent.click(within(meal).getByRole('button', { name: 'Añadir comida' }));
+    expect(writes(api)[2]).toMatchObject({ method: 'POST', path: '/api/v2/modules/meals', body: { item: { label: 'Desayuno', note: 'Avena', dateKey: utcDayKey() } } });
+    expect(await screen.findByText('Avena')).toBeInTheDocument();
   });
 });

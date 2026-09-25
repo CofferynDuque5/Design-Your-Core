@@ -146,6 +146,25 @@ export const legacyDoc = (): Record<string, unknown> => ({
     { id: 'i1', title: 'App de hábitos', body: 'Para estudiantes', category: 'app', tags: 'saas, urgente' },
     { id: 'i2', title: 'Landing para portfolio', body: '', category: 'web', tags: '' },
   ],
-  transactions: [{ id: 'x1', type: 'gasto', amount: 10 }],
+  // Tanda 3. Los movimientos son de este mes (UTC); el último es un dato antiguo raro, de otro mes.
+  transactions: [
+    { id: 'x1', date: new Date().toISOString().slice(0, 10), amount: 1200, type: 'income', category: 'Sueldo', note: 'Septiembre' },
+    { id: 'x2', date: new Date().toISOString().slice(0, 10), amount: 45.5, type: 'expense', category: 'Comida', note: 'Mercado' },
+    { id: 'x3', date: '2020-01-05', type: 'gasto', amount: 10 },
+  ],
+  goals: [
+    { id: 'g1', title: 'Publicar 8 videos', target: 8, current: 7, unit: 'videos', deadline: '', category: 'creador', done: false },
+    { id: 'g2', title: 'Leer 12 libros', target: 12, current: 12, unit: 'libros', deadline: '', category: 'estudio', done: true },
+  ],
+  pets: [{ id: 'pet1', name: 'Luna', species: 'cat', note: '3 años' }],
+  petCares: [{ id: 'pc1', petId: 'pet1', kind: 'comida', title: 'Darle de comer', time: '08:00', days: '1234567', sound: true, enabled: true, lastDone: '' }],
+  period: [],
+  cycle: { cycleLength: 28, periodLength: 5 },
+  workouts: [{ id: 'w1', date: '2026-09-20', plan: 'Core express', minutes: 15 }],
+  sleep: [{ id: 'sl1', date: '2026-09-20', bedtime: '23:30', waketime: '07:15', quality: 4, note: '' }],
+  journal: [{ id: 'j1', date: '2026-09-19', mood: '🙂', gratitude: 'Mi familia', note: 'Buen día' }],
+  routines: [{ id: 'rt1', title: 'Tomar vitaminas', time: '08:30', days: '1234567', icon: 'bell', sound: true, enabled: true }],
+  meals: [],
+  dayLog: { dateKey: '2020-01-01', water: 5, waterGoal: 8 },
   claveFutura: true,
 });

@@ -1,7 +1,9 @@
-import { addDays, COLOR_NAMES, isoWeekday, legacyList, longDay, monthLabel, REMINDER_COLORS, type Day, type LegacyReminder } from '@dyc/core';
+import { addDays, COLOR_NAMES, cycleInfo, cyclePredictions, isDay, isoWeekday, legacyList, legacyObject, longDay, monthLabel, PERIOD_FLOW_INFO, REMINDER_COLORS, type Day, type LegacyReminder } from '@dyc/core';
 import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
+import { useSession } from '../app/session';
 import { PageHeader } from '../components/AppShell';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
@@ -14,6 +16,9 @@ const MARKS = {
   workout: { label: 'Entreno', className: 'mark--workout' },
   goal: { label: 'Meta', className: 'mark--goal' },
   journal: { label: 'Diario', className: 'mark--journal' },
+  // Solo si Ciclo está activado, como en la app anterior (`user.showCycle`).
+  period: { label: 'Regla', className: 'mark--period' },
+  predicted: { label: 'Regla prevista', className: 'mark--predicted' },
 } as const;
 type MarkKind = keyof typeof MARKS;
 
@@ -58,6 +63,17 @@ export function Calendar() {
   const [editing, setEditing] = useState<LegacyReminder | 'new' | null>(null);
   const data = legacy.data?.data ?? {};
   const reminders = useLegacyList(legacy.data?.data, 'reminders');
+  const showCycle = !!useSession().user?.showCycle;
+  // Regla registrada y prevista (misma estimación que en Ciclo; ver docs/modulos.md).
+  const cycleDays = useMemo(() => {
+    if (!showCycle) return { period: new Set<Day>(), predicted: new Set<Day>() };
+    const d = legacy.data?.data ?? {};
+    const period = legacyList(d, 'period');
+    const cycle = legacyObject(d, 'cycle');
+    const registered = new Set(period.map((p) => p.date).filter(isDay));
+    const end = addDays(month, daysInMonth(month) - 1);
+    return { period: registered, predicted: cyclePredictions(cycleInfo(period, cycle, today), cycle, month, end, registered).period };
+  }, [showCycle, legacy.data, month, today]);
 
   // Qué hay cada día del mes visible.
   const marks = useMemo(() => {
@@ -75,8 +91,10 @@ export function Calendar() {
     arr<Workout>(d, 'workouts').forEach((w) => add(w.date, 'workout'));
     arr<Goal>(d, 'goals').forEach((g) => add(g.deadline, 'goal'));
     arr<Journal>(d, 'journal').forEach((j) => add(j.date, 'journal'));
+    cycleDays.period.forEach((day) => add(day, 'period'));
+    cycleDays.predicted.forEach((day) => add(day, 'predicted'));
     return byDay;
-  }, [legacy.data, month]);
+  }, [legacy.data, month, cycleDays]);
 
   const n = daysInMonth(month);
   const lead = isoWeekday(month) - 1;
@@ -176,7 +194,7 @@ export function Calendar() {
               </tbody>
             </table>
             <ul className="legend legend--row" aria-label="Leyenda">
-              {(Object.keys(MARKS) as MarkKind[]).map((k) => (
+              {(Object.keys(MARKS) as MarkKind[]).filter((k) => showCycle || (k !== 'period' && k !== 'predicted')).map((k) => (
                 <li key={k}>
                   <span className={`mark ${MARKS[k].className}`} aria-hidden="true" />
                   {MARKS[k].label}
@@ -184,7 +202,7 @@ export function Calendar() {
               ))}
             </ul>
           </section>
-          <DayPanel day={selected} data={data} reminders={reminders} onEdit={setEditing} />
+          <DayPanel day={selected} data={data} reminders={reminders} onEdit={setEditing} cycle={showCycle ? { period: cycleDays.period.has(selected), predicted: cycleDays.predicted.has(selected) } : null} />
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo evento' : 'Editar evento'}>
@@ -194,14 +212,27 @@ export function Calendar() {
   );
 }
 
-function DayPanel({ day, data, reminders, onEdit }: { day: Day; data: Record<string, unknown>; reminders: LegacyReminder[]; onEdit: (r: LegacyReminder) => void }) {
+function DayPanel({
+  day,
+  data,
+  reminders,
+  onEdit,
+  cycle,
+}: {
+  day: Day;
+  data: Record<string, unknown>;
+  reminders: LegacyReminder[];
+  onEdit: (r: LegacyReminder) => void;
+  cycle: { period: boolean; predicted: boolean } | null;
+}) {
   const actions = useModule('reminders');
   const dayNum = Number(day.slice(8));
   const events = reminders.filter((r) => r.day === dayNum);
   const workouts = arr<Workout>(data, 'workouts').filter((w) => w.date === day);
   const goals = arr<Goal>(data, 'goals').filter((g) => g.deadline === day);
   const journal = arr<Journal>(data, 'journal').filter((j) => j.date === day);
-  const empty = !events.length && !workouts.length && !goals.length && !journal.length;
+  const periodDay = cycle?.period ? legacyList(data, 'period').find((p) => p.date === day) : undefined;
+  const empty = !events.length && !workouts.length && !goals.length && !journal.length && !cycle?.period && !cycle?.predicted;
 
   return (
     <section className="card stack" aria-labelledby="day-panel-title">
@@ -255,6 +286,28 @@ function DayPanel({ day, data, reminders, onEdit }: { day: Day; data: Record<str
               </span>
             </li>
           ))}
+          {cycle?.period && (
+            <li className="day-item">
+              <span className="mark mark--period" aria-hidden="true" />
+              <span className="day-item__text">
+                <strong>Regla</strong>
+                <span className="muted small">
+                  Flujo {(PERIOD_FLOW_INFO[periodDay?.flow as keyof typeof PERIOD_FLOW_INFO] ?? PERIOD_FLOW_INFO.medium).label.toLowerCase()} · <Link to="/ciclo">Ver en Ciclo</Link>
+                </span>
+              </span>
+            </li>
+          )}
+          {cycle?.predicted && (
+            <li className="day-item">
+              <span className="mark mark--predicted" aria-hidden="true" />
+              <span className="day-item__text">
+                <strong>Regla prevista</strong>
+                <span className="muted small">
+                  Estimación, no consejo médico · <Link to="/ciclo">Ver en Ciclo</Link>
+                </span>
+              </span>
+            </li>
+          )}
           {journal.map((j, i) => (
             <li key={`j${i}`} className="day-item">
               <span className="mark mark--journal" aria-hidden="true" />

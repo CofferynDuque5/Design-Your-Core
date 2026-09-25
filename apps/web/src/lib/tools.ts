@@ -124,3 +124,35 @@ export function useAutosave(value: string, save: (v: string) => void, delay = 60
   }, [flush]);
   return { draft, change, flush };
 }
+
+/** Cantidades sin moneda, como la app anterior (`toLocaleString("es")`): 1234.5 → "1234,5"; 12345 → "12.345". */
+export const money = (n: number) => new Intl.NumberFormat('es', { maximumFractionDigits: 2 }).format(n);
+
+/** 465 → "7 h 45 min". */
+export const minutesLabel = (m: number) => durationLabel(m / 60);
+
+/** "HH:MM" de una fecha local. */
+export const localTime = (d = new Date()) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+/** Días de un mes en una cuadrícula de lunes a domingo (null = hueco). */
+export function monthWeeks(month: string): Array<Array<string | null>> {
+  const y = Number(month.slice(0, 4));
+  const m = Number(month.slice(5, 7));
+  const n = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const lead = first === 0 ? 6 : first - 1;
+  const cells: Array<string | null> = [...Array(lead).fill(null), ...Array.from({ length: n }, (_, i) => `${month.slice(0, 8)}${String(i + 1).padStart(2, '0')}`)];
+  while (cells.length % 7) cells.push(null);
+  return Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
+}
+
+/** Cabecera de la semana en los calendarios: letra visible y nombre completo para lectores. */
+export const WEEK_HEAD = [
+  ['L', 'lunes'],
+  ['M', 'martes'],
+  ['X', 'miércoles'],
+  ['J', 'jueves'],
+  ['V', 'viernes'],
+  ['S', 'sábado'],
+  ['D', 'domingo'],
+] as const;

@@ -460,3 +460,250 @@ test('contenido e ideas: publicar, etapas, filtros y guardado al escribir', asyn
   await expect(page.getByRole('article', { name: 'Reel para Instagram' }).getByLabel('Desarrollo de «Reel para Instagram»')).toHaveValue('Tres consejos en 30 segundos');
   expect(await readLegacy(page)).toMatchObject(OLD);
 });
+
+// ---------- Tanda 3: vida personal y salud ----------
+
+const utcToday = () => new Date().toISOString().slice(0, 10);
+const byDate = (list: unknown) => [...(list as Array<{ date: string }>)].sort((a, b) => a.date.localeCompare(b.date));
+
+test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) => {
+  await register(page, 'finanzas');
+  await onboard(page);
+  const today = utcToday();
+  await seedLegacy(page, {
+    ...OLD,
+    transactions: [{ id: 'tx_viejo', date: today, amount: 40, type: 'expense', category: 'Comida', note: 'Mercado', extra: 'de la app anterior' }],
+    goals: [{ id: 'g_viejo', title: 'Leer 3 libros', target: 3, current: 2, unit: 'libros', deadline: '', category: 'estudio', done: false }],
+  });
+  // El presupuesto de la app anterior vivía solo en este navegador: se ofrece como sugerencia.
+  await page.evaluate(() => localStorage.setItem('core_budget', '300'));
+  await page.goto('/finanzas');
+  await page.getByRole('button', { name: 'Definir' }).click();
+  const budget = page.getByRole('dialog', { name: 'Presupuesto mensual' });
+  await expect(budget.getByLabel('Cuánto quieres gastar al mes')).toHaveValue('300');
+  await expect(budget.getByText(/La app anterior tenía 300/)).toBeVisible();
+  await budget.getByLabel('Cuánto quieres gastar al mes').fill('250,5');
+  await budget.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByText(/Quedan 210,5/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Nuevo movimiento' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Nuevo movimiento' });
+  await dialog.getByRole('button', { name: 'Ingreso' }).click();
+  await dialog.getByLabel('Monto').fill('1200');
+  await dialog.getByLabel('Categoría').selectOption('Sueldo');
+  await dialog.getByRole('button', { name: 'Añadir movimiento' }).click();
+  await page.getByRole('button', { name: 'Editar: Gasto de 40 en Comida (Mercado)' }).click();
+  dialog = page.getByRole('dialog', { name: 'Editar movimiento' });
+  await dialog.getByLabel('Monto').fill('45,75');
+  await dialog.getByRole('button', { name: 'Guardar' }).click();
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('button', { name: 'Editar: Ingreso de 1200 en Sueldo' })).toBeVisible();
+  await expect(page.getByText(/Quedan 204,75/)).toBeVisible();
+
+  let doc = await readLegacy(page);
+  expect(doc.budget).toEqual({ monthly: 250.5 });
+  expect(doc.transactions).toEqual([
+    { id: expect.any(String), type: 'income', amount: 1200, category: 'Sueldo', note: '', date: today },
+    { id: 'tx_viejo', date: today, amount: 45.75, type: 'expense', category: 'Comida', note: 'Mercado', extra: 'de la app anterior' },
+  ]);
+
+  await page.goto('/metas');
+  const card = page.getByRole('article', { name: 'Leer 3 libros' });
+  await card.getByRole('button', { name: 'Sumar 1 a «Leer 3 libros»' }).click();
+  await expect(card.getByRole('button', { name: 'Lograda' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Nueva meta' }).click();
+  dialog = page.getByRole('dialog', { name: 'Nueva meta' });
+  await dialog.getByLabel('Meta').fill('Ahorrar para el viaje');
+  await dialog.getByLabel('Objetivo').fill('600');
+  await dialog.getByLabel('Unidad (opcional)').fill('€');
+  await dialog.getByLabel('Fecha límite (opcional)').fill('2026-12-09');
+  await dialog.getByLabel('Categoría').selectOption('dinero');
+  await dialog.getByRole('button', { name: 'Añadir meta' }).click();
+  await page.getByRole('article', { name: 'Ahorrar para el viaje' }).getByRole('button', { name: 'Sumar 1 a «Ahorrar para el viaje»' }).click();
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('article', { name: 'Ahorrar para el viaje' }).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.getByText('1 de 600 €')).toBeVisible();
+
+  doc = await readLegacy(page);
+  expect(doc.goals).toEqual([
+    { id: 'g_viejo', title: 'Leer 3 libros', target: 3, current: 3, unit: 'libros', deadline: '', category: 'estudio', done: true },
+    { id: expect.any(String), title: 'Ahorrar para el viaje', target: 600, current: 1, unit: '€', deadline: '2026-12-09', category: 'dinero', done: false },
+  ]);
+  expect(doc).toMatchObject(OLD);
+});
+
+test('mascotas y rutina: cuidados por días, borrado en cascada, agua y comidas', async ({ page }) => {
+  await register(page, 'mascotas');
+  await onboard(page);
+  const today = utcToday();
+  await seedLegacy(page, {
+    ...OLD,
+    pets: [{ id: 'pet_viejo', name: 'Luna', species: 'cat', note: '3 años' }],
+    petCares: [{ id: 'pc_viejo', petId: 'pet_viejo', kind: 'comida', title: 'Darle de comer', time: '08:00', days: '1234567', sound: true, enabled: true, lastDone: '' }],
+    dayLog: { dateKey: '2020-01-01', water: 5, waterGoal: 6 },
+  });
+  await page.goto('/mascotas');
+  const luna = page.getByRole('article', { name: 'Luna' });
+  await luna.getByRole('checkbox', { name: 'Hecho hoy: «Darle de comer» de Luna' }).click();
+  await expect(luna.getByRole('checkbox', { name: 'Hecho hoy: «Darle de comer» de Luna' })).toBeChecked();
+  await luna.getByRole('button', { name: /Añadir cuidado/ }).click();
+  let dialog = page.getByRole('dialog', { name: 'Nuevo cuidado de Luna' });
+  await dialog.getByLabel('Tipo').selectOption('paseo');
+  await dialog.getByLabel('Hora (opcional)').fill('19:00');
+  for (const d of ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']) await dialog.getByRole('checkbox', { name: d }).uncheck();
+  await expect(dialog.getByText('Fines de semana')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Añadir cuidado' }).click();
+  await page.getByRole('button', { name: 'Nueva mascota' }).click();
+  dialog = page.getByRole('dialog', { name: 'Nueva mascota' });
+  await dialog.getByLabel('Nombre').fill('Toby');
+  await dialog.getByLabel('Especie').selectOption('dog');
+  await dialog.getByRole('button', { name: 'Añadir mascota' }).click();
+  await expect
+    .poll(async () => (await readLegacy(page)).petCares)
+    .toEqual([
+      { id: 'pc_viejo', petId: 'pet_viejo', kind: 'comida', title: 'Darle de comer', time: '08:00', days: '1234567', sound: true, enabled: true, lastDone: today },
+      { id: expect.any(String), petId: 'pet_viejo', kind: 'paseo', title: 'Paseo', time: '19:00', days: '67', sound: true, enabled: true, lastDone: '' },
+    ]);
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('article', { name: 'Luna' }).getByRole('checkbox', { name: 'Hecho hoy: «Darle de comer» de Luna' })).toBeChecked();
+
+  // Borrar una mascota borra también sus cuidados.
+  await page.getByRole('button', { name: 'Editar a Luna' }).click();
+  dialog = page.getByRole('dialog', { name: 'Editar mascota' });
+  await dialog.getByRole('button', { name: 'Borrar', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Se borrará a Luna con 2 cuidados.');
+  await dialog.getByRole('button', { name: 'Borrar definitivamente' }).click();
+  await expect(page.getByRole('article', { name: 'Luna' })).toHaveCount(0);
+  await expect.poll(async () => (await readLegacy(page)).petCares).toEqual([]);
+  let doc = await readLegacy(page);
+  expect(doc.pets).toEqual([{ id: expect.any(String), name: 'Toby', species: 'dog', note: '' }]);
+
+  // El agua es de hoy: el registro de otro día empieza de cero y la meta se conserva.
+  await page.goto('/rutina');
+  await expect(page.getByText('de 6 vasos')).toBeVisible();
+  await page.getByRole('button', { name: 'Un vaso', exact: true }).click();
+  await page.getByRole('button', { name: 'Nueva rutina' }).click();
+  dialog = page.getByRole('dialog', { name: 'Nueva rutina' });
+  await dialog.getByLabel('Qué haces').fill('Leer');
+  await dialog.getByLabel('Hora').fill('22:00');
+  for (const d of ['sábado', 'domingo']) await dialog.getByRole('checkbox', { name: d }).uncheck();
+  await dialog.getByRole('button', { name: 'Añadir rutina' }).click();
+  await page.getByRole('button', { name: 'Añadir comida' }).click();
+  dialog = page.getByRole('dialog', { name: 'Nueva comida' });
+  await dialog.getByLabel('Comida').selectOption('Desayuno');
+  await dialog.getByLabel('Hora (opcional)').fill('08:15');
+  await dialog.getByLabel('Qué comiste (opcional)').fill('Avena');
+  await dialog.getByRole('button', { name: 'Añadir comida' }).click();
+  await expect(page.getByText('Avena')).toBeVisible();
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('region', { name: 'Agua de hoy' })).toContainText('1 de 6 vasos');
+
+  doc = await readLegacy(page);
+  expect(doc.dayLog).toEqual({ dateKey: today, water: 1, waterGoal: 6 });
+  expect(doc.routines).toEqual([{ id: expect.any(String), title: 'Leer', time: '22:00', days: '12345', icon: 'bell', sound: true, enabled: true }]);
+  expect(doc.meals).toEqual([{ id: expect.any(String), label: 'Desayuno', time: '08:15', note: 'Avena', dateKey: today }]);
+  expect(doc).toMatchObject(OLD);
+});
+
+test('ciclo: fecha local, ajustes, menú y Calendario', async ({ page }, info) => {
+  await register(page, 'ciclo');
+  await onboard(page);
+  const { habits, claveFutura } = OLD;
+  await seedLegacy(page, { ...OLD, cycle: { cycleLength: 28, periodLength: 5, avisoViejo: true } });
+  const localToday = await page.evaluate(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const desktop = info.project.name === 'escritorio';
+  const tools = page.getByRole('navigation', { name: 'Herramientas' });
+
+  // Sin activarlo no está en el menú, pero se llega desde Más.
+  await page.goto('/mas');
+  await page.getByRole('link', { name: /Ciclo.*oculto en el menú/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Ciclo' })).toBeVisible();
+  if (desktop) await expect(tools.getByRole('link', { name: 'Ciclo' })).toHaveCount(0);
+  await expect(page.getByText(/se guardan en tu cuenta de Design Your Core y se sincronizan/)).toBeVisible();
+  await expect(page.getByText('Es una estimación, no un consejo médico.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Marcar como día de regla' }).click();
+  await expect(page.getByText('Día 1', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Abundante' }).click();
+  await page.getByRole('button', { name: 'Cólicos' }).click();
+  const settings = page.getByRole('form', { name: 'Tu ciclo' });
+  await settings.getByLabel('Duración del ciclo (días)').fill('30');
+  await settings.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByText('En 30 días')).toBeVisible();
+
+  await page.getByRole('switch', { name: 'Mostrar Ciclo en el menú y en el Calendario' }).click();
+  await expect(page.getByText('Ciclo aparece en el menú y en el Calendario.')).toBeVisible();
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('switch', { name: 'Mostrar Ciclo en el menú y en el Calendario' })).toBeChecked();
+  if (desktop) await expect(tools.getByRole('link', { name: 'Ciclo' })).toBeVisible();
+
+  // El Calendario marca el día de regla y la leyenda incluye la estimación.
+  await page.goto('/calendario');
+  await expect(page.getByRole('button', { name: /regla$/, pressed: true })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Leyenda' })).toContainText('Regla prevista');
+  await page.getByRole('link', { name: 'Ver en Ciclo' }).click();
+  await expect(page).toHaveURL(/\/ciclo$/);
+
+  const doc = await readLegacy(page);
+  expect(doc.period).toEqual([{ id: expect.any(String), date: localToday, flow: 'heavy', symptoms: 'Cólicos', mood: '', note: '' }]);
+  expect(doc.cycle).toEqual({ cycleLength: 30, periodLength: 5, avisoViejo: true });
+  expect(doc).toMatchObject({ habits, claveFutura });
+});
+
+test('ejercicio, sueño y diario: registrar, editar y guardar al escribir', async ({ page }) => {
+  await register(page, 'salud');
+  await onboard(page);
+  const today = utcToday();
+  const oldJournal = { id: 'j_viejo', date: '2026-01-09', mood: '😐', gratitude: '', note: 'Día largo' };
+  await seedLegacy(page, { ...OLD, workouts: [{ id: 'w_viejo', date: '2026-01-10', plan: 'Correr', minutes: 40 }], journal: [oldJournal] });
+
+  await page.goto('/ejercicio');
+  await page.getByRole('button', { name: 'Hecho hoy: Full body' }).click();
+  await page.getByRole('button', { name: 'Agendar Full body en tu Rutina' }).click();
+  await page.getByRole('button', { name: /^Editar Correr del/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar entreno' });
+  await dialog.getByLabel('Minutos').fill('45');
+  await dialog.getByRole('button', { name: 'Guardar' }).click();
+  await reloadWhenSaved(page);
+  await expect(page.getByText('10 ene · 45 min')).toBeVisible();
+  let doc = await readLegacy(page);
+  expect(doc.workouts).toEqual([
+    { id: expect.any(String), date: today, plan: 'Full body', minutes: 30 },
+    { id: 'w_viejo', date: '2026-01-10', plan: 'Correr', minutes: 45 },
+  ]);
+  expect(doc.routines).toEqual([{ id: expect.any(String), title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true }]);
+
+  await page.goto('/sueno');
+  await page.getByRole('button', { name: 'Registrar la de anoche' }).click();
+  const night = page.getByRole('dialog', { name: 'Registrar noche' });
+  await night.getByLabel('Te acostaste').fill('23:30');
+  await night.getByLabel('Te levantaste').fill('07:15');
+  await expect(night.getByText('Dormiste 7 h 45 min.')).toBeVisible();
+  await night.getByRole('radio', { name: /^4/ }).click();
+  await night.getByRole('button', { name: 'Registrar' }).click();
+  await reloadWhenSaved(page);
+  await expect(page.getByText('Media de las últimas 1 noche')).toBeVisible();
+  doc = await readLegacy(page);
+  expect(doc.sleep).toEqual([{ id: expect.any(String), date: today, bedtime: '23:30', waketime: '07:15', quality: 4, note: '' }]);
+
+  // El diario crea la entrada de hoy con lo primero que escribes.
+  await page.goto('/diario');
+  await expect(page.getByText(/se crea con lo primero que escribas/)).toBeVisible();
+  await page.getByRole('radio', { name: /Genial/ }).click();
+  await expect(page.getByRole('radio', { name: /Genial/ })).toBeChecked();
+  await page.getByLabel('Hoy agradezco…').fill('El sol');
+  await page.getByLabel('Notas del día').fill('Terminé el informe.');
+  await expect
+    .poll(async () => byDate((await readLegacy(page)).journal))
+    .toEqual([oldJournal, { id: expect.any(String), date: today, mood: '😄', gratitude: 'El sol', note: 'Terminé el informe.' }]);
+  await reloadWhenSaved(page);
+  await expect(page.getByLabel('Hoy agradezco…')).toHaveValue('El sol');
+  await page.getByRole('button', { name: /^9 ene/ }).click();
+  await expect(page.getByLabel('Notas del día')).toHaveValue('Día largo');
+  doc = await readLegacy(page);
+  expect((doc.journal as unknown[]).length).toBe(2);
+  expect(doc).toMatchObject(OLD);
+});

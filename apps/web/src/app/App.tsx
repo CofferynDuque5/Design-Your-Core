@@ -12,6 +12,14 @@ import { Calendar } from '../pages/Calendar';
 import { CheckIn } from '../pages/CheckIn';
 import { Challenges } from '../pages/Challenges';
 import { Content } from '../pages/Content';
+import { Cycle } from '../pages/Cycle';
+import { Exercise } from '../pages/Exercise';
+import { Finance } from '../pages/Finance';
+import { Goals } from '../pages/Goals';
+import { Journal } from '../pages/Journal';
+import { Pets } from '../pages/Pets';
+import { Routine } from '../pages/Routine';
+import { Sleep } from '../pages/Sleep';
 import { Focus } from '../pages/Focus';
 import { Habits } from '../pages/Habits';
 import { Ideas } from '../pages/Ideas';
@@ -98,6 +106,14 @@ export function AppRoutes() {
         <Route path="cuadernos/:id" element={<NotebookDetail />} />
         <Route path="contenido" element={<Content />} />
         <Route path="ideas" element={<Ideas />} />
+        <Route path="finanzas" element={<Finance />} />
+        <Route path="metas" element={<Goals />} />
+        <Route path="mascotas" element={<Pets />} />
+        <Route path="ciclo" element={<Cycle />} />
+        <Route path="ejercicio" element={<Exercise />} />
+        <Route path="sueno" element={<Sleep />} />
+        <Route path="diario" element={<Journal />} />
+        <Route path="rutina" element={<Routine />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

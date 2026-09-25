@@ -1,4 +1,17 @@
-import { FOCUS_MAX, LEGACY_CHILDREN, legacyList, mergeLegacyItem, reorderById, type LegacyData, type LegacyItems, type LegacyKey, type LegacyPatch } from '@dyc/core';
+import {
+  LEGACY_CHILDREN,
+  LEGACY_NEWEST_FIRST,
+  legacyList,
+  legacyObject,
+  mergeLegacyItem,
+  reorderById,
+  type LegacyData,
+  type LegacyItems,
+  type LegacyKey,
+  type LegacyObjectKey,
+  type LegacyObjects,
+  type LegacyPatch,
+} from '@dyc/core';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { errorMessage } from '../components/States';
@@ -42,12 +55,15 @@ type Op<K extends LegacyKey> =
 function apply<K extends LegacyKey>(data: LegacyData, key: K, op: Op<K>): LegacyData {
   const list = legacyList(data, key) as Array<LegacyItems[K]>;
   switch (op.type) {
-    case 'add':
-      return { ...data, [key]: key === 'focus' ? [op.item, ...list].slice(0, FOCUS_MAX) : [...list, op.item] };
+    case 'add': {
+      // Enfoque, finanzas, entrenos y sueño: lo más reciente primero, como en el servidor.
+      const max = LEGACY_NEWEST_FIRST[key];
+      return { ...data, [key]: max ? [op.item, ...list].slice(0, max) : [...list, op.item] };
+    }
     case 'update':
       return { ...data, [key]: list.map((x) => (x.id === op.id ? mergeLegacyItem(key, x, op.patch as Record<string, unknown>) : x)) };
     case 'remove': {
-      // Pendiente → subtareas y cuaderno → cajitas se borran juntos, como en el servidor.
+      // Pendiente → subtareas, cuaderno → cajitas y mascota → cuidados se borran juntos, como en el servidor.
       const child = LEGACY_CHILDREN[key];
       return {
         ...data,
@@ -107,6 +123,39 @@ export function useModule<K extends LegacyKey>(key: K) {
     }),
     [mutate],
   );
+}
+
+/** Un objeto del documento (`cycle`, `dayLog`, `budget`) con sus valores por defecto. */
+export function useLegacyObject<K extends LegacyObjectKey>(data: LegacyData | undefined, key: K, today?: string): LegacyObjects[K] {
+  return useMemo(() => legacyObject(data, key, today), [data, key, today]);
+}
+
+/**
+ * Cambios en una clave que es un objeto: se fusionan al instante con lo
+ * guardado (conservando lo desconocido) y se deshacen con un aviso si la API falla.
+ */
+export function useModuleObject<K extends LegacyObjectKey>(key: K) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { mutate } = useMutation({
+    mutationKey: ['legacy', key],
+    scope: { id: 'legacy' },
+    mutationFn: (patch: Partial<LegacyObjects[K]>) => api.modules.patch(key, patch),
+    onMutate: async (patch) => {
+      await qc.cancelQueries({ queryKey: LEGACY_QUERY });
+      const prev = qc.getQueryData<Legacy>(LEGACY_QUERY);
+      if (prev) qc.setQueryData<Legacy>(LEGACY_QUERY, { ...prev, data: { ...prev.data, [key]: { ...legacyObject(prev.data, key), ...patch } } });
+      return { prev };
+    },
+    onError: (e, _patch, ctx) => {
+      if (ctx?.prev) qc.setQueryData(LEGACY_QUERY, ctx.prev);
+      toast(errorMessage(e), { tone: 'error' });
+    },
+    onSettled: () => {
+      if (qc.isMutating({ mutationKey: ['legacy'] }) <= 1) return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
+    },
+  });
+  return useMemo(() => ({ patch: (patch: Partial<LegacyObjects[K]>) => mutate(patch) }), [mutate]);
 }
 
 /** Pide confirmación al recargar o cerrar mientras quedan cambios sin guardar (el navegador los cancelaría). */

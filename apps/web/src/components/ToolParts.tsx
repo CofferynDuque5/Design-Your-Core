@@ -1,6 +1,7 @@
-import type { LegacyCheckItem } from '@dyc/core';
-import { Trash2 } from 'lucide-react';
+import { daysLabel, monthLabel, WEEKDAYS, type LegacyCheckItem } from '@dyc/core';
+import { ChevronLeft, ChevronRight, Info, Trash2 } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
+import { Link } from 'react-router';
 
 // Piezas comunes de las herramientas de la tanda 2 (Materias, Proyectos,
 // Roadmaps, Cuadernos, Contenido e Ideas).
@@ -147,3 +148,90 @@ export const paletteWith = (palette: readonly string[], color: string): string[]
 
 /** Opciones de un select con el valor actual añadido si no está en la lista. */
 export const optionsWith = (list: readonly string[], value: string): string[] => (!value || list.includes(value) ? [...list] : [...list, value]);
+
+// ---------- Tanda 3 ----------
+
+const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+
+/** Días de la semana como en la app anterior ("1234567", 1 = lunes). Nunca deja la lista vacía. */
+export function WeekdayPicker({ legend, value, onChange, hint }: { legend: string; value: string; onChange: (days: string) => void; hint?: ReactNode }) {
+  const toggle = (iso: string) => {
+    const next = value.includes(iso) ? value.replace(iso, '') : [...value, iso].sort().join('');
+    if (next) onChange(next);
+  };
+  return (
+    <fieldset className="field">
+      <legend className="field__label">{legend}</legend>
+      <div className="weekday-picker">
+        {WEEKDAYS.map((w, i) => (
+          <label key={w.iso} className="chip-radio">
+            <input type="checkbox" checked={value.includes(w.iso)} onChange={() => toggle(w.iso)} />
+            <span>
+              <span aria-hidden="true">{w.label}</span>
+              <span className="visually-hidden">{WEEKDAY_NAMES[i]}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      <span className="field__hint">{hint ?? daysLabel(value)}</span>
+    </fieldset>
+  );
+}
+
+/** Ánimo con emoji (radios). Pulsar el elegido lo quita (se guarda ""). */
+export function MoodPicker({ legend, moods, value, onChange, hideLegend }: { legend: string; moods: ReadonlyArray<{ emoji: string; label: string }>; value: string; onChange: (mood: string) => void; hideLegend?: boolean }) {
+  const name = useId();
+  const known = moods.some((m) => m.emoji === value);
+  return (
+    <fieldset className="field">
+      <legend className={hideLegend ? 'visually-hidden' : 'field__label'}>{legend}</legend>
+      <div className="mood-picker">
+        {[...moods, ...(value && !known ? [{ emoji: value, label: 'Guardado antes' }] : [])].map((m) => (
+          <label key={m.emoji} className="mood-option" title={m.label}>
+            <input type="radio" name={name} checked={value === m.emoji} onChange={() => onChange(m.emoji)} onClick={() => value === m.emoji && onChange('')} />
+            <span className="emoji" aria-hidden="true">{m.emoji}</span>
+            <span className="mood-option__label">{m.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Recuerda que el check-in diario registra aparte actividad, sueño y notas (no se mezclan en esta tanda). */
+export function CheckInNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="checkin-note small">
+      <Info size={16} aria-hidden="true" />
+      <span>
+        {children} <Link to="/check-in">Ir al check-in</Link>
+      </span>
+    </p>
+  );
+}
+
+/** Navegación por meses con el título en una región viva. */
+export function MonthNav({ month, onChange, current, titleId }: { month: string; onChange: (month: string) => void; current: string; titleId: string }) {
+  const shift = (n: number) => {
+    const d = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1));
+    onChange(d.toISOString().slice(0, 10));
+  };
+  return (
+    <div className="month-nav">
+      <button type="button" className="icon-btn" onClick={() => shift(-1)} aria-label="Mes anterior">
+        <ChevronLeft size={20} aria-hidden="true" />
+      </button>
+      <h2 id={titleId} className="section-title" aria-live="polite">
+        {monthLabel(month)}
+      </h2>
+      <button type="button" className="icon-btn" onClick={() => shift(1)} aria-label="Mes siguiente">
+        <ChevronRight size={20} aria-hidden="true" />
+      </button>
+      {month.slice(0, 7) !== current.slice(0, 7) && (
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange(`${current.slice(0, 7)}-01`)}>
+          Hoy
+        </button>
+      )}
+    </div>
+  );
+}

@@ -1,6 +1,7 @@
 import { ChevronRight, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router';
 import { useLegacyData } from '../app/legacy';
+import { useSession } from '../app/session';
 import { TOOL_GROUPS, TOOLS } from '../app/tools';
 import { PageHeader } from '../components/AppShell';
 import { ErrorState, Loading } from '../components/States';
@@ -14,18 +15,13 @@ export const LEGACY_GROUPS: Array<{ title: string; modules: Array<{ name: string
   {
     title: 'Organización y trabajo',
     modules: [
-      { name: 'Rutinas', keys: ['routines'], unit: ['rutina', 'rutinas'] },
       { name: 'Notas (Bodega)', keys: ['notes'], unit: ['nota', 'notas'] },
       { name: 'Trabajo', keys: ['workItems'], unit: ['elemento', 'elementos'] },
     ],
   },
   {
-    title: 'Vida personal',
-    modules: [
-      { name: 'Finanzas', keys: ['transactions'], unit: ['movimiento', 'movimientos'] },
-      { name: 'Metas', keys: ['goals'], unit: ['meta', 'metas'] },
-      { name: 'Mascotas', keys: ['pets', 'petCares'], unit: ['registro', 'registros'] },
-    ],
+    title: 'Bienestar',
+    modules: [{ name: 'Respiración', keys: ['meditations'], unit: ['sesión', 'sesiones'] }],
   },
 ];
 
@@ -35,13 +31,14 @@ export function countItems(data: Record<string, unknown>, keys: string[]): numbe
 
 export function More() {
   const legacy = useLegacyData();
+  const { user } = useSession();
   const legacyUrl = import.meta.env.VITE_LEGACY_APP_URL;
 
   return (
     <div className="page page--narrow">
       <PageHeader eyebrow="Más" title="Otras herramientas" />
       <div className="stack-lg">
-        <p className="lead">Design Your Core se centra en tus seis pilares. Aquí tienes las herramientas de productividad de la app anterior, con todos tus datos.</p>
+        <p className="lead">Design Your Core se centra en tus seis pilares. Aquí tienes las herramientas de la app anterior, con todos tus datos.</p>
         {legacy.isPending ? (
           <Loading />
         ) : legacy.isError ? (
@@ -58,7 +55,7 @@ export function More() {
                     {g.label}
                   </h3>
                   <ul className="tool-links" aria-labelledby={`tools-${g.id}`}>
-                    {TOOLS.filter((t) => t.group === g.id).map(({ to, label, icon: Icon, description, count, unit }) => {
+                    {TOOLS.filter((t) => t.group === g.id).map(({ to, label, icon: Icon, description, count, unit, optIn }) => {
                       const n = count(legacy.data.data);
                       return (
                         <li key={to}>
@@ -68,7 +65,10 @@ export function More() {
                             </span>
                             <span className="tool-link__text">
                               <strong>{label}</strong>
-                              <span className="muted small">{description}</span>
+                              <span className="muted small">
+                                {description}
+                                {optIn && !user?.showCycle && ' · oculto en el menú'}
+                              </span>
                             </span>
                             <span className="muted small numeric tool-link__count">{n ? plural(n, unit[0], unit[1]) : 'Vacío'}</span>
                             <ChevronRight size={18} aria-hidden="true" />
