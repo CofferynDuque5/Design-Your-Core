@@ -1130,6 +1130,9 @@ describe('Bóveda', () => {
     withApi();
     renderAt('/boveda');
     await create();
+    // El temporizador se arma en un efecto: hay que dejar que corra antes de falsear el reloj,
+    // o en una máquina lenta se arma a mitad de la prueba y no llega a los 5 minutos.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     act(() => void window.dispatchEvent(new Event('pointerdown')));
     act(() => vi.advanceTimersByTime(4 * 60_000));
