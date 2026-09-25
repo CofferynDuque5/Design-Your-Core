@@ -8,6 +8,7 @@ import { Forgot } from '../pages/auth/Forgot';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
 import { Agenda } from '../pages/Agenda';
+import { Assistant } from '../pages/Assistant';
 import { Breathe } from '../pages/Breathe';
 import { Calendar } from '../pages/Calendar';
 import { CheckIn } from '../pages/CheckIn';
@@ -121,6 +122,7 @@ export function AppRoutes() {
         <Route path="notas" element={<Notes />} />
         <Route path="notas/:id" element={<NoteEditor />} />
         <Route path="boveda" element={<Vault />} />
+        <Route path="asistente" element={<Assistant />} />
         <Route path="trabajo" element={<Work />} />
         <Route path="respiracion" element={<Breathe />} />
         <Route path="*" element={<NotFound />} />

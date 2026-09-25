@@ -337,6 +337,7 @@ describe('Más', () => {
     const knowledge = within(tools).getByRole('list', { name: 'Conocimiento' });
     expect(within(knowledge).getByRole('link', { name: /Notas.*2 notas/ })).toHaveAttribute('href', '/notas');
     expect(within(knowledge).getByRole('link', { name: /Bóveda/ })).toHaveAttribute('href', '/boveda');
+    expect(within(knowledge).getByRole('link', { name: /Asistente.*Con tu clave/ })).toHaveAttribute('href', '/asistente');
     // Ya no queda nada «por llegar»: todas las secciones de la app anterior están aquí.
     expect(screen.queryByRole('heading', { name: 'Llegan pronto' })).not.toBeInTheDocument();
   });
@@ -1142,5 +1143,96 @@ describe('Bóveda', () => {
     await screen.findByRole('button', { name: 'Nueva entrada' }, { timeout: 5000 });
     act(() => void window.dispatchEvent(new Event('pagehide')));
     expect(screen.getByRole('heading', { name: 'Bóveda bloqueada' })).toBeInTheDocument();
+  });
+});
+
+describe('Asistente', () => {
+  const GOOGLE = 'POST /v1beta/openai/chat/completions';
+  const answer = (message: object) => ({ choices: [{ message }] });
+  const ready = () => localStorage.setItem('dyc.assistant', JSON.stringify({ apiKey: 'clave-de-prueba', model: 'gemini-flash-latest', seenPrivacy: true }));
+  afterEach(() => localStorage.clear());
+
+  it('antes de usarlo pide la clave, la guarda solo en este navegador y explica qué se envía', async () => {
+    withApi();
+    renderAt('/asistente');
+    expect(await screen.findByRole('heading', { name: 'Antes de empezar: qué se envía a Google' })).toBeInTheDocument();
+    expect(screen.getByText(/Nunca: tu Bóveda, tus notas, el texto de tu diario/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Mensaje para el asistente')).toBeDisabled();
+    expect(screen.getByText('Guarda tu clave de Gemini para empezar.')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Clave de la API de Gemini'), 'AIza-clave-1234');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar en este navegador' }));
+    expect(screen.getByText('••••1234')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('dyc.assistant') as string)).toMatchObject({ apiKey: 'AIza-clave-1234', model: 'gemini-flash-latest' });
+    expect(screen.getByLabelText('Mensaje para el asistente')).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+    expect(screen.getByLabelText('Mensaje para el asistente')).toBeEnabled();
+    expect(screen.getByRole('switch', { name: 'Incluir un resumen de mis datos' })).not.toBeChecked();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar' }));
+    expect(localStorage.getItem('dyc.assistant')).toBeNull();
+    expect(screen.getByLabelText('Clave de la API de Gemini')).toBeInTheDocument();
+  });
+
+  it('una acción propuesta solo se escribe al pulsar «Hacer»; «Descartar» no escribe nada', async () => {
+    ready();
+    let turn = 0;
+    const api = withApi({
+      [GOOGLE]: () =>
+        ++turn === 1
+          ? answer({ content: 'Te propongo esto:', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'add_todo', arguments: '{"title":"Comprar pan"}' } }, { id: 'call_2', type: 'function', function: { name: 'log_water', arguments: '{"glasses":2}' } }] })
+          : answer({ content: '¡Listo! Ya está en tus **pendientes**.' }),
+    });
+    renderAt('/asistente');
+    await userEvent.type(await screen.findByLabelText('Mensaje para el asistente'), 'Añade comprar pan y 2 vasos de agua{Enter}');
+
+    const todo = await screen.findByRole('group', { name: 'Acción propuesta: Añadir pendiente' });
+    expect(within(todo).getByText('Comprar pan')).toBeInTheDocument();
+    const water = screen.getByRole('group', { name: 'Acción propuesta: Registrar agua' });
+    // Nada se ha escrito todavía y no se puede seguir sin decidir.
+    expect(api.calls.filter((c) => c.path.startsWith('/api/v2/modules') && c.method !== 'GET')).toHaveLength(0);
+    expect(screen.getByText('Elige «Hacer» o «Descartar» en la acción propuesta para seguir.')).toBeInTheDocument();
+    const google = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions');
+    expect(google?.auth).toBe('Bearer clave-de-prueba');
+    const first = google?.body as { model: string; messages: Array<{ role: string; content: string }> };
+    expect(first.model).toBe('gemini-flash-latest');
+    // El resumen de datos está desactivado: no se envían.
+    expect(JSON.stringify(first)).not.toContain('Pagar la luz');
+
+    await userEvent.click(within(todo).getByRole('button', { name: 'Hacer' }));
+    expect(await screen.findByRole('group', { name: 'Hecho: Añadir pendiente' })).toBeInTheDocument();
+    const posts = api.calls.filter((c) => c.method === 'POST' && c.path === '/api/v2/modules/todos');
+    expect(posts).toHaveLength(1);
+    expect(posts[0].body).toMatchObject({ item: { title: 'Comprar pan', done: false } });
+    await userEvent.click(within(water).getByRole('button', { name: 'Descartar' }));
+    expect(screen.getByRole('group', { name: 'Descartado: Registrar agua' })).toBeInTheDocument();
+    expect(api.calls.filter((c) => c.path === '/api/v2/modules/dayLog')).toHaveLength(0);
+
+    // El siguiente mensaje lleva el resultado de cada acción; el resumen de datos, solo si se activa.
+    await userEvent.click(screen.getByRole('switch', { name: 'Incluir un resumen de mis datos' }));
+    await userEvent.click(screen.getByText('Ver exactamente lo que se enviará'));
+    expect(screen.getByLabelText('Resumen de tus datos que se enviará')).toHaveTextContent('Pagar la luz');
+    await userEvent.type(screen.getByLabelText('Mensaje para el asistente'), 'Gracias{Enter}');
+    expect(await screen.findByText('pendientes', { selector: 'strong' })).toBeInTheDocument();
+    const second = api.calls.filter((c) => c.path === '/v1beta/openai/chat/completions')[1].body as { messages: Array<{ role: string; content: string | null; tool_call_id?: string }> };
+    expect(second.messages.filter((m) => m.role === 'tool')).toEqual([
+      { role: 'tool', tool_call_id: 'call_1', content: 'Hecho. Pendiente añadido: «Comprar pan».' },
+      { role: 'tool', tool_call_id: 'call_2', content: 'La persona descartó esta acción: no se hizo nada.' },
+    ]);
+    expect(second.messages[0].content).toContain('Pagar la luz');
+  });
+
+  it('errores claros y un reintento con el modelo ligero', async () => {
+    ready();
+    let n = 0;
+    withApi({ [GOOGLE]: () => (++n === 1 ? [429, { error: { message: 'exhausted' } }] : n === 2 ? answer({ content: 'Hola, ¿en qué te ayudo?' }) : [401, { error: { message: 'bad key' } }]) });
+    renderAt('/asistente');
+    await userEvent.type(await screen.findByLabelText('Mensaje para el asistente'), 'Hola{Enter}');
+    expect(await screen.findByText('Hola, ¿en qué te ayudo?')).toBeInTheDocument();
+    expect(screen.getByText('gemini-flash-latest no respondió; se usó gemini-flash-lite-latest.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Mensaje para el asistente'), 'Otra{Enter}');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Google no aceptó tu clave');
+    // El mensaje vuelve al cuadro para reintentarlo.
+    expect(screen.getByLabelText('Mensaje para el asistente')).toHaveValue('Otra');
   });
 });

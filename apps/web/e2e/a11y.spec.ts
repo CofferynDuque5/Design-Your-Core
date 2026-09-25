@@ -238,3 +238,30 @@ test('bóveda: crear, desbloqueada, bloqueada y sus diálogos', async ({ page })
   await expect(page.getByRole('dialog', { name: 'Olvidé la contraseña maestra' })).toBeVisible();
   await expectAccessible(page, 'diálogo contraseña olvidada');
 });
+
+test('asistente: sin clave, conversación y acción propuesta', async ({ page }) => {
+  await register(page, 'a11y-asistente');
+  await onboard(page);
+  await page.route('https://generativelanguage.googleapis.com/**', (route) =>
+    route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type' } })
+      : route.fulfill({
+          status: 200,
+          headers: { 'access-control-allow-origin': '*' },
+          contentType: 'application/json',
+          body: JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'Claro. Te propongo:\n\n- Un **pendiente**', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'add_todo', arguments: '{"title":"Comprar pan"}' } }] } }] }),
+        }),
+  );
+  await page.goto('/asistente');
+  await expect(page.getByRole('heading', { name: 'Antes de empezar: qué se envía a Google' })).toBeVisible();
+  await expectAccessible(page, 'asistente sin clave');
+  await page.getByLabel('Clave de la API de Gemini').fill('clave-falsa');
+  await page.getByRole('button', { name: 'Guardar en este navegador' }).click();
+  await page.getByRole('button', { name: 'Entendido' }).click();
+  await page.getByRole('switch', { name: 'Incluir un resumen de mis datos' }).check();
+  await page.getByText('Ver exactamente lo que se enviará').click();
+  await page.getByLabel('Mensaje para el asistente').fill('Añade comprar pan');
+  await page.getByRole('button', { name: 'Enviar' }).click();
+  await expect(page.getByRole('group', { name: 'Acción propuesta: Añadir pendiente' })).toBeVisible();
+  await expectAccessible(page, 'asistente con acción propuesta');
+});

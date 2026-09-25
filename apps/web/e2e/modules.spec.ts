@@ -900,3 +900,71 @@ test('bóveda: crear, añadir, bloquear, desbloquear y cifrar las contraseñas d
   await expect(page.getByText('Se bloqueó tras 5 minutos sin actividad.')).toBeVisible();
   await expect(page.getByText('Banco Sol')).toBeHidden();
 });
+
+test('asistente: clave en este navegador, respuestas simuladas de Google y acción confirmada', async ({ page }) => {
+  await register(page, 'asistente');
+  await onboard(page);
+  await seedLegacy(page, { ...OLD, todos: [{ id: 'td_viejo', title: 'Pagar la luz', done: false }] });
+
+  // Google nunca se llama de verdad: todas las peticiones se responden aquí.
+  const sent: Array<{ auth: string | null; body: { model: string; messages: Array<{ role: string; content: string | null; tool_call_id?: string }>; tools?: unknown[] } }> = [];
+  const replies: Array<[number, object]> = [
+    [200, { choices: [{ message: { role: 'assistant', content: 'ok' } }] }],
+    [200, { choices: [{ message: { role: 'assistant', content: 'Te propongo esta tarea:', tool_calls: [{ id: 'call_a', type: 'function', function: { name: 'add_task', arguments: '{"title":"Repasar física","pri":"alta","time":"17:30"}' } }] } }] }],
+    [429, { error: { code: 429, message: 'Resource has been exhausted' } }],
+    [200, { choices: [{ message: { role: 'assistant', content: 'Hecho, **suerte** con física.' } }] }],
+  ];
+  await page.route('https://generativelanguage.googleapis.com/**', async (route) => {
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'POST, OPTIONS' };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    expect(route.request().url()).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+    sent.push({ auth: await route.request().headerValue('authorization'), body: route.request().postDataJSON() });
+    const next = replies.shift();
+    if (!next) throw new Error('Petición a Google no esperada');
+    return route.fulfill({ status: next[0], headers: cors, contentType: 'application/json', body: JSON.stringify(next[1]) });
+  });
+
+  await page.goto('/asistente');
+  await page.getByLabel('Clave de la API de Gemini').fill('clave-falsa-e2e-9876');
+  await page.getByRole('button', { name: 'Guardar en este navegador' }).click();
+  await expect(page.getByText('••••9876')).toBeVisible();
+  expect(JSON.parse((await page.evaluate(() => localStorage.getItem('dyc.assistant'))) as string)).toMatchObject({ apiKey: 'clave-falsa-e2e-9876' });
+  await page.getByRole('button', { name: 'Probar conexión' }).click();
+  await expect(page.getByText('Conexión correcta con gemini-flash-latest.')).toBeVisible();
+  await page.getByRole('button', { name: 'Entendido' }).click();
+
+  await page.getByLabel('Mensaje para el asistente').fill('Agenda repasar física a las 17:30, es urgente');
+  await page.getByRole('button', { name: 'Enviar' }).click();
+  const card = page.getByRole('group', { name: 'Acción propuesta: Añadir tarea' });
+  await expect(card).toContainText('Repasar física');
+  await expect(card).toContainText('17:30');
+  // Antes de «Hacer», nada cambia en los datos.
+  expect((await readLegacy(page)).tasks).toBeUndefined();
+  await card.getByRole('button', { name: 'Hacer' }).click();
+  await expect(page.getByRole('group', { name: 'Hecho: Añadir tarea' })).toBeVisible();
+  await expect.poll(async () => (await readLegacy(page)).tasks).toEqual([{ id: expect.any(String), title: 'Repasar física', pri: 'alta', time: '17:30', rem: true, done: false, tags: '' }]);
+
+  // 429 → un reintento con el modelo ligero; el resumen de datos solo va si se activa.
+  await page.getByRole('switch', { name: 'Incluir un resumen de mis datos' }).check();
+  await page.getByLabel('Mensaje para el asistente').fill('Gracias');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('suerte', { exact: true })).toBeVisible();
+  await expect(page.getByText('gemini-flash-latest no respondió; se usó gemini-flash-lite-latest.')).toBeVisible();
+
+  expect(sent.map((s) => s.body.model)).toEqual(['gemini-flash-latest', 'gemini-flash-latest', 'gemini-flash-latest', 'gemini-flash-lite-latest']);
+  expect(sent.every((s) => s.auth === 'Bearer clave-falsa-e2e-9876')).toBe(true);
+  expect(sent[0].body.tools).toBeUndefined();
+  expect(sent[1].body.tools).toHaveLength(10);
+  expect(JSON.stringify(sent[1].body)).not.toContain('Pagar la luz');
+  expect(sent[3].body.messages[0].content).toContain('Pagar la luz');
+  expect(sent[3].body.messages.find((m) => m.role === 'tool')).toEqual({ role: 'tool', tool_call_id: 'call_a', content: 'Hecho. Tarea añadida: «Repasar física» (prioridad alta).' });
+  // La clave nunca llega a nuestro servidor.
+  expect(JSON.stringify(await readLegacy(page))).not.toContain('clave-falsa-e2e');
+
+  // «Quitar» la borra de este navegador; la conversación se pierde al recargar.
+  await page.getByRole('button', { name: 'Quitar' }).click();
+  expect(await page.evaluate(() => localStorage.getItem('dyc.assistant'))).toBeNull();
+  await page.reload();
+  await expect(page.getByText('Repasar física')).toBeHidden();
+  await expect(page.getByLabel('Clave de la API de Gemini')).toBeVisible();
+});

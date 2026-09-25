@@ -18,6 +18,7 @@ import {
   PawPrint,
   Route,
   School,
+  Sparkles,
   StickyNote,
   Target,
   Timer,
@@ -178,6 +179,14 @@ export const TOOLS: Tool[] = [
     description: 'Contraseñas cifradas en tu dispositivo',
     count: (d) => (vaultSecureOf(d)?.items.length ?? 0) + legacyVault(d).length,
     unit: ['entrada', 'entradas'],
+  },
+  {
+    to: '/asistente',
+    label: 'Asistente',
+    icon: Sparkles,
+    group: 'conocimiento',
+    description: 'Chat con Gemini usando tu propia clave',
+    note: 'Con tu clave',
   },
   {
     to: '/finanzas',

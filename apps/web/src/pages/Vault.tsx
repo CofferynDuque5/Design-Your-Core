@@ -135,7 +135,7 @@ function HowItWorks() {
       <h2 id="vault-how" className="list-count">
         Cómo se protege
       </h2>
-      <ul className="vault-facts small">
+      <ul className="facts small">
         <li>Tus entradas se cifran en este dispositivo antes de guardarse, con una clave que sale de tu contraseña maestra (AES-GCM de 256 bits).</li>
         <li>El servidor solo guarda datos cifrados: no ve tus contraseñas ni tu contraseña maestra, que nunca sale de este navegador.</li>
         <li>Si pierdes la contraseña maestra, pierdes las entradas: nadie puede recuperarlas, tampoco nosotros.</li>
