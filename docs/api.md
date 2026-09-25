@@ -139,4 +139,17 @@ La app móvil no guarda un token de 60 días: recibe un **token de acceso de 15 
 
 ## Módulos de la app anterior
 
-Edición elemento a elemento de las listas `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas`, `transactions`, `goals`, `pets`, `petCares`, `period`, `workouts`, `sleep`, `journal`, `routines` y `meals` del documento de `/api/sync`, en `/api/v2/modules`. Las claves que son un objeto (`cycle`, `dayLog` y `budget`) se guardan enteras con `PUT /modules/:key` o en parte con `PATCH /modules/:key`, y responden `{ value, updatedAt }`. Ver [modulos.md](modulos.md).
+Edición elemento a elemento de las listas `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas`, `transactions`, `goals`, `pets`, `petCares`, `period`, `workouts`, `sleep`, `journal`, `routines`, `meals`, `notes`, `workItems` y `meditations` del documento de `/api/sync`, en `/api/v2/modules`. Las claves que son un objeto (`cycle`, `dayLog` y `budget`) se guardan enteras con `PUT /modules/:key` o en parte con `PATCH /modules/:key`, y responden `{ value, updatedAt }`. En `notes`, `excerpt` y `tag` los calcula el servidor.
+
+La **bóveda cifrada** (`vaultSecure`, clave nueva) tiene rutas propias; el servidor solo valida la forma, nunca ve el contenido:
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| PUT | `/api/v2/modules/vaultSecure` 🔒 | `{ v: 1, kdf, check, items: [] }` | 201 `{ value, updatedAt }` · 409 si ya existe |
+| DELETE | `/api/v2/modules/vaultSecure` 🔒 | | `{ ok, updatedAt }` (la lista antigua `vault` no se toca) |
+| POST | `/api/v2/modules/vaultSecure/items` 🔒 | `{ item: { id, iv, ct } }` | 201 `{ item, updatedAt }` · 404 sin bóveda · 409 id repetido |
+| PUT | `/api/v2/modules/vaultSecure/items/:id` 🔒 | `{ iv, ct }` | `{ item, updatedAt }` · 404 |
+| DELETE | `/api/v2/modules/vaultSecure/items/:id` 🔒 | | `{ ok, updatedAt }` · 404 |
+| POST | `/api/v2/modules/vaultSecure/migrate` 🔒 | `{ items, legacyIds }` | `{ migrated, remaining, updatedAt }`: añade las entradas cifradas y quita de `vault` las de `legacyIds` en la misma escritura |
+
+Formatos, validación y reglas: ver [modulos.md](modulos.md).

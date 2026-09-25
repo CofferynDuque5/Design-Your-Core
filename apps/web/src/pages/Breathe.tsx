@@ -16,6 +16,8 @@ export const BREATH_PATTERNS: Record<PatternId, { label: string; hint: string; p
   caja: { label: 'Caja 4-4-4-4', hint: 'Inhala 4, mantén 4, exhala 4 y mantén 4 segundos. Ayuda a calmarte y concentrarte.', phases: [['in', 4], ['hold', 4], ['out', 4], ['hold', 4]] },
   '478': { label: '4-7-8', hint: 'Inhala 4, mantén 7 y exhala 8 segundos. Ayuda a relajarte antes de dormir.', phases: [['in', 4], ['hold', 7], ['out', 8]] },
 };
+// Orden fijo: «478» parece un número y Object.keys lo pondría primero.
+const PATTERN_ORDER: PatternId[] = ['caja', '478'];
 const PHASE_LABEL: Record<Phase, string> = { in: 'Inhala', hold: 'Mantén', out: 'Exhala' };
 const DURATIONS = [1, 3, 5] as const;
 const HISTORY_MAX = 30;
@@ -157,7 +159,7 @@ export function Breathe() {
           <h2 id="breathe-title" className="visually-hidden">
             Respiración guiada
           </h2>
-          <Segmented label="Técnica" value={pattern} onChange={setPattern} disabled={active} options={(Object.keys(BREATH_PATTERNS) as PatternId[]).map((p) => ({ value: p, label: BREATH_PATTERNS[p].label }))} />
+          <Segmented label="Técnica" value={pattern} onChange={setPattern} disabled={active} options={PATTERN_ORDER.map((p) => ({ value: p, label: BREATH_PATTERNS[p].label }))} />
           <p className="muted small center">{BREATH_PATTERNS[pattern].hint}</p>
           <div className="breathe__stage">
             <div className="breathe__circle" data-phase={active ? now.phase : 'idle'} style={{ ['--scale' as string]: scale, ['--phase-s' as string]: `${now.seconds}s` }} aria-hidden="true" />

@@ -723,14 +723,17 @@ function Generator({ onCopy }: { onCopy: (password: string) => void }) {
         {value}
       </output>
       <div className="vault-gen-options">
+        <span className="small muted" aria-hidden="true">
+          Caracteres
+        </span>
         <Segmented
-          label="Longitud"
+          label="Longitud en caracteres"
           value={length}
           onChange={(v) => {
             setLength(v);
             regen(v);
           }}
-          options={LENGTHS.map((l) => ({ value: l, label: `${l} caracteres` }))}
+          options={LENGTHS.map((l) => ({ value: l, label: l }))}
         />
         <label className="toggle-line">
           <input

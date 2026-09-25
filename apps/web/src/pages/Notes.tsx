@@ -109,7 +109,7 @@ export function Notes() {
             groups.map(([subject, list], gi) => (
               <section key={subject} className="stack-sm" aria-labelledby={`notes-group-${gi}`}>
                 <h2 id={`notes-group-${gi}`} className="section-title note-group-title">
-                  <span className="legend__dot" style={{ ['--c' as string]: noteTag(subject) }} aria-hidden="true" />
+                  <span className="legend__dot" style={{ ['--c' as string]: colorOf(list[0]) }} aria-hidden="true" />
                   {subject} <span className="chip small numeric">{list.length}</span>
                 </h2>
                 <ul className="note-grid">

@@ -7,8 +7,9 @@ La app anterior ("Core") guarda todo el estado de cada persona en **un solo docu
 | 1 | Agenda, Pendientes, Calendario, Horario, Enfoque | `/agenda` (`?vista=tareas`), `/pendientes`, `/calendario`, `/horario`, `/enfoque` | `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus` |
 | 2 | Materias, Proyectos, Roadmaps, Cuadernos, Contenido, Ideas | `/materias`, `/proyectos`, `/roadmaps`, `/cuadernos` (y `/cuadernos/:id`), `/contenido`, `/ideas` | `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas` |
 | 3 | Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario, Rutina | `/finanzas`, `/metas`, `/mascotas`, `/ciclo`, `/ejercicio`, `/sueno`, `/diario`, `/rutina` | `transactions`, `budget`, `goals`, `pets`, `petCares`, `period`, `cycle`, `workouts`, `sleep`, `journal`, `routines`, `meals`, `dayLog` |
+| 4 | Notas, Bóveda, Asistente, Trabajo, Respiración | `/notas` (y `/notas/:id`), `/boveda`, `/asistente`, `/trabajo`, `/respiracion` | `notes`, `vaultSecure` (nueva) y `vault`, `workItems`, `meditations`; el Asistente escribe en las claves de sus herramientas |
 
-El resto de secciones (Notas de la Bodega, Trabajo y Respiración) aparece en **Más** con su número de elementos y un enlace a la app anterior hasta que lleguen. El estudio completo de formatos está en `diagnostico/modulos-app-anterior.md` (carpeta del proyecto).
+Con la tanda 4 están **todas** las secciones de la app anterior: **Más** es el centro de todas las herramientas, agrupadas como en la barra lateral y con su número de elementos, y ya no hay apartado «Llegan pronto». Si la web se compila con `VITE_LEGACY_APP_URL`, **Más** mantiene el botón «Abrir la app anterior». El estudio completo de formatos está en `diagnostico/modulos-app-anterior.md` (carpeta del proyecto).
 
 ## API: `/api/v2/modules` 🔒
 
@@ -22,7 +23,7 @@ El resto de secciones (Notas de la Bodega, Trabajo y Respiración) aparece en **
 | PUT | `/modules/:key` (objetos) | El objeto completo | `{ value, updatedAt }`. Solo para `cycle`, `dayLog` y `budget` |
 | PATCH | `/modules/:key` (objetos) | Campos a cambiar | `{ value, updatedAt }`. Se fusiona sobre lo guardado y los valores por defecto |
 
-`:key` es una lista: `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas`, `transactions`, `goals`, `pets`, `petCares`, `period`, `workouts`, `sleep`, `journal`, `routines` o `meals` (otra clave responde 404, y las rutas de listas con una clave de objeto también). Como hace la app anterior, en `focus` (500), `transactions` (2000), `workouts` (400) y `sleep` (400) el elemento nuevo va **al principio** y la lista se corta en ese máximo; en las demás va al final. `period` y `journal` admiten **un solo registro por fecha**: repetir la fecha responde 409.
+`:key` es una lista: `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas`, `transactions`, `goals`, `pets`, `petCares`, `period`, `workouts`, `sleep`, `journal`, `routines`, `meals`, `notes`, `workItems` o `meditations` (otra clave responde 404, y las rutas de listas con una clave de objeto también). Como hace la app anterior, en `focus` (500), `transactions` (2000), `workouts` (400), `sleep` (400) y `meditations` (400) el elemento nuevo va **al principio** y la lista se corta en ese máximo; en las demás va al final. `period` y `journal` admiten **un solo registro por fecha**: repetir la fecha responde 409.
 
 Las claves que son **un objeto** no son listas: `cycle`, `dayLog` y `budget`. `PUT` las sustituye enteras y `PATCH` cambia solo los campos enviados; en los dos casos se valida el resultado, la escritura es atómica igual que en las listas, las demás claves del documento no se tocan y los campos del objeto que la app nueva no conoce se conservan.
 
@@ -53,6 +54,9 @@ La validación está en `@dyc/core` (`packages/core/src/legacy.ts`) y reproduce 
 | `journal` | `date` (UTC), `mood` (emoji o `""`), `gratitude`, `note` |
 | `routines` | `title`, `time` `HH:MM`, `days`, `icon` (por defecto `bell`), `sound`, `enabled` |
 | `meals` | `label` (por defecto «Comida»; la web ofrece Desayuno, Comida, Cena y Snack), `time` `HH:MM` o `""`, `note`, `dateKey` (UTC) |
+| `notes` | `title` (por defecto «Nota sin título»), `subject` (materia en texto libre, por defecto «General»), `date` (**texto para mostrar**, «25 sept», no una fecha), `tag` (color), `excerpt`, `body` (Markdown, hasta ~6 MB porque puede llevar imágenes en base64), `commit`, `tags` (texto separado por comas), `shareId` (`null` o el id que puso la app anterior; la app nueva **no lo cambia**) |
+| `workItems` | `title`, `project` `p1`\|`p2`\|`p3` (los tres proyectos fijos de la app anterior), `status` `todo`\|`curso`, `done`, `due` (texto libre) |
+| `meditations` | `date` (UTC), `minutes` entero 0–1440, `kind` (por defecto `respiracion`) |
 
 `days` es el texto de la app anterior con los días en que toca: `"1234567"`, con **1 = lunes** y 7 = domingo, cada día una sola vez y al menos uno.
 
@@ -61,6 +65,36 @@ La validación está en `@dyc/core` (`packages/core/src/legacy.ts`) y reproduce 
 | `cycle` | `cycleLength` 15–60 (por defecto 28), `periodLength` 1–14 (por defecto 5) |
 | `dayLog` | `dateKey` (UTC), `water` 0–40, `waterGoal` 1–40 (por defecto 8). Si `dateKey` no es hoy, el agua de hoy cuenta desde 0 y la meta se conserva |
 | `budget` | `monthly` ≥ 0. **Clave nueva**: la app anterior guardaba el presupuesto solo en el `localStorage` del navegador (`core_budget`); la app nueva lo guarda en el documento y, si aún no hay, ofrece ese valor del navegador como sugerencia al definirlo. `monthly: 0` = sin presupuesto |
+
+En `notes`, **`excerpt` y `tag` los calcula siempre el servidor** (y la web al instante, con la misma función `deriveLegacyPatch`): `excerpt` = los primeros 90 caracteres de `body` y `tag` = el color de la materia con la fórmula de la app anterior (`#0FA968 #4F7CFF #EC6A9C #8B5CF6 #E8912A`, según la longitud y la primera letra). Si llegan en un POST se ignoran, y un PATCH no los acepta. La app anterior no cambiaba `tag` al cambiar la materia; la app nueva sí, para que el color siga a la materia.
+
+### Bóveda cifrada: `vaultSecure`
+
+La bóveda de la app anterior (`vault`: `{ id, name, mono, user, pass }`) guarda las contraseñas **en texto plano** dentro del documento, que viaja completo en `/api/sync` y en las copias de seguridad. La app nueva no la reutiliza: guarda una bóveda **cifrada en el navegador** en una clave nueva, `vaultSecure`:
+
+```json
+{ "v": 1,
+  "kdf": { "name": "PBKDF2", "hash": "SHA-256", "iterations": 600000, "salt": "<16 bytes base64>" },
+  "check": { "iv": "<12 bytes base64>", "ct": "<base64>" },
+  "items": [{ "id": "…", "iv": "<12 bytes base64>", "ct": "<base64>" }] }
+```
+
+- Solo Web Crypto: la contraseña maestra pasa por PBKDF2-SHA-256 (sal aleatoria de 16 bytes, al menos 600 000 iteraciones) y da una clave AES-GCM de 256 bits que no se puede exportar. Cada entrada se cifra con **su propio IV aleatorio de 12 bytes** y el id de la entrada como dato autenticado, así que un cifrado no se puede mover a otra entrada. `ct` descifrado es el JSON `{ name, mono, user, pass, url?, note? }`. `check` cifra un texto fijo y sirve para saber si la contraseña maestra es la buena.
+- La contraseña maestra y la clave **nunca salen del navegador**. El servidor solo valida la forma con zod estricto (versión, iteraciones, longitudes exactas de sal e IV, base64 y tamaño máximo; hasta 2000 entradas) y nunca ve el contenido.
+- **Si se pierde la contraseña maestra, se pierden las entradas**: no hay recuperación. «¿Olvidaste la contraseña maestra?» solo permite borrar la bóveda y crear otra.
+- Se bloquea sola tras 5 minutos sin actividad, al salir de la página y al salir de la sección; lo descifrado solo vive en memoria.
+- La app anterior no conoce `vaultSecure`: no ve la bóveda cifrada (y conserva la clave al guardar el documento, porque guarda todo lo que recibe).
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| PUT | `/modules/vaultSecure` | La bóveda completa (se crea vacía) | 201 `{ value, updatedAt }` · 409 si ya hay una |
+| DELETE | `/modules/vaultSecure` | | `{ ok, updatedAt }`. Borra la bóveda cifrada; `vault` no se toca |
+| POST | `/modules/vaultSecure/items` | `{ item: { id, iv, ct } }` | 201 `{ item, updatedAt }` · 404 sin bóveda · 409 si el id existe |
+| PUT | `/modules/vaultSecure/items/:id` | `{ iv, ct }` (IV nuevo en cada cambio) | `{ item, updatedAt }` · 404 |
+| DELETE | `/modules/vaultSecure/items/:id` | | `{ ok, updatedAt }` · 404 |
+| POST | `/modules/vaultSecure/migrate` | `{ items, legacyIds }` | `{ migrated, remaining, updatedAt }`: añade las entradas ya cifradas y quita de `vault` las de `legacyIds`, **en la misma escritura** |
+
+**Migración de las contraseñas sin cifrar.** Si `vault` tiene entradas con contraseña, la Bóveda avisa de cuántas hay guardadas sin cifrar. Con la bóveda desbloqueada ofrece «Cifrar y borrar las copias sin cifrar»: antes explica que después la bóveda de la app anterior aparecerá vacía, y solo al confirmarlo cifra cada entrada en el navegador y llama a `migrate`, que deja `vault` en `[]`. **Nunca se hace sola.** Si otro navegador tiene abierta la app anterior con una copia vieja y la vuelve a subir, el aviso reaparece y se puede repetir.
 
 **Temas, hitos y pasos** (`topics`, `milestones`, `steps`) van dentro de su elemento, como en la app anterior: se cambian con un PATCH del elemento que lleva **la lista completa** (`{ "topics": [...] }`). Cada subelemento se valida (`id` antiguo o `crypto.randomUUID()`, `name`, `done`; en hitos también `date`) y se fusiona con el guardado de su mismo id, así que los campos que la app nueva no conoce se conservan.
 
@@ -75,15 +109,17 @@ Al crear se completan los valores por defecto de la app anterior (`kind: "study"
 - **Borrar una materia no borra sus clases ni sus proyectos**, igual que la app anterior: las clases conservan el id de la materia en `subject` (el Horario las muestra como clases sueltas y se siguen editando) y los proyectos su nombre. Borrar un cuaderno sí borra sus cajitas.
 - **Renombrar una materia** en la app nueva actualiza también el `subject` de los proyectos que tenían su nombre anterior (la app anterior no lo hacía y el vínculo se rompía). El formato no cambia: sigue siendo el nombre.
 - **Lenguaje de las cajitas de código**: la app anterior mostraba el selector pero no guardaba el cambio (`updateBox` solo persistía `title`, `text` y `color`). La app nueva lo guarda en el **mismo campo `lang`** que la app anterior ya escribe al crear la cajita, así que la app anterior lo lee sin cambios.
-- **Imágenes de los apuntes**: si el texto de una cajita tiene `coreimg:<id>`, la app nueva muestra las imágenes que la app anterior subió a la nube (`POST /api/images/fetch`) y las incrustadas en base64; las que solo están en el IndexedDB del navegador donde se añadieron se indican con un aviso. Subir imágenes aún no está en la app nueva.
+- **Imágenes de los apuntes**: si el texto de una cajita tiene `coreimg:<id>`, la app nueva muestra las imágenes que la app anterior subió a la nube (`POST /api/images/fetch`) y las incrustadas en base64; las que solo están en el IndexedDB del navegador donde se añadieron se indican con un aviso. Subir imágenes a las cajitas aún no está en la app nueva (en **Notas** sí).
 - Horas: `blocks` usa horas decimales y `classes` texto `HH:MM`. Enfoque guarda el día en UTC; Calendario y Horario trabajan con la hora local, igual que la app anterior.
 - **Días en UTC o en hora local**, igual que la app anterior: Finanzas, Ejercicio, Sueño, Diario, Rutina (comidas y agua) y el «hecho hoy» de Mascotas usan el día en UTC; Ciclo usa el día local.
 - **Borrar una mascota borra sus cuidados** (`petCares`), y un cuidado no se puede crear para una mascota que no existe.
+- **Notas**: `date` sigue siendo el texto corto de la app anterior («25 sept») y no se reescribe al editar. Las imágenes se reducen a JPEG (máximo 1400 px, calidad 0,72), se suben con `POST /api/images` y se insertan como `![imagen](coreimg:<id>)`, igual que la app anterior con la nube activa; al mostrarlas se piden con `POST /api/images/fetch`. Las imágenes incrustadas en base64 (`data:image/…`) también se muestran. Compartir (`shareId`) no se reconstruye porque en la app anterior solo funcionaba en el mismo navegador; el campo se conserva tal cual.
+- **Trabajo** y **Respiración** guardan en los formatos de la app anterior: los proyectos de Trabajo son los tres fijos `p1`, `p2` y `p3` (no están unidos a la sección Proyectos) y cada sesión de respiración es `{ id, date, minutes, kind: "respiracion" }` con el día en UTC.
 - **Ciclo** se muestra en el menú y en el Calendario solo si la persona lo activa. El ajuste es la columna `showCycle` de la cuenta (la misma que la app anterior lee de `user.showCycle`), no una clave del documento; se cambia con `PATCH /api/v2/me`. Desde **Más** se llega siempre.
 
 ## En la web
 
-- Una sola consulta (`useLegacyData`, clave `['legacy']`) alimenta todas las herramientas y **Más**. En la barra lateral y en **Más** se agrupan en «Organización» (tanda 1), «Estudio y trabajo» (tanda 2), «Vida personal» y «Salud» (tanda 3).
+- Una sola consulta (`useLegacyData`, clave `['legacy']`) alimenta todas las herramientas y **Más**. En la barra lateral y en **Más** se agrupan en «Organización», «Estudio y trabajo» (con Trabajo), «Conocimiento» (Notas, Bóveda y Asistente), «Vida personal» y «Salud» (con Respiración).
 - Los cambios se ven al instante y se envían en orden (una cola por documento); si la API falla, se deshacen y aparece un aviso.
 - Enfoque: 25 / 5 / 15 minutos; tras cada cuarta sesión de enfoque completada toca descanso largo. Se guarda un registro al terminar o al saltar (si pasó al menos 1 s); reiniciar no guarda. El temporizador vive en la página: si sales de ella, se detiene.
 - Borrar materias, proyectos, roadmaps, cuadernos y videos pide confirmación, como la app anterior. Borrar una idea se puede deshacer desde el aviso.
@@ -99,4 +135,16 @@ Al crear se completan los valores por defecto de la app anterior (`kind: "study"
 - Diario: una entrada por día. La app anterior la creaba al abrir la sección; la app nueva la crea con lo primero que escribes o eliges, y después guarda sola mientras escribes.
 - Ejercicio: «Agendar» crea en Rutina `🏋️ Entreno: <plan>` a las 18:00 todos los días, como la app anterior.
 - Los **avisos con sonido** de Mascotas y Rutina (notificaciones a la hora) aún no están en la app nueva: se guardan y se editan `time`, `days`, `sound` y `enabled`, y la web muestra cuándo toca cada uno.
-- Las funciones con IA de la app anterior (resumir, ampliar, generar guion o apuntes, desarrollar ideas) no están en la app nueva; siguen en la app anterior.
+- Notas: biblioteca por materia con búsqueda y filtro por etiqueta; editor con barra de formato (negrita, cursiva, encabezado, lista, casilla, código y cita), vista previa y guardado automático. La vista previa usa un **Markdown seguro** propio: nunca inserta HTML, solo enlaza `http(s)` y `mailto`, las imágenes de otras webs se muestran como enlace y las fórmulas `$…$` se ven como texto en monoespaciado (sin KaTeX).
+- Respiración: técnicas Caja 4-4-4-4 y 4-7-8 de 1, 3 o 5 minutos, con el texto «Inhala», «Mantén» y «Exhala» (también para lectores de pantalla) y animación que respeta «reducir movimiento». Se guarda al terminar; si terminas antes, se guardan los minutos completos (con menos de uno no se guarda nada).
+- Las funciones con IA dentro de otras secciones de la app anterior (resumir, ampliar, generar guion o apuntes, desarrollar ideas) no están en la app nueva; siguen en la app anterior.
+
+### Asistente
+
+- Usa **la clave de Gemini de cada persona**, guardada solo en el `localStorage` de ese navegador (clave `dyc.assistant`, con el modelo elegido). No se guarda en la cuenta ni pasa por nuestro servidor; «Quitar» la borra. La app anterior usaba `core_openai_*`; no se lee ni se borra.
+- Las peticiones van **directamente del navegador a Google**: `POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` con `Authorization: Bearer <clave>`. No hay proxy (`ai.php` no se reconstruye). Modelos: `gemini-flash-latest` (por defecto), `gemini-3.6-flash`, `gemini-flash-lite-latest` y `gemini-pro-latest`. «Probar conexión» hace una petición mínima sin datos.
+- Errores en español para 401/403 (y 400 de clave no válida), 404 (modelo), 429 (cuota) y 5xx. Ante 429 o 5xx se reintenta **una vez** con `gemini-flash-lite-latest`.
+- Antes de usarlo se muestra qué se envía. Siempre: lo que escribes, la conversación, la fecha y la lista de herramientas. **Solo con «Incluir un resumen de mis datos» activado** (empieza desactivado y no se recuerda): un resumen compacto de pendientes y tareas sin hacer, rutina de hoy, metas en curso, totales de finanzas del mes, agua, última noche de sueño, entrenos de la semana, si ya hay diario de hoy y el panel v2 (puntuaciones, check-ins y hábitos de hoy). La página enseña el texto exacto. Nunca se envían la Bóveda, las notas, el texto del diario ni contraseñas.
+- La conversación solo vive en memoria: se pierde al recargar o salir. Las respuestas usan el mismo Markdown seguro que las notas.
+- Herramientas: `add_todo`, `add_task`, `add_idea`, `add_goal`, `add_transaction`, `log_water`, `log_workout`, `log_sleep`, `add_journal` y `add_routine`, con los parámetros de la app anterior (`log_workout` pide además los minutos, porque `workouts` exige al menos 1). Cada llamada se muestra como **acción propuesta** con lo que se va a guardar y los botones «Hacer» y «Descartar»; **nada se escribe sin «Hacer»**, y entonces se guarda con esta misma API de módulos (validada antes con los esquemas de `@dyc/core`). El resultado de cada acción se envía al modelo con el siguiente mensaje. `add_journal` añade a la entrada de hoy si ya existe (una por día).
+- No hay Content-Security-Policy en la web ni en su `.htaccess`; si se añade, `connect-src` debe permitir `https://generativelanguage.googleapis.com`.
