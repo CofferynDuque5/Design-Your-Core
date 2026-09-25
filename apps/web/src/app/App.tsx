@@ -8,6 +8,7 @@ import { Forgot } from '../pages/auth/Forgot';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
 import { Agenda } from '../pages/Agenda';
+import { Breathe } from '../pages/Breathe';
 import { Calendar } from '../pages/Calendar';
 import { CheckIn } from '../pages/CheckIn';
 import { Challenges } from '../pages/Challenges';
@@ -25,6 +26,7 @@ import { Habits } from '../pages/Habits';
 import { Ideas } from '../pages/Ideas';
 import { More } from '../pages/More';
 import { NotebookDetail, Notebooks } from '../pages/Notebooks';
+import { NoteEditor, Notes } from '../pages/Notes';
 import { NotFound } from '../pages/NotFound';
 import { Onboarding } from '../pages/Onboarding';
 import { Profile } from '../pages/Profile';
@@ -35,6 +37,7 @@ import { Schedule } from '../pages/Schedule';
 import { Subjects } from '../pages/Subjects';
 import { Today } from '../pages/Today';
 import { Todos } from '../pages/Todos';
+import { Work } from '../pages/Work';
 import { useProfile } from './queries';
 import { SessionProvider, useSession } from './session';
 import { ToastProvider } from './toast';
@@ -114,6 +117,10 @@ export function AppRoutes() {
         <Route path="sueno" element={<Sleep />} />
         <Route path="diario" element={<Journal />} />
         <Route path="rutina" element={<Routine />} />
+        <Route path="notas" element={<Notes />} />
+        <Route path="notas/:id" element={<NoteEditor />} />
+        <Route path="trabajo" element={<Work />} />
+        <Route path="respiracion" element={<Breathe />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

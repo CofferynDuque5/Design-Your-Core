@@ -7,28 +7,6 @@ import { PageHeader } from '../components/AppShell';
 import { ErrorState, Loading } from '../components/States';
 import { plural } from '../lib/format';
 
-/**
- * Módulos de la app anterior que aún no están en la app nueva. Sus datos se
- * conservan intactos en el servidor; llegan en las próximas tandas.
- */
-export const LEGACY_GROUPS: Array<{ title: string; modules: Array<{ name: string; keys: string[]; unit: [string, string] }> }> = [
-  {
-    title: 'Organización y trabajo',
-    modules: [
-      { name: 'Notas (Bodega)', keys: ['notes'], unit: ['nota', 'notas'] },
-      { name: 'Trabajo', keys: ['workItems'], unit: ['elemento', 'elementos'] },
-    ],
-  },
-  {
-    title: 'Bienestar',
-    modules: [{ name: 'Respiración', keys: ['meditations'], unit: ['sesión', 'sesiones'] }],
-  },
-];
-
-export function countItems(data: Record<string, unknown>, keys: string[]): number {
-  return keys.reduce((n, k) => n + (Array.isArray(data[k]) ? (data[k] as unknown[]).length : 0), 0);
-}
-
 export function More() {
   const legacy = useLegacyData();
   const { user } = useSession();
@@ -38,7 +16,7 @@ export function More() {
     <div className="page page--narrow">
       <PageHeader eyebrow="Más" title="Otras herramientas" />
       <div className="stack-lg">
-        <p className="lead">Design Your Core se centra en tus seis pilares. Aquí tienes las herramientas de la app anterior, con todos tus datos.</p>
+        <p className="lead">Design Your Core se centra en tus seis pilares. Aquí tienes todas las herramientas de la app anterior, con tus datos, agrupadas como en el menú.</p>
         {legacy.isPending ? (
           <Loading />
         ) : legacy.isError ? (
@@ -55,8 +33,9 @@ export function More() {
                     {g.label}
                   </h3>
                   <ul className="tool-links" aria-labelledby={`tools-${g.id}`}>
-                    {TOOLS.filter((t) => t.group === g.id).map(({ to, label, icon: Icon, description, count, unit, optIn }) => {
-                      const n = count(legacy.data.data);
+                    {TOOLS.filter((t) => t.group === g.id).map(({ to, label, icon: Icon, description, count, unit, note, optIn }) => {
+                      const n = count ? count(legacy.data.data) : 0;
+                      const status = count && unit ? (n ? plural(n, unit[0], unit[1]) : 'Vacío') : (note ?? '');
                       return (
                         <li key={to}>
                           <Link to={to} className="card tool-link">
@@ -70,7 +49,7 @@ export function More() {
                                 {optIn && !user?.showCycle && ' · oculto en el menú'}
                               </span>
                             </span>
-                            <span className="muted small numeric tool-link__count">{n ? plural(n, unit[0], unit[1]) : 'Vacío'}</span>
+                            <span className="muted small numeric tool-link__count">{status}</span>
                             <ChevronRight size={18} aria-hidden="true" />
                           </Link>
                         </li>
@@ -81,35 +60,19 @@ export function More() {
               ))}
             </section>
 
-            <div className="stack-sm">
-              <h2 className="section-title">Llegan pronto</h2>
-              <p className="muted">Estas secciones llegarán a la app nueva en las próximas actualizaciones. Mientras tanto siguen en la app anterior, con tus datos guardados.</p>
-              {legacyUrl && (
+            {legacyUrl && (
+              <section className="card stack-sm" aria-labelledby="legacy-app-title">
+                <h2 id="legacy-app-title" className="section-title">
+                  La app anterior
+                </h2>
+                <p className="muted">Sigue disponible y usa los mismos datos. Si la tienes abierta a la vez, recárgala para ver lo que cambies aquí.</p>
                 <div>
                   <a className="btn btn--secondary" href={legacyUrl} target="_blank" rel="noopener noreferrer">
                     Abrir la app anterior <ExternalLink size={16} aria-hidden="true" />
                   </a>
                 </div>
-              )}
-            </div>
-            {LEGACY_GROUPS.map((g, i) => (
-              <section key={g.title} className="card stack" aria-labelledby={`legacy-group-${i}`}>
-                <h3 id={`legacy-group-${i}`} className="section-title">
-                  {g.title}
-                </h3>
-                <ul className="legacy-list">
-                  {g.modules.map((m) => {
-                    const n = countItems(legacy.data.data, m.keys);
-                    return (
-                      <li key={m.name}>
-                        <span>{m.name}</span>
-                        <span className="muted small numeric">{n ? plural(n, m.unit[0], m.unit[1]) : 'Sin datos'}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
               </section>
-            ))}
+            )}
           </>
         )}
         <p className="muted small">¿Quieres una copia de todo? Descárgala desde Perfil › Tus datos.</p>

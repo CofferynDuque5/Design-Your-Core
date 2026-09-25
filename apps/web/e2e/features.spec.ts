@@ -4,6 +4,9 @@ import { onboard, PASSWORD, register, signIn } from './helpers';
 
 // Recorridos por funciones concretas, cada uno con una cuenta nueva.
 
+/** Notas, Bóveda y Asistente. */
+const TOOLS_KNOWLEDGE = 1;
+
 test('retos: subir de nivel, completar y el límite de tres', async ({ page }) => {
   await register(page, 'retos');
   await onboard(page);
@@ -111,28 +114,26 @@ test('pareja: dos personas se vinculan con un código', async ({ page, browser }
   await other.close();
 });
 
-test('la sección Más conserva los módulos anteriores', async ({ page }) => {
+test('la sección Más reúne todas las herramientas', async ({ page }) => {
   await register(page, 'mas');
   await onboard(page);
   await page.goto('/perfil');
   await page.getByRole('link', { name: /Más herramientas/ }).click();
   await expect(page).toHaveURL(/\/mas$/);
-  // Lo que aún no está en la app nueva sigue listado con su enlace a la app anterior.
-  for (const group of ['Organización y trabajo', 'Bienestar']) {
-    await expect(page.getByRole('region', { name: group })).toBeVisible();
-  }
-  await expect(page.getByRole('region', { name: 'Organización y trabajo' }).getByText('Notas (Bodega)')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Organización y trabajo' }).getByText('Finanzas')).toHaveCount(0);
+  // Todas las secciones de la app anterior ya están en la app nueva: nada «llega pronto».
+  await expect(page.getByRole('heading', { name: 'Llegan pronto' })).toHaveCount(0);
   const tools = page.getByRole('region', { name: 'Herramientas' });
-  await expect(tools.getByRole('list', { name: 'Estudio y trabajo' }).getByRole('link')).toHaveCount(6);
+  await expect(tools.getByRole('list', { name: 'Organización' }).getByRole('link')).toHaveCount(5);
+  await expect(tools.getByRole('list', { name: 'Estudio y trabajo' }).getByRole('link')).toHaveCount(7);
+  await expect(tools.getByRole('list', { name: 'Conocimiento' }).getByRole('link')).toHaveCount(TOOLS_KNOWLEDGE);
   await expect(tools.getByRole('list', { name: 'Vida personal' }).getByRole('link')).toHaveCount(3);
   // Ciclo está en Salud aunque no se muestre en el menú.
-  await expect(tools.getByRole('list', { name: 'Salud' }).getByRole('link')).toHaveCount(5);
+  await expect(tools.getByRole('list', { name: 'Salud' }).getByRole('link')).toHaveCount(6);
   await expect(tools.getByRole('link', { name: /Ciclo.*oculto en el menú/ })).toBeVisible();
   await tools.getByRole('link', { name: /Pendientes/ }).click();
   await expect(page).toHaveURL(/\/pendientes$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Pendientes' })).toBeVisible();
   await page.goto('/mas');
-  await page.getByRole('region', { name: 'Herramientas' }).getByRole('link', { name: /Cuadernos/ }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Cuadernos' })).toBeVisible();
+  await page.getByRole('region', { name: 'Herramientas' }).getByRole('link', { name: /Respiración/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Respiración' })).toBeVisible();
 });

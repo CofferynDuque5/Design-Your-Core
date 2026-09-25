@@ -1,4 +1,5 @@
 import {
+  deriveLegacyPatch,
   LEGACY_CHILDREN,
   LEGACY_NEWEST_FIRST,
   legacyList,
@@ -56,12 +57,15 @@ function apply<K extends LegacyKey>(data: LegacyData, key: K, op: Op<K>): Legacy
   const list = legacyList(data, key) as Array<LegacyItems[K]>;
   switch (op.type) {
     case 'add': {
-      // Enfoque, finanzas, entrenos y sueño: lo más reciente primero, como en el servidor.
+      // Enfoque, finanzas, entrenos, sueño y respiración: lo más reciente primero, como en el servidor.
       const max = LEGACY_NEWEST_FIRST[key];
       return { ...data, [key]: max ? [op.item, ...list].slice(0, max) : [...list, op.item] };
     }
-    case 'update':
-      return { ...data, [key]: list.map((x) => (x.id === op.id ? mergeLegacyItem(key, x, op.patch as Record<string, unknown>) : x)) };
+    case 'update': {
+      // Con los campos derivados (extracto y color de una nota, `rem` de una tarea), como el servidor.
+      const patch = deriveLegacyPatch(key, op.patch as Record<string, unknown>);
+      return { ...data, [key]: list.map((x) => (x.id === op.id ? mergeLegacyItem(key, x, patch) : x)) };
+    }
     case 'remove': {
       // Pendiente → subtareas, cuaderno → cajitas y mascota → cuidados se borran juntos, como en el servidor.
       const child = LEGACY_CHILDREN[key];

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { onboard, readLegacy, register, seedLegacy } from './helpers';
+import { onboard, readLegacy, register, seedLegacy, sessionToken } from './helpers';
 
-// Herramientas de la app anterior (tandas 1 y 2) contra la API real. Cada recorrido
+// Herramientas de la app anterior (tandas 1 a 4) contra la API real. Cada recorrido
 // comprueba además que el documento de /api/sync (el que lee la app anterior)
 // conserva sus formatos y las claves que la app nueva no conoce.
 
@@ -705,5 +705,130 @@ test('ejercicio, sueño y diario: registrar, editar y guardar al escribir', asyn
   await expect(page.getByLabel('Notas del día')).toHaveValue('Día largo');
   doc = await readLegacy(page);
   expect((doc.journal as unknown[]).length).toBe(2);
+  expect(doc).toMatchObject(OLD);
+});
+
+test('notas: biblioteca por materia, formato, imagen subida y formatos de la app anterior', async ({ page }) => {
+  await register(page, 'notas');
+  await onboard(page);
+  const shared = { id: 'n_viejo', title: 'Ondas', subject: 'Física', date: '3 sept', tag: '#4F7CFF', excerpt: '# Ondas', body: '# Ondas\n- [x] Repasar', commit: false, tags: 'examen', shareId: 'abc123defg', campoViejo: 1 };
+  await seedLegacy(page, { ...OLD, notes: [shared] });
+  await page.goto('/notas');
+  await expect(page.getByRole('region', { name: /^Física/ }).getByRole('link', { name: /Ondas/ })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Nueva nota' }).click();
+  await expect(page.getByLabel('Título')).toBeFocused();
+  await page.keyboard.type('Enlaces químicos');
+  const body = page.getByLabel('Texto de la nota, en Markdown');
+  await body.fill('Tipos de enlace');
+  await body.selectText();
+  await page.getByRole('button', { name: 'Negrita' }).click();
+  await expect(body).toHaveValue('**Tipos de enlace**');
+  await body.press('End');
+  await body.press('Enter');
+  await page.getByRole('button', { name: 'Casilla' }).click();
+  await page.keyboard.type('Iónico');
+  await page.getByLabel('Materia').fill('Química');
+  await page.getByLabel('Materia').press('Enter');
+  await page.getByLabel('Etiquetas').fill('examen, química');
+
+  // Imagen grande: se reduce en el navegador a JPEG de 1400 px y se sube a /api/images.
+  const png = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 2400;
+    c.height = 1600;
+    const ctx = c.getContext('2d') as CanvasRenderingContext2D;
+    ctx.fillStyle = '#4F7CFF';
+    ctx.fillRect(0, 0, 2400, 1600);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(400, 400, 800, 800);
+    return c.toDataURL('image/png').split(',')[1];
+  });
+  await page.getByLabel('Insertar imagen').setInputFiles({ name: 'esquema.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await expect(page.getByText('Imagen añadida a la nota.')).toBeVisible();
+  await expect(body).toHaveValue(/^\*\*Tipos de enlace\*\*\n- \[ \] Iónico\n!\[imagen\]\(coreimg:[\w-]+\)\n$/);
+  await page.getByRole('button', { name: 'Vista previa' }).click();
+  await expect(page.getByRole('img', { name: 'Imagen 1' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Por hacer' })).toBeVisible();
+
+  await expect
+    .poll(async () => ((await readLegacy(page)).notes as Array<Record<string, unknown>>).find((n) => n.id !== 'n_viejo')?.body)
+    .toMatch(/coreimg:/);
+  const doc = await readLegacy(page);
+  const notes = doc.notes as Array<Record<string, string>>;
+  expect(notes[0]).toEqual(shared);
+  const created = notes[1];
+  expect(created).toMatchObject({ title: 'Enlaces químicos', subject: 'Química', tag: '#8B5CF6', tags: 'examen, química', commit: false, shareId: null });
+  expect(created.date).toMatch(/^\d{1,2} [a-z]{3,4}\.?$/);
+  expect(created.excerpt).toBe(created.body.slice(0, 90));
+  const imageId = /coreimg:([\w-]+)/.exec(created.body)?.[1] as string;
+  const token = await sessionToken(page);
+  const res = await page.request.post('/api/images/fetch', { data: { ids: [imageId] }, headers: { Authorization: `Bearer ${token}` } });
+  const dataUrl = (await res.json()).images[imageId] as string;
+  expect(dataUrl).toMatch(/^data:image\/jpeg;base64,/);
+  const size = await page.evaluate(async (src) => {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    return [img.naturalWidth, img.naturalHeight];
+  }, dataUrl);
+  expect(size).toEqual([1400, 933]);
+
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('img', { name: 'Imagen 1' })).toBeVisible();
+  await page.getByRole('link', { name: 'Notas', exact: true }).first().click();
+  await page.getByRole('group', { name: 'Etiqueta' }).getByRole('button', { name: '#química' }).click();
+  await expect(page.getByRole('region', { name: /^Física/ })).toHaveCount(0);
+  await page.getByRole('link', { name: /Enlaces químicos/ }).click();
+  await page.getByRole('button', { name: 'Borrar nota' }).click();
+  await page.getByRole('button', { name: 'Borrar definitivamente' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Notas' })).toBeVisible();
+  await expect.poll(async () => ((await readLegacy(page)).notes as unknown[]).length).toBe(1);
+  expect(await readLegacy(page)).toMatchObject(OLD);
+});
+
+test('trabajo y respiración: tareas por proyecto y una sesión guiada', async ({ page }) => {
+  await page.clock.install();
+  await register(page, 'trabajo');
+  await onboard(page);
+  const today = utcToday();
+  await seedLegacy(page, { ...OLD, workItems: [{ id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: false, due: 'Hoy' }], meditations: [{ id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' }] });
+
+  await page.goto('/trabajo');
+  await expect(page.getByRole('region', { name: /En curso/ }).getByText('Proyecto 2')).toBeVisible();
+  await page.getByLabel('Nueva tarea de trabajo').fill('Preparar la demo');
+  await page.getByLabel('Proyecto de la tarea nueva').selectOption('p3');
+  await page.getByRole('button', { name: 'Añadir', exact: true }).click();
+  await page.getByRole('region', { name: /En curso/ }).getByRole('checkbox', { name: /Informe/ }).click();
+  await expect(page.getByRole('region', { name: /Hecho/ }).getByRole('checkbox', { name: /Informe/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Editar «Preparar la demo»' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar tarea de trabajo' });
+  await dialog.getByRole('button', { name: 'En curso' }).click();
+  await dialog.getByLabel('Para cuándo (opcional)').fill('Viernes');
+  await dialog.getByRole('button', { name: 'Guardar' }).click();
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('region', { name: /Hecho/ }).getByText('Informe')).toBeVisible();
+  await expect(page.getByRole('region', { name: /En curso/ }).getByText('Viernes')).toBeVisible();
+  let doc = await readLegacy(page);
+  expect(doc.workItems).toEqual([
+    { id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: true, due: 'Hoy' },
+    { id: expect.any(String), title: 'Preparar la demo', project: 'p3', status: 'curso', done: false, due: 'Viernes' },
+  ]);
+
+  await page.goto('/respiracion');
+  await page.getByRole('button', { name: '1 min' }).click();
+  await page.getByRole('button', { name: 'Empezar' }).click();
+  await expect(page.locator('.breathe__phase')).toHaveText('Inhala');
+  await page.clock.runFor(5_000);
+  await expect(page.locator('.breathe__phase')).toHaveText('Mantén');
+  await page.clock.runFor(56_000);
+  await expect(page.getByRole('button', { name: 'Empezar' })).toBeVisible();
+  await expect(page.getByText('1 min', { exact: true }).first()).toBeVisible();
+  await reloadWhenSaved(page);
+  doc = await readLegacy(page);
+  expect(doc.meditations).toEqual([
+    { id: expect.any(String), date: today, minutes: 1, kind: 'respiracion' },
+    { id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' },
+  ]);
   expect(doc).toMatchObject(OLD);
 });

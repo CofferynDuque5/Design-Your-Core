@@ -2,6 +2,7 @@ import { legacyList, type LegacyData } from '@dyc/core';
 import {
   AlarmClock,
   BookOpen,
+  BriefcaseBusiness,
   CalendarClock,
   CalendarDays,
   Clapperboard,
@@ -16,18 +17,21 @@ import {
   PawPrint,
   Route,
   School,
+  StickyNote,
   Target,
   Timer,
   Wallet,
+  Wind,
   type LucideIcon,
 } from 'lucide-react';
 
-export type ToolGroup = 'organizacion' | 'estudio' | 'personal' | 'salud';
+export type ToolGroup = 'organizacion' | 'estudio' | 'conocimiento' | 'personal' | 'salud';
 
 /** Subgrupos de «Herramientas» en la barra lateral y en «Más». */
 export const TOOL_GROUPS: Array<{ id: ToolGroup; label: string }> = [
   { id: 'organizacion', label: 'Organización' },
   { id: 'estudio', label: 'Estudio y trabajo' },
+  { id: 'conocimiento', label: 'Conocimiento' },
   { id: 'personal', label: 'Vida personal' },
   { id: 'salud', label: 'Salud' },
 ];
@@ -38,13 +42,15 @@ export interface Tool {
   icon: LucideIcon;
   group: ToolGroup;
   description: string;
-  count: (d: LegacyData) => number;
-  unit: [string, string];
+  /** Cuántos elementos tiene (con su unidad); sin cuenta, se muestra `note`. */
+  count?: (d: LegacyData) => number;
+  unit?: [string, string];
+  note?: string;
   /** Solo aparece en el menú si la persona lo activa (Ciclo, como `showCycle` en la app anterior). */
   optIn?: 'cycle';
 }
 
-/** Herramientas de la app anterior ya reconstruidas en la app nueva (tandas 1, 2 y 3). */
+/** Todas las secciones de la app anterior, reconstruidas en la app nueva (tandas 1 a 4). */
 export const TOOLS: Tool[] = [
   {
     to: '/agenda',
@@ -146,6 +152,24 @@ export const TOOLS: Tool[] = [
     unit: ['idea', 'ideas'],
   },
   {
+    to: '/trabajo',
+    label: 'Trabajo',
+    icon: BriefcaseBusiness,
+    group: 'estudio',
+    description: 'Tareas de trabajo por proyecto, de la app anterior',
+    count: (d) => legacyList(d, 'workItems').filter((w) => !w.done).length,
+    unit: ['por hacer', 'por hacer'],
+  },
+  {
+    to: '/notas',
+    label: 'Notas',
+    icon: StickyNote,
+    group: 'conocimiento',
+    description: 'Apuntes en Markdown por materia, con imágenes',
+    count: (d) => legacyList(d, 'notes').length,
+    unit: ['nota', 'notas'],
+  },
+  {
     to: '/finanzas',
     label: 'Finanzas',
     icon: Wallet,
@@ -207,6 +231,15 @@ export const TOOLS: Tool[] = [
     description: 'Rutinas por hora y día, comidas y agua',
     count: (d) => legacyList(d, 'routines').length,
     unit: ['rutina', 'rutinas'],
+  },
+  {
+    to: '/respiracion',
+    label: 'Respiración',
+    icon: Wind,
+    group: 'salud',
+    description: 'Respiración guiada y tus minutos de calma',
+    count: (d) => legacyList(d, 'meditations').length,
+    unit: ['sesión', 'sesiones'],
   },
   {
     to: '/ciclo',

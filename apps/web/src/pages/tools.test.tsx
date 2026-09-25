@@ -1,4 +1,4 @@
-import { addDays, reorderById, utcDayKey } from '@dyc/core';
+import { addDays, noteDateLabel, noteTag, reorderById, utcDayKey } from '@dyc/core';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -8,7 +8,13 @@ import { AppRoutes, makeQueryClient, Providers } from '../app/App';
 import { fakeFetch, legacyDoc, profile, USER, type Handler } from '../test/fakeApi';
 import { localDayKey } from '../lib/tools';
 
-// Herramientas de la app anterior (tandas 1, 2 y 3) contra una API falsa.
+// Herramientas de la app anterior (tandas 1 a 4) contra una API falsa.
+
+// jsdom no carga imágenes: la reducción a JPEG se prueba en el navegador (e2e).
+vi.mock('../app/images', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../app/images')>()),
+  compressImage: vi.fn(async () => 'data:image/jpeg;base64,/9j/4AAQSkZJRg=='),
+}));
 
 function renderAt(path: string) {
   const client = makeQueryClient();
@@ -35,7 +41,7 @@ function withApi(extra: Record<string, Handler> = {}) {
     'POST /api/v2/modules/:key': (b, url) => {
       const [key] = parts(url);
       const item = (b as { item: Record<string, unknown> }).item;
-      doc[key] = key === 'focus' ? [item, ...(doc[key] ?? [])] : [...(doc[key] ?? []), item];
+      doc[key] = key === 'focus' || key === 'meditations' ? [item, ...(doc[key] ?? [])] : [...(doc[key] ?? []), item];
       return [201, { item, updatedAt: at }];
     },
     'PUT /api/v2/modules/:key/order': (b, url) => {
@@ -270,7 +276,7 @@ describe('Cambios sin guardar', () => {
 });
 
 describe('Más', () => {
-  it('enlaza las herramientas por grupos con sus cuentas y deja el resto para la app anterior', async () => {
+  it('es el centro de todas las herramientas, por grupos y con sus cuentas', async () => {
     withApi();
     renderAt('/mas');
     const tools = await screen.findByRole('region', { name: 'Herramientas' });
@@ -288,12 +294,15 @@ describe('Más', () => {
     expect(within(personal).getByRole('link', { name: /Metas.*1 en curso/ })).toHaveAttribute('href', '/metas');
     expect(within(personal).getByRole('link', { name: /Mascotas.*1 mascota/ })).toHaveAttribute('href', '/mascotas');
     const health = within(tools).getByRole('list', { name: 'Salud' });
-    expect(within(health).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/ejercicio', '/sueno', '/diario', '/rutina', '/ciclo']);
+    expect(within(health).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/ejercicio', '/sueno', '/diario', '/rutina', '/respiracion', '/ciclo']);
+    expect(within(health).getByRole('link', { name: /Respiración.*1 sesión/ })).toBeInTheDocument();
     // Ciclo siempre se abre desde Más, aunque esté oculto en el menú.
     expect(within(health).getByRole('link', { name: /Ciclo.*oculto en el menú.*Vacío/ })).toBeInTheDocument();
-    // Lo que aún no está en la app nueva sigue en «Llegan pronto».
-    expect(screen.getByRole('region', { name: 'Organización y trabajo' })).toHaveTextContent('Notas (Bodega)');
-    expect(screen.queryByRole('region', { name: 'Vida personal' })).not.toBeInTheDocument();
+    expect(within(study).getByRole('link', { name: /Trabajo.*1 por hacer/ })).toHaveAttribute('href', '/trabajo');
+    const knowledge = within(tools).getByRole('list', { name: 'Conocimiento' });
+    expect(within(knowledge).getByRole('link', { name: /Notas.*2 notas/ })).toHaveAttribute('href', '/notas');
+    // Ya no queda nada «por llegar»: todas las secciones de la app anterior están aquí.
+    expect(screen.queryByRole('heading', { name: 'Llegan pronto' })).not.toBeInTheDocument();
   });
 });
 
@@ -565,7 +574,7 @@ describe('Barra lateral', () => {
     const salud = within(nav).getByRole('button', { name: 'Salud' });
     expect(salud).toHaveAttribute('aria-expanded', 'true');
     const list = within(nav).getByRole('list', { name: 'Salud' });
-    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Ejercicio', 'Sueño', 'Diario', 'Rutina']);
+    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Ejercicio', 'Sueño', 'Diario', 'Rutina', 'Respiración']);
     // Los demás grupos empiezan plegados y se abren al pulsarlos.
     const personal = within(nav).getByRole('button', { name: 'Vida personal' });
     expect(personal).toHaveAttribute('aria-expanded', 'false');
@@ -857,5 +866,145 @@ describe('Rutina', () => {
     await userEvent.click(within(meal).getByRole('button', { name: 'Añadir comida' }));
     expect(writes(api)[2]).toMatchObject({ method: 'POST', path: '/api/v2/modules/meals', body: { item: { label: 'Desayuno', note: 'Avena', dateKey: utcDayKey() } } });
     expect(await screen.findByText('Avena')).toBeInTheDocument();
+  });
+});
+
+describe('Notas', () => {
+  it('agrupa por materia, busca, filtra por etiqueta y muestra la nota con sus imágenes', async () => {
+    withApi({ 'POST /api/images/fetch': (b) => ({ images: (b as { ids: string[] }).ids.includes('img1') ? { img1: 'data:image/jpeg;base64,AAAA' } : {} }) });
+    renderAt('/notas');
+    const physics = await screen.findByRole('region', { name: /^Física/ });
+    expect(within(physics).getByRole('link', { name: /Ondas/ })).toHaveAttribute('href', '/notas/n1');
+    expect(within(physics).getByRole('link', { name: /Ondas.*Repasar la frecuencia.*3 sept.*#examen/ })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /^General/ })).toHaveTextContent('Libros');
+
+    await userEvent.type(screen.getByLabelText('Buscar en tus notas'), 'rayuela');
+    expect(screen.queryByRole('region', { name: /^Física/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Libros/ })).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText('Buscar en tus notas'));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Etiqueta' })).getByRole('button', { name: '#examen' }));
+    expect(screen.queryByRole('link', { name: /Libros/ })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: /Ondas/ }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Nota: Ondas' })).toBeInTheDocument();
+    // Con texto se abre en vista previa, con el Markdown ya formateado y las imágenes de la nube.
+    expect(screen.getByRole('heading', { level: 2, name: 'Ondas' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Hecho' })).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'Imagen 1' })).toHaveAttribute('src', 'data:image/jpeg;base64,AAAA');
+  });
+
+  it('crea una nota, le da formato y se guarda sola sin tocar el enlace público', async () => {
+    const api = withApi();
+    renderAt('/notas');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva nota' }));
+    expect(writes(api)[0]).toMatchObject({
+      method: 'POST',
+      path: '/api/v2/modules/notes',
+      body: { item: { title: 'Nota sin título', subject: 'General', date: noteDateLabel(), tag: noteTag('General'), excerpt: '', body: '', commit: false, tags: '', shareId: null } },
+    });
+    const title = await screen.findByLabelText('Título');
+    await waitFor(() => expect(title).toHaveFocus());
+    await userEvent.keyboard('Derivadas');
+    const body = screen.getByLabelText('Texto de la nota, en Markdown');
+    await userEvent.type(body, 'Regla de la cadena');
+    (body as HTMLTextAreaElement).setSelectionRange(0, 5);
+    await userEvent.click(screen.getByRole('button', { name: 'Negrita' }));
+    expect(body).toHaveValue('**Regla** de la cadena');
+    await userEvent.click(screen.getByRole('button', { name: 'Casilla' }));
+    expect(body).toHaveValue('- [ ] **Regla** de la cadena');
+    const materia = screen.getByLabelText('Materia');
+    await userEvent.clear(materia);
+    await userEvent.type(materia, 'Cálculo{Enter}');
+    await waitFor(() => expect(writes(api).find((w) => w.method === 'PATCH' && (w.body as { body?: string }).body === '- [ ] **Regla** de la cadena')).toBeTruthy(), { timeout: 2000 });
+    const patches = writes(api).filter((w) => w.method === 'PATCH');
+    expect(patches.every((w) => w.path === patches[0].path && !('shareId' in (w.body as object)) && !('excerpt' in (w.body as object)))).toBe(true);
+    expect(patches.map((w) => w.body)).toEqual(expect.arrayContaining([{ title: 'Derivadas' }, { subject: 'Cálculo' }]));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Vista previa' }));
+    expect(screen.getByRole('img', { name: 'Por hacer' })).toBeInTheDocument();
+    expect(screen.getByText('Regla', { selector: 'strong' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Borrar nota' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Borrar definitivamente' }));
+    expect(writes(api).at(-1)).toMatchObject({ method: 'DELETE', path: patches[0].path });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Notas' })).toBeInTheDocument();
+  });
+
+  it('inserta una imagen reducida y subida a la nube como coreimg:', async () => {
+    const api = withApi({ 'POST /api/images': (b) => ({ ok: true, count: Object.keys((b as { images: object }).images).length }) });
+    renderAt('/notas/n2');
+    await userEvent.click(await screen.findByRole('button', { name: 'Escribir' }));
+    await userEvent.upload(screen.getByLabelText('Insertar imagen'), new File(['x'], 'foto.png', { type: 'image/png' }));
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'POST' && c.path === '/api/images')).toBeTruthy());
+    const upload = api.calls.find((c) => c.path === '/api/images') as { body: { images: Record<string, string> } };
+    const [id] = Object.keys(upload.body.images);
+    expect(upload.body.images[id]).toBe('data:image/jpeg;base64,/9j/4AAQSkZJRg==');
+    const expected = `Leer *Rayuela*\n![imagen](coreimg:${id})\n`;
+    await waitFor(() => expect(screen.getByLabelText('Texto de la nota, en Markdown')).toHaveValue(expected));
+    await waitFor(() => expect(writes(api).find((w) => w.method === 'PATCH')).toMatchObject({ path: '/api/v2/modules/notes/n2', body: { body: expected } }), { timeout: 2000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Vista previa' }));
+    expect(screen.getByRole('img', { name: 'Imagen 1' })).toHaveAttribute('src', 'data:image/jpeg;base64,/9j/4AAQSkZJRg==');
+  });
+});
+
+describe('Trabajo', () => {
+  it('agrupa por estado, añade, marca y edita con los proyectos de la app anterior', async () => {
+    const api = withApi();
+    renderAt('/trabajo');
+    const doing = await screen.findByRole('region', { name: /En curso/ });
+    expect(within(doing).getByText('Proyecto 2')).toBeInTheDocument();
+    expect(within(doing).getByText('Hoy')).toBeInTheDocument();
+    expect(screen.getByText('1/2 completadas')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /Hecho/ })).toHaveTextContent('Revisar cambios');
+    expect(screen.getByText(/tres proyectos fijos de la app anterior/)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Nueva tarea de trabajo'), 'Preparar reunión');
+    await userEvent.selectOptions(screen.getByLabelText('Proyecto de la tarea nueva'), 'p3');
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/workItems', body: { item: { title: 'Preparar reunión', project: 'p3', status: 'todo', done: false, due: '' } } });
+    const todo = await screen.findByRole('region', { name: /Por hacer/ });
+    await userEvent.click(within(todo).getByRole('checkbox', { name: /Preparar reunión/ }));
+    expect(writes(api)[1]).toMatchObject({ method: 'PATCH', body: { done: true } });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Editar «Informe mensual»' }));
+    const dialog = screen.getByRole('dialog', { name: 'Editar tarea de trabajo' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Por hacer' }));
+    await userEvent.clear(within(dialog).getByLabelText('Para cuándo (opcional)'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    expect(writes(api)[2]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/workItems/wk1', body: { title: 'Informe mensual', project: 'p2', status: 'todo', due: '' } });
+  });
+});
+
+describe('Respiración', () => {
+  it('guía con texto cada fase y guarda la sesión al terminar', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    const api = withApi();
+    renderAt('/respiracion');
+    expect(await screen.findByText('Sesión en total')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '1 min' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+    expect(screen.getAllByText('Inhala').length).toBeGreaterThan(0);
+    act(() => vi.advanceTimersByTime(4_500));
+    expect(screen.getAllByText('Mantén').length).toBeGreaterThan(0);
+    act(() => vi.advanceTimersByTime(4_000));
+    expect(screen.getAllByText('Exhala').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Caja 4-4-4-4' })).toBeDisabled();
+    act(() => vi.advanceTimersByTime(52_000));
+    await waitFor(() => expect(writes(api)).toHaveLength(1));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/meditations', body: { item: { date: utcDayKey(), minutes: 1, kind: 'respiracion' } } });
+    expect(screen.getByRole('button', { name: 'Empezar' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Sesiones en total')).toBeInTheDocument());
+  });
+
+  it('terminar antes del primer minuto no guarda nada', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    const api = withApi();
+    renderAt('/respiracion');
+    await userEvent.click(await screen.findByRole('button', { name: '4-7-8' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+    act(() => vi.advanceTimersByTime(30_000));
+    await userEvent.click(screen.getByRole('button', { name: 'Terminar' }));
+    expect(screen.getByText(/Con menos de un minuto no se guarda/)).toBeInTheDocument();
+    expect(writes(api)).toHaveLength(0);
   });
 });

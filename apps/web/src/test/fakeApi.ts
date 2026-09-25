@@ -166,5 +166,26 @@ export const legacyDoc = (): Record<string, unknown> => ({
   routines: [{ id: 'rt1', title: 'Tomar vitaminas', time: '08:30', days: '1234567', icon: 'bell', sound: true, enabled: true }],
   meals: [],
   dayLog: { dateKey: '2020-01-01', water: 5, waterGoal: 8 },
+  // Tanda 4.
+  notes: [
+    {
+      id: 'n1',
+      title: 'Ondas',
+      subject: 'Física',
+      date: '3 sept',
+      tag: '#EC6A9C',
+      excerpt: '# Ondas',
+      body: '# Ondas\n- [x] Repasar la **frecuencia**\n\n![imagen](coreimg:img1)',
+      commit: false,
+      tags: 'examen, física',
+      shareId: 'abc123defg',
+    },
+    { id: 'n2', title: 'Libros', subject: 'General', date: '10 sept', tag: '#E8912A', excerpt: 'Leer', body: 'Leer *Rayuela*', commit: false, tags: 'lectura', shareId: null },
+  ],
+  workItems: [
+    { id: 'wk1', title: 'Informe mensual', project: 'p2', status: 'curso', done: false, due: 'Hoy' },
+    { id: 'wk2', title: 'Revisar cambios', project: 'p1', status: 'todo', done: true, due: '' },
+  ],
+  meditations: [{ id: 'md1', date: '2026-09-20', minutes: 3, kind: 'respiracion' }],
   claveFutura: true,
 });

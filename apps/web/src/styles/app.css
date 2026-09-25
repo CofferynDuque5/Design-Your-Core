@@ -3842,6 +3842,427 @@
   .water-card__actions .btn:last-child {
     flex: 1;
   }
+
+  /* ---------- Tanda 4: Notas ---------- */
+
+  .search-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-field > svg {
+    position: absolute;
+    left: var(--space-3);
+    color: var(--color-ink-muted);
+    pointer-events: none;
+  }
+
+  .search-field .input {
+    width: 100%;
+    padding-left: calc(var(--space-3) + 26px);
+  }
+
+  .note-group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .note-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    gap: var(--space-3);
+  }
+
+  .note-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    height: 100%;
+    border-top: 4px solid var(--c);
+    color: var(--color-ink);
+    text-decoration: none;
+    transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  }
+
+  .note-card:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-line-strong);
+    border-top-color: var(--c);
+  }
+
+  .note-card__title {
+    overflow-wrap: anywhere;
+  }
+
+  .note-card__text {
+    display: -webkit-box;
+    flex: 1;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow-wrap: anywhere;
+  }
+
+  .note-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .note-card__tag {
+    color: var(--color-ink-muted);
+    font-weight: var(--weight-medium);
+  }
+
+  .note-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .note-page__top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .note-page__top .back-link {
+    margin: 0;
+  }
+
+  .note-title-input {
+    width: 100%;
+    min-height: 56px;
+    padding: var(--space-1) 0 var(--space-1) var(--space-3);
+    border: 0;
+    border-left: 4px solid var(--c);
+    background: transparent;
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    font-size: var(--text-h1);
+    line-height: 1.15;
+  }
+
+  .note-title-input:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .note-meta {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  @media (min-width: 720px) {
+    .note-meta {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+      align-items: start;
+    }
+  }
+
+  .note-editor {
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .note-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface-sunken);
+  }
+
+  .note-toolbar__tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .note-toolbar__tools .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .note-toolbar__file {
+    cursor: pointer;
+  }
+
+  .note-toolbar__file:focus-within {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .note-toolbar__file.is-busy {
+    opacity: 0.5;
+    cursor: progress;
+  }
+
+  .note-body-input {
+    display: block;
+    width: 100%;
+    min-height: 420px;
+    padding: var(--space-4);
+    border: 0;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    resize: vertical;
+  }
+
+  .note-body-input:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+
+  .note-preview {
+    min-height: 240px;
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .note-page__danger {
+    display: flex;
+  }
+
+  /* ---------- Markdown (notas y Asistente) ---------- */
+
+  .markdown {
+    overflow-wrap: anywhere;
+    line-height: 1.6;
+  }
+
+  .markdown > * + * {
+    margin-top: var(--space-3);
+  }
+
+  .markdown p,
+  .markdown ul,
+  .markdown ol,
+  .markdown blockquote,
+  .markdown pre {
+    margin-bottom: 0;
+  }
+
+  .markdown .md-heading {
+    margin-bottom: 0;
+    font-family: var(--font-display);
+    line-height: 1.25;
+  }
+
+  .markdown h2.md-heading { font-size: var(--text-h2); }
+  .markdown h3.md-heading { font-size: var(--text-h3); }
+  .markdown h4.md-heading,
+  .markdown h5.md-heading,
+  .markdown h6.md-heading { font-size: var(--text-title); }
+
+  .markdown ul {
+    padding-left: var(--space-5);
+    list-style: disc;
+  }
+
+  .markdown ol {
+    padding-left: var(--space-6);
+  }
+
+  .markdown li + li {
+    margin-top: var(--space-1);
+  }
+
+  .markdown li.md-task {
+    display: flex;
+    gap: var(--space-2);
+    margin-left: calc(-1 * var(--space-5));
+    list-style: none;
+  }
+
+  .md-check {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    margin-top: 0.2em;
+    border: 2px solid var(--color-line-strong);
+    border-radius: 4px;
+  }
+
+  .md-check--on {
+    border-color: var(--color-primary);
+    background: var(--color-primary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 14px no-repeat;
+  }
+
+  .markdown blockquote {
+    margin-inline: 0;
+    padding: var(--space-1) var(--space-4);
+    border-left: 3px solid var(--color-line-strong);
+    color: var(--color-ink-muted);
+  }
+
+  .markdown code {
+    padding: 0.1em 0.35em;
+    border-radius: var(--radius-xs);
+    background: var(--color-surface-sunken);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.9em;
+  }
+
+  .markdown .md-code {
+    padding: var(--space-3) var(--space-4);
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+    background: var(--color-surface-sunken);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .markdown .md-code code {
+    padding: 0;
+    background: none;
+  }
+
+  .markdown .md-math {
+    color: var(--color-primary);
+  }
+
+  .markdown hr {
+    border: 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .markdown a {
+    color: var(--color-primary);
+  }
+
+  .md-img {
+    display: block;
+    max-width: 100%;
+    max-height: 480px;
+    border-radius: var(--radius-md);
+  }
+
+  .md-img--missing {
+    display: inline-block;
+    padding: var(--space-2) var(--space-3);
+    border: 1px dashed var(--color-line-strong);
+    color: var(--color-ink-muted);
+    font-size: var(--text-small);
+  }
+
+  /* ---------- Tanda 4: Trabajo ---------- */
+
+  .work-add__project {
+    flex: none !important;
+    width: auto;
+  }
+
+  .work-row__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding-block: var(--space-2);
+  }
+
+  .work-row__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--color-ink-muted);
+  }
+
+  .check-row--done .work-row__meta span {
+    text-decoration: none !important;
+  }
+
+  @media (max-width: 480px) {
+    .work-add {
+      flex-wrap: wrap;
+    }
+
+    .work-add .input:first-of-type {
+      flex-basis: 100%;
+    }
+
+    .work-add__project {
+      flex: 1 !important;
+    }
+  }
+
+  /* ---------- Tanda 4: Respiración ---------- */
+
+  .breathe {
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .breathe .segmented {
+    width: 100%;
+    max-width: 440px;
+  }
+
+  .breathe .segmented button {
+    flex: 1;
+    padding-inline: var(--space-2);
+    white-space: nowrap;
+  }
+
+  .breathe__stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: min(260px, 70vw);
+    aspect-ratio: 1;
+  }
+
+  .breathe__circle {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-sage) 55%, var(--color-surface)), color-mix(in srgb, var(--color-sage) 22%, var(--color-surface)));
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-sage) 12%, transparent);
+    transform: scale(var(--scale, 0.62));
+    transition: transform var(--phase-s, 4s) ease-in-out;
+  }
+
+  .breathe__cue {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .breathe__phase {
+    font-family: var(--font-display);
+    font-size: var(--text-h2);
+  }
+
+  .breathe__count {
+    font-size: var(--text-h3);
+    color: var(--color-ink-muted);
+  }
+
+  /* Sin animación: el círculo queda quieto y guían el texto y la cuenta. */
+  @media (prefers-reduced-motion: reduce) {
+    .breathe__circle {
+      transform: none;
+      transition: none;
+    }
+  }
+
+  .mark--breathe {
+    background: var(--color-sage);
+  }
 }
 
 @keyframes dyc-toast-in {
