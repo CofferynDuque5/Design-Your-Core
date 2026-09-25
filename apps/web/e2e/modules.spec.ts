@@ -832,3 +832,71 @@ test('trabajo y respiración: tareas por proyecto y una sesión guiada', async (
   ]);
   expect(doc).toMatchObject(OLD);
 });
+
+test('bóveda: crear, añadir, bloquear, desbloquear y cifrar las contraseñas de la app anterior', async ({ page }) => {
+  await page.clock.install();
+  await register(page, 'boveda');
+  await onboard(page);
+  const MASTER = 'tres palabras largas juntas';
+  const OLD_VAULT = [
+    { id: 'v_banco', name: 'Banco Sol', mono: 'BS', user: 'ana.perez', pass: 'Clave-Plana-123' },
+    { id: 'v_correo', name: 'Correo', mono: 'CO', user: 'ana@example.com', pass: 'otra-clave-456' },
+  ];
+  await seedLegacy(page, { ...OLD, vault: OLD_VAULT });
+
+  await page.goto('/boveda');
+  const notice = page.getByRole('region', { name: 'Hay 2 contraseñas de la app anterior guardadas sin cifrar' });
+  await expect(notice).toContainText('Crea tu bóveda para cifrarlas.');
+  await page.getByLabel('Contraseña maestra', { exact: true }).fill(MASTER);
+  await page.getByLabel('Repite la contraseña maestra').fill(MASTER);
+  await page.getByRole('checkbox', { name: /si la olvido, pierdo las entradas/ }).check();
+  await page.getByRole('button', { name: 'Crear la bóveda' }).click();
+
+  await page.getByRole('button', { name: 'Nueva entrada' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nueva entrada' });
+  await dialog.getByLabel('Nombre').fill('GitHub');
+  await dialog.getByLabel('Usuario o correo').fill('ana-dev');
+  await dialog.getByRole('button', { name: 'Generar' }).click();
+  const generated = await dialog.getByLabel('Contraseña', { exact: true }).inputValue();
+  expect(generated).toHaveLength(20);
+  await dialog.getByRole('button', { name: 'Añadir a la bóveda' }).click();
+  await expect(page.getByText('ana-dev')).toBeVisible();
+
+  // Tras recargar, la bóveda está bloqueada y la contraseña equivocada no la abre.
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('heading', { name: 'Bóveda bloqueada' })).toBeVisible();
+  await expect(notice).toContainText('Desbloquea la bóveda para cifrarlas.');
+  await page.getByLabel('Contraseña maestra').fill('no es esta');
+  await page.getByRole('button', { name: 'Desbloquear' }).click();
+  await expect(page.getByText('La contraseña maestra no es correcta.')).toBeVisible();
+  await page.getByLabel('Contraseña maestra').fill(MASTER);
+  await page.getByRole('button', { name: 'Desbloquear' }).click();
+  await page.getByRole('button', { name: 'Mostrar la contraseña de «GitHub»' }).click();
+  await expect(page.getByText(generated)).toBeVisible();
+
+  // Migración: solo tras confirmarla.
+  await notice.getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Cifrar las contraseñas de la app anterior' });
+  await expect(confirm).toContainText('la bóveda de la app anterior aparecerá vacía');
+  expect((await readLegacy(page)).vault).toEqual(OLD_VAULT);
+  await confirm.getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }).click();
+  await expect(notice).toBeHidden();
+  await expect(page.getByText('Banco Sol')).toBeVisible();
+  await expect(page.getByText('ana@example.com')).toBeVisible();
+
+  const doc = await readLegacy(page);
+  expect(doc.vault).toEqual([]);
+  expect(doc).toMatchObject(OLD);
+  const secure = doc.vaultSecure as { v: number; kdf: Record<string, unknown>; items: Array<Record<string, string>> };
+  expect(secure.kdf).toMatchObject({ name: 'PBKDF2', hash: 'SHA-256', iterations: 600_000 });
+  expect(secure.items).toHaveLength(3);
+  for (const item of secure.items) expect(Object.keys(item).sort()).toEqual(['ct', 'id', 'iv']);
+  const blob = JSON.stringify(doc);
+  for (const secret of ['Clave-Plana-123', 'otra-clave-456', 'ana.perez', 'Banco Sol', 'GitHub', 'ana-dev', generated, MASTER]) expect(blob).not.toContain(secret);
+
+  // Se bloquea sola tras 5 minutos sin actividad.
+  await page.clock.runFor(5 * 60_000 + 1_000);
+  await expect(page.getByRole('heading', { name: 'Bóveda bloqueada' })).toBeVisible();
+  await expect(page.getByText('Se bloqueó tras 5 minutos sin actividad.')).toBeVisible();
+  await expect(page.getByText('Banco Sol')).toBeHidden();
+});

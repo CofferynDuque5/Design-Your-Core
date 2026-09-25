@@ -37,6 +37,7 @@ import { Schedule } from '../pages/Schedule';
 import { Subjects } from '../pages/Subjects';
 import { Today } from '../pages/Today';
 import { Todos } from '../pages/Todos';
+import { Vault } from '../pages/Vault';
 import { Work } from '../pages/Work';
 import { useProfile } from './queries';
 import { SessionProvider, useSession } from './session';
@@ -119,6 +120,7 @@ export function AppRoutes() {
         <Route path="rutina" element={<Routine />} />
         <Route path="notas" element={<Notes />} />
         <Route path="notas/:id" element={<NoteEditor />} />
+        <Route path="boveda" element={<Vault />} />
         <Route path="trabajo" element={<Work />} />
         <Route path="respiracion" element={<Breathe />} />
         <Route path="*" element={<NotFound />} />

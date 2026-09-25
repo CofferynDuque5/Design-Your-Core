@@ -29,11 +29,14 @@ function renderAt(path: string) {
 }
 
 /** API falsa con estado: aplica los cambios al documento como el servidor. */
-function withApi(extra: Record<string, Handler> = {}) {
+function withApi(extra: Record<string, Handler> = {}, seed?: (doc: Record<string, unknown>) => void) {
   const doc = legacyDoc() as Record<string, Array<Record<string, unknown>>>;
+  seed?.(doc);
+  type Box = { items: Array<{ id: string }> } & Record<string, unknown>;
+  const box = () => (doc as unknown as { vaultSecure: Box }).vaultSecure;
   const at = '2026-09-25T10:00:00.000Z';
   const parts = (url: URL) => url.pathname.split('/').slice(4);
-  return fakeFetch({
+  const api = fakeFetch({
     'GET /api/me': () => ({ user: USER }),
     'GET /api/v2/profile': () => ({ profile: profile() }),
     'GET /api/v2/modules': () => ({ data: structuredClone(doc), updatedAt: at }),
@@ -70,8 +73,40 @@ function withApi(extra: Record<string, Handler> = {}) {
       return { value, updatedAt: at };
     },
     'PATCH /api/v2/me': (b) => ({ user: { ...USER, ...(b as object) } }),
+    // Bóveda cifrada: como el servidor, sin ver nunca el contenido.
+    'PUT /api/v2/modules/vaultSecure': (b) => {
+      if ((doc as Record<string, unknown>).vaultSecure) return [409, { error: 'Ya tienes una bóveda' }];
+      (doc as Record<string, unknown>).vaultSecure = b;
+      return [201, { value: b, updatedAt: at }];
+    },
+    'DELETE /api/v2/modules/vaultSecure': () => {
+      delete (doc as Record<string, unknown>).vaultSecure;
+      return { ok: true, updatedAt: at };
+    },
+    'POST /api/v2/modules/vaultSecure/items': (b) => {
+      const item = (b as { item: { id: string } }).item;
+      box().items = [...box().items, item];
+      return [201, { item, updatedAt: at }];
+    },
+    'PUT /api/v2/modules/vaultSecure/items/:id': (b, url) => {
+      const id = decodeURIComponent(url.pathname.split('/').pop() as string);
+      box().items = box().items.map((x) => (x.id === id ? { id, ...(b as object) } : x));
+      return { item: { id, ...(b as object) }, updatedAt: at };
+    },
+    'DELETE /api/v2/modules/vaultSecure/items/:id': (_b, url) => {
+      const id = decodeURIComponent(url.pathname.split('/').pop() as string);
+      box().items = box().items.filter((x) => x.id !== id);
+      return { ok: true, updatedAt: at };
+    },
+    'POST /api/v2/modules/vaultSecure/migrate': (b) => {
+      const { items, legacyIds } = b as { items: Array<{ id: string }>; legacyIds: string[] };
+      box().items = [...box().items, ...items];
+      doc.vault = (doc.vault ?? []).filter((x) => !legacyIds.includes(x.id as string));
+      return { migrated: items.length, remaining: doc.vault.length, updatedAt: at };
+    },
     ...extra,
   });
+  return Object.assign(api, { doc });
 }
 
 const writes = (api: ReturnType<typeof withApi>) => api.calls.filter((c) => c.method !== 'GET');
@@ -301,6 +336,7 @@ describe('Más', () => {
     expect(within(study).getByRole('link', { name: /Trabajo.*1 por hacer/ })).toHaveAttribute('href', '/trabajo');
     const knowledge = within(tools).getByRole('list', { name: 'Conocimiento' });
     expect(within(knowledge).getByRole('link', { name: /Notas.*2 notas/ })).toHaveAttribute('href', '/notas');
+    expect(within(knowledge).getByRole('link', { name: /Bóveda/ })).toHaveAttribute('href', '/boveda');
     // Ya no queda nada «por llegar»: todas las secciones de la app anterior están aquí.
     expect(screen.queryByRole('heading', { name: 'Llegan pronto' })).not.toBeInTheDocument();
   });
@@ -1006,5 +1042,105 @@ describe('Respiración', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Terminar' }));
     expect(screen.getByText(/Con menos de un minuto no se guarda/)).toBeInTheDocument();
     expect(writes(api)).toHaveLength(0);
+  });
+});
+
+describe('Bóveda', () => {
+  const MASTER = 'caballo correcto batería grapa';
+  const create = async () => {
+    await userEvent.type(await screen.findByLabelText('Contraseña maestra'), MASTER);
+    await userEvent.type(screen.getByLabelText('Repite la contraseña maestra'), MASTER);
+    await userEvent.click(screen.getByRole('checkbox', { name: /si la olvido, pierdo las entradas/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Crear la bóveda' }));
+    return screen.findByRole('button', { name: 'Nueva entrada' }, { timeout: 5000 });
+  };
+
+  it('crea la bóveda, guarda una entrada cifrada y solo la abre con la contraseña maestra', async () => {
+    const api = withApi();
+    renderAt('/boveda');
+    expect(await screen.findByRole('heading', { name: 'Crea tu bóveda' })).toBeInTheDocument();
+    expect(screen.getByText(/No se puede recuperar\./)).toBeInTheDocument();
+    await userEvent.click(await create());
+
+    const put = writes(api)[0];
+    expect(put).toMatchObject({ method: 'PUT', path: '/api/v2/modules/vaultSecure', body: { v: 1, kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: 600_000 }, items: [] } });
+    expect(JSON.stringify(put.body)).not.toContain(MASTER);
+
+    const dialog = screen.getByRole('dialog', { name: 'Nueva entrada' });
+    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'GitHub');
+    await userEvent.type(within(dialog).getByLabelText('Usuario o correo'), 'ana@example.com');
+    await userEvent.type(within(dialog).getByLabelText('Contraseña'), 'S3cr3to-de-Ana!');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir a la bóveda' }));
+    expect(await screen.findByText('GitHub')).toBeInTheDocument();
+    await waitFor(() => expect(writes(api)).toHaveLength(2));
+    const post = writes(api)[1];
+    expect(post.path).toBe('/api/v2/modules/vaultSecure/items');
+    expect(Object.keys((post.body as { item: object }).item)).toEqual(['id', 'iv', 'ct']);
+    // Nada en claro sale del navegador.
+    expect(JSON.stringify(api.doc)).not.toMatch(/S3cr3to|ana@example|GitHub/);
+
+    expect(screen.queryByText('S3cr3to-de-Ana!')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Mostrar la contraseña de «GitHub»' }));
+    expect(screen.getByText('S3cr3to-de-Ana!')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bloquear' }));
+    expect(screen.getByRole('heading', { name: 'Bóveda bloqueada' })).toBeInTheDocument();
+    expect(screen.queryByText('GitHub')).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Contraseña maestra'), 'otra cosa{Enter}');
+    expect(await screen.findByText('La contraseña maestra no es correcta.', {}, { timeout: 5000 })).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText('Contraseña maestra'));
+    await userEvent.type(screen.getByLabelText('Contraseña maestra'), `${MASTER}{Enter}`);
+    expect(await screen.findByText('GitHub', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText('ana@example.com')).toBeInTheDocument();
+  });
+
+  it('cifra las contraseñas de la app anterior solo tras confirmarlo y no deja copias en claro', async () => {
+    const api = withApi({}, (doc) => {
+      doc.vault = [
+        { id: 'v1', name: 'Banco Sol', mono: 'BS', user: 'ana.perez', pass: 'Clave-Plana-123' },
+        { id: 'v2', name: 'Correo', mono: 'CO', user: 'ana@example.com', pass: 'otra-clave-456' },
+      ];
+    });
+    renderAt('/boveda');
+    const notice = await screen.findByRole('region', { name: 'Hay 2 contraseñas de la app anterior guardadas sin cifrar' });
+    expect(within(notice).getByText('Crea tu bóveda para cifrarlas.')).toBeInTheDocument();
+    await create();
+    expect(writes(api)).toHaveLength(1);
+
+    await userEvent.click(within(notice).getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }));
+    const dialog = screen.getByRole('dialog', { name: 'Cifrar las contraseñas de la app anterior' });
+    expect(within(dialog).getByText(/la bóveda de la app anterior aparecerá vacía/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Banco Sol')).toBeInTheDocument();
+    // Nada se escribe hasta confirmar.
+    expect(writes(api)).toHaveLength(1);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }));
+
+    await waitFor(() => expect(writes(api)).toHaveLength(2), { timeout: 5000 });
+    const migrate = writes(api)[1];
+    expect(migrate).toMatchObject({ method: 'POST', path: '/api/v2/modules/vaultSecure/migrate', body: { legacyIds: ['v1', 'v2'] } });
+    expect(api.doc.vault).toEqual([]);
+    expect((api.doc as unknown as { vaultSecure: { items: unknown[] } }).vaultSecure.items).toHaveLength(2);
+    expect(JSON.stringify(api.doc)).not.toMatch(/Clave-Plana-123|otra-clave-456|Banco Sol/);
+    expect(await screen.findByText('Banco Sol')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('region', { name: /app anterior/ })).not.toBeInTheDocument());
+  });
+
+  it('se bloquea sola tras 5 minutos sin actividad y al salir de la página', async () => {
+    withApi();
+    renderAt('/boveda');
+    await create();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    act(() => void window.dispatchEvent(new Event('pointerdown')));
+    act(() => vi.advanceTimersByTime(4 * 60_000));
+    expect(screen.getByRole('button', { name: 'Nueva entrada' })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(screen.getByRole('heading', { name: 'Bóveda bloqueada' })).toBeInTheDocument();
+    expect(screen.getByText(/Se bloqueó tras 5 minutos sin actividad/)).toBeInTheDocument();
+    vi.useRealTimers();
+
+    await userEvent.type(screen.getByLabelText('Contraseña maestra'), `${MASTER}{Enter}`);
+    await screen.findByRole('button', { name: 'Nueva entrada' }, { timeout: 5000 });
+    act(() => void window.dispatchEvent(new Event('pagehide')));
+    expect(screen.getByRole('heading', { name: 'Bóveda bloqueada' })).toBeInTheDocument();
   });
 });

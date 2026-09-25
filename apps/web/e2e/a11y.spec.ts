@@ -190,3 +190,51 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   await expect(page.getByRole('dialog')).toBeVisible();
   await expectAccessible(page, 'diálogo de borrar cuenta');
 });
+
+test('bóveda: crear, desbloqueada, bloqueada y sus diálogos', async ({ page }) => {
+  test.setTimeout(120_000);
+  await register(page, 'a11y-boveda');
+  await onboard(page);
+  await seedLegacy(page, { vault: [{ id: 'v1', name: 'Banco Sol', mono: 'BS', user: 'ana.perez', pass: 'Clave-Plana-123' }] });
+  const MASTER = 'tres palabras largas juntas';
+
+  await page.goto('/boveda');
+  await expect(page.getByRole('heading', { name: 'Crea tu bóveda' })).toBeVisible();
+  await page.getByLabel('Contraseña maestra', { exact: true }).fill(MASTER);
+  await page.getByLabel('Repite la contraseña maestra').fill('no coincide');
+  await expectAccessible(page, 'crear bóveda con error');
+  await page.getByLabel('Repite la contraseña maestra').fill(MASTER);
+  await page.getByRole('checkbox', { name: /si la olvido, pierdo las entradas/ }).check();
+  await page.getByRole('button', { name: 'Crear la bóveda' }).click();
+
+  await page.getByRole('button', { name: 'Nueva entrada' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nueva entrada' });
+  await expectAccessible(page, 'diálogo nueva entrada');
+  await dialog.getByLabel('Nombre').fill('GitHub');
+  await dialog.getByLabel('Usuario o correo').fill('ana-dev');
+  await dialog.getByLabel('Contraseña', { exact: true }).fill('S3cr3to-de-Ana!');
+  await dialog.getByLabel('Web (opcional)').fill('github.com');
+  await dialog.getByRole('button', { name: 'Añadir a la bóveda' }).click();
+  await page.getByRole('button', { name: 'Mostrar la contraseña de «GitHub»' }).click();
+  await expectAccessible(page, 'bóveda desbloqueada con aviso');
+
+  await page.getByRole('button', { name: 'Editar «GitHub»' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Borrar', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+  await expectAccessible(page, 'confirmar borrado de entrada');
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }).click();
+  await expect(page.getByRole('dialog', { name: 'Cifrar las contraseñas de la app anterior' })).toBeVisible();
+  await expectAccessible(page, 'diálogo de migración');
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Bloquear' }).click();
+  await page.getByLabel('Contraseña maestra').fill('no es esta');
+  await page.getByRole('button', { name: 'Desbloquear' }).click();
+  await expect(page.getByText('La contraseña maestra no es correcta.')).toBeVisible();
+  await expectAccessible(page, 'bóveda bloqueada con error');
+  await page.getByRole('button', { name: '¿Olvidaste la contraseña maestra?' }).click();
+  await expect(page.getByRole('dialog', { name: 'Olvidé la contraseña maestra' })).toBeVisible();
+  await expectAccessible(page, 'diálogo contraseña olvidada');
+});

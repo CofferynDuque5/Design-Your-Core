@@ -5,7 +5,7 @@ import { onboard, PASSWORD, register, signIn } from './helpers';
 // Recorridos por funciones concretas, cada uno con una cuenta nueva.
 
 /** Notas, Bóveda y Asistente. */
-const TOOLS_KNOWLEDGE = 1;
+const TOOLS_KNOWLEDGE = 2;
 
 test('retos: subir de nivel, completar y el límite de tres', async ({ page }) => {
   await register(page, 'retos');

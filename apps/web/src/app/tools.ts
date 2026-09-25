@@ -1,4 +1,4 @@
-import { legacyList, type LegacyData } from '@dyc/core';
+import { legacyList, legacyVault, vaultSecureOf, type LegacyData } from '@dyc/core';
 import {
   AlarmClock,
   BookOpen,
@@ -10,6 +10,7 @@ import {
   Flower2,
   FolderKanban,
   GraduationCap,
+  KeyRound,
   Lightbulb,
   ListTodo,
   Moon,
@@ -168,6 +169,15 @@ export const TOOLS: Tool[] = [
     description: 'Apuntes en Markdown por materia, con imágenes',
     count: (d) => legacyList(d, 'notes').length,
     unit: ['nota', 'notas'],
+  },
+  {
+    to: '/boveda',
+    label: 'Bóveda',
+    icon: KeyRound,
+    group: 'conocimiento',
+    description: 'Contraseñas cifradas en tu dispositivo',
+    count: (d) => (vaultSecureOf(d)?.items.length ?? 0) + legacyVault(d).length,
+    unit: ['entrada', 'entradas'],
   },
   {
     to: '/finanzas',

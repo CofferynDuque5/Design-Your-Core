@@ -4263,6 +4263,228 @@
   .mark--breathe {
     background: var(--color-sage);
   }
+
+  /* ---------- Tanda 4: Bóveda ---------- */
+
+  .vault-lock-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .vault-lock-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    flex: none;
+    border-radius: var(--radius-md);
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+  }
+
+  .vault-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .vault-warning svg {
+    flex: none;
+    margin-top: 2px;
+  }
+
+  .toggle-line--ink {
+    color: var(--color-ink);
+  }
+
+  .vault-forgot {
+    align-self: center;
+  }
+
+  .vault-facts {
+    display: grid;
+    gap: var(--space-2);
+    padding-left: var(--space-5);
+    color: var(--color-ink-muted);
+    list-style: disc;
+  }
+
+  .vault-steps {
+    display: grid;
+    gap: var(--space-2);
+    padding-left: var(--space-5);
+    list-style: decimal;
+  }
+
+  .vault-legacy__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0;
+    color: inherit;
+  }
+
+  .vault-legacy p {
+    color: var(--color-ink);
+  }
+
+  .vault-migrate-list {
+    display: grid;
+    gap: var(--space-1);
+    max-height: 200px;
+    overflow-y: auto;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-sunken);
+  }
+
+  .strength {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .strength__bar {
+    display: inline-flex;
+    gap: 3px;
+  }
+
+  .strength__bar span {
+    width: 18px;
+    height: 5px;
+    border-radius: var(--radius-pill);
+    background: var(--color-line-strong);
+  }
+
+  .strength[data-score='1'] .strength__bar [data-on],
+  .strength[data-score='2'] .strength__bar [data-on] {
+    background: var(--color-warning);
+  }
+
+  .strength[data-score='3'] .strength__bar [data-on],
+  .strength[data-score='4'] .strength__bar [data-on] {
+    background: var(--color-success);
+  }
+
+  .vault-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .vault-toolbar .search-field {
+    flex: 1 1 240px;
+  }
+
+  .vault-list > li + li {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .vault-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-3);
+    padding-block: var(--space-3);
+  }
+
+  .vault-mono {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--c, var(--color-line-strong));
+    border-radius: var(--radius-md);
+    background: var(--color-surface-sunken);
+    color: var(--color-ink);
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+  }
+
+  .vault-row__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .vault-row__text > *,
+  .vault-row__url {
+    overflow-wrap: anywhere;
+  }
+
+  .vault-row__actions {
+    display: flex;
+  }
+
+  .vault-row__copy-user {
+    grid-column: 2 / -1;
+    justify-self: start;
+    margin-left: calc(-1 * var(--space-3));
+  }
+
+  .vault-pass {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    word-break: break-all;
+  }
+
+  .vault-pass--hidden {
+    color: var(--color-ink-muted);
+    letter-spacing: 0.1em;
+  }
+
+  .vault-row--damaged .vault-mono {
+    border-color: var(--color-danger);
+  }
+
+  .vault-pass-field {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .vault-pass-field .input {
+    flex: 1;
+    min-width: 0;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  .vault-generated {
+    display: block;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-sunken);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 1.05rem;
+    word-break: break-all;
+  }
+
+  .vault-gen-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  @media (max-width: 480px) {
+    .vault-row {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .vault-row__actions {
+      grid-column: 2;
+      margin-left: calc(-1 * var(--space-3));
+    }
+
+    .vault-toolbar .btn {
+      flex: 1;
+    }
+  }
 }
 
 @keyframes dyc-toast-in {
