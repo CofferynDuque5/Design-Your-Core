@@ -135,3 +135,7 @@ La app móvil no guarda un token de 60 días: recibe un **token de acceso de 15 
 ## Cambio en v1: sincronización sin sobrescrituras
 
 `PUT /api/sync` acepta ahora `baseUpdatedAt` (el `updatedAt` que el cliente leyó). Si el documento cambió desde entonces en otro dispositivo, responde 409 con `{ error, data, updatedAt }` en lugar de pisarlo. Sin ese campo se comporta como antes, así que la app publicada sigue funcionando.
+
+## Módulos de la app anterior
+
+Edición elemento a elemento de las claves `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes` y `focus` del documento de `/api/sync`, en `/api/v2/modules`. Ver [modulos.md](modulos.md).
