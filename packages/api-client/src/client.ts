@@ -152,11 +152,15 @@ export function createClient(opts: ClientOptions) {
     /** Datos de la app anterior (v1): un documento JSON por persona. Para editar, usa `modules`. */
     legacy: {
       get: () => request<{ data: Record<string, unknown>; updatedAt: string | null }>('GET', '/api/sync'),
+      /** Imágenes de los apuntes que la app anterior subió a la nube (`coreimg:<id>`): `{ id: dataURL }`. */
+      images: (ids: string[]) => request<{ images: Record<string, string> }>('POST', '/api/images/fetch', { ids }),
     },
 
     /**
      * Módulos de la app anterior elemento a elemento (Agenda, Pendientes,
-     * Calendario, Horario, Enfoque) sobre el mismo documento de /api/sync.
+     * Calendario, Horario, Enfoque, Materias, Proyectos, Roadmaps, Cuadernos,
+     * Contenido e Ideas) sobre el mismo documento de /api/sync. Los temas,
+     * hitos y pasos se cambian enviando su lista completa en `update`.
      */
     modules: {
       get: () => request<{ data: LegacyData; updatedAt: string | null }>('GET', '/api/v2/modules'),

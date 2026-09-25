@@ -1,4 +1,4 @@
-import { FOCUS_MAX, isLegacyKey, LEGACY_CROSS, legacyItemSchemas, legacyList, legacyPatchSchemas, legacyReorderSchema, reorderById, type LegacyKey } from '@dyc/core';
+import { FOCUS_MAX, isLegacyKey, LEGACY_CHILDREN, LEGACY_CROSS, LEGACY_PARENT, legacyItemSchemas, legacyList, legacyPatchSchemas, legacyReorderSchema, mergeLegacyItem, reorderById, type LegacyKey } from '@dyc/core';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { Router, type RequestHandler, type Response } from 'express';
 import { ah } from '../lib/http.js';
@@ -70,7 +70,9 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
 
   // Comprobaciones que dependen del resto del documento.
   const checkRelations = (key: LegacyKey, item: Doc, doc: Doc) => {
-    if (key === 'subtasks' && typeof item.todoId === 'string' && !ids(doc, 'todos').has(item.todoId)) throw new HttpError(400, 'La tarea principal no existe');
+    const parent = LEGACY_PARENT[key];
+    const ref = parent ? item[parent.field] : undefined;
+    if (parent && typeof ref === 'string' && !ids(doc, parent.key).has(ref)) throw new HttpError(400, key === 'subtasks' ? 'La tarea principal no existe' : 'El cuaderno no existe');
     if (key === 'classes' && typeof item.subject === 'string' && item.subject) {
       const subjects = Array.isArray(doc.subjects) ? (doc.subjects as Array<{ id?: unknown }>) : [];
       if (!subjects.some((s) => s && s.id === item.subject)) throw new HttpError(400, 'La materia no existe');
@@ -119,8 +121,8 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
       const out = await edit(req.userId as string, key, (list, doc) => {
         const i = list.findIndex((x) => idOf(x) === req.params.id);
         if (i < 0) throw new HttpError(404, 'Elemento no encontrado');
-        // Fusión superficial: los campos que esta API no conoce se conservan.
-        const item = { ...list[i], ...patch, id: list[i].id };
+        // Los campos que esta API no conoce se conservan, también en temas, hitos y pasos.
+        const item = mergeLegacyItem(key, list[i], patch);
         const cross = LEGACY_CROSS[key];
         const msg = cross && cross.fields.some((f) => f in patch) ? cross.check(item) : null;
         if (msg) throw new HttpError(400, `Datos inválidos: ${msg}`);
@@ -139,8 +141,10 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
     await run(res, async () => {
       const out = await edit(req.userId as string, key, (list, doc) => {
         if (!list.some((x) => idOf(x) === req.params.id)) throw new HttpError(404, 'Elemento no encontrado');
-        // Borrar un pendiente borra sus subtareas, como la app anterior.
-        const also = key === 'todos' ? { subtasks: rawList(doc, 'subtasks').filter((s) => !s || s.todoId !== req.params.id) } : undefined;
+        // Borrar un pendiente borra sus subtareas y un cuaderno sus cajitas, como la app anterior.
+        // Borrar una materia NO borra sus clases ni sus proyectos (tampoco en la app anterior).
+        const child = LEGACY_CHILDREN[key];
+        const also = child ? { [child.key]: rawList(doc, child.key).filter((s) => !s || s[child.field] !== req.params.id) } : undefined;
         return { list: list.filter((x) => idOf(x) !== req.params.id), result: null, also };
       });
       res.json({ ok: true, updatedAt: out.updatedAt });

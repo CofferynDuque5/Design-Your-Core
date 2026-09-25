@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { focusStats, legacyItemSchemas, legacyPatchSchemas, nextFocusMode, reorderById, type LegacyFocus } from '../src/legacy.js';
+import {
+  checkItems,
+  checkItemsPayload,
+  dueThisWeek,
+  focusStats,
+  legacyItemSchemas,
+  legacyPatchSchemas,
+  mergeLegacyItem,
+  nextFocusMode,
+  parseDeadline,
+  projectProgress,
+  reorderById,
+  splitTags,
+  stepStates,
+  type LegacyFocus,
+} from '../src/legacy.js';
 
 describe('módulos de la app anterior', () => {
   it('completa los valores por defecto de la app anterior y rechaza campos extra', () => {
@@ -44,5 +59,67 @@ describe('módulos de la app anterior', () => {
     expect(focusStats(records, '2026-09-25')).toEqual({ sessionsToday: 2, hoursWeek: (1500 * 3 + 900) / 3600, hoursTotal: (1500 * 3 + 900 + 3600) / 3600, streak: 3 });
     expect(focusStats(records, '2026-09-26').streak).toBe(3);
     expect(focusStats(records, '2026-09-27').streak).toBe(0);
+  });
+
+  it('tanda 2: valores por defecto de la app anterior', () => {
+    expect(legacyItemSchemas.subjects.parse({ id: 's1', name: 'Física' })).toEqual({ id: 's1', name: 'Física', teacher: '', room: '', color: '#4F7CFF', nextClass: '', topics: [] });
+    expect(legacyItemSchemas.projects.parse({ id: 'p1', title: 'Ensayo' })).toEqual({ id: 'p1', title: 'Ensayo', subject: '', deadline: '', status: 'curso', color: '#0FA968', milestones: [] });
+    expect(legacyItemSchemas.roadmaps.parse({ id: 'r1', name: 'Ingeniería' })).toEqual({ id: 'r1', name: 'Ingeniería', color: '#8B5CF6', steps: [] });
+    expect(legacyItemSchemas.notebooks.parse({ id: 'n1', category: '  ' })).toEqual({ id: 'n1', title: 'Cuaderno', category: 'General', subject: '', topic: '', color: '#4F7CFF', emoji: '📓' });
+    expect(legacyItemSchemas.noteBoxes.parse({ id: 'b1', notebookId: 'n1' })).toEqual({ id: 'b1', notebookId: 'n1', title: '', text: '', color: '#FFF7D6', kind: 'text', lang: '' });
+    expect(legacyItemSchemas.noteBoxes.parse({ id: 'b2', notebookId: 'n1', kind: 'code' })).toMatchObject({ color: '#1e1e2e', kind: 'code', lang: 'js' });
+    expect(legacyItemSchemas.content.parse({ id: 'c1', title: 'Video' })).toEqual({ id: 'c1', title: 'Video', stage: 'idea', platform: 'youtube', notes: '', script: '', due: '' });
+    expect(legacyItemSchemas.ideas.parse({ id: 'i1', title: 'App' })).toEqual({ id: 'i1', title: 'App', body: '', category: 'app', tags: '' });
+    expect(legacyItemSchemas.projects.parse({ id: 'p2', title: 'x', milestones: [{ id: 'xk3j9a2b', name: 'Borrador' }] }).milestones).toEqual([{ id: 'xk3j9a2b', name: 'Borrador', done: false, date: '' }]);
+  });
+
+  it('tanda 2: rechaza estados, plataformas, categorías y subelementos inválidos', () => {
+    expect(legacyItemSchemas.projects.safeParse({ id: 'p', title: 'x', status: 'hecho' }).success).toBe(false);
+    expect(legacyItemSchemas.content.safeParse({ id: 'c', title: 'x', platform: 'twitch' }).success).toBe(false);
+    expect(legacyItemSchemas.ideas.safeParse({ id: 'i', title: 'x', category: 'ventas' }).success).toBe(false);
+    expect(legacyPatchSchemas.subjects.safeParse({ topics: [{ id: 't', name: 'x', extra: 1 }] }).success).toBe(false);
+    expect(legacyPatchSchemas.roadmaps.safeParse({ steps: [{ name: 'sin id' }] }).success).toBe(false);
+    expect(legacyPatchSchemas.noteBoxes.parse({ lang: 'python' })).toEqual({ lang: 'python' });
+  });
+
+  it('fusiona temas, hitos y pasos por id conservando lo que no conoce', () => {
+    const subject = { id: 's', name: 'Física', topics: [{ id: 'a', name: 'Ondas', done: false, nota: 'vieja' }, { id: 'b', name: 'Óptica', done: false }], extra: 1 };
+    const merged = mergeLegacyItem('subjects', subject, { topics: [{ id: 'a', name: 'Ondas', done: true }, { id: 'c', name: 'Calor', done: false }] });
+    expect(merged).toEqual({ id: 's', name: 'Física', extra: 1, topics: [{ id: 'a', name: 'Ondas', done: true, nota: 'vieja' }, { id: 'c', name: 'Calor', done: false }] });
+    expect(mergeLegacyItem('ideas', { id: 'i', title: 'x', raro: true }, { title: 'y' })).toEqual({ id: 'i', title: 'y', raro: true });
+  });
+
+  it('normaliza subelementos antiguos y envía solo los campos conocidos', () => {
+    const list = checkItems([{ id: 'a', name: 'Uno', done: 1, extra: true }, null, { name: 'Sin id' }], () => 'nuevo');
+    expect(list).toEqual([{ id: 'a', name: 'Uno', done: true, extra: true }, { id: 'nuevo', name: 'Sin id', done: false }]);
+    expect(checkItemsPayload(list)).toEqual([{ id: 'a', name: 'Uno', done: true }, { id: 'nuevo', name: 'Sin id', done: false }]);
+    expect(checkItemsPayload([{ id: 'm', name: 'Hito', done: false, date: '' }])).toEqual([{ id: 'm', name: 'Hito', done: false, date: '' }]);
+  });
+
+  it('progreso de proyectos y entregas de la semana como la app anterior', () => {
+    expect(projectProgress({ status: 'curso', milestones: [] })).toBe(0);
+    expect(projectProgress({ status: 'revision', milestones: [] })).toBe(90);
+    expect(projectProgress({ status: 'entregado' })).toBe(100);
+    expect(projectProgress({ status: 'entregado', milestones: [{ done: true }, { done: false }, { done: false }] })).toBe(33);
+    const now = Date.parse('2026-09-25T12:00:00Z');
+    expect(dueThisWeek('la próxima clase', now)).toBe(true); // no se entiende: cuenta, como antes
+    expect(dueThisWeek('', now)).toBe(false);
+    expect(dueThisWeek('28 SEP', now)).toBe(true);
+    expect(dueThisWeek('25 sep.', now)).toBe(true);
+    expect(dueThisWeek('20 SEP', now)).toBe(false);
+    expect(dueThisWeek('3 de octubre', now)).toBe(false);
+    expect(dueThisWeek('2026-09-28', now)).toBe(true);
+    expect(dueThisWeek('2026-10-20', now)).toBe(false);
+    expect(parseDeadline('20 SEP', new Date(now))?.getMonth()).toBe(8);
+    expect(parseDeadline('5 dic 2027')?.getFullYear()).toBe(2027);
+    expect(parseDeadline('31 foo')).toBeNull();
+  });
+
+  it('estados de los pasos de un roadmap y etiquetas', () => {
+    expect(stepStates([{ done: true }, { done: false }, { done: false }, { done: false }])).toEqual(['done', 'current', 'next', 'locked']);
+    expect(stepStates([{ done: true }, { done: true }])).toEqual(['done', 'done']);
+    expect(stepStates([{ done: false }, { done: true }])).toEqual(['current', 'done']);
+    expect(splitTags('examen, física , ,saas')).toEqual(['examen', 'física', 'saas']);
+    expect(splitTags(undefined)).toEqual([]);
   });
 });

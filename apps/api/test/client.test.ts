@@ -159,4 +159,15 @@ describe('@dyc/api-client', () => {
     expect(data.subtasks).toEqual([]);
     expect((await api.legacy.get()).data).toEqual(data);
   });
+  it('tanda 2: temas por lista completa, cascada de cajitas e imágenes de los apuntes', async () => {
+    const api = await signedIn();
+    await api.modules.add('subjects', { id: 's1', name: 'Física', teacher: '', room: '', color: '#4F7CFF', nextClass: '', topics: [] });
+    const upd = await api.modules.update('subjects', 's1', { topics: [{ id: 't1', name: 'Ondas', done: true }] });
+    expect(upd.item.topics).toEqual([{ id: 't1', name: 'Ondas', done: true }]);
+    await api.modules.add('notebooks', { id: 'n1', title: 'Cálculo', category: 'General', subject: '', topic: '', color: '#4F7CFF', emoji: '📓' });
+    await api.modules.add('noteBoxes', { id: 'b1', notebookId: 'n1', title: '', text: 'Hola', color: '#FFF7D6', kind: 'text', lang: '' });
+    await api.modules.remove('notebooks', 'n1');
+    expect((await api.modules.get()).data.noteBoxes).toEqual([]);
+    expect(await api.legacy.images(['no-existe'])).toEqual({ images: {} });
+  });
 });

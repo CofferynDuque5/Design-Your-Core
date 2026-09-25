@@ -8,8 +8,23 @@ import { addDays, isDay, type Day } from './dates.js';
  * Ver docs/modulos.md.
  */
 
-/** Claves del documento que la API v2 permite editar por elemento (tanda 1). */
-export const LEGACY_KEYS = ['blocks', 'tasks', 'todos', 'subtasks', 'reminders', 'classes', 'focus'] as const;
+/** Claves del documento que la API v2 permite editar por elemento (tandas 1 y 2). */
+export const LEGACY_KEYS = [
+  'blocks',
+  'tasks',
+  'todos',
+  'subtasks',
+  'reminders',
+  'classes',
+  'focus',
+  'subjects',
+  'projects',
+  'roadmaps',
+  'notebooks',
+  'noteBoxes',
+  'content',
+  'ideas',
+] as const;
 export type LegacyKey = (typeof LEGACY_KEYS)[number];
 export const isLegacyKey = (k: unknown): k is LegacyKey => typeof k === 'string' && (LEGACY_KEYS as readonly string[]).includes(k);
 
@@ -38,6 +53,18 @@ export const TASK_PRIORITY_INFO: Record<TaskPriority, { label: string; color: st
 export const REMINDER_COLORS = ['#0FA968', '#4F7CFF', '#EC6A9C', '#8B5CF6', '#E8912A', '#E5484D'] as const;
 /** Paleta de clases del Horario (el primero es el de por defecto). */
 export const CLASS_COLORS = ['#4F7CFF', '#0FA968', '#8B5CF6', '#EC6A9C', '#E8912A', '#22B8CF', '#E5484D'] as const;
+/** Paletas de la tanda 2 (el primer color es el de por defecto, salvo en proyectos, que empiezan por el de la materia). */
+export const SUBJECT_COLORS = ['#4F7CFF', '#0FA968', '#E8912A', '#8B5CF6', '#EC6A9C', '#22B8CF'] as const;
+export const PROJECT_COLORS = ['#0FA968', '#4F7CFF', '#E8912A', '#EC6A9C', '#8B5CF6', '#EF4444', '#14B8A6'] as const;
+export const ROADMAP_COLORS = ['#8B5CF6', '#4F7CFF', '#0FA968', '#E8912A', '#EC6A9C'] as const;
+export const NOTEBOOK_COLORS = ['#4F7CFF', '#0FA968', '#EC6A9C', '#8B5CF6', '#E8912A', '#E5484D', '#14B8A6', '#111827'] as const;
+/** Fondos de las cajitas de texto; las de código usan siempre CODE_BOX_COLOR. */
+export const BOX_COLORS = ['#FFF7D6', '#DDF3E4', '#E3ECFF', '#FCE0EC', '#EDE4FF', '#FFE8D6', '#F1F3F5'] as const;
+export const CODE_BOX_COLOR = '#1e1e2e';
+export const NOTEBOOK_EMOJIS = ['📓', '📕', '📗', '📘', '📙', '🧠', '🔬', '🧮', '📐', '🌍', '💻', '🎨', '🎵', '⚗️', '📖', '✏️'] as const;
+/** Lenguajes de las cajitas de código (el primero es el de por defecto). */
+export const CODE_LANGS = ['js', 'ts', 'python', 'html', 'css', 'java', 'c++', 'c#', 'php', 'sql', 'bash', 'json', 'otro'] as const;
+
 export const COLOR_NAMES: Record<string, string> = {
   '#0FA968': 'Verde',
   '#4F7CFF': 'Azul',
@@ -46,6 +73,52 @@ export const COLOR_NAMES: Record<string, string> = {
   '#E8912A': 'Naranja',
   '#E5484D': 'Rojo',
   '#22B8CF': 'Turquesa',
+  '#EF4444': 'Rojo',
+  '#14B8A6': 'Verde azulado',
+  '#111827': 'Negro',
+  '#FFF7D6': 'Amarillo',
+  '#DDF3E4': 'Verde',
+  '#E3ECFF': 'Azul',
+  '#FCE0EC': 'Rosa',
+  '#EDE4FF': 'Lila',
+  '#FFE8D6': 'Melocotón',
+  '#F1F3F5': 'Gris',
+};
+
+export const PROJECT_STATUSES = ['curso', 'revision', 'entregado'] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+export const PROJECT_STATUS_INFO: Record<ProjectStatus, { label: string }> = {
+  curso: { label: 'En curso' },
+  revision: { label: 'En revisión' },
+  entregado: { label: 'Entregado' },
+};
+
+export const CONTENT_STAGES = ['idea', 'guion', 'grabar', 'editar', 'publicado'] as const;
+export type ContentStage = (typeof CONTENT_STAGES)[number];
+export const CONTENT_STAGE_INFO: Record<ContentStage, { label: string }> = {
+  idea: { label: 'Idea' },
+  guion: { label: 'Guion' },
+  grabar: { label: 'Grabar' },
+  editar: { label: 'Editar' },
+  publicado: { label: 'Publicado' },
+};
+
+export const CONTENT_PLATFORMS = ['youtube', 'tiktok', 'instagram', 'otro'] as const;
+export type ContentPlatform = (typeof CONTENT_PLATFORMS)[number];
+export const CONTENT_PLATFORM_INFO: Record<ContentPlatform, { label: string; color: string }> = {
+  youtube: { label: 'YouTube', color: '#FF0033' },
+  tiktok: { label: 'TikTok', color: '#111827' },
+  instagram: { label: 'Instagram', color: '#E1306C' },
+  otro: { label: 'Otro', color: '#8B8E88' },
+};
+
+export const IDEA_CATEGORIES = ['app', 'web', 'marketing', 'otro'] as const;
+export type IdeaCategory = (typeof IDEA_CATEGORIES)[number];
+export const IDEA_CATEGORY_INFO: Record<IdeaCategory, { label: string; color: string }> = {
+  app: { label: 'App', color: '#0FA968' },
+  web: { label: 'Web', color: '#4F7CFF' },
+  marketing: { label: 'Marketing', color: '#EC6A9C' },
+  otro: { label: 'Otro', color: '#8A8F98' },
 };
 
 /** Días de la semana de las clases: 1 = lunes … 7 = domingo. */
@@ -129,6 +202,90 @@ export interface LegacyFocus {
   dateKey: Day;
 }
 
+/** Tema de una materia, hito de un proyecto o paso de un roadmap (van dentro de su elemento). */
+export interface LegacyCheckItem {
+  id: string;
+  name: string;
+  done: boolean;
+}
+
+export interface LegacySubject {
+  id: string;
+  name: string;
+  teacher: string;
+  room: string;
+  color: string;
+  /** Texto libre, p. ej. "Lunes 8:00". */
+  nextClass: string;
+  topics: LegacyCheckItem[];
+}
+
+export interface LegacyMilestone extends LegacyCheckItem {
+  /** Siempre "" en la app anterior. */
+  date: string;
+}
+
+export interface LegacyProject {
+  id: string;
+  title: string;
+  /** NOMBRE de la materia (no su id) o "". */
+  subject: string;
+  /** Texto libre, p. ej. "20 SEP". */
+  deadline: string;
+  status: ProjectStatus;
+  color: string;
+  milestones: LegacyMilestone[];
+}
+
+export interface LegacyRoadmap {
+  id: string;
+  name: string;
+  color: string;
+  steps: LegacyCheckItem[];
+}
+
+export interface LegacyNotebook {
+  id: string;
+  title: string;
+  category: string;
+  /** Texto libre (no es un vínculo con `subjects`). */
+  subject: string;
+  topic: string;
+  color: string;
+  emoji: string;
+}
+
+export interface LegacyNoteBox {
+  id: string;
+  notebookId: string;
+  title: string;
+  text: string;
+  color: string;
+  kind: 'text' | 'code';
+  /** "" en las de texto; en las de código, uno de CODE_LANGS. */
+  lang: string;
+}
+
+export interface LegacyContent {
+  id: string;
+  title: string;
+  stage: ContentStage;
+  platform: ContentPlatform;
+  notes: string;
+  script: string;
+  /** Texto libre, p. ej. "12 sep". */
+  due: string;
+}
+
+export interface LegacyIdea {
+  id: string;
+  title: string;
+  body: string;
+  category: IdeaCategory;
+  /** Etiquetas separadas por comas. */
+  tags: string;
+}
+
 export interface LegacyItems {
   blocks: LegacyBlock;
   tasks: LegacyTask;
@@ -137,6 +294,13 @@ export interface LegacyItems {
   reminders: LegacyReminder;
   classes: LegacyClass;
   focus: LegacyFocus;
+  subjects: LegacySubject;
+  projects: LegacyProject;
+  roadmaps: LegacyRoadmap;
+  notebooks: LegacyNotebook;
+  noteBoxes: LegacyNoteBox;
+  content: LegacyContent;
+  ideas: LegacyIdea;
 }
 
 /** Documento completo de la app anterior: claves conocidas y cualquier otra que traiga. */
@@ -149,6 +313,16 @@ export const legacyIdSchema = z.string().regex(/^[\w-]{1,100}$/, 'Id no válido'
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Hora no válida (usa HH:MM)');
 const title = (max: number) => z.string().trim().min(1, 'Escribe un título').max(max);
 const hex = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color no válido');
+const text = (max: number) => z.string().max(max).default('');
+const line = (max: number) => z.string().trim().max(max).default('');
+
+/**
+ * Subelementos (temas, hitos, pasos). Se editan enviando la lista completa
+ * dentro del PATCH del elemento. El nombre no se recorta ni se exige para no
+ * rechazar datos antiguos al reenviarlos; la interfaz no deja crear vacíos.
+ */
+const checkItem = z.object({ id: legacyIdSchema, name: z.string().max(300), done: z.boolean().default(false) }).strict();
+const checkList = (item: z.AnyZodObject = checkItem) => z.array(item).max(1000).default([]);
 
 const shapes = {
   blocks: z.object({
@@ -196,6 +370,64 @@ const shapes = {
     seconds: z.number().int().min(1).max(86_400),
     dateKey: z.string().refine(isDay, 'Fecha no válida (usa AAAA-MM-DD)'),
   }),
+  subjects: z.object({
+    id: legacyIdSchema,
+    name: title(120),
+    teacher: line(120),
+    room: line(60),
+    color: hex.default(SUBJECT_COLORS[0]),
+    nextClass: line(60),
+    topics: checkList(),
+  }),
+  projects: z.object({
+    id: legacyIdSchema,
+    title: title(200),
+    subject: line(120),
+    deadline: line(60),
+    status: z.enum(PROJECT_STATUSES).default('curso'),
+    color: hex.default(PROJECT_COLORS[0]),
+    milestones: checkList(checkItem.extend({ date: z.string().max(60).default('') })),
+  }),
+  roadmaps: z.object({
+    id: legacyIdSchema,
+    name: title(120),
+    color: hex.default(ROADMAP_COLORS[0]),
+    steps: checkList(),
+  }),
+  notebooks: z.object({
+    id: legacyIdSchema,
+    title: title(120).default('Cuaderno'),
+    category: z.string().trim().max(60).default('General').transform((c) => c || 'General'),
+    subject: line(120),
+    topic: line(120),
+    color: hex.default(NOTEBOOK_COLORS[0]),
+    emoji: z.string().min(1).max(16).default(NOTEBOOK_EMOJIS[0]),
+  }),
+  noteBoxes: z.object({
+    id: legacyIdSchema,
+    notebookId: legacyIdSchema,
+    title: z.string().max(200).default(''),
+    text: text(200_000),
+    color: hex.optional(),
+    kind: z.enum(['text', 'code']).default('text'),
+    lang: z.string().max(20).optional(),
+  }),
+  content: z.object({
+    id: legacyIdSchema,
+    title: title(200),
+    stage: z.enum(CONTENT_STAGES).default('idea'),
+    platform: z.enum(CONTENT_PLATFORMS).default('youtube'),
+    notes: text(50_000),
+    script: text(50_000),
+    due: line(60),
+  }),
+  ideas: z.object({
+    id: legacyIdSchema,
+    title: title(200),
+    body: text(50_000),
+    category: z.enum(IDEA_CATEGORIES).default('app'),
+    tags: z.string().max(300).default(''),
+  }),
 };
 
 /**
@@ -233,6 +465,22 @@ export const legacyItemSchemas = {
   reminders: shapes.reminders.strict(),
   classes: withCross('classes', shapes.classes.strict()),
   focus: shapes.focus.strict(),
+  subjects: shapes.subjects.strict(),
+  projects: shapes.projects.strict(),
+  roadmaps: shapes.roadmaps.strict(),
+  notebooks: shapes.notebooks.strict(),
+  // Color y lenguaje por defecto según el tipo, y en el mismo orden que la app anterior.
+  noteBoxes: shapes.noteBoxes.strict().transform((b) => ({
+    id: b.id,
+    notebookId: b.notebookId,
+    title: b.title,
+    text: b.text,
+    color: b.color ?? (b.kind === 'code' ? CODE_BOX_COLOR : BOX_COLORS[0]),
+    kind: b.kind,
+    lang: b.lang ?? (b.kind === 'code' ? CODE_LANGS[0] : ''),
+  })),
+  content: shapes.content.strict(),
+  ideas: shapes.ideas.strict(),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 const patchOf = (o: z.AnyZodObject): z.AnyZodObject => {
@@ -250,10 +498,62 @@ export const legacyPatchSchemas = {
   reminders: patchOf(shapes.reminders),
   classes: patchOf(shapes.classes),
   focus: patchOf(shapes.focus),
+  subjects: patchOf(shapes.subjects),
+  projects: patchOf(shapes.projects),
+  roadmaps: patchOf(shapes.roadmaps),
+  notebooks: patchOf(shapes.notebooks),
+  noteBoxes: patchOf(shapes.noteBoxes),
+  content: patchOf(shapes.content),
+  ideas: patchOf(shapes.ideas),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 /** Cambios parciales de un elemento (sin id). */
 export type LegacyPatch<K extends LegacyKey> = Partial<Omit<LegacyItems[K], 'id'>>;
+
+/** Lista de subelementos de cada clave (se edita con un PATCH del elemento). */
+export const LEGACY_NESTED: Partial<Record<LegacyKey, string>> = { subjects: 'topics', projects: 'milestones', roadmaps: 'steps' };
+
+/** Relaciones padre → hijos: el hijo guarda el id del padre en `field` y se borra con él, como en la app anterior. */
+export const LEGACY_CHILDREN: Partial<Record<LegacyKey, { key: LegacyKey; field: string }>> = {
+  todos: { key: 'subtasks', field: 'todoId' },
+  notebooks: { key: 'noteBoxes', field: 'notebookId' },
+};
+
+/** Padre de cada clave hija (el inverso de LEGACY_CHILDREN). */
+export const LEGACY_PARENT: Partial<Record<LegacyKey, { key: LegacyKey; field: string }>> = {
+  subtasks: { key: 'todos', field: 'todoId' },
+  noteBoxes: { key: 'notebooks', field: 'notebookId' },
+};
+
+const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
+
+/**
+ * Aplica un cambio parcial igual en el servidor y en la vista optimista:
+ * fusión superficial (se conservan los campos que la app nueva no conoce) y,
+ * en las listas anidadas, cada subelemento se fusiona con el guardado de su
+ * mismo id para no perder sus campos desconocidos.
+ */
+export function mergeLegacyItem<T extends { id: string }>(key: LegacyKey, item: T, patch: Record<string, unknown>): T {
+  const next: Record<string, unknown> = { ...item, ...patch, id: item.id };
+  const field = LEGACY_NESTED[key];
+  if (field && Array.isArray(patch[field])) {
+    const before = (item as Record<string, unknown>)[field];
+    const old = new Map((Array.isArray(before) ? before : []).filter(isObj).map((s) => [s.id, s]));
+    next[field] = (patch[field] as unknown[]).map((s) => (isObj(s) ? { ...(old.get(s.id) ?? {}), ...s } : s));
+  }
+  return next as T;
+}
+
+/** Subelementos de un elemento con la defensa de la app anterior: sin entradas rotas, ids y `done` garantizados. */
+export function checkItems<T extends LegacyCheckItem>(list: unknown, makeId: () => string): T[] {
+  if (!Array.isArray(list)) return [];
+  return list.filter(isObj).map((s) => ({ ...s, id: typeof s.id === 'string' && s.id ? s.id : makeId(), name: typeof s.name === 'string' ? s.name : '', done: !!s.done }) as T);
+}
+
+/** Para enviar una lista anidada: solo los campos conocidos (el servidor conserva el resto por id). */
+export function checkItemsPayload<T extends LegacyCheckItem>(list: T[]): T[] {
+  return list.map((s) => ({ id: s.id, name: s.name, done: !!s.done, ...('date' in s ? { date: typeof s.date === 'string' ? s.date : '' } : {}) }) as T);
+}
 
 export const legacyReorderSchema = z.object({ ids: z.array(legacyIdSchema).max(5000) }).strict();
 
@@ -330,3 +630,71 @@ export function hoursLabel(h: number): string {
   const total = Math.round(h * 60);
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
+
+// ---------- Tanda 2: derivados de Materias, Proyectos y Roadmaps ----------
+
+/** Porcentaje entero de hechos (0 si la lista está vacía). */
+export const donePercent = (list: Array<{ done?: unknown }>): number => (list.length ? Math.round((list.filter((x) => !!x.done).length / list.length) * 100) : 0);
+
+/** Progreso de un proyecto como la app anterior: por hitos; sin hitos, 100 % entregado, 90 % en revisión y 0 % en otro caso. */
+export function projectProgress(p: { milestones?: unknown; status?: unknown }): number {
+  const ms = Array.isArray(p.milestones) ? (p.milestones as Array<{ done?: unknown }>).filter(isObj) : [];
+  if (ms.length) return donePercent(ms);
+  return p.status === 'entregado' ? 100 : p.status === 'revision' ? 90 : 0;
+}
+
+const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/**
+ * Lee una fecha de entrega escrita a mano. Entiende "20 SEP", "12 sep.",
+ * "3 de octubre (de 2026)" (del año en curso si no lo lleva) y fechas con año
+ * que entienda `Date.parse` ("2026-09-28"). Devuelve null si no la entiende.
+ */
+export function parseDeadline(text: unknown, now: Date = new Date()): Date | null {
+  const t = typeof text === 'string' ? text.trim().toLowerCase() : '';
+  if (!t) return null;
+  const m = /^(\d{1,2})\s*(?:de\s+)?([a-záéíóú]{3,})\.?(?:\s+(?:de\s+)?(\d{4}))?$/.exec(t);
+  if (m) {
+    const month = MONTHS_ES.indexOf(m[2].slice(0, 3).replace('set', 'sep'));
+    const day = Number(m[1]);
+    if (month < 0 || day < 1 || day > 31) return null;
+    return new Date(m[3] ? Number(m[3]) : now.getFullYear(), month, day);
+  }
+  if (!/\d{4}/.test(t)) return null;
+  const at = Date.parse(t);
+  return Number.isNaN(at) ? null : new Date(at);
+}
+
+/**
+ * ¿Cuenta como entrega de esta semana? Como la app anterior: entre ayer y
+ * dentro de 7 días, y una fecha que no se entiende cuenta siempre (vacía no).
+ * Mejora: "20 SEP" se lee en español del año en curso (la app anterior se lo
+ * pasaba a `Date.parse`, que en Chrome lo toma como del año 2001).
+ */
+export function dueThisWeek(deadline: unknown, now: number = Date.now()): boolean {
+  const t = typeof deadline === 'string' ? deadline.trim() : '';
+  if (!t) return false;
+  const at = parseDeadline(t, new Date(now));
+  if (!at) return true;
+  const day = 86_400_000;
+  // Fin del día de la entrega: "hoy" cuenta todo el día.
+  const diff = at.getTime() + day - 1 - now;
+  return diff >= -day && diff <= 8 * day;
+}
+
+export type StepState = 'done' | 'current' | 'next' | 'locked';
+
+/** Estado de cada paso de un roadmap (no se guarda): el primero sin hacer es el actual y el siguiente, el próximo. */
+export function stepStates(steps: Array<{ done?: unknown }>): StepState[] {
+  const current = steps.findIndex((s) => !s.done);
+  return steps.map((s, i) => (s.done ? 'done' : i === current ? 'current' : i === current + 1 ? 'next' : 'locked'));
+}
+
+/** "examen, física , " → ["examen", "física"] */
+export const splitTags = (tags: unknown): string[] =>
+  typeof tags === 'string'
+    ? tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [];

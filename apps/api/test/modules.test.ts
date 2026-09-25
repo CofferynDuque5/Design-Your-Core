@@ -178,4 +178,108 @@ describe('v2 · módulos de la app anterior', () => {
     await api.patch('/api/v2/modules/todos/mio').set(bearer(other.token)).send({ done: true }).expect(404);
     await api.delete('/api/v2/modules/todos/mio').set(bearer(other.token)).expect(404);
   });
+
+  it('tanda 2: crea, edita y borra materias, proyectos, roadmaps, cuadernos, contenido e ideas', async () => {
+    const { api, auth, sync } = await setup();
+    const cases: Array<[string, Record<string, unknown>, Record<string, unknown>]> = [
+      ['subjects', { name: 'Química', teacher: 'Prof. Ruiz', color: '#8B5CF6' }, { room: 'Lab 1', nextClass: 'Lunes 8:00' }],
+      ['projects', { title: 'Ensayo de Historia', subject: 'Física', deadline: '20 SEP', color: '#22B8CF' }, { status: 'revision', deadline: '27 SEP' }],
+      ['roadmaps', { name: 'Ingeniería de Sistemas', color: '#4F7CFF' }, { name: 'Ingeniería' }],
+      ['notebooks', { title: 'Apuntes', category: 'Universidad', subject: 'Cálculo', topic: 'Derivadas', emoji: '🧮' }, { color: '#111827' }],
+      ['content', { title: 'Probé 100 apps de IA', platform: 'tiktok' }, { stage: 'guion', script: '# Gancho', due: '12 sep' }],
+      ['ideas', { title: 'App de hábitos', category: 'web' }, { body: 'Para estudiantes', tags: 'saas, urgente' }],
+    ];
+    for (const [key, item, patch] of cases) {
+      const id = randomUUID();
+      const created = await api.post(`/api/v2/modules/${key}`).set(auth).send({ item: { id, ...item } }).expect(201);
+      expect(created.body.item).toMatchObject({ id, ...item });
+      const updated = await api.patch(`/api/v2/modules/${key}/${id}`).set(auth).send(patch).expect(200);
+      expect((await sync())[key]).toContainEqual({ ...created.body.item, ...patch });
+      expect(updated.body.item).toEqual({ ...created.body.item, ...patch });
+      await api.delete(`/api/v2/modules/${key}/${id}`).set(auth).expect(200);
+    }
+    const doc = await sync();
+    expect(doc.subjects).toEqual(OLD_DOC.subjects);
+    expect(doc.claveFutura).toEqual(OLD_DOC.claveFutura);
+    expect(doc.habits).toEqual(OLD_DOC.habits);
+  });
+
+  it('temas, hitos y pasos se editan con la lista completa y conservan lo que la API no conoce', async () => {
+    const { api, auth, sync } = await setup({
+      ...OLD_DOC,
+      subjects: [{ id: 'mat1', name: 'Física', color: '#22B8CF', room: 'B-3', teacher: '', nextClass: '', topics: [{ id: 'xab12cd', name: 'Ondas', done: false, nota: 'de la IA' }] }],
+      projects: [{ id: 'id_p1', title: 'Maqueta', subject: 'Física', deadline: '20 SEP', status: 'curso', color: '#0FA968', milestones: [] }],
+    });
+    await api
+      .patch('/api/v2/modules/subjects/mat1')
+      .set(auth)
+      .send({ topics: [{ id: 'xab12cd', name: 'Ondas', done: true }, { id: 't2', name: 'Óptica', done: false }] })
+      .expect(200);
+    await api.patch('/api/v2/modules/projects/id_p1').set(auth).send({ milestones: [{ id: 'm1', name: 'Boceto', done: true, date: '' }] }).expect(200);
+    await api.post('/api/v2/modules/roadmaps').set(auth).send({ item: { id: 'r1', name: 'Ruta', steps: [{ id: 's1', name: 'Cálculo I' }] } }).expect(201);
+    await api.patch('/api/v2/modules/roadmaps/r1').set(auth).send({ steps: [{ id: 's1', name: 'Cálculo I', done: true }, { id: 's2', name: 'Cálculo II', done: false }] }).expect(200);
+    await api.patch('/api/v2/modules/subjects/mat1').set(auth).send({ topics: [{ id: 'x', name: 'x', done: 'sí' }] }).expect(400);
+    const doc = await sync();
+    expect((doc.subjects as Array<{ topics: unknown }>)[0].topics).toEqual([
+      { id: 'xab12cd', name: 'Ondas', done: true, nota: 'de la IA' },
+      { id: 't2', name: 'Óptica', done: false },
+    ]);
+    expect((doc.projects as Array<Record<string, unknown>>)[0]).toEqual({ id: 'id_p1', title: 'Maqueta', subject: 'Física', deadline: '20 SEP', status: 'curso', color: '#0FA968', milestones: [{ id: 'm1', name: 'Boceto', done: true, date: '' }] });
+    expect(doc.roadmaps).toEqual([{ id: 'r1', name: 'Ruta', color: '#8B5CF6', steps: [{ id: 's1', name: 'Cálculo I', done: true }, { id: 's2', name: 'Cálculo II', done: false }] }]);
+  });
+
+  it('cuadernos: las cajitas exigen su cuaderno, guardan el lenguaje y se borran con él', async () => {
+    const { api, auth, sync } = await setup();
+    await api.post('/api/v2/modules/noteBoxes').set(auth).send({ item: { id: 'b0', notebookId: 'no-existe' } }).expect(400);
+    await api.post('/api/v2/modules/notebooks').set(auth).send({ item: { id: 'n1', title: 'Cálculo' } }).expect(201);
+    await api.post('/api/v2/modules/notebooks').set(auth).send({ item: { id: 'n2', title: 'Historia' } }).expect(201);
+    const code = await api.post('/api/v2/modules/noteBoxes').set(auth).send({ item: { id: 'b1', notebookId: 'n1', kind: 'code', title: 'main.py' } }).expect(201);
+    expect(code.body.item).toEqual({ id: 'b1', notebookId: 'n1', title: 'main.py', text: '', color: '#1e1e2e', kind: 'code', lang: 'js' });
+    await api.post('/api/v2/modules/noteBoxes').set(auth).send({ item: { id: 'b2', notebookId: 'n2', text: 'Revolución francesa' } }).expect(201);
+    // La app anterior no guardaba el cambio de lenguaje; aquí sí, en el mismo campo `lang`.
+    await api.patch('/api/v2/modules/noteBoxes/b1').set(auth).send({ lang: 'python', text: 'print(1)' }).expect(200);
+    await api.patch('/api/v2/modules/noteBoxes/b1').set(auth).send({ notebookId: 'no-existe' }).expect(400);
+    expect((await sync()).noteBoxes).toContainEqual({ id: 'b1', notebookId: 'n1', title: 'main.py', text: 'print(1)', color: '#1e1e2e', kind: 'code', lang: 'python' });
+    await api.delete('/api/v2/modules/notebooks/n1').set(auth).expect(200);
+    const doc = await sync();
+    expect((doc.notebooks as Array<{ id: string }>).map((n) => n.id)).toEqual(['n2']);
+    expect((doc.noteBoxes as Array<{ id: string }>).map((b) => b.id)).toEqual(['b2']);
+  });
+
+  it('borrar una materia conserva sus clases y proyectos, como la app anterior', async () => {
+    const { api, auth, sync } = await setup({
+      ...OLD_DOC,
+      classes: [{ id: 'c1', day: 1, start: '08:00', end: '09:30', title: 'Física', room: 'B-3', color: '#22B8CF', subject: 'mat1' }],
+      projects: [{ id: 'p1', title: 'Maqueta', subject: 'Física', deadline: '', status: 'curso', color: '#22B8CF', milestones: [] }],
+    });
+    await api.delete('/api/v2/modules/subjects/mat1').set(auth).expect(200);
+    const doc = await sync();
+    expect(doc.subjects).toEqual([]);
+    expect(doc.classes).toEqual([expect.objectContaining({ id: 'c1', subject: 'mat1' })]);
+    expect(doc.projects).toEqual([expect.objectContaining({ id: 'p1', subject: 'Física' })]);
+    // La clase sigue editándose en el Horario (sin tocar su materia o dejándola suelta).
+    await api.patch('/api/v2/modules/classes/c1').set(auth).send({ room: 'B-4' }).expect(200);
+    await api.patch('/api/v2/modules/classes/c1').set(auth).send({ subject: '' }).expect(200);
+  });
+
+  it('tanda 2: valida los formatos antiguos', async () => {
+    const { api, auth } = await setup();
+    const bad: Array<[string, Record<string, unknown>]> = [
+      ['subjects', { id: 's', name: '' }],
+      ['subjects', { id: 's', name: 'x', color: 'azul' }],
+      ['projects', { id: 'p', title: 'x', status: 'hecho' }],
+      ['projects', { id: 'p', title: 'x', milestones: [{ id: 'm', name: 'x', done: false, extra: 1 }] }],
+      ['roadmaps', { id: 'r', name: 'x', steps: [{ name: 'sin id' }] }],
+      ['notebooks', { id: 'n', title: 'x', emoji: '' }],
+      ['noteBoxes', { id: 'b', notebookId: 'n', kind: 'imagen' }],
+      ['content', { id: 'c', title: 'x', stage: 'subido' }],
+      ['content', { id: 'c', title: 'x', platform: 'twitch' }],
+      ['ideas', { id: 'i', title: 'x', category: 'ventas' }],
+      ['ideas', { id: 'i', title: 'x', votos: 3 }],
+    ];
+    for (const [key, item] of bad) {
+      const res = await api.post(`/api/v2/modules/${key}`).set(auth).send({ item });
+      expect(res.status, `${key} ${JSON.stringify(item)}`).toBe(400);
+    }
+  });
 });
