@@ -117,11 +117,16 @@ test('la sección Más conserva los módulos anteriores', async ({ page }) => {
   await page.goto('/perfil');
   await page.getByRole('link', { name: /Más herramientas/ }).click();
   await expect(page).toHaveURL(/\/mas$/);
-  for (const group of ['Organización', 'Trabajo y estudio', 'Vida personal']) {
+  for (const group of ['Organización y trabajo', 'Vida personal']) {
     await expect(page.getByRole('region', { name: group })).toBeVisible();
   }
   await expect(page.getByRole('region', { name: 'Vida personal' }).getByText('Finanzas')).toBeVisible();
-  await page.getByRole('region', { name: 'Herramientas' }).getByRole('link', { name: /Pendientes/ }).click();
+  const tools = page.getByRole('region', { name: 'Herramientas' });
+  await expect(tools.getByRole('list', { name: 'Estudio y trabajo' }).getByRole('link')).toHaveCount(6);
+  await tools.getByRole('link', { name: /Pendientes/ }).click();
   await expect(page).toHaveURL(/\/pendientes$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Pendientes' })).toBeVisible();
+  await page.goto('/mas');
+  await page.getByRole('region', { name: 'Herramientas' }).getByRole('link', { name: /Cuadernos/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Cuadernos' })).toBeVisible();
 });

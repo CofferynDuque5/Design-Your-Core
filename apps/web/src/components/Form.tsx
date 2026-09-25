@@ -143,12 +143,27 @@ export function SelectField({ label, hint, error, children, ...select }: FieldPr
 }
 
 /** Muestras de color como radios: cada una lleva su nombre para lectores de pantalla. */
-export function ColorPicker({ legend, colors, value, onChange, names }: { legend: string; colors: readonly string[]; value: string; onChange: (c: string) => void; names: Record<string, string> }) {
+export function ColorPicker({
+  legend,
+  colors,
+  value,
+  onChange,
+  names,
+  compact,
+}: {
+  legend: string;
+  colors: readonly string[];
+  value: string;
+  onChange: (c: string) => void;
+  names: Record<string, string>;
+  /** Muestras pequeñas y leyenda solo para lectores de pantalla (p. ej. dentro de una cajita). */
+  compact?: boolean;
+}) {
   const name = useId();
   return (
-    <fieldset className="field">
-      <legend className="field__label">{legend}</legend>
-      <div className="swatches">
+    <fieldset className={compact ? 'field swatches-field--compact' : 'field'}>
+      <legend className={compact ? 'visually-hidden' : 'field__label'}>{legend}</legend>
+      <div className={compact ? 'swatches swatches--sm' : 'swatches'}>
         {colors.map((c) => (
           <label key={c} className="swatch" style={{ ['--c' as string]: c }}>
             <input type="radio" name={name} checked={value.toLowerCase() === c.toLowerCase()} onChange={() => onChange(c)} />

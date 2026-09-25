@@ -18,7 +18,7 @@ export function fakeFetch(routes: Record<string, Handler>) {
       return m === method && new RegExp(`^${p.replace(/:[^/]+/g, '[^/]+')}$`).test(url.pathname);
     });
     if (!key) return new Response(JSON.stringify({ error: `Sin ruta falsa para ${method} ${url.pathname}` }), { status: 404 });
-    const out = routes[key](body, url);
+    const out = await routes[key](body, url);
     const [status, data] = Array.isArray(out) && typeof out[0] === 'number' ? (out as [number, unknown]) : [200, out];
     return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
   });
@@ -89,7 +89,63 @@ export const legacyDoc = (): Record<string, unknown> => ({
   reminders: [{ id: 'r1', day: 14, title: 'Dentista', when: '14:00', color: '#4F7CFF', icon: 'doc', on: true }],
   classes: [{ id: 'c1', day: 1, start: '08:00', end: '09:30', title: 'Cálculo', room: 'A-201', color: '#4F7CFF', subject: '' }],
   focus: [{ id: 'f1', mode: 'focus', seconds: 1500, dateKey: '2026-09-20' }],
-  subjects: [{ id: 'mat1', name: 'Física', color: '#22B8CF', room: 'B-3', teacher: '', nextClass: '', topics: [] }],
+  subjects: [
+    {
+      id: 'mat1',
+      name: 'Física',
+      color: '#22B8CF',
+      room: 'B-3',
+      teacher: 'Prof. Ruiz',
+      nextClass: 'Lunes 8:00',
+      topics: [
+        { id: 'tp1', name: 'Ondas', done: true },
+        { id: 'xa1b2c3', name: 'Óptica', done: false },
+      ],
+    },
+  ],
+  projects: [
+    {
+      id: 'p1',
+      title: 'Maqueta del puente',
+      subject: 'Física',
+      deadline: '20 SEP',
+      status: 'curso',
+      color: '#22B8CF',
+      milestones: [
+        { id: 'm1', name: 'Boceto', date: '', done: true },
+        { id: 'm2', name: 'Estructura', date: '', done: false },
+      ],
+    },
+    { id: 'id_p2', title: 'Ensayo de Historia', subject: '', deadline: '', status: 'entregado', color: '#0FA968', milestones: [] },
+  ],
+  roadmaps: [
+    {
+      id: 'rm1',
+      name: 'Ingeniería',
+      color: '#8B5CF6',
+      steps: [
+        { id: 'st1', name: 'Cálculo I', done: true },
+        { id: 'st2', name: 'Cálculo II', done: false },
+        { id: 'st3', name: 'Ecuaciones', done: false },
+      ],
+    },
+  ],
+  notebooks: [
+    { id: 'nb1', title: 'Apuntes de cálculo', category: 'Universidad', subject: 'Cálculo', topic: 'Derivadas', color: '#4F7CFF', emoji: '🧮' },
+    { id: 'nb2', title: 'Recetas', category: 'General', subject: '', topic: '', color: '#0FA968', emoji: '📗' },
+  ],
+  noteBoxes: [
+    { id: 'bx1', notebookId: 'nb1', title: 'Regla de la cadena', text: "f(g(x))' = f'(g(x))·g'(x)", color: '#FFF7D6', kind: 'text', lang: '' },
+    { id: 'bx2', notebookId: 'nb1', title: 'derivada.py', text: 'def d(f, x, h=1e-6):\n    return (f(x + h) - f(x)) / h', color: '#1e1e2e', kind: 'code', lang: 'python' },
+  ],
+  content: [
+    { id: 'ct1', title: 'Probé 100 apps de IA', stage: 'guion', platform: 'youtube', notes: '', script: 'Gancho: ¿cuál vale la pena?', due: '12 sep' },
+    { id: 'ct2', title: 'Mi escritorio', stage: 'publicado', platform: 'tiktok', notes: '', script: '', due: '' },
+  ],
+  ideas: [
+    { id: 'i1', title: 'App de hábitos', body: 'Para estudiantes', category: 'app', tags: 'saas, urgente' },
+    { id: 'i2', title: 'Landing para portfolio', body: '', category: 'web', tags: '' },
+  ],
   transactions: [{ id: 'x1', type: 'gasto', amount: 10 }],
   claveFutura: true,
 });

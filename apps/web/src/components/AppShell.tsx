@@ -1,7 +1,8 @@
 import { BarChart3, CheckSquare, Flag, LayoutGrid, Sun, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router';
-import { TOOLS } from '../app/tools';
+import { useUnsavedGuard } from '../app/legacy';
+import { TOOL_GROUPS, TOOLS } from '../app/tools';
 import { Logo } from './Logo';
 
 const NAV = [
@@ -30,6 +31,7 @@ function useOnline() {
 export function AppShell() {
   const online = useOnline();
   const location = useLocation();
+  useUnsavedGuard();
   // Los enlaces de invitación de pareja llegan como /?invite=CODIGO.
   const invite = new URLSearchParams(location.search).get('invite');
   if (invite && location.pathname !== '/perfil') return <Navigate to={`/perfil?invite=${encodeURIComponent(invite)}`} replace />;
@@ -58,20 +60,24 @@ export function AppShell() {
             </li>
           </ul>
         </nav>
-        <nav aria-labelledby="nav-tools">
-          <p id="nav-tools" className="sidebar__group">
-            Herramientas
-          </p>
-          <ul className="sidebar__nav">
-            {TOOLS.map(({ to, label, icon: Icon }) => (
-              <li key={to}>
-                <NavLink to={to} className="sidebar__link">
-                  <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
-                  {label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
+        <nav aria-label="Herramientas" className="sidebar__tools">
+          {TOOL_GROUPS.map((g) => (
+            <div key={g.id}>
+              <p id={`nav-tools-${g.id}`} className="sidebar__group">
+                {g.label}
+              </p>
+              <ul className="sidebar__nav sidebar__nav--compact" aria-labelledby={`nav-tools-${g.id}`}>
+                {TOOLS.filter((t) => t.group === g.id).map(({ to, label, icon: Icon }) => (
+                  <li key={to}>
+                    <NavLink to={to} className="sidebar__link">
+                      <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+                      {label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
       </aside>
       <main id="main" className="main" tabIndex={-1}>

@@ -1,6 +1,6 @@
-import { FOCUS_MAX, legacyList, reorderById, type LegacyData, type LegacyItems, type LegacyKey, type LegacyPatch } from '@dyc/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { FOCUS_MAX, LEGACY_CHILDREN, legacyList, mergeLegacyItem, reorderById, type LegacyData, type LegacyItems, type LegacyKey, type LegacyPatch } from '@dyc/core';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
 import { errorMessage } from '../components/States';
 import { api } from './api';
 import { useToast } from './toast';
@@ -18,6 +18,12 @@ export const useLegacyData = () => useQuery({ queryKey: LEGACY_QUERY, queryFn: a
 /** Lista de una clave con la defensa de la app anterior (`x || []`). */
 export function useLegacyList<K extends LegacyKey>(data: LegacyData | undefined, key: K): Array<LegacyItems[K]> {
   return useMemo(() => legacyList(data, key), [data, key]);
+}
+
+/** Id de un tema, hito o paso: randomUUID o "x" + 7 caracteres, como la app anterior. */
+export function newSubId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `x${Math.random().toString(36).slice(2, 9)}`;
 }
 
 /** Id nuevo como en la app anterior. */
@@ -39,13 +45,16 @@ function apply<K extends LegacyKey>(data: LegacyData, key: K, op: Op<K>): Legacy
     case 'add':
       return { ...data, [key]: key === 'focus' ? [op.item, ...list].slice(0, FOCUS_MAX) : [...list, op.item] };
     case 'update':
-      return { ...data, [key]: list.map((x) => (x.id === op.id ? { ...x, ...op.patch } : x)) };
-    case 'remove':
+      return { ...data, [key]: list.map((x) => (x.id === op.id ? mergeLegacyItem(key, x, op.patch as Record<string, unknown>) : x)) };
+    case 'remove': {
+      // Pendiente → subtareas y cuaderno → cajitas se borran juntos, como en el servidor.
+      const child = LEGACY_CHILDREN[key];
       return {
         ...data,
         [key]: list.filter((x) => x.id !== op.id),
-        ...(key === 'todos' ? { subtasks: legacyList(data, 'subtasks').filter((s) => s.todoId !== op.id) } : {}),
+        ...(child ? { [child.key]: legacyList(data, child.key).filter((s) => (s as unknown as Record<string, unknown>)[child.field] !== op.id) } : {}),
       };
+    }
     case 'reorder':
       return { ...data, [key]: reorderById(list, op.ids) };
   }
@@ -98,4 +107,21 @@ export function useModule<K extends LegacyKey>(key: K) {
     }),
     [mutate],
   );
+}
+
+/** Pide confirmación al recargar o cerrar mientras quedan cambios sin guardar (el navegador los cancelaría). */
+export function warnBeforeUnload(e: BeforeUnloadEvent) {
+  e.preventDefault();
+  // Navegadores antiguos necesitan returnValue para mostrar el aviso.
+  e.returnValue = '';
+}
+
+/** Mientras la cola de escrituras de la app anterior tenga cambios en vuelo, avisa antes de salir. */
+export function useUnsavedGuard() {
+  const busy = useIsMutating({ mutationKey: ['legacy'] }) > 0;
+  useEffect(() => {
+    if (!busy) return;
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [busy]);
 }

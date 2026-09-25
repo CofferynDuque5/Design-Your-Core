@@ -11,14 +11,20 @@ import { Agenda } from '../pages/Agenda';
 import { Calendar } from '../pages/Calendar';
 import { CheckIn } from '../pages/CheckIn';
 import { Challenges } from '../pages/Challenges';
+import { Content } from '../pages/Content';
 import { Focus } from '../pages/Focus';
 import { Habits } from '../pages/Habits';
+import { Ideas } from '../pages/Ideas';
 import { More } from '../pages/More';
+import { NotebookDetail, Notebooks } from '../pages/Notebooks';
 import { NotFound } from '../pages/NotFound';
 import { Onboarding } from '../pages/Onboarding';
 import { Profile } from '../pages/Profile';
 import { Progress } from '../pages/Progress';
+import { Projects } from '../pages/Projects';
+import { Roadmaps } from '../pages/Roadmaps';
 import { Schedule } from '../pages/Schedule';
+import { Subjects } from '../pages/Subjects';
 import { Today } from '../pages/Today';
 import { Todos } from '../pages/Todos';
 import { useProfile } from './queries';
@@ -85,6 +91,13 @@ export function AppRoutes() {
         <Route path="calendario" element={<Calendar />} />
         <Route path="horario" element={<Schedule />} />
         <Route path="enfoque" element={<Focus />} />
+        <Route path="materias" element={<Subjects />} />
+        <Route path="proyectos" element={<Projects />} />
+        <Route path="roadmaps" element={<Roadmaps />} />
+        <Route path="cuadernos" element={<Notebooks />} />
+        <Route path="cuadernos/:id" element={<NotebookDetail />} />
+        <Route path="contenido" element={<Content />} />
+        <Route path="ideas" element={<Ideas />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

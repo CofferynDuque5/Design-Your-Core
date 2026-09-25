@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { onboard, readLegacy, register, seedLegacy } from './helpers';
 
-// Herramientas de la app anterior (tanda 1) contra la API real. Cada recorrido
+// Herramientas de la app anterior (tandas 1 y 2) contra la API real. Cada recorrido
 // comprueba además que el documento de /api/sync (el que lee la app anterior)
 // conserva sus formatos y las claves que la app nueva no conoce.
 
@@ -209,4 +209,254 @@ test('enfoque: una sesión saltada se guarda y cuenta', async ({ page }) => {
   const doc = await readLegacy(page);
   expect(doc.focus).toEqual([expect.objectContaining({ mode: 'focus', seconds: 120, dateKey: new Date().toISOString().slice(0, 10) })]);
   expect(doc).toMatchObject(OLD);
+});
+
+// ---------- Tanda 2: Materias, Proyectos, Roadmaps, Cuadernos, Contenido e Ideas ----------
+
+test('materias: temas, horario, renombrar con sus proyectos y borrar sin tocar las clases', async ({ page }) => {
+  await register(page, 'materias');
+  await onboard(page);
+  await seedLegacy(page, {
+    ...OLD,
+    subjects: [{ id: 'mat1', name: 'Física', teacher: 'Prof. Ruiz', room: 'B-3', color: '#22B8CF', nextClass: 'Lunes 8:00', topics: [{ id: 'xk2m9ab', name: 'Ondas', done: true }] }],
+    projects: [{ id: 'id_p1', title: 'Maqueta', subject: 'Física', deadline: '20 SEP', status: 'curso', color: '#22B8CF', milestones: [] }],
+    classes: [],
+  });
+  await page.goto('/materias');
+  const card = page.getByRole('article', { name: 'Física' });
+  await expect(card.getByRole('progressbar', { name: 'Avance de Física' })).toHaveAttribute('aria-valuenow', '100');
+  await card.getByRole('button', { name: 'Temas · 1/1' }).click();
+  await card.getByLabel('Nuevo tema de «Física»').fill('Óptica');
+  await card.getByRole('button', { name: 'Añadir', exact: true }).click();
+  await expect(card.getByRole('checkbox', { name: 'Óptica' })).not.toBeChecked();
+  await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50');
+  await card.getByRole('button', { name: 'Añadir «Física» al horario' }).click();
+  await expect(page.getByText(/añadida al Horario/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Editar «Física»' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar materia' });
+  await dialog.getByLabel('Nombre').fill('Física I');
+  await dialog.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByRole('article', { name: 'Física I' })).toBeVisible();
+
+  await expect
+    .poll(async () => {
+      const doc = await readLegacy(page);
+      return [doc.subjects, doc.projects, doc.classes];
+    })
+    .toEqual([
+      [
+        {
+          id: 'mat1',
+          name: 'Física I',
+          teacher: 'Prof. Ruiz',
+          room: 'B-3',
+          color: '#22B8CF',
+          nextClass: 'Lunes 8:00',
+          topics: [{ id: 'xk2m9ab', name: 'Ondas', done: true }, expect.objectContaining({ name: 'Óptica', done: false })],
+        },
+      ],
+      [expect.objectContaining({ id: 'id_p1', subject: 'Física I' })],
+      [expect.objectContaining({ day: 1, start: '08:00', end: '09:30', title: 'Física', room: 'B-3', color: '#22B8CF', subject: 'mat1' })],
+    ]);
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('article', { name: 'Física I' }).getByText('Lun 08:00 · B-3')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Editar «Física I»' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Borrar' }).click();
+  await page.getByRole('button', { name: 'Borrar definitivamente' }).click();
+  await expect(page.getByRole('heading', { name: 'Aún no tienes materias' })).toBeVisible();
+  await expect.poll(async () => (await readLegacy(page)).subjects).toEqual([]);
+  const doc = await readLegacy(page);
+  expect(doc.classes).toEqual([expect.objectContaining({ subject: 'mat1' })]);
+  expect(doc.projects).toEqual([expect.objectContaining({ subject: 'Física I' })]);
+  expect(doc).toMatchObject(OLD);
+});
+
+test('proyectos: crear con materia, estado, hitos y filtros', async ({ page }) => {
+  await register(page, 'proyectos');
+  await onboard(page);
+  await seedLegacy(page, { ...OLD, subjects: [{ id: 'mat1', name: 'Historia', teacher: '', room: '', color: '#E8912A', nextClass: '', topics: [] }] });
+  await page.goto('/proyectos');
+  await expect(page.getByRole('heading', { name: 'Aún no tienes proyectos' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Nuevo proyecto' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nuevo proyecto' });
+  await dialog.getByLabel('Nombre').fill('Ensayo de Historia');
+  await dialog.getByLabel('Materia').selectOption('Historia');
+  await dialog.getByLabel('Entrega (opcional)').fill('20 SEP');
+  await dialog.getByRole('button', { name: 'Añadir proyecto' }).click();
+
+  const card = page.getByRole('article', { name: 'Ensayo de Historia' });
+  await expect(card.getByText('Entrega · 20 SEP')).toBeVisible();
+  await card.getByRole('group', { name: 'Estado de «Ensayo de Historia»' }).getByRole('button', { name: 'En revisión' }).click();
+  await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '90');
+  await card.getByRole('button', { name: /^Hitos/ }).click();
+  for (const name of ['Esquema', 'Borrador']) {
+    await card.getByLabel('Nuevo hito de «Ensayo de Historia»').fill(name);
+    await card.getByRole('button', { name: 'Añadir', exact: true }).click();
+    await expect(card.getByRole('checkbox', { name })).toBeVisible();
+  }
+  await card.getByRole('checkbox', { name: 'Esquema' }).click();
+  await expect(card.getByRole('checkbox', { name: 'Esquema' })).toBeChecked();
+  await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50');
+
+  await expect
+    .poll(async () => (await readLegacy(page)).projects)
+    .toEqual([
+      {
+        id: expect.any(String),
+        title: 'Ensayo de Historia',
+        subject: 'Historia',
+        deadline: '20 SEP',
+        status: 'revision',
+        color: '#E8912A',
+        milestones: [expect.objectContaining({ name: 'Esquema', date: '', done: true }), expect.objectContaining({ name: 'Borrador', date: '', done: false })],
+      },
+    ]);
+  await reloadWhenSaved(page);
+  const show = page.getByRole('group', { name: 'Mostrar' });
+  await show.getByRole('button', { name: 'Entregados' }).click();
+  await expect(page.getByRole('heading', { name: 'Nada por aquí con este filtro' })).toBeVisible();
+  await show.getByRole('button', { name: 'En curso' }).click();
+  await expect(page.getByRole('article', { name: 'Ensayo de Historia' })).toBeVisible();
+  expect(await readLegacy(page)).toMatchObject(OLD);
+});
+
+test('roadmaps: pasos que se desbloquean al completar', async ({ page }) => {
+  await register(page, 'roadmaps');
+  await onboard(page);
+  await seedLegacy(page, OLD);
+  await page.goto('/roadmaps');
+  await page.getByRole('button', { name: 'Nuevo roadmap' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nuevo roadmap' });
+  await dialog.getByLabel('Nombre').fill('Ingeniería de Sistemas');
+  await dialog.getByRole('radio', { name: 'Azul' }).check();
+  await dialog.getByRole('button', { name: 'Añadir roadmap' }).click();
+
+  const card = page.getByRole('article', { name: 'Ingeniería de Sistemas' });
+  for (const name of ['Cálculo I', 'Cálculo II', 'Ecuaciones']) {
+    await card.getByLabel('Nuevo paso de «Ingeniería de Sistemas»').fill(name);
+    await card.getByRole('button', { name: 'Añadir', exact: true }).click();
+    await expect(card.getByRole('list', { name: /^Pasos de/ }).getByText(name, { exact: true })).toBeVisible();
+  }
+  await card.getByRole('button', { name: 'Marcar «Cálculo I» como completada' }).click();
+  await expect(card.getByRole('button', { name: 'Marcar «Cálculo II» como completada' })).toBeVisible();
+  await expect(page.getByText('1 de 3 completadas')).toBeVisible();
+
+  await expect
+    .poll(async () => (await readLegacy(page)).roadmaps)
+    .toEqual([
+      {
+        id: expect.any(String),
+        name: 'Ingeniería de Sistemas',
+        color: '#4F7CFF',
+        steps: [expect.objectContaining({ name: 'Cálculo I', done: true }), expect.objectContaining({ name: 'Cálculo II', done: false }), expect.objectContaining({ name: 'Ecuaciones', done: false })],
+      },
+    ]);
+  await reloadWhenSaved(page);
+  await page.getByRole('button', { name: 'Reabrir «Cálculo I»' }).click();
+  await expect(page.getByRole('button', { name: 'Marcar «Cálculo I» como completada' })).toBeVisible();
+  await expect.poll(async () => ((await readLegacy(page)).roadmaps as Array<{ steps: Array<{ done: boolean }> }>)[0].steps.map((s) => s.done)).toEqual([false, false, false]);
+  expect(await readLegacy(page)).toMatchObject(OLD);
+});
+
+test('cuadernos: cuaderno, cajitas de texto y de código con su lenguaje, y borrado en cascada', async ({ page }) => {
+  await register(page, 'cuadernos');
+  await onboard(page);
+  await seedLegacy(page, {
+    ...OLD,
+    notebooks: [{ id: 'id_viejo', title: 'Recetas', category: 'General', subject: '', topic: '', color: '#0FA968', emoji: '📗' }],
+    noteBoxes: [{ id: 'bx0', notebookId: 'id_viejo', title: 'Pan', text: 'Harina y agua', color: '#DDF3E4', kind: 'text', lang: '' }],
+  });
+  await page.goto('/cuadernos');
+  await page.getByRole('button', { name: 'Nuevo cuaderno' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nuevo cuaderno' });
+  await dialog.getByLabel('Título').fill('Cálculo');
+  await dialog.getByLabel('Categoría').fill('Universidad');
+  await dialog.getByLabel('Tema (opcional)').fill('Derivadas');
+  await dialog.getByRole('radio', { name: 'Icono 🧮' }).check();
+  await dialog.getByRole('button', { name: 'Crear cuaderno' }).click();
+
+  await page.getByLabel('Categoría').selectOption('Universidad');
+  await expect(page.getByRole('link', { name: /Recetas/ })).toHaveCount(0);
+  await page.getByRole('link', { name: /Cálculo/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Cálculo' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sin cajitas todavía' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Texto', exact: true }).click();
+  const box = page.getByRole('region', { name: 'Cajita 1' });
+  await box.getByLabel('Texto de la cajita 1').fill('La derivada mide el cambio.');
+  await box.getByRole('radio', { name: 'Lila' }).click();
+  await expect(box.getByRole('radio', { name: 'Lila' })).toBeChecked();
+  await page.getByRole('button', { name: 'Código', exact: true }).click();
+  const code = page.getByRole('region', { name: 'Cajita de código 2' });
+  await code.getByLabel('Contenido de la cajita de código 2').fill('print(2 * 3)');
+  await code.getByLabel('Lenguaje de la cajita de código 2').selectOption('python');
+  await code.getByLabel('Nombre del archivo de la cajita de código 2').fill('main.py');
+  // Con nombre, la cajita pasa a llamarse por él.
+  await page.getByLabel('Nombre del archivo de la cajita de código «main.py»').blur();
+
+  const notebookId = page.url().split('/').pop() as string;
+  await expect
+    .poll(async () => (await readLegacy(page)).noteBoxes)
+    .toEqual([
+      { id: 'bx0', notebookId: 'id_viejo', title: 'Pan', text: 'Harina y agua', color: '#DDF3E4', kind: 'text', lang: '' },
+      { id: expect.any(String), notebookId, title: '', text: 'La derivada mide el cambio.', color: '#EDE4FF', kind: 'text', lang: '' },
+      { id: expect.any(String), notebookId, title: 'main.py', text: 'print(2 * 3)', color: '#1e1e2e', kind: 'code', lang: 'python' },
+    ]);
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('region', { name: 'Cajita de código «main.py»' }).getByLabel(/Lenguaje/)).toHaveValue('python');
+
+  await page.getByRole('button', { name: 'Decorar' }).click();
+  await page.getByRole('dialog', { name: 'Decorar cuaderno' }).getByRole('button', { name: 'Borrar' }).click();
+  await expect(page.getByRole('alert')).toContainText('con 2 cajitas');
+  await page.getByRole('button', { name: 'Borrar definitivamente' }).click();
+  await expect(page).toHaveURL(/\/cuadernos$/);
+  await expect.poll(async () => ((await readLegacy(page)).noteBoxes as Array<{ id: string }>).map((b) => b.id)).toEqual(['bx0']);
+  const doc = await readLegacy(page);
+  expect(doc.notebooks).toEqual([{ id: 'id_viejo', title: 'Recetas', category: 'General', subject: '', topic: '', color: '#0FA968', emoji: '📗' }]);
+  expect(doc).toMatchObject(OLD);
+});
+
+test('contenido e ideas: publicar, etapas, filtros y guardado al escribir', async ({ page }) => {
+  await register(page, 'contenido');
+  await onboard(page);
+  await seedLegacy(page, { ...OLD, ideas: [{ id: 'id_idea', title: 'App de hábitos', body: '', category: 'app', tags: '' }] });
+  await page.goto('/contenido');
+  await page.getByLabel('Nuevo video').fill('Probé 100 apps de IA');
+  await page.getByLabel('Plataforma').selectOption('tiktok');
+  await page.getByRole('button', { name: 'Añadir', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Publicado: «Probé 100 apps de IA»' }).click();
+  await expect(page.getByRole('region', { name: /Publicados/ }).getByText('Probé 100 apps de IA')).toBeVisible();
+  await page.getByRole('button', { name: 'Editar «Probé 100 apps de IA»' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar video' });
+  await dialog.getByLabel('Fecha (opcional)').fill('12 sep');
+  await dialog.getByLabel('Guion').fill('Gancho: ¿cuál vale la pena?');
+  await dialog.getByLabel('Etapa').selectOption('editar');
+  await dialog.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByRole('region', { name: /En producción/ }).getByText('Probé 100 apps de IA')).toBeVisible();
+  await expect
+    .poll(async () => (await readLegacy(page)).content)
+    .toEqual([{ id: expect.any(String), title: 'Probé 100 apps de IA', stage: 'editar', platform: 'tiktok', notes: '', script: 'Gancho: ¿cuál vale la pena?', due: '12 sep' }]);
+
+  await page.goto('/ideas');
+  await page.getByRole('button', { name: 'Marketing' }).click();
+  await expect(page.getByRole('heading', { name: 'Aún no hay ideas de Marketing' })).toBeVisible();
+  await page.getByLabel('Nueva idea de Marketing').fill('Reel para Instagram');
+  await page.getByRole('button', { name: 'Añadir', exact: true }).click();
+  const card = page.getByRole('article', { name: 'Reel para Instagram' });
+  await card.getByLabel('Desarrollo de «Reel para Instagram»').fill('Tres consejos en 30 segundos');
+  await card.getByLabel(/Etiquetas de/).fill('reels, verano');
+  await card.getByLabel(/Etiquetas de/).blur();
+  await expect(card.getByText('#verano')).toBeVisible();
+  await expect
+    .poll(async () => (await readLegacy(page)).ideas)
+    .toEqual([
+      { id: 'id_idea', title: 'App de hábitos', body: '', category: 'app', tags: '' },
+      { id: expect.any(String), title: 'Reel para Instagram', body: 'Tres consejos en 30 segundos', category: 'marketing', tags: 'reels, verano' },
+    ]);
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('article', { name: 'Reel para Instagram' }).getByLabel('Desarrollo de «Reel para Instagram»')).toHaveValue('Tres consejos en 30 segundos');
+  expect(await readLegacy(page)).toMatchObject(OLD);
 });

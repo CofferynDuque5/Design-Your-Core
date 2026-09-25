@@ -1,7 +1,7 @@
 import { ChevronRight, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router';
 import { useLegacyData } from '../app/legacy';
-import { TOOLS } from '../app/tools';
+import { TOOL_GROUPS, TOOLS } from '../app/tools';
 import { PageHeader } from '../components/AppShell';
 import { ErrorState, Loading } from '../components/States';
 import { plural } from '../lib/format';
@@ -12,19 +12,10 @@ import { plural } from '../lib/format';
  */
 export const LEGACY_GROUPS: Array<{ title: string; modules: Array<{ name: string; keys: string[]; unit: [string, string] }> }> = [
   {
-    title: 'Organización',
+    title: 'Organización y trabajo',
     modules: [
       { name: 'Rutinas', keys: ['routines'], unit: ['rutina', 'rutinas'] },
-      { name: 'Notas', keys: ['notes', 'noteBoxes'], unit: ['nota', 'notas'] },
-    ],
-  },
-  {
-    title: 'Trabajo y estudio',
-    modules: [
-      { name: 'Materias', keys: ['subjects'], unit: ['materia', 'materias'] },
-      { name: 'Proyectos y roadmaps', keys: ['projects', 'roadmaps'], unit: ['proyecto', 'proyectos'] },
-      { name: 'Cuadernos', keys: ['notebooks'], unit: ['cuaderno', 'cuadernos'] },
-      { name: 'Contenido e ideas', keys: ['content', 'ideas'], unit: ['elemento', 'elementos'] },
+      { name: 'Notas (Bodega)', keys: ['notes'], unit: ['nota', 'notas'] },
       { name: 'Trabajo', keys: ['workItems'], unit: ['elemento', 'elementos'] },
     ],
   },
@@ -61,26 +52,33 @@ export function More() {
               <h2 id="tools-title" className="section-title">
                 Herramientas
               </h2>
-              <ul className="tool-links">
-                {TOOLS.map(({ to, label, icon: Icon, description, count, unit }) => {
-                  const n = count(legacy.data.data);
-                  return (
-                    <li key={to}>
-                      <Link to={to} className="card tool-link">
-                        <span className="tool-link__icon" aria-hidden="true">
-                          <Icon size={22} strokeWidth={1.75} />
-                        </span>
-                        <span className="tool-link__text">
-                          <strong>{label}</strong>
-                          <span className="muted small">{description}</span>
-                        </span>
-                        <span className="muted small numeric tool-link__count">{n ? plural(n, unit[0], unit[1]) : 'Vacío'}</span>
-                        <ChevronRight size={18} aria-hidden="true" />
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
+              {TOOL_GROUPS.map((g) => (
+                <div key={g.id} className="stack-sm">
+                  <h3 id={`tools-${g.id}`} className="group-title">
+                    {g.label}
+                  </h3>
+                  <ul className="tool-links" aria-labelledby={`tools-${g.id}`}>
+                    {TOOLS.filter((t) => t.group === g.id).map(({ to, label, icon: Icon, description, count, unit }) => {
+                      const n = count(legacy.data.data);
+                      return (
+                        <li key={to}>
+                          <Link to={to} className="card tool-link">
+                            <span className="tool-link__icon" aria-hidden="true">
+                              <Icon size={22} strokeWidth={1.75} />
+                            </span>
+                            <span className="tool-link__text">
+                              <strong>{label}</strong>
+                              <span className="muted small">{description}</span>
+                            </span>
+                            <span className="muted small numeric tool-link__count">{n ? plural(n, unit[0], unit[1]) : 'Vacío'}</span>
+                            <ChevronRight size={18} aria-hidden="true" />
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
             </section>
 
             <div className="stack-sm">
