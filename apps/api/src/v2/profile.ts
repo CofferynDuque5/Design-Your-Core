@@ -1,7 +1,8 @@
-import { isPillarId, profileInputSchema, type PillarId } from '@dyc/core';
+import { isPillarId, profileInputSchema, userSettingsSchema, type PillarId } from '@dyc/core';
 import type { Prisma, PrismaClient, Profile } from '@prisma/client';
 import { Router, type RequestHandler } from 'express';
 import { ah } from '../lib/http.js';
+import { publicUser } from '../routes/auth.js';
 import { parse } from './util.js';
 
 export function publicProfile(p: Profile | null) {
@@ -43,6 +44,15 @@ export function profileRoutes({ prisma, requireAuth }: { prisma: PrismaClient; r
       create: { ...(data as Prisma.ProfileUncheckedCreateInput), userId },
     });
     res.json({ profile: publicProfile(saved) });
+  }));
+
+  // Ajustes de la cuenta. `showCycle` es el mismo que la app anterior recibe
+  // en `user` al entrar, así que las dos apps muestran u ocultan Ciclo igual.
+  r.patch('/me', requireAuth, ah(async (req, res) => {
+    const input = parse(userSettingsSchema, req.body, res);
+    if (!input) return;
+    const user = await prisma.user.update({ where: { id: req.userId }, data: { showCycle: input.showCycle } });
+    res.json({ user: publicUser(user) });
   }));
 
   return r;

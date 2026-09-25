@@ -282,4 +282,146 @@ describe('v2 · módulos de la app anterior', () => {
       expect(res.status, `${key} ${JSON.stringify(item)}`).toBe(400);
     }
   });
+  it('tanda 3: crea, edita y borra finanzas, metas, mascotas, ciclo, ejercicio, sueño, diario y rutina', async () => {
+    const { api, auth, sync } = await setup();
+    await api.post('/api/v2/modules/pets').set(auth).send({ item: { id: 'pet1', name: 'Luna' } }).expect(201);
+    const cases: Array<[string, Record<string, unknown>, Record<string, unknown>]> = [
+      ['transactions', { date: '2026-09-25', amount: 12.5, category: 'Comida' }, { amount: 15, note: 'Mercado' }],
+      ['goals', { title: 'Publicar 8 videos', target: 8, unit: 'videos', deadline: '2026-10-31', category: 'creador' }, { current: 8, done: true }],
+      ['petCares', { petId: 'pet1', title: 'Darle de comer', time: '08:00' }, { lastDone: '2026-09-25', days: '135' }],
+      ['period', { date: '2026-09-20', flow: 'heavy', symptoms: 'Cólicos, Fatiga', mood: '😣' }, { flow: 'light', note: 'Mejor' }],
+      ['workouts', { date: '2026-09-25', plan: 'Full body', minutes: 30 }, { minutes: 35 }],
+      ['sleep', { date: '2026-09-25', bedtime: '23:30', waketime: '07:15', quality: 4 }, { quality: 5, note: 'Sin pantallas' }],
+      ['journal', { date: '2026-09-25', mood: '🙂', gratitude: 'Mi familia' }, { note: 'Buen día' }],
+      ['routines', { title: 'Tomar vitaminas', time: '08:30', days: '12345' }, { enabled: false }],
+      ['meals', { label: 'Desayuno', time: '08:00', dateKey: '2026-09-25' }, { note: 'Avena' }],
+    ];
+    for (const [key, item, patch] of cases) {
+      const id = randomUUID();
+      const created = await api.post(`/api/v2/modules/${key}`).set(auth).send({ item: { id, ...item } }).expect(201);
+      expect(created.body.item).toMatchObject({ id, ...item });
+      const updated = await api.patch(`/api/v2/modules/${key}/${id}`).set(auth).send(patch).expect(200);
+      expect(updated.body.item).toEqual({ ...created.body.item, ...patch });
+      expect((await sync())[key]).toContainEqual(updated.body.item);
+      await api.delete(`/api/v2/modules/${key}/${id}`).set(auth).expect(200);
+    }
+    const doc = await sync();
+    expect(doc.claveFutura).toEqual(OLD_DOC.claveFutura);
+    expect(doc.habits).toEqual(OLD_DOC.habits);
+    expect(doc.cycle).toEqual(OLD_DOC.cycle);
+  });
+
+  it('tanda 3: valores por defecto y formatos de la app anterior', async () => {
+    const { api, auth } = await setup();
+    const post = async (key: string, item: Record<string, unknown>) => (await api.post(`/api/v2/modules/${key}`).set(auth).send({ item }).expect(201)).body.item;
+    expect(await post('transactions', { id: 't1', date: '2026-09-25', amount: 10 })).toEqual({ id: 't1', date: '2026-09-25', amount: 10, type: 'expense', category: 'Otro', note: '' });
+    expect(await post('goals', { id: 'g1', title: 'Leer' })).toEqual({ id: 'g1', title: 'Leer', target: 10, current: 0, unit: '', deadline: '', category: 'personal', done: false });
+    expect(await post('pets', { id: 'p1', name: 'Toby' })).toEqual({ id: 'p1', name: 'Toby', species: 'dog', note: '' });
+    expect(await post('petCares', { id: 'c1', petId: 'p1', title: 'Paseo' })).toEqual({ id: 'c1', petId: 'p1', kind: 'comida', title: 'Paseo', time: '', days: '1234567', sound: true, enabled: true, lastDone: '' });
+    expect(await post('period', { id: 'd1', date: '2026-09-20' })).toEqual({ id: 'd1', date: '2026-09-20', flow: 'medium', symptoms: '', mood: '', note: '' });
+    expect(await post('routines', { id: 'r1', title: 'Agua', time: '10:00' })).toEqual({ id: 'r1', title: 'Agua', time: '10:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
+    expect(await post('meals', { id: 'm1', dateKey: '2026-09-25' })).toEqual({ id: 'm1', label: 'Comida', time: '', note: '', dateKey: '2026-09-25' });
+    const bad: Array<[string, Record<string, unknown>]> = [
+      ['transactions', { id: 'x', date: '2026-09-25', amount: -5 }],
+      ['transactions', { id: 'x', date: '25/09/2026', amount: 5 }],
+      ['transactions', { id: 'x', date: '2026-09-25', amount: 5, type: 'gasto' }],
+      ['goals', { id: 'x', title: 'x', target: 0 }],
+      ['goals', { id: 'x', title: 'x', category: 'viajes' }],
+      ['goals', { id: 'x', title: 'x', deadline: 'mañana' }],
+      ['pets', { id: 'x', name: '  ' }],
+      ['pets', { id: 'x', name: 'x', species: 'dragon' }],
+      ['petCares', { id: 'x', petId: 'no-existe', title: 'x' }],
+      ['petCares', { id: 'x', petId: 'p1', title: 'x', days: '1238' }],
+      ['petCares', { id: 'x', petId: 'p1', title: 'x', days: '112' }],
+      ['period', { id: 'x', date: '2026-09-21', flow: 'poco' }],
+      ['workouts', { id: 'x', date: '2026-09-25', plan: 'x', minutes: 0 }],
+      ['sleep', { id: 'x', date: '2026-09-25', bedtime: '23:00', waketime: '7:00' }],
+      ['sleep', { id: 'x', date: '2026-09-25', bedtime: '23:00', waketime: '07:00', quality: 6 }],
+      ['routines', { id: 'x', title: 'x', time: '25:00' }],
+      ['meals', { id: 'x', dateKey: '2026-09-25', extra: 1 }],
+    ];
+    for (const [key, item] of bad) {
+      const res = await api.post(`/api/v2/modules/${key}`).set(auth).send({ item });
+      expect(res.status, `${key} ${JSON.stringify(item)}`).toBe(400);
+    }
+  });
+
+  it('tanda 3: lo más reciente primero con su máximo y un registro por fecha', async () => {
+    const transactions = Array.from({ length: 2000 }, (_, i) => ({ id: `t${i}`, date: '2026-09-01', amount: 1, type: 'expense', category: 'Otro', note: '' }));
+    const { api, auth, sync } = await setup({ ...OLD_DOC, transactions });
+    await api.post('/api/v2/modules/transactions').set(auth).send({ item: { id: 'nuevo', date: '2026-09-25', amount: 3 } }).expect(201);
+    const list = (await sync()).transactions as Array<{ id: string }>;
+    expect(list).toHaveLength(2000);
+    expect(list[0].id).toBe('nuevo');
+    for (const key of ['workouts', 'sleep']) {
+      const item = key === 'workouts' ? { date: '2026-09-25', plan: 'Core express', minutes: 15 } : { date: '2026-09-25', bedtime: '23:00', waketime: '07:00' };
+      await api.post(`/api/v2/modules/${key}`).set(auth).send({ item: { id: `${key}1`, ...item } }).expect(201);
+      await api.post(`/api/v2/modules/${key}`).set(auth).send({ item: { id: `${key}2`, ...item } }).expect(201);
+      expect(((await sync())[key] as Array<{ id: string }>).map((x) => x.id)).toEqual([`${key}2`, `${key}1`]);
+    }
+    await api.post('/api/v2/modules/period').set(auth).send({ item: { id: 'd1', date: '2026-09-20' } }).expect(201);
+    await api.post('/api/v2/modules/period').set(auth).send({ item: { id: 'd2', date: '2026-09-21' } }).expect(201);
+    expect((await api.post('/api/v2/modules/period').set(auth).send({ item: { id: 'd3', date: '2026-09-20' } }).expect(409)).body.error).toBe('Ese día ya está registrado');
+    await api.patch('/api/v2/modules/period/d2').set(auth).send({ date: '2026-09-20' }).expect(409);
+    await api.patch('/api/v2/modules/period/d2').set(auth).send({ date: '2026-09-22', flow: 'light' }).expect(200);
+    await api.post('/api/v2/modules/journal').set(auth).send({ item: { id: 'j1', date: '2026-09-25' } }).expect(201);
+    await api.post('/api/v2/modules/journal').set(auth).send({ item: { id: 'j2', date: '2026-09-25' } }).expect(409);
+    await api.patch('/api/v2/modules/journal/j1').set(auth).send({ note: 'Hoy', date: '2026-09-25' }).expect(200);
+  });
+
+  it('tanda 3: borrar una mascota borra sus cuidados', async () => {
+    const { api, auth, sync } = await setup();
+    for (const id of ['luna', 'toby']) await api.post('/api/v2/modules/pets').set(auth).send({ item: { id, name: id } }).expect(201);
+    await api.post('/api/v2/modules/petCares').set(auth).send({ item: { id: 'c1', petId: 'luna', title: 'Comida' } }).expect(201);
+    await api.post('/api/v2/modules/petCares').set(auth).send({ item: { id: 'c2', petId: 'toby', title: 'Paseo', kind: 'paseo' } }).expect(201);
+    await api.patch('/api/v2/modules/petCares/c2').set(auth).send({ petId: 'nadie' }).expect(400);
+    await api.delete('/api/v2/modules/pets/luna').set(auth).expect(200);
+    const doc = await sync();
+    expect((doc.pets as Array<{ id: string }>).map((p) => p.id)).toEqual(['toby']);
+    expect((doc.petCares as Array<{ id: string }>).map((c) => c.id)).toEqual(['c2']);
+  });
+
+  it('objetos cycle, dayLog y budget: PUT completo y PATCH parcial, conservando el resto', async () => {
+    const { api, auth, sync } = await setup({ ...OLD_DOC, cycle: { cycleLength: 28, periodLength: 5, notaVieja: 1 }, dayLog: { dateKey: '2026-09-24', water: 5, waterGoal: 8 } });
+    let res = await api.patch('/api/v2/modules/cycle').set(auth).send({ cycleLength: 30 }).expect(200);
+    expect(res.body.value).toEqual({ cycleLength: 30, periodLength: 5, notaVieja: 1 });
+    expect(res.body.updatedAt).toBeTruthy();
+    res = await api.put('/api/v2/modules/cycle').set(auth).send({ cycleLength: 26 }).expect(200);
+    expect(res.body.value).toEqual({ cycleLength: 26, periodLength: 5, notaVieja: 1 });
+    await api.patch('/api/v2/modules/cycle').set(auth).send({ cycleLength: 14 }).expect(400);
+    await api.patch('/api/v2/modules/cycle').set(auth).send({ periodLength: 15 }).expect(400);
+    await api.patch('/api/v2/modules/cycle').set(auth).send({ otra: 1 }).expect(400);
+    await api.patch('/api/v2/modules/dayLog').set(auth).send({ dateKey: '2026-09-25', water: 1 }).expect(200);
+    await api.patch('/api/v2/modules/dayLog').set(auth).send({ water: 41 }).expect(400);
+    await api.put('/api/v2/modules/dayLog').set(auth).send({ water: 2 }).expect(400); // falta dateKey
+    await api.patch('/api/v2/modules/budget').set(auth).send({ monthly: 1500.5 }).expect(200);
+    await api.put('/api/v2/modules/budget').set(auth).send({ monthly: -1 }).expect(400);
+    await api.patch('/api/v2/modules/todos').set(auth).send({ title: 'x' }).expect(404);
+    await api.put('/api/v2/modules/habits').set(auth).send({}).expect(404);
+    await api.post('/api/v2/modules/cycle').set(auth).send({ item: { id: 'x' } }).expect(404);
+    const doc = await sync();
+    expect(doc.cycle).toEqual({ cycleLength: 26, periodLength: 5, notaVieja: 1 });
+    expect(doc.dayLog).toEqual({ dateKey: '2026-09-25', water: 1, waterGoal: 8 });
+    expect(doc.budget).toEqual({ monthly: 1500.5 });
+    expect(doc.claveFutura).toEqual(OLD_DOC.claveFutura);
+    expect(doc.todos).toEqual(OLD_DOC.todos);
+  });
+
+  it('un objeto que falta se crea con los valores por defecto de la app anterior', async () => {
+    const { api, auth, sync } = await setup({ todos: [] });
+    const res = await api.patch('/api/v2/modules/cycle').set(auth).send({ periodLength: 4 }).expect(200);
+    expect(res.body.value).toEqual({ cycleLength: 28, periodLength: 4 });
+    expect((await sync()).cycle).toEqual({ cycleLength: 28, periodLength: 4 });
+  });
+
+  it('mostrar Ciclo es un ajuste de la cuenta que ve también la app anterior', async () => {
+    const { api, auth } = await setup();
+    expect((await api.get('/api/me').set(auth).expect(200)).body.user.showCycle).toBe(false);
+    const res = await api.patch('/api/v2/me').set(auth).send({ showCycle: true }).expect(200);
+    expect(res.body.user).toMatchObject({ showCycle: true });
+    expect((await api.get('/api/me').set(auth).expect(200)).body.user.showCycle).toBe(true);
+    await api.patch('/api/v2/me').set(auth).send({ showCycle: 'sí' }).expect(400);
+    await api.patch('/api/v2/me').set(auth).send({ showCycle: true, name: 'Otra' }).expect(400);
+    await api.patch('/api/v2/me').send({ showCycle: false }).expect(401);
+  });
 });

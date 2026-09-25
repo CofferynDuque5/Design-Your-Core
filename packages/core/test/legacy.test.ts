@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkItems,
+  cycleInfo,
+  cyclePredictions,
+  goalPercent,
+  goalStep,
+  goalToggleDone,
+  legacyObject,
+  legacyObjectPatchSchemas,
+  legacyObjectSchemas,
+  monthSummary,
+  nextDue,
+  periodRuns,
+  sleepMinutes,
+  sleepStats,
+  waterToday,
+  workoutStats,
+  type LegacyGoal,
+  type LegacySleep,
+  type LegacyTransaction,
   checkItemsPayload,
   dueThisWeek,
   focusStats,
@@ -121,5 +139,81 @@ describe('módulos de la app anterior', () => {
     expect(stepStates([{ done: false }, { done: true }])).toEqual(['current', 'done']);
     expect(splitTags('examen, física , ,saas')).toEqual(['examen', 'física', 'saas']);
     expect(splitTags(undefined)).toEqual([]);
+  });
+  it('tanda 3: valores por defecto y formatos de la app anterior', () => {
+    expect(legacyItemSchemas.transactions.parse({ id: 't', date: '2026-09-25', amount: 4.5, category: '  ' })).toEqual({ id: 't', date: '2026-09-25', amount: 4.5, type: 'expense', category: 'Otro', note: '' });
+    expect(legacyItemSchemas.petCares.safeParse({ id: 'c', petId: 'p', title: 'x', days: '71' }).success).toBe(true);
+    expect(legacyItemSchemas.petCares.safeParse({ id: 'c', petId: 'p', title: 'x', days: '' }).success).toBe(false);
+    expect(legacyItemSchemas.meals.parse({ id: 'm', label: '', dateKey: '2026-09-25' }).label).toBe('Comida');
+    expect(legacyItemSchemas.sleep.safeParse({ id: 's', date: '2026-09-25', bedtime: '23:00', waketime: '07:00', quality: 0 }).success).toBe(false);
+    expect(legacyObjectSchemas.cycle.parse({})).toEqual({ cycleLength: 28, periodLength: 5 });
+    expect(legacyObjectSchemas.dayLog.parse({ dateKey: '2026-09-25' })).toEqual({ dateKey: '2026-09-25', water: 0, waterGoal: 8 });
+    expect(legacyObjectPatchSchemas.dayLog.parse({ water: 3 })).toEqual({ water: 3 });
+    expect(legacyObjectPatchSchemas.cycle.safeParse({ cycleLength: 61 }).success).toBe(false);
+    expect(legacyObject({ cycle: { periodLength: 4, extra: true } }, 'cycle')).toEqual({ cycleLength: 28, periodLength: 4, extra: true });
+    expect(legacyObject({ dayLog: [] }, 'dayLog', '2026-09-25')).toEqual({ dateKey: '2026-09-25', water: 0, waterGoal: 8 });
+  });
+
+  it('finanzas: resumen del mes como la app anterior', () => {
+    const tx = (id: string, date: string, amount: number, type: string, category = 'Otro'): LegacyTransaction => ({ id, date, amount, type, category, note: '' }) as LegacyTransaction;
+    const s = monthSummary([tx('a', '2026-09-02', 1000, 'income', 'Sueldo'), tx('b', '2026-09-03', 120.3, 'expense', 'Comida'), tx('c', '2026-09-20', 30, 'expense', 'Ocio'), tx('d', '2026-09-21', 40.2, 'raro', 'Comida'), tx('e', '2026-08-30', 999, 'expense')], '2026-09');
+    expect(s).toMatchObject({ income: 1000, expense: 190.5, balance: 809.5 });
+    expect(s.byCategory).toEqual([{ category: 'Comida', amount: 160.5 }, { category: 'Ocio', amount: 30 }]);
+    expect(s.items.map((t) => t.id)).toEqual(['d', 'c', 'b', 'a']);
+  });
+
+  it('metas: +1, −1 y «Lograda»', () => {
+    const g: LegacyGoal = { id: 'g', title: 'x', target: 3, current: 2, unit: '', deadline: '', category: 'personal', done: false };
+    expect(goalStep(g, 1)).toEqual({ current: 3, done: true });
+    expect(goalStep({ ...g, current: 0 }, -1)).toEqual({ current: 0, done: false });
+    expect(goalToggleDone(g)).toEqual({ done: true, current: 3 });
+    expect(goalToggleDone({ ...g, done: true })).toEqual({ done: false });
+    expect(goalPercent({ current: 5, target: 8 })).toBe(63);
+    expect(goalPercent({ current: 12, target: 8 })).toBe(100);
+    expect(goalPercent({ current: 1, target: 0 })).toBe(0);
+  });
+
+  it('sueño y ejercicio: duración, medias y semana', () => {
+    expect(sleepMinutes('23:30', '07:15')).toBe(465);
+    expect(sleepMinutes('01:00', '09:00')).toBe(480);
+    expect(sleepMinutes('bad', '09:00')).toBeNull();
+    const s = (date: string, bedtime: string, waketime: string, quality: number): LegacySleep => ({ id: date, date, bedtime, waketime, quality, note: '' });
+    const stats = sleepStats([s('2026-09-20', '23:00', '07:00', 4), s('2026-09-25', '00:00', '06:00', 2), s('2026-09-10', '22:00', '10:00', 5)], 2);
+    expect(stats).toEqual({ nights: 2, avgMinutes: 420, avgQuality: 3 });
+    expect(sleepStats([]).avgMinutes).toBeNull();
+    const w = (date: string, minutes: number) => ({ id: date + minutes, date, plan: 'Full body', minutes });
+    // 2026-09-25 es viernes: la semana va del 21 al 27.
+    expect(workoutStats([w('2026-09-25', 30), w('2026-09-24', 15), w('2026-09-21', 20), w('2026-09-20', 40)], '2026-09-25')).toEqual({ weekCount: 3, weekMinutes: 65, total: 4, streak: 2 });
+  });
+
+  it('ciclo: día del ciclo, próximo periodo y ventana fértil como la app anterior', () => {
+    const days = ['2026-08-30', '2026-08-31', '2026-09-01', '2026-09-02', '2026-07-31'].map((date, i) => ({ id: `d${i}`, date }));
+    const info = cycleInfo(days, { cycleLength: 28, periodLength: 5 }, '2026-09-25');
+    expect(info).toEqual({ lastStart: '2026-08-30', cycleDay: 27, nextStart: '2026-09-27', daysUntilNext: 2, fertileStart: '2026-09-10', fertileEnd: '2026-09-14' });
+    // Si el próximo ya pasó, avanza de ciclo en ciclo hasta que no quede en el pasado.
+    expect(cycleInfo(days, { cycleLength: 28 }, '2026-10-30')?.nextStart).toBe('2026-11-22');
+    expect(cycleInfo([], undefined, '2026-09-25')).toBeNull();
+    // Registros futuros no mueven el inicio.
+    expect(cycleInfo([...days, { id: 'f', date: '2026-12-01' }], undefined, '2026-09-25')?.lastStart).toBe('2026-08-30');
+    const p = cyclePredictions(info, { cycleLength: 28, periodLength: 3 }, '2026-09-01', '2026-10-31', ['2026-09-28']);
+    expect([...p.period]).toEqual(['2026-09-27', '2026-09-29', '2026-10-25', '2026-10-26', '2026-10-27']);
+    expect([...p.fertile]).toEqual(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11', '2026-10-12']);
+    expect(periodRuns(days)).toEqual([
+      { start: '2026-08-30', end: '2026-09-02', days: 4 },
+      { start: '2026-07-31', end: '2026-07-31', days: 1 },
+    ]);
+  });
+
+  it('cuidados y rutinas: próxima vez según los días y lo hecho hoy', () => {
+    // Viernes 25 de septiembre de 2026, 10:00 local.
+    const now = new Date(2026, 8, 25, 10, 0);
+    const today = now.toISOString().slice(0, 10);
+    expect(nextDue({ days: '1234567', time: '08:00' }, now)).toEqual({ inDays: 0, time: '08:00', late: true });
+    expect(nextDue({ days: '1234567', time: '18:00', lastDone: today }, now)).toEqual({ inDays: 1, time: '18:00', late: false });
+    expect(nextDue({ days: '1', time: '' }, now)).toEqual({ inDays: 3, time: '', late: false });
+    expect(nextDue({ days: '5', time: '09:00', lastDone: today }, now)).toEqual({ inDays: 7, time: '09:00', late: false });
+    expect(nextDue({ days: '1234567', enabled: false }, now)).toBeNull();
+    expect(waterToday({ dateKey: '2026-09-25', water: 3 }, '2026-09-25')).toBe(3);
+    expect(waterToday({ dateKey: '2026-09-24', water: 3 }, '2026-09-25')).toBe(0);
   });
 });

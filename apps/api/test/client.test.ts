@@ -170,4 +170,18 @@ describe('@dyc/api-client', () => {
     expect((await api.modules.get()).data.noteBoxes).toEqual([]);
     expect(await api.legacy.images(['no-existe'])).toEqual({ images: {} });
   });
+  it('tanda 3: listas con cascada, objetos y el ajuste de Ciclo', async () => {
+    const api = await signedIn();
+    await api.modules.add('pets', { id: 'p1', name: 'Luna', species: 'cat', note: '' });
+    await api.modules.add('petCares', { id: 'c1', petId: 'p1', kind: 'comida', title: 'Comida', time: '08:00', days: '1234567', sound: true, enabled: true, lastDone: '' });
+    await api.modules.remove('pets', 'p1');
+    expect((await api.modules.get()).data.petCares).toEqual([]);
+    expect((await api.modules.patch('cycle', { cycleLength: 30 })).value).toEqual({ cycleLength: 30, periodLength: 5 });
+    expect((await api.modules.set('budget', { monthly: 900 })).value).toEqual({ monthly: 900 });
+    const { data } = await api.modules.get();
+    expect(data.cycle).toEqual({ cycleLength: 30, periodLength: 5 });
+    expect(data.budget).toEqual({ monthly: 900 });
+    expect((await api.auth.updateMe({ showCycle: true })).showCycle).toBe(true);
+    expect((await api.auth.me()).showCycle).toBe(true);
+  });
 });

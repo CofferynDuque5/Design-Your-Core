@@ -1,4 +1,4 @@
-import type { CheckInInput, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyPatch, Period, ProfileInput } from '@dyc/core';
+import type { CheckInInput, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings } from '@dyc/core';
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
@@ -91,6 +91,8 @@ export function createClient(opts: ClientOptions) {
       register: (b: { email: string; password: string; name?: string; gender?: User['gender'] }) => request<Session>('POST', '/api/auth/register', b),
       login: (b: { email: string; password: string }) => request<Session>('POST', '/api/auth/login', b),
       me: () => request<{ user: User }>('GET', '/api/me').then((r) => r.user),
+      /** Ajustes de la cuenta compartidos con la app anterior (mostrar Ciclo). */
+      updateMe: (b: UserSettings) => request<{ user: User }>('PATCH', '/api/v2/me', b).then((r) => r.user),
       forgotPassword: (email: string) => request<{ ok: true; message: string }>('POST', '/api/auth/forgot-password', { email }),
       changePassword: (current: string, next: string) => request<{ ok: true; token: string }>('POST', '/api/auth/change-password', { current, next }),
       logoutOthers: () => request<{ ok: true; token: string }>('POST', '/api/auth/logout-others'),
@@ -159,8 +161,10 @@ export function createClient(opts: ClientOptions) {
     /**
      * Módulos de la app anterior elemento a elemento (Agenda, Pendientes,
      * Calendario, Horario, Enfoque, Materias, Proyectos, Roadmaps, Cuadernos,
-     * Contenido e Ideas) sobre el mismo documento de /api/sync. Los temas,
-     * hitos y pasos se cambian enviando su lista completa en `update`.
+     * Contenido, Ideas, Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño,
+     * Diario y Rutina) sobre el mismo documento de /api/sync. Los temas, hitos
+     * y pasos se cambian enviando su lista completa en `update`. Las claves que
+     * son un objeto (`cycle`, `dayLog`, `budget`) se guardan con `set` o `patch`.
      */
     modules: {
       get: () => request<{ data: LegacyData; updatedAt: string | null }>('GET', '/api/v2/modules'),
@@ -170,6 +174,8 @@ export function createClient(opts: ClientOptions) {
         request<{ item: LegacyItems[K]; updatedAt: string }>('PATCH', `/api/v2/modules/${key}/${encodeURIComponent(id)}`, patch),
       remove: (key: LegacyKey, id: string) => request<{ ok: true; updatedAt: string }>('DELETE', `/api/v2/modules/${key}/${encodeURIComponent(id)}`),
       reorder: (key: LegacyKey, ids: string[]) => request<{ ok: true; updatedAt: string }>('PUT', `/api/v2/modules/${key}/order`, { ids }),
+      set: <K extends LegacyObjectKey>(key: K, value: LegacyObjects[K]) => request<{ value: LegacyObjects[K]; updatedAt: string }>('PUT', `/api/v2/modules/${key}`, value),
+      patch: <K extends LegacyObjectKey>(key: K, patch: Partial<LegacyObjects[K]>) => request<{ value: LegacyObjects[K]; updatedAt: string }>('PATCH', `/api/v2/modules/${key}`, patch),
     },
 
     partner: {

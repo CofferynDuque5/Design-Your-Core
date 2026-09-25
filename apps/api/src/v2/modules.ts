@@ -1,6 +1,25 @@
-import { FOCUS_MAX, isLegacyKey, LEGACY_CHILDREN, LEGACY_CROSS, LEGACY_PARENT, legacyItemSchemas, legacyList, legacyPatchSchemas, legacyReorderSchema, mergeLegacyItem, reorderById, type LegacyKey } from '@dyc/core';
+import {
+  isLegacyKey,
+  isLegacyObjectKey,
+  LEGACY_CHILDREN,
+  LEGACY_CROSS,
+  LEGACY_NEWEST_FIRST,
+  LEGACY_PARENT,
+  LEGACY_UNIQUE,
+  legacyItemSchemas,
+  legacyList,
+  legacyObjectDefaults,
+  legacyObjectPatchSchemas,
+  legacyObjectSchemas,
+  legacyPatchSchemas,
+  legacyReorderSchema,
+  mergeLegacyItem,
+  reorderById,
+  type LegacyKey,
+  type LegacyObjectKey,
+} from '@dyc/core';
 import type { Prisma, PrismaClient } from '@prisma/client';
-import { Router, type RequestHandler, type Response } from 'express';
+import { Router, type Request, type RequestHandler, type Response } from 'express';
 import { ah } from '../lib/http.js';
 import { parse } from './util.js';
 
@@ -29,8 +48,8 @@ class HttpError extends Error {
 export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; requireAuth: RequestHandler }): Router {
   const r = Router();
 
-  /** Lee el documento con la fila bloqueada, aplica `fn` a la lista y guarda. */
-  async function edit<T>(userId: string, key: LegacyKey, fn: (list: Item[], doc: Doc) => { list: Item[]; result: T; also?: Doc }) {
+  /** Lee el documento con la fila bloqueada, aplica `fn` y guarda las claves que devuelve (el resto queda igual). */
+  async function withDoc<T>(userId: string, fn: (doc: Doc) => { set: Doc; result: T }) {
     return prisma.$transaction(
       async (tx) => {
         const lock = () => tx.$queryRaw<Array<{ data: unknown }>>`SELECT "data" FROM "Blob" WHERE "userId" = ${userId} FOR UPDATE`;
@@ -41,15 +60,27 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
         }
         const raw = rows[0]?.data;
         const doc: Doc = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Doc) : {};
-        // Se trabaja sobre la lista tal cual (sin filtrar) para no perder nada de lo guardado.
-        const { list, result, also } = fn(rawList(doc, key), doc);
-        const next = { ...doc, ...also, [key]: list } as Prisma.InputJsonObject;
+        const { set, result } = fn(doc);
+        const next = { ...doc, ...set } as Prisma.InputJsonObject;
         const saved = await tx.blob.update({ where: { userId }, data: { data: next } });
         return { result, updatedAt: saved.updatedAt };
       },
       { maxWait: 10_000, timeout: 15_000 },
     );
   }
+
+  /** Edita la lista de una clave (tal cual, sin filtrar, para no perder nada de lo guardado). */
+  const edit = <T>(userId: string, key: LegacyKey, fn: (list: Item[], doc: Doc) => { list: Item[]; result: T; also?: Doc }) =>
+    withDoc(userId, (doc) => {
+      const { list, result, also } = fn(rawList(doc, key), doc);
+      return { set: { ...also, [key]: list }, result };
+    });
+
+  const objectParam = (key: string, res: Response): LegacyObjectKey | null => {
+    if (isLegacyObjectKey(key)) return key;
+    res.status(404).json({ error: 'Módulo no encontrado' });
+    return null;
+  };
 
   const keyParam = (key: string, res: Response): LegacyKey | null => {
     if (isLegacyKey(key)) return key;
@@ -72,11 +103,17 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
   const checkRelations = (key: LegacyKey, item: Doc, doc: Doc) => {
     const parent = LEGACY_PARENT[key];
     const ref = parent ? item[parent.field] : undefined;
-    if (parent && typeof ref === 'string' && !ids(doc, parent.key).has(ref)) throw new HttpError(400, key === 'subtasks' ? 'La tarea principal no existe' : 'El cuaderno no existe');
+    if (parent && typeof ref === 'string' && !ids(doc, parent.key).has(ref)) throw new HttpError(400, parent.missing);
     if (key === 'classes' && typeof item.subject === 'string' && item.subject) {
       const subjects = Array.isArray(doc.subjects) ? (doc.subjects as Array<{ id?: unknown }>) : [];
       if (!subjects.some((s) => s && s.id === item.subject)) throw new HttpError(400, 'La materia no existe');
     }
+  };
+
+  // Un registro por fecha (Ciclo y Diario), como la app anterior.
+  const checkUnique = (key: LegacyKey, item: Doc, list: Item[], id: string) => {
+    const unique = LEGACY_UNIQUE[key];
+    if (unique && unique.field in item && list.some((x) => x && idOf(x) !== id && x[unique.field] === item[unique.field])) throw new HttpError(409, unique.message);
   };
 
   // Todo el documento, igual que GET /api/sync.
@@ -93,9 +130,11 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
     await run(res, async () => {
       const out = await edit(req.userId as string, key, (list, doc) => {
         if (list.some((x) => idOf(x) === item.id)) throw new HttpError(409, 'Ya existe un elemento con ese id');
+        checkUnique(key, item, list, item.id);
         checkRelations(key, item, doc);
-        // Enfoque: la más reciente primero y como mucho 500, como la app anterior.
-        return { list: key === 'focus' ? [item, ...list].slice(0, FOCUS_MAX) : [...list, item], result: item };
+        // Enfoque, finanzas, entrenos y sueño: lo más reciente primero y con su máximo, como la app anterior.
+        const max = LEGACY_NEWEST_FIRST[key];
+        return { list: max ? [item, ...list].slice(0, max) : [...list, item], result: item };
       });
       res.status(201).json({ item: out.result, updatedAt: out.updatedAt });
     });
@@ -126,6 +165,7 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
         const cross = LEGACY_CROSS[key];
         const msg = cross && cross.fields.some((f) => f in patch) ? cross.check(item) : null;
         if (msg) throw new HttpError(400, `Datos inválidos: ${msg}`);
+        checkUnique(key, patch, list, req.params.id);
         checkRelations(key, patch, doc);
         const next = [...list];
         next[i] = item;
@@ -141,7 +181,7 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
     await run(res, async () => {
       const out = await edit(req.userId as string, key, (list, doc) => {
         if (!list.some((x) => idOf(x) === req.params.id)) throw new HttpError(404, 'Elemento no encontrado');
-        // Borrar un pendiente borra sus subtareas y un cuaderno sus cajitas, como la app anterior.
+        // Borrar un pendiente borra sus subtareas, un cuaderno sus cajitas y una mascota sus cuidados, como la app anterior.
         // Borrar una materia NO borra sus clases ni sus proyectos (tampoco en la app anterior).
         const child = LEGACY_CHILDREN[key];
         const also = child ? { [child.key]: rawList(doc, child.key).filter((s) => !s || s[child.field] !== req.params.id) } : undefined;
@@ -150,6 +190,24 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
       res.json({ ok: true, updatedAt: out.updatedAt });
     });
   }));
+
+  // Claves que son un objeto (cycle, dayLog, budget). PUT exige el objeto
+  // completo y PATCH solo lo que cambia; en ambos se conservan los campos
+  // guardados que la API no conoce y el resto del documento.
+  const saveObject = async (req: Request, res: Response, partial: boolean) => {
+    const key = objectParam(req.params.key, res);
+    if (!key) return;
+    const input = parse(partial ? legacyObjectPatchSchemas[key] : legacyObjectSchemas[key], req.body, res) as Doc | null;
+    if (!input) return;
+    const out = await withDoc(req.userId as string, (doc) => {
+      const before = doc[key];
+      const value = { ...legacyObjectDefaults(key), ...(before && typeof before === 'object' && !Array.isArray(before) ? before : {}), ...input };
+      return { set: { [key]: value }, result: value };
+    });
+    res.json({ value: out.result, updatedAt: out.updatedAt });
+  };
+  r.put('/modules/:key', requireAuth, ah((req, res) => saveObject(req, res, false)));
+  r.patch('/modules/:key', requireAuth, ah((req, res) => saveObject(req, res, true)));
 
   return r;
 }
