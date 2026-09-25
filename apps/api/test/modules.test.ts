@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { noteTag } from '@dyc/core';
 import { bearer, makeApp, prisma, registerUser, resetDb } from './helpers.js';
 
 beforeEach(resetDb);
@@ -423,5 +424,86 @@ describe('v2 · módulos de la app anterior', () => {
     await api.patch('/api/v2/me').set(auth).send({ showCycle: 'sí' }).expect(400);
     await api.patch('/api/v2/me').set(auth).send({ showCycle: true, name: 'Otra' }).expect(400);
     await api.patch('/api/v2/me').send({ showCycle: false }).expect(401);
+  });
+
+  it('tanda 4: notas con extracto y color derivados, trabajo y respiración', async () => {
+    const shared = { id: 'n0', title: 'Vieja', subject: 'Física', date: '3 sept', tag: '#8B5CF6', excerpt: 'Hola', body: 'Hola', commit: false, tags: '', shareId: 'abc123defg', extraVieja: 1 };
+    const { api, auth, sync } = await setup({ ...OLD_DOC, notes: [shared] });
+    const post = async (key: string, item: Record<string, unknown>) => (await api.post(`/api/v2/modules/${key}`).set(auth).send({ item }).expect(201)).body.item;
+    const body = `# Ondas\n${'á'.repeat(120)}`;
+    const note = await post('notes', { id: 'n1', subject: 'Física', date: '25 sept', body, tags: 'examen, física' });
+    expect(note).toEqual({ id: 'n1', title: 'Nota sin título', subject: 'Física', date: '25 sept', tag: noteTag('Física'), excerpt: body.slice(0, 90), body, commit: false, tags: 'examen, física', shareId: null });
+    let res = await api.patch('/api/v2/modules/notes/n0').set(auth).send({ body: 'Texto nuevo', subject: 'Química' }).expect(200);
+    // El enlace público y los campos desconocidos se conservan; extracto y color se recalculan.
+    expect(res.body.item).toEqual({ ...shared, body: 'Texto nuevo', excerpt: 'Texto nuevo', subject: 'Química', tag: noteTag('Química') });
+    await api.patch('/api/v2/modules/notes/n0').set(auth).send({ shareId: null }).expect(400);
+    await api.patch('/api/v2/modules/notes/n0').set(auth).send({ excerpt: 'x' }).expect(400);
+    expect(await post('notes', { id: 'n2', tag: '#000000', excerpt: 'otro', body: 'Hola' })).toMatchObject({ subject: 'General', tag: noteTag('General'), excerpt: 'Hola' });
+    await api.post('/api/v2/modules/notes').set(auth).send({ item: { id: 'n3', tag: 'x'.repeat(30) } }).expect(400);
+    // Una imagen incrustada en base64 (como hacía la app anterior sin IndexedDB) cabe en el cuerpo.
+    const img = `![imagen](data:image/jpeg;base64,${'A'.repeat(500_000)})`;
+    res = await api.patch('/api/v2/modules/notes/n1').set(auth).send({ body: img }).expect(200);
+    expect(res.body.item.excerpt).toBe(img.slice(0, 90));
+
+    expect(await post('workItems', { id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: 'p1', status: 'todo', done: false, due: '' });
+    await api.patch('/api/v2/modules/workItems/w1').set(auth).send({ status: 'curso', project: 'p3', due: 'Hoy' }).expect(200);
+    await api.patch('/api/v2/modules/workItems/w1').set(auth).send({ project: 'otro' }).expect(400);
+
+    const meditations = Array.from({ length: 400 }, (_, i) => ({ id: `m${i}`, date: '2026-09-01', minutes: 1, kind: 'respiracion' }));
+    const before = await sync();
+    await api.put('/api/sync').set(auth).send({ data: { ...before, meditations } }).expect(200);
+    expect(await post('meditations', { id: 'nueva', date: '2026-09-25', minutes: 3 })).toEqual({ id: 'nueva', date: '2026-09-25', minutes: 3, kind: 'respiracion' });
+    const doc = await sync();
+    expect((doc.meditations as Array<{ id: string }>).map((m) => m.id).slice(0, 2)).toEqual(['nueva', 'm0']);
+    expect(doc.meditations).toHaveLength(400);
+    expect(doc.workItems).toEqual([{ id: 'w1', title: 'Informe', project: 'p3', status: 'curso', done: false, due: 'Hoy' }]);
+    expect(doc.claveFutura).toEqual(OLD_DOC.claveFutura);
+  });
+
+  it('bóveda cifrada: el servidor solo guarda datos cifrados con su forma y migra la lista antigua a petición', async () => {
+    const legacyVault = [
+      { id: 'v1', name: 'Banco', mono: 'BA', user: 'ana', pass: 'secreta-1' },
+      { id: 'v2', name: 'Correo', mono: 'CO', user: 'ana@x.com', pass: 'secreta-2' },
+      { id: 'v3', name: 'Añadida después', mono: 'AD', user: '', pass: 'otra' },
+    ];
+    const { api, auth, sync } = await setup({ ...OLD_DOC, vault: legacyVault });
+    const b64 = (n: number, fill = 7) => Buffer.from(new Uint8Array(n).fill(fill)).toString('base64');
+    const item = (id: string, fill = 1) => ({ id, iv: b64(12, fill), ct: b64(64, fill) });
+    const vault = { v: 1, kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: 600_000, salt: b64(16) }, check: { iv: b64(12), ct: b64(40) }, items: [] };
+
+    await api.post('/api/v2/modules/vaultSecure/items').set(auth).send({ item: item('a') }).expect(404);
+    await api.put('/api/v2/modules/vaultSecure').send(vault).expect(401);
+    await api.put('/api/v2/modules/vaultSecure').set(auth).send({ ...vault, kdf: { ...vault.kdf, iterations: 1000 } }).expect(400);
+    await api.put('/api/v2/modules/vaultSecure').set(auth).send({ ...vault, items: [{ id: 'a', name: 'Banco', pass: 'x' }] }).expect(400);
+    expect((await api.put('/api/v2/modules/vaultSecure').set(auth).send(vault).expect(201)).body.value).toEqual(vault);
+    // Nunca sustituye una bóveda que ya existe.
+    await api.put('/api/v2/modules/vaultSecure').set(auth).send(vault).expect(409);
+    await api.patch('/api/v2/modules/vaultSecure').set(auth).send({ v: 1 }).expect(404);
+    await api.post('/api/v2/modules/vault').set(auth).send({ item: { id: 'x', name: 'x', pass: 'x' } }).expect(404);
+
+    await api.post('/api/v2/modules/vaultSecure/items').set(auth).send({ item: item('a') }).expect(201);
+    await api.post('/api/v2/modules/vaultSecure/items').set(auth).send({ item: item('a') }).expect(409);
+    await api.post('/api/v2/modules/vaultSecure/items').set(auth).send({ item: { ...item('b'), user: 'ana' } }).expect(400);
+    await api.post('/api/v2/modules/vaultSecure/items').set(auth).send({ item: item('b') }).expect(201);
+    expect((await api.put('/api/v2/modules/vaultSecure/items/a').set(auth).send({ iv: b64(12, 9), ct: b64(64, 9) }).expect(200)).body.item).toEqual(item('a', 9));
+    await api.put('/api/v2/modules/vaultSecure/items/zzz').set(auth).send({ iv: b64(12), ct: b64(64) }).expect(404);
+    await api.delete('/api/v2/modules/vaultSecure/items/b').set(auth).expect(200);
+
+    // Migración: añade las cifradas y quita de `vault` solo las que cifran, en la misma escritura.
+    await api.post('/api/v2/modules/vaultSecure/migrate').set(auth).send({ items: [item('a')], legacyIds: ['v1'] }).expect(409);
+    const res = await api.post('/api/v2/modules/vaultSecure/migrate').set(auth).send({ items: [item('m1'), item('m2')], legacyIds: ['v1', 'v2'] }).expect(200);
+    expect(res.body).toMatchObject({ migrated: 2, remaining: 1 });
+    let doc = await sync();
+    expect(doc.vault).toEqual([legacyVault[2]]);
+    expect((doc.vaultSecure as { items: unknown[] }).items).toEqual([item('a', 9), item('m1'), item('m2')]);
+    expect(JSON.stringify(doc.vaultSecure)).not.toMatch(/secreta|Banco|ana/);
+    expect(doc.claveFutura).toEqual(OLD_DOC.claveFutura);
+
+    // Borrar la bóveda (contraseña maestra olvidada) no toca la lista antigua.
+    await api.delete('/api/v2/modules/vaultSecure').set(auth).expect(200);
+    doc = await sync();
+    expect(doc).not.toHaveProperty('vaultSecure');
+    expect(doc.vault).toEqual([legacyVault[2]]);
+    await api.post('/api/v2/modules/vaultSecure/migrate').set(auth).send({ items: [item('m3')], legacyIds: ['v3'] }).expect(404);
   });
 });

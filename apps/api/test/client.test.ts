@@ -184,4 +184,22 @@ describe('@dyc/api-client', () => {
     expect((await api.auth.updateMe({ showCycle: true })).showCycle).toBe(true);
     expect((await api.auth.me()).showCycle).toBe(true);
   });
+  it('tanda 4: notas con imágenes subidas, respiración y bóveda cifrada', async () => {
+    const api = await signedIn();
+    const note = await api.modules.add('notes', { id: 'n1', title: 'Ondas', subject: 'Física', date: '25 sept', body: '![imagen](coreimg:img-1)', tags: '' });
+    expect(note.item.excerpt).toBe('![imagen](coreimg:img-1)');
+    expect(await api.legacy.uploadImages({ 'img-1': 'data:image/jpeg;base64,AAAA' })).toEqual({ ok: true, count: 1 });
+    expect(await api.legacy.images(['img-1'])).toEqual({ images: { 'img-1': 'data:image/jpeg;base64,AAAA' } });
+    await api.modules.add('meditations', { id: 'm1', date: '2026-09-25', minutes: 3, kind: 'respiracion' });
+    const b64 = (n: number) => Buffer.from(new Uint8Array(n).fill(3)).toString('base64');
+    const vault = { v: 1 as const, kdf: { name: 'PBKDF2' as const, hash: 'SHA-256' as const, iterations: 600_000, salt: b64(16) }, check: { iv: b64(12), ct: b64(40) }, items: [] };
+    await api.vault.create(vault);
+    await api.vault.add({ id: 'e1', iv: b64(12), ct: b64(60) });
+    await api.vault.update({ id: 'e1', iv: b64(12), ct: b64(90) });
+    await api.vault.migrate([{ id: 'e2', iv: b64(12), ct: b64(60) }], ['no-existe']);
+    await api.vault.remove('e1');
+    expect(((await api.modules.get()).data.vaultSecure as { items: Array<{ id: string }> }).items.map((i) => i.id)).toEqual(['e2']);
+    await api.vault.destroy();
+    expect((await api.modules.get()).data).not.toHaveProperty('vaultSecure');
+  });
 });

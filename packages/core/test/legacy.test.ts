@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deriveLegacyPatch,
+  NOTE_TAG_COLORS,
+  noteDateLabel,
+  noteTag,
   checkItems,
   cycleInfo,
   cyclePredictions,
@@ -33,6 +37,7 @@ import {
   stepStates,
   type LegacyFocus,
 } from '../src/legacy.js';
+import { legacyVault, vaultMigrateSchema, vaultMono, vaultSecureOf, vaultSecureSchema } from '../src/vault.js';
 
 describe('módulos de la app anterior', () => {
   it('completa los valores por defecto de la app anterior y rechaza campos extra', () => {
@@ -215,5 +220,58 @@ describe('módulos de la app anterior', () => {
     expect(nextDue({ days: '1234567', enabled: false }, now)).toBeNull();
     expect(waterToday({ dateKey: '2026-09-25', water: 3 }, '2026-09-25')).toBe(3);
     expect(waterToday({ dateKey: '2026-09-24', water: 3 }, '2026-09-25')).toBe(0);
+  });
+});
+
+describe('tanda 4: notas, trabajo, respiración y bóveda cifrada', () => {
+  it('notas: valores por defecto, extracto y color de la materia como la app anterior', () => {
+    const body = `# Ondas\n${'x'.repeat(200)}`;
+    const note = legacyItemSchemas.notes.parse({ id: 'n1', title: '  ', subject: 'Física', date: '25 sept', body });
+    expect(note).toEqual({ id: 'n1', title: 'Nota sin título', subject: 'Física', date: '25 sept', tag: noteTag('Física'), excerpt: body.slice(0, 90), body, commit: false, tags: '', shareId: null });
+    // `|largo + primer código| % 5` sobre #0FA968 #4F7CFF #EC6A9C #8B5CF6 #E8912A.
+    expect(noteTag('General')).toBe(NOTE_TAG_COLORS[(7 + 71) % 5]);
+    expect(noteTag('Física')).toBe(NOTE_TAG_COLORS[(6 + 70) % 5]);
+    expect(noteTag('')).toBe(NOTE_TAG_COLORS[0]);
+    expect(legacyItemSchemas.notes.parse({ id: 'n2', subject: '' }).subject).toBe('General');
+    // El cliente no decide `tag` ni `excerpt` (se recalculan), ni cambia el enlace público.
+    expect(legacyItemSchemas.notes.parse({ id: 'n3', subject: 'Física', tag: '#000000', excerpt: 'otro', body: 'Hola' })).toMatchObject({ tag: noteTag('Física'), excerpt: 'Hola' });
+    expect(legacyPatchSchemas.notes.safeParse({ shareId: 'abc' }).success).toBe(false);
+    expect(legacyPatchSchemas.notes.safeParse({ excerpt: 'x' }).success).toBe(false);
+    expect(deriveLegacyPatch('notes', { body: 'Hola' })).toEqual({ body: 'Hola', excerpt: 'Hola' });
+    expect(deriveLegacyPatch('notes', { subject: 'Física' })).toEqual({ subject: 'Física', tag: noteTag('Física') });
+    expect(deriveLegacyPatch('tasks', { time: null })).toEqual({ time: null, rem: false });
+    expect(noteDateLabel(new Date(2026, 8, 25, 12))).toMatch(/^25 sept?\.?$/);
+  });
+
+  it('trabajo y respiración: formatos de la app anterior', () => {
+    expect(legacyItemSchemas.workItems.parse({ id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: 'p1', status: 'todo', done: false, due: '' });
+    expect(legacyItemSchemas.workItems.safeParse({ id: 'w1', title: 'x', project: 'p4' }).success).toBe(false);
+    expect(legacyItemSchemas.meditations.parse({ id: 'm1', date: '2026-09-25', minutes: 3 })).toEqual({ id: 'm1', date: '2026-09-25', minutes: 3, kind: 'respiracion' });
+    expect(legacyItemSchemas.meditations.safeParse({ id: 'm1', date: '2026-09-25', minutes: 2.5 }).success).toBe(false);
+  });
+
+  it('bóveda: el servidor solo acepta datos cifrados con la forma exacta', () => {
+    const b64 = (n: number) => Buffer.from(new Uint8Array(n).fill(7)).toString('base64');
+    const vault = { v: 1, kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: 600_000, salt: b64(16) }, check: { iv: b64(12), ct: b64(40) }, items: [{ id: 'a', iv: b64(12), ct: b64(80) }] };
+    expect(vaultSecureSchema.parse(vault)).toEqual(vault);
+    expect(vaultSecureOf({ vaultSecure: vault })).toEqual(vault);
+    const bad: unknown[] = [
+      { ...vault, kdf: { ...vault.kdf, iterations: 100_000 } },
+      { ...vault, kdf: { ...vault.kdf, salt: b64(8) } },
+      { ...vault, check: { ...vault.check, iv: b64(16) } },
+      { ...vault, items: [{ id: 'a', iv: b64(12), ct: 'no es base64!' }] },
+      { ...vault, items: [{ id: 'a', iv: b64(12), ct: b64(80), pass: 'hola' }] },
+      { ...vault, items: [vault.items[0], vault.items[0]] },
+      { ...vault, extra: 1 },
+      { ...vault, v: 2 },
+    ];
+    for (const v of bad) expect(vaultSecureSchema.safeParse(v).success, JSON.stringify(v)).toBe(false);
+    expect(vaultSecureOf({})).toBeNull();
+    expect(vaultMigrateSchema.safeParse({ items: vault.items, legacyIds: ['id_1'] }).success).toBe(true);
+    expect(vaultMigrateSchema.safeParse({ items: [], legacyIds: ['id_1'] }).success).toBe(false);
+    expect(legacyVault({ vault: [{ id: 'v1', name: 'Banco', mono: 'BA', user: 'ana', pass: 'secreta' }, null, 'x'] })).toEqual([{ id: 'v1', name: 'Banco', mono: 'BA', user: 'ana', pass: 'secreta' }]);
+    expect(vaultMono('GitHub')).toBe('GI');
+    expect(vaultMono('banco del sol')).toBe('BD');
+    expect(vaultMono('  ')).toBe('?');
   });
 });

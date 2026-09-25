@@ -1,4 +1,5 @@
 import {
+  deriveLegacyPatch,
   isLegacyKey,
   isLegacyObjectKey,
   LEGACY_CHILDREN,
@@ -15,6 +16,11 @@ import {
   legacyReorderSchema,
   mergeLegacyItem,
   reorderById,
+  VAULT_MAX_ITEMS,
+  vaultItemPatchSchema,
+  vaultItemSchema,
+  vaultMigrateSchema,
+  vaultSecureSchema,
   type LegacyKey,
   type LegacyObjectKey,
 } from '@dyc/core';
@@ -48,8 +54,11 @@ class HttpError extends Error {
 export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; requireAuth: RequestHandler }): Router {
   const r = Router();
 
-  /** Lee el documento con la fila bloqueada, aplica `fn` y guarda las claves que devuelve (el resto queda igual). */
-  async function withDoc<T>(userId: string, fn: (doc: Doc) => { set: Doc; result: T }) {
+  /**
+   * Lee el documento con la fila bloqueada, aplica `fn` y guarda las claves que
+   * devuelve en `set` (y quita las de `unset`); el resto queda igual.
+   */
+  async function withDoc<T>(userId: string, fn: (doc: Doc) => { set: Doc; unset?: string[]; result: T }) {
     return prisma.$transaction(
       async (tx) => {
         const lock = () => tx.$queryRaw<Array<{ data: unknown }>>`SELECT "data" FROM "Blob" WHERE "userId" = ${userId} FOR UPDATE`;
@@ -60,8 +69,8 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
         }
         const raw = rows[0]?.data;
         const doc: Doc = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Doc) : {};
-        const { set, result } = fn(doc);
-        const next = { ...doc, ...set } as Prisma.InputJsonObject;
+        const { set, unset = [], result } = fn(doc);
+        const next = Object.fromEntries(Object.entries({ ...doc, ...set }).filter(([k]) => !unset.includes(k))) as Prisma.InputJsonObject;
         const saved = await tx.blob.update({ where: { userId }, data: { data: next } });
         return { result, updatedAt: saved.updatedAt };
       },
@@ -116,6 +125,102 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
     if (unique && unique.field in item && list.some((x) => x && idOf(x) !== id && x[unique.field] === item[unique.field])) throw new HttpError(409, unique.message);
   };
 
+  // ---------- Bóveda cifrada (`vaultSecure`) ----------
+  // El navegador cifra; aquí solo se valida la forma y el tamaño. Van antes que
+  // las rutas genéricas para que «vaultSecure» no se tome por una clave de lista.
+
+  const vaultOf = (doc: Doc) => {
+    const v = doc.vaultSecure;
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Doc & { items?: unknown }) : null;
+  };
+  const vaultItems = (v: Doc & { items?: unknown }) => (Array.isArray(v.items) ? (v.items as Item[]) : []);
+  const noVault = () => new HttpError(404, 'Aún no has creado la bóveda');
+
+  // Crear: nunca sustituye una bóveda que ya existe (se haría perder sus entradas).
+  r.put('/modules/vaultSecure', requireAuth, ah(async (req, res) => {
+    const vault = parse(vaultSecureSchema, req.body, res);
+    if (!vault) return;
+    await run(res, async () => {
+      const out = await withDoc(req.userId as string, (doc) => {
+        if (vaultOf(doc)) throw new HttpError(409, 'Ya tienes una bóveda');
+        return { set: { vaultSecure: vault }, result: vault };
+      });
+      res.status(201).json({ value: out.result, updatedAt: out.updatedAt });
+    });
+  }));
+
+  // Borrar toda la bóveda (p. ej. si se olvidó la contraseña maestra). La lista antigua `vault` no se toca.
+  r.delete('/modules/vaultSecure', requireAuth, ah(async (req, res) => {
+    const out = await withDoc(req.userId as string, () => ({ set: {}, unset: ['vaultSecure'], result: null }));
+    res.json({ ok: true, updatedAt: out.updatedAt });
+  }));
+
+  /** Cambia las entradas de la bóveda, que tiene que existir. */
+  const editVault = <T>(userId: string, fn: (items: Item[], doc: Doc) => { items: Item[]; result: T; also?: Doc }) =>
+    withDoc(userId, (doc) => {
+      const vault = vaultOf(doc);
+      if (!vault) throw noVault();
+      const { items, result, also } = fn(vaultItems(vault), doc);
+      if (items.length > VAULT_MAX_ITEMS) throw new HttpError(400, `La bóveda admite hasta ${VAULT_MAX_ITEMS} entradas`);
+      return { set: { ...also, vaultSecure: { ...vault, items } }, result };
+    });
+
+  r.post('/modules/vaultSecure/items', requireAuth, ah(async (req, res) => {
+    const item = parse(vaultItemSchema, req.body?.item, res);
+    if (!item) return;
+    await run(res, async () => {
+      const out = await editVault(req.userId as string, (items) => {
+        if (items.some((x) => idOf(x) === item.id)) throw new HttpError(409, 'Ya existe un elemento con ese id');
+        return { items: [...items, item as Item], result: item };
+      });
+      res.status(201).json({ item: out.result, updatedAt: out.updatedAt });
+    });
+  }));
+
+  r.put('/modules/vaultSecure/items/:id', requireAuth, ah(async (req, res) => {
+    const patch = parse(vaultItemPatchSchema, req.body, res);
+    if (!patch) return;
+    await run(res, async () => {
+      const out = await editVault(req.userId as string, (items) => {
+        const i = items.findIndex((x) => idOf(x) === req.params.id);
+        if (i < 0) throw new HttpError(404, 'Elemento no encontrado');
+        const next = [...items];
+        next[i] = { id: req.params.id, ...patch };
+        return { items: next, result: next[i] };
+      });
+      res.json({ item: out.result, updatedAt: out.updatedAt });
+    });
+  }));
+
+  r.delete('/modules/vaultSecure/items/:id', requireAuth, ah(async (req, res) => {
+    await run(res, async () => {
+      const out = await editVault(req.userId as string, (items) => {
+        if (!items.some((x) => idOf(x) === req.params.id)) throw new HttpError(404, 'Elemento no encontrado');
+        return { items: items.filter((x) => idOf(x) !== req.params.id), result: null };
+      });
+      res.json({ ok: true, updatedAt: out.updatedAt });
+    });
+  }));
+
+  // Migración confirmada: añade las entradas cifradas y quita de la lista
+  // antigua `vault` (texto plano) las que cifran, en una sola escritura. Lo que
+  // la app anterior haya añadido después se queda en `vault`.
+  r.post('/modules/vaultSecure/migrate', requireAuth, ah(async (req, res) => {
+    const input = parse(vaultMigrateSchema, req.body, res);
+    if (!input) return;
+    await run(res, async () => {
+      const out = await editVault(req.userId as string, (items, doc) => {
+        const taken = new Set(items.map(idOf));
+        if (input.items.some((x) => taken.has(x.id))) throw new HttpError(409, 'Ya existe un elemento con ese id');
+        const drop = new Set(input.legacyIds);
+        const legacy = Array.isArray(doc.vault) ? (doc.vault as unknown[]) : [];
+        const vault = legacy.filter((x) => !(typeof idOf(x) === 'string' && drop.has(idOf(x) as string)));
+        return { items: [...items, ...input.items], result: { migrated: input.items.length, remaining: vault.length }, also: { vault } };
+      });
+      res.json({ ...out.result, updatedAt: out.updatedAt });
+    });
+  }));
+
   // Todo el documento, igual que GET /api/sync.
   r.get('/modules', requireAuth, ah(async (req, res) => {
     const blob = await prisma.blob.findUnique({ where: { userId: req.userId } });
@@ -153,9 +258,10 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
   r.patch('/modules/:key/:id', requireAuth, ah(async (req, res) => {
     const key = keyParam(req.params.key, res);
     if (!key) return;
-    const patch = parse(legacyPatchSchemas[key], req.body, res) as Doc | null;
-    if (!patch) return;
-    if (key === 'tasks' && 'time' in patch) patch.rem = !!patch.time;
+    const parsed = parse(legacyPatchSchemas[key], req.body, res) as Doc | null;
+    if (!parsed) return;
+    // Campos derivados: `rem` de las tareas, extracto y color de las notas.
+    const patch = deriveLegacyPatch(key, parsed);
     await run(res, async () => {
       const out = await edit(req.userId as string, key, (list, doc) => {
         const i = list.findIndex((x) => idOf(x) === req.params.id);

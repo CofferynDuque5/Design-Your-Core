@@ -8,7 +8,7 @@ import { addDays, diffDays, isDay, periodRange, type Day } from './dates.js';
  * Ver docs/modulos.md.
  */
 
-/** Claves del documento que la API v2 permite editar por elemento (tandas 1, 2 y 3). */
+/** Claves del documento que la API v2 permite editar por elemento (tandas 1 a 4). */
 export const LEGACY_KEYS = [
   'blocks',
   'tasks',
@@ -34,6 +34,9 @@ export const LEGACY_KEYS = [
   'journal',
   'routines',
   'meals',
+  'notes',
+  'workItems',
+  'meditations',
 ] as const;
 export type LegacyKey = (typeof LEGACY_KEYS)[number];
 export const isLegacyKey = (k: unknown): k is LegacyKey => typeof k === 'string' && (LEGACY_KEYS as readonly string[]).includes(k);
@@ -253,8 +256,50 @@ export const WORKOUT_PLANS = [
 export const SLEEP_QUALITY_LABELS = ['Muy mala', 'Mala', 'Regular', 'Buena', 'Muy buena'] as const;
 export const MEAL_LABELS = ['Desayuno', 'Comida', 'Cena', 'Snack'] as const;
 
+// ---------- Catálogos de la tanda 4 ----------
+
+/** Colores de las notas: `tag` se calcula de la materia (`subject`) como la app anterior. */
+export const NOTE_TAG_COLORS = ['#0FA968', '#4F7CFF', '#EC6A9C', '#8B5CF6', '#E8912A'] as const;
+export const NOTE_DEFAULT_TITLE = 'Nota sin título';
+export const NOTE_DEFAULT_SUBJECT = 'General';
+/** Longitud del extracto (`excerpt` = los primeros caracteres del cuerpo). */
+export const NOTE_EXCERPT_LENGTH = 90;
+
+/** Mismo cálculo que la app anterior: `colores[|largo + primer código UTF-16| % 5]`. */
+export function noteTag(subject: string): string {
+  const n = Math.abs(subject.length + subject.charCodeAt(0));
+  return NOTE_TAG_COLORS[Number.isFinite(n) ? n % NOTE_TAG_COLORS.length : 0];
+}
+
+/** `excerpt` de una nota: los primeros 90 caracteres del cuerpo, como la app anterior. */
+export const noteExcerpt = (body: string): string => body.slice(0, NOTE_EXCERPT_LENGTH);
+
+/**
+ * `date` de una nota es un **texto para mostrar** («25 sept»), no una fecha:
+ * la app anterior lo escribe con `toLocaleDateString("es", { day, month: "short" })`.
+ */
+export const noteDateLabel = (now: Date = new Date()): string => now.toLocaleDateString('es', { day: 'numeric', month: 'short' });
+
+/** Proyectos de Trabajo: tres proyectos de demostración fijos en el código de la app anterior (no son `projects`). */
+export const WORK_PROJECTS = ['p1', 'p2', 'p3'] as const;
+export type WorkProject = (typeof WORK_PROJECTS)[number];
+export const WORK_PROJECT_INFO: Record<WorkProject, { label: string; color: string }> = {
+  p1: { label: 'Proyecto 1', color: '#0FA968' },
+  p2: { label: 'Proyecto 2', color: '#EC6A9C' },
+  p3: { label: 'Proyecto 3', color: '#4F7CFF' },
+};
+export const WORK_STATUSES = ['todo', 'curso'] as const;
+export type WorkStatus = (typeof WORK_STATUSES)[number];
+export const WORK_STATUS_INFO: Record<WorkStatus, { label: string }> = {
+  todo: { label: 'Por hacer' },
+  curso: { label: 'En curso' },
+};
+
+/** Tipo de sesión de Respiración (`meditations.kind`) que escribe la app anterior. */
+export const MEDITATION_KIND = 'respiracion';
+
 /** Máximo de registros que guarda la app anterior (el más reciente primero). */
-export const LEGACY_NEWEST_FIRST: Partial<Record<LegacyKey, number>> = { focus: FOCUS_MAX, transactions: 2000, workouts: 400, sleep: 400 };
+export const LEGACY_NEWEST_FIRST: Partial<Record<LegacyKey, number>> = { focus: FOCUS_MAX, transactions: 2000, workouts: 400, sleep: 400, meditations: 400 };
 
 /** Claves con un solo registro por fecha (la app anterior no permite duplicados). */
 export const LEGACY_UNIQUE: Partial<Record<LegacyKey, { field: string; message: string }>> = {
@@ -531,6 +576,45 @@ export interface LegacyDayLog {
   waterGoal: number;
 }
 
+export interface LegacyNote {
+  id: string;
+  title: string;
+  /** Materia: agrupa la biblioteca («General» por defecto). */
+  subject: string;
+  /** Texto para mostrar («25 sept»), no una fecha interpretable. */
+  date: string;
+  /** Color calculado de `subject` (NOTE_TAG_COLORS). */
+  tag: string;
+  /** Los primeros 90 caracteres de `body`. */
+  excerpt: string;
+  /** Markdown; las imágenes van como `![imagen](coreimg:<id>)` o incrustadas en base64. */
+  body: string;
+  /** Siempre false (activaba una demostración de la app anterior). */
+  commit: boolean;
+  /** Etiquetas separadas por comas. */
+  tags: string;
+  /** Enlace público de la app anterior (solo funcionaba en su navegador). La app nueva no lo cambia. */
+  shareId: string | null;
+}
+
+export interface LegacyWorkItem {
+  id: string;
+  title: string;
+  project: WorkProject;
+  status: WorkStatus;
+  done: boolean;
+  /** Texto libre («Hoy», «Vie»…) o "". */
+  due: string;
+}
+
+export interface LegacyMeditation {
+  id: string;
+  /** Día en UTC. */
+  date: Day;
+  minutes: number;
+  kind: string;
+}
+
 /** Nuevo: presupuesto mensual de Finanzas, por persona (antes en localStorage `core_budget`). */
 export interface LegacyBudget {
   monthly: number;
@@ -567,6 +651,9 @@ export interface LegacyItems {
   journal: LegacyJournal;
   routines: LegacyRoutine;
   meals: LegacyMeal;
+  notes: LegacyNote;
+  workItems: LegacyWorkItem;
+  meditations: LegacyMeditation;
 }
 
 /** Documento completo de la app anterior: claves conocidas y cualquier otra que traiga. */
@@ -783,6 +870,35 @@ const shapes = {
     note: line(300),
     dateKey: dayKey,
   }),
+  notes: z.object({
+    id: legacyIdSchema,
+    // Sin recortar: el título se guarda mientras escribes y un espacio al final no debe desaparecer.
+    title: z.string().max(200).default(NOTE_DEFAULT_TITLE).transform((t) => (t.trim() ? t : NOTE_DEFAULT_TITLE)),
+    subject: z.string().max(120).default(NOTE_DEFAULT_SUBJECT).transform((t) => t.trim() || NOTE_DEFAULT_SUBJECT),
+    date: z.string().max(40).default(''),
+    // Se aceptan (la vista optimista los lleva) pero siempre se recalculan de la materia y del cuerpo.
+    tag: z.string().max(20).optional(),
+    excerpt: z.string().max(400).optional(),
+    // Admite imágenes incrustadas en base64 como la app anterior (el cuerpo JSON admite 8 MB).
+    body: text(6_000_000),
+    tags: z.string().max(300).default(''),
+    commit: z.boolean().default(false),
+    shareId: z.string().regex(/^[a-z0-9]{1,40}$/, 'Enlace no válido').nullable().default(null),
+  }),
+  workItems: z.object({
+    id: legacyIdSchema,
+    title: title(200),
+    project: z.enum(WORK_PROJECTS).default('p1'),
+    status: z.enum(WORK_STATUSES).default('todo'),
+    done: z.boolean().default(false),
+    due: line(60),
+  }),
+  meditations: z.object({
+    id: legacyIdSchema,
+    date: dayKey,
+    minutes: z.number().int().min(0).max(1440),
+    kind: z.string().trim().max(40).default(MEDITATION_KIND).transform((k) => k || MEDITATION_KIND),
+  }),
 };
 
 /** Formas de las claves que son un objeto. */
@@ -860,6 +976,21 @@ export const legacyItemSchemas = {
   journal: shapes.journal.strict(),
   routines: shapes.routines.strict(),
   meals: shapes.meals.strict(),
+  // `tag` y `excerpt` se calculan siempre (de la materia y del cuerpo), en el orden de campos de la app anterior.
+  notes: shapes.notes.strict().transform((n) => ({
+    id: n.id,
+    title: n.title,
+    subject: n.subject,
+    date: n.date,
+    tag: noteTag(n.subject),
+    excerpt: noteExcerpt(n.body),
+    body: n.body,
+    commit: n.commit,
+    tags: n.tags,
+    shareId: n.shareId,
+  })),
+  workItems: shapes.workItems.strict(),
+  meditations: shapes.meditations.strict(),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 const patchOf = (o: z.AnyZodObject): z.AnyZodObject => {
@@ -894,7 +1025,27 @@ export const legacyPatchSchemas = {
   journal: patchOf(shapes.journal),
   routines: patchOf(shapes.routines),
   meals: patchOf(shapes.meals),
+  // El enlace público (`shareId`) y `commit` son de la app anterior: la app nueva no los cambia.
+  notes: patchOf(shapes.notes.omit({ shareId: true, commit: true, tag: true, excerpt: true })),
+  workItems: patchOf(shapes.workItems),
+  meditations: patchOf(shapes.meditations),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
+
+/**
+ * Campos que se derivan de otros en un cambio parcial, igual en el servidor y
+ * en la vista optimista: `rem` de una tarea sigue a `time`; el extracto de una
+ * nota sigue al cuerpo y su color, a la materia.
+ */
+export function deriveLegacyPatch(key: LegacyKey, patch: Record<string, unknown>): Record<string, unknown> {
+  if (key === 'tasks' && 'time' in patch) return { ...patch, rem: !!patch.time };
+  if (key === 'notes') {
+    const out = { ...patch };
+    if (typeof patch.body === 'string') out.excerpt = noteExcerpt(patch.body);
+    if (typeof patch.subject === 'string') out.tag = noteTag(patch.subject);
+    return out;
+  }
+  return patch;
+}
 
 /** Objeto completo (PUT): campos exactos, con los valores por defecto de la app anterior. */
 export const legacyObjectSchemas = {
