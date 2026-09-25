@@ -138,4 +138,4 @@ La app móvil no guarda un token de 60 días: recibe un **token de acceso de 15 
 
 ## Módulos de la app anterior
 
-Edición elemento a elemento de las claves `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes` y `focus` del documento de `/api/sync`, en `/api/v2/modules`. Ver [modulos.md](modulos.md).
+Edición elemento a elemento de las claves `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content` e `ideas` del documento de `/api/sync`, en `/api/v2/modules`. Ver [modulos.md](modulos.md).
