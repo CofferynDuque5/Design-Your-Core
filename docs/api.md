@@ -17,6 +17,7 @@ Esta versión es compatible con la app publicada actualmente. El plan añade `/a
 | POST | `/api/auth/register` (estricta) | `{ email, password (8+), name?, gender? ('mujer'\|'hombre'\|'otro') }` | `{ token, user }` · 409 si el correo existe |
 | POST | `/api/auth/login` (estricta) | `{ email, password }` | `{ token, user }` · 401 si no coincide |
 | GET | `/api/me` 🔒 | | `{ user }` |
+| PATCH | `/api/v2/me` 🔒 | `{ showCycle }` (booleano) | `{ user }`. Es el mismo ajuste `showCycle` de la app anterior: muestra Ciclo en el menú y en el Calendario |
 | POST | `/api/auth/change-password` 🔒 (estricta) | `{ current, next (8+) }` | `{ ok, token }`. Cierra las demás sesiones |
 | POST | `/api/auth/logout-others` 🔒 | | `{ ok, token }`. Cierra las demás sesiones |
 | POST | `/api/auth/forgot-password` (estricta) | `{ email }` | Siempre `{ ok, message }`. Envía un enlace válido 30 min |
@@ -138,4 +139,4 @@ La app móvil no guarda un token de 60 días: recibe un **token de acceso de 15 
 
 ## Módulos de la app anterior
 
-Edición elemento a elemento de las claves `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content` e `ideas` del documento de `/api/sync`, en `/api/v2/modules`. Ver [modulos.md](modulos.md).
+Edición elemento a elemento de las listas `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas`, `transactions`, `goals`, `pets`, `petCares`, `period`, `workouts`, `sleep`, `journal`, `routines` y `meals` del documento de `/api/sync`, en `/api/v2/modules`. Las claves que son un objeto (`cycle`, `dayLog` y `budget`) se guardan enteras con `PUT /modules/:key` o en parte con `PATCH /modules/:key`, y responden `{ value, updatedAt }`. Ver [modulos.md](modulos.md).
