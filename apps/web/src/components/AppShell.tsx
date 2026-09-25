@@ -1,6 +1,7 @@
 import { BarChart3, CheckSquare, Flag, LayoutGrid, Sun, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router';
+import { TOOLS } from '../app/tools';
 import { Logo } from './Logo';
 
 const NAV = [
@@ -55,6 +56,21 @@ export function AppShell() {
                 Más
               </NavLink>
             </li>
+          </ul>
+        </nav>
+        <nav aria-labelledby="nav-tools">
+          <p id="nav-tools" className="sidebar__group">
+            Herramientas
+          </p>
+          <ul className="sidebar__nav">
+            {TOOLS.map(({ to, label, icon: Icon }) => (
+              <li key={to}>
+                <NavLink to={to} className="sidebar__link">
+                  <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
+                  {label}
+                </NavLink>
+              </li>
+            ))}
           </ul>
         </nav>
       </aside>

@@ -1,0 +1,72 @@
+import { useEffect, useState } from 'react';
+
+// Utilidades de las herramientas (Agenda, Horario, Enfoque…).
+
+/** 1.5 → "1 h 30 min"; 0.5 → "30 min". */
+export function durationLabel(hours: number): string {
+  const total = Math.round(hours * 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (!h) return `${m} min`;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+/** 1.25 → "1,3 h" (una cifra decimal, formato español). */
+export const hoursShort = (h: number) => `${new Intl.NumberFormat('es', { maximumFractionDigits: 1 }).format(h)} h`;
+
+/** Hora local actual en horas decimales. */
+export const nowHours = (d = new Date()) => d.getHours() + d.getMinutes() / 60;
+
+/** Día de la semana local, 1 = lunes … 7 = domingo. */
+export const isoDay = (d = new Date()) => (d.getDay() === 0 ? 7 : d.getDay());
+
+export interface Placed<T> {
+  item: T;
+  start: number;
+  end: number;
+  /** Columna dentro de su grupo de solapes y número de columnas del grupo. */
+  lane: number;
+  lanes: number;
+}
+
+/** Reparte en columnas los elementos que se solapan (como un calendario). */
+export function layoutLanes<T>(items: Array<{ item: T; start: number; end: number }>): Array<Placed<T>> {
+  const sorted = [...items].sort((a, b) => a.start - b.start || b.end - a.end);
+  const out: Array<Placed<T>> = [];
+  let group: Array<Placed<T>> = [];
+  let laneEnds: number[] = [];
+  let groupEnd = -Infinity;
+  const flush = () => {
+    const lanes = laneEnds.length;
+    group.forEach((g) => (g.lanes = lanes));
+    out.push(...group);
+    group = [];
+    laneEnds = [];
+    groupEnd = -Infinity;
+  };
+  for (const it of sorted) {
+    if (group.length && it.start >= groupEnd) flush();
+    let lane = laneEnds.findIndex((e) => e <= it.start);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(it.end);
+    } else laneEnds[lane] = it.end;
+    group.push({ ...it, lane, lanes: 1 });
+    groupEnd = Math.max(groupEnd, it.end);
+  }
+  if (group.length) flush();
+  return out;
+}
+
+/** "2026-09-25" de una fecha local. */
+export const localDayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** La hora actual, refrescada cada minuto. */
+export function useNow(every = 60_000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(new Date()), every);
+    return () => window.clearInterval(t);
+  }, [every]);
+  return now;
+}

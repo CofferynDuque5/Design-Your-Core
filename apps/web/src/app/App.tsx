@@ -7,15 +7,20 @@ import { UpdatePrompt } from '../components/UpdatePrompt';
 import { Forgot } from '../pages/auth/Forgot';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
+import { Agenda } from '../pages/Agenda';
+import { Calendar } from '../pages/Calendar';
 import { CheckIn } from '../pages/CheckIn';
 import { Challenges } from '../pages/Challenges';
+import { Focus } from '../pages/Focus';
 import { Habits } from '../pages/Habits';
 import { More } from '../pages/More';
 import { NotFound } from '../pages/NotFound';
 import { Onboarding } from '../pages/Onboarding';
 import { Profile } from '../pages/Profile';
 import { Progress } from '../pages/Progress';
+import { Schedule } from '../pages/Schedule';
 import { Today } from '../pages/Today';
+import { Todos } from '../pages/Todos';
 import { useProfile } from './queries';
 import { SessionProvider, useSession } from './session';
 import { ToastProvider } from './toast';
@@ -75,6 +80,11 @@ export function AppRoutes() {
         <Route path="habitos" element={<Habits />} />
         <Route path="perfil" element={<Profile />} />
         <Route path="mas" element={<More />} />
+        <Route path="agenda" element={<Agenda />} />
+        <Route path="pendientes" element={<Todos />} />
+        <Route path="calendario" element={<Calendar />} />
+        <Route path="horario" element={<Schedule />} />
+        <Route path="enfoque" element={<Focus />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

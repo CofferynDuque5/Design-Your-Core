@@ -69,3 +69,27 @@ export const dashboard = (over: Partial<Dashboard> = {}): Dashboard => ({
   onboarded: true,
   ...over,
 });
+
+/** Documento de la app anterior con algo de cada herramienta y claves que la app nueva no conoce. */
+export const legacyDoc = (): Record<string, unknown> => ({
+  blocks: [
+    { id: 'b1', label: 'Estudiar cálculo', sub: 'Capítulo 3', start: 9, dur: 1.5, kind: 'study' },
+    { id: 'b2', label: 'Correr', sub: '', start: 18, dur: 1, kind: 'ex' },
+  ],
+  tasks: [
+    { id: 't1', title: 'Entregar ensayo', pri: 'alta', time: null, rem: false, done: false, tags: '' },
+    { id: 't2', title: 'Comprar libreta', pri: 'baja', time: null, rem: false, done: true, tags: '' },
+  ],
+  todos: [
+    { id: 'td1', title: 'Pagar la luz', done: false },
+    { id: 'td2', title: 'Organizar mudanza', done: false },
+    { id: 'td3', title: 'Llamar al banco', done: true },
+  ],
+  subtasks: [{ id: 's1', todoId: 'td2', title: 'Pedir cajas', done: true }],
+  reminders: [{ id: 'r1', day: 14, title: 'Dentista', when: '14:00', color: '#4F7CFF', icon: 'doc', on: true }],
+  classes: [{ id: 'c1', day: 1, start: '08:00', end: '09:30', title: 'Cálculo', room: 'A-201', color: '#4F7CFF', subject: '' }],
+  focus: [{ id: 'f1', mode: 'focus', seconds: 1500, dateKey: '2026-09-20' }],
+  subjects: [{ id: 'mat1', name: 'Física', color: '#22B8CF', room: 'B-3', teacher: '', nextClass: '', topics: [] }],
+  transactions: [{ id: 'x1', type: 'gasto', amount: 10 }],
+  claveFutura: true,
+});

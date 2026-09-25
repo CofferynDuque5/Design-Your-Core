@@ -121,4 +121,7 @@ test('la sección Más conserva los módulos anteriores', async ({ page }) => {
     await expect(page.getByRole('region', { name: group })).toBeVisible();
   }
   await expect(page.getByRole('region', { name: 'Vida personal' }).getByText('Finanzas')).toBeVisible();
+  await page.getByRole('region', { name: 'Herramientas' }).getByRole('link', { name: /Pendientes/ }).click();
+  await expect(page).toHaveURL(/\/pendientes$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Pendientes' })).toBeVisible();
 });

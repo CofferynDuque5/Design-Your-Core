@@ -1,4 +1,4 @@
-import { useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 interface FieldProps {
   label: string;
@@ -93,14 +93,70 @@ export function Scale({
   );
 }
 
-export function Segmented<T extends string>({ options, value, onChange, label }: { options: Array<{ value: T; label: string }>; value: T; onChange: (v: T) => void; label: string }) {
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+  disabled,
+}: {
+  options: Array<{ value: T; label: string }>;
+  value: T;
+  onChange: (v: T) => void;
+  label: string;
+  disabled?: boolean;
+}) {
   return (
     <div className="segmented" role="group" aria-label={label}>
       {options.map((o) => (
-        <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
+        <button key={o.value} type="button" aria-pressed={o.value === value} disabled={disabled} onClick={() => onChange(o.value)}>
           {o.label}
         </button>
       ))}
     </div>
+  );
+}
+
+export function SelectField({ label, hint, error, children, ...select }: FieldProps & SelectHTMLAttributes<HTMLSelectElement>) {
+  const id = useId();
+  const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined;
+  return (
+    <div className="field">
+      <label className="field__label" htmlFor={id}>
+        {label}
+      </label>
+      <select id={id} className="input select" aria-invalid={error ? true : undefined} aria-describedby={describedBy} {...select}>
+        {children}
+      </select>
+      {hint && (
+        <span className="field__hint" id={`${id}-hint`}>
+          {hint}
+        </span>
+      )}
+      {error && (
+        <span className="field__error" id={`${id}-error`}>
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Muestras de color como radios: cada una lleva su nombre para lectores de pantalla. */
+export function ColorPicker({ legend, colors, value, onChange, names }: { legend: string; colors: readonly string[]; value: string; onChange: (c: string) => void; names: Record<string, string> }) {
+  const name = useId();
+  return (
+    <fieldset className="field">
+      <legend className="field__label">{legend}</legend>
+      <div className="swatches">
+        {colors.map((c) => (
+          <label key={c} className="swatch" style={{ ['--c' as string]: c }}>
+            <input type="radio" name={name} checked={value.toLowerCase() === c.toLowerCase()} onChange={() => onChange(c)} />
+            <span aria-hidden="true" />
+            <span className="visually-hidden">{names[c.toUpperCase()] ?? c}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

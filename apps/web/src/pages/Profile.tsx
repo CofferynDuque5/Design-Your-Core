@@ -31,7 +31,7 @@ export function Profile() {
         <Link to="/mas" className="card link-card">
           <span>
             <strong>Más herramientas</strong>
-            <span className="muted"> · agenda, finanzas, notas y el resto de módulos de la app anterior</span>
+            <span className="muted"> · agenda, pendientes, calendario, horario, enfoque y el resto de la app anterior</span>
           </span>
           <ArrowRight size={18} aria-hidden="true" />
         </Link>
