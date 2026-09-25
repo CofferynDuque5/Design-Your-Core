@@ -76,8 +76,14 @@ test('pendientes: añadir, subtareas, reordenar, renombrar y borrar', async ({ p
   await page.getByRole('checkbox', { name: 'Pagar la luz y el agua' }).click();
   await expect(page.getByRole('checkbox', { name: 'Pagar la luz y el agua' })).toBeChecked();
   await expect(page.getByRole('heading', { name: /1 por hacer/ })).toBeVisible();
+  // Antes de recargar, esperar a que el servidor tenga todos los cambios: recargar
+  // con escrituras en cola las cancela.
+  await expect
+    .poll(async () => (await readLegacy(page)).todos)
+    .toEqual([expect.objectContaining({ title: 'Organizar mudanza' }), { id: 'id_viejo', title: 'Pagar la luz y el agua', done: true }]);
 
   await page.reload();
+  await expect(page.getByRole('heading', { name: /1 por hacer/ })).toBeVisible();
   const items = page.locator('.todo-list > li');
   await expect(items.first()).toContainText('Organizar mudanza');
   await expect(page.getByRole('checkbox', { name: 'Pagar la luz y el agua' })).toBeChecked();
