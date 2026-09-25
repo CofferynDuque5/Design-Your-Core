@@ -1,9 +1,31 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { onboard, readLegacy, register, seedLegacy } from './helpers';
 
 // Herramientas de la app anterior (tanda 1) contra la API real. Cada recorrido
 // comprueba además que el documento de /api/sync (el que lee la app anterior)
 // conserva sus formatos y las claves que la app nueva no conoce.
+
+// Escrituras en curso contra /api/v2/modules. Recargar con cambios en cola los
+// cancela, así que las recargas esperan a que no quede ninguna.
+const pending = new WeakMap<Page, number>();
+const isWrite = (method: string, url: string) => method !== 'GET' && url.includes('/api/v2/modules');
+test.beforeEach(({ page }) => {
+  pending.set(page, 0);
+  page.on('request', (r) => isWrite(r.method(), r.url()) && pending.set(page, (pending.get(page) ?? 0) + 1));
+  const done = (r: { method(): string; url(): string }) => isWrite(r.method(), r.url()) && pending.set(page, (pending.get(page) ?? 0) - 1);
+  page.on('requestfinished', done);
+  page.on('requestfailed', done);
+});
+
+async function reloadWhenSaved(page: Page) {
+  // Dos lecturas seguidas a cero: la cola envía la siguiente escritura al terminar la anterior.
+  await expect.poll(async () => {
+    if (pending.get(page)) return false;
+    await page.waitForTimeout(300);
+    return !pending.get(page);
+  }).toBe(true);
+  await page.reload();
+}
 
 const OLD = {
   habits: [{ id: 'h1', label: 'Leer', icon: 'read', streak: 3, done: false, progress: 0 }],
@@ -29,7 +51,7 @@ test('agenda: bloques del día y tareas por prioridad', async ({ page }) => {
   await dialog.getByLabel('Nombre').fill('Repasar física');
   await dialog.getByRole('radio', { name: 'Proyecto' }).check();
   await dialog.getByRole('button', { name: 'Guardar' }).click();
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(page.getByRole('button', { name: /Editar «Repasar física», 10:00 a 12:00, Proyecto/ })).toBeVisible();
 
   await page.getByRole('button', { name: 'Tareas' }).click();
@@ -41,7 +63,7 @@ test('agenda: bloques del día y tareas por prioridad', async ({ page }) => {
   await alta.getByRole('checkbox', { name: 'Entregar ensayo' }).click();
   await expect(alta.getByRole('checkbox', { name: 'Entregar ensayo' })).toBeChecked();
   await expect(alta.getByText('1 de 1 hechas')).toBeAttached();
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(page.getByRole('region', { name: /Alta/ }).getByRole('checkbox', { name: 'Entregar ensayo' })).toBeChecked();
 
   const doc = await readLegacy(page);
@@ -82,7 +104,7 @@ test('pendientes: añadir, subtareas, reordenar, renombrar y borrar', async ({ p
     .poll(async () => (await readLegacy(page)).todos)
     .toEqual([expect.objectContaining({ title: 'Organizar mudanza' }), { id: 'id_viejo', title: 'Pagar la luz y el agua', done: true }]);
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(page.getByRole('heading', { name: /1 por hacer/ })).toBeVisible();
   const items = page.locator('.todo-list > li');
   await expect(items.first()).toContainText('Organizar mudanza');
@@ -158,7 +180,7 @@ test('horario: clase desde una materia, próxima clase y edición', async ({ pag
   const edit = page.getByRole('dialog', { name: 'Editar clase' });
   await edit.getByLabel('Aula (opcional)').fill('Lab 2');
   await edit.getByRole('button', { name: 'Guardar' }).click();
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula Lab 2/ })).toBeVisible();
 
   const doc = await readLegacy(page);
@@ -182,7 +204,7 @@ test('enfoque: una sesión saltada se guarda y cuenta', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Descanso corto' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('timer')).toHaveText('05:00');
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(page.locator('.stat', { hasText: 'Sesiones hoy' }).locator('.stat__value')).toHaveText('1');
   const doc = await readLegacy(page);
   expect(doc.focus).toEqual([expect.objectContaining({ mode: 'focus', seconds: 120, dateKey: new Date().toISOString().slice(0, 10) })]);
