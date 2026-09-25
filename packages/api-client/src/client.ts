@@ -1,4 +1,4 @@
-import type { CheckInInput, Day, HabitInput, HabitPatch, Period, ProfileInput } from '@dyc/core';
+import type { CheckInInput, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyPatch, Period, ProfileInput } from '@dyc/core';
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
@@ -149,9 +149,23 @@ export function createClient(opts: ClientOptions) {
       remove: (password: string) => request<{ ok: true }>('DELETE', '/api/v2/account', { password }),
     },
 
-    /** Datos de la app anterior (v1): un documento JSON por persona. Solo lectura desde la app nueva. */
+    /** Datos de la app anterior (v1): un documento JSON por persona. Para editar, usa `modules`. */
     legacy: {
       get: () => request<{ data: Record<string, unknown>; updatedAt: string | null }>('GET', '/api/sync'),
+    },
+
+    /**
+     * Módulos de la app anterior elemento a elemento (Agenda, Pendientes,
+     * Calendario, Horario, Enfoque) sobre el mismo documento de /api/sync.
+     */
+    modules: {
+      get: () => request<{ data: LegacyData; updatedAt: string | null }>('GET', '/api/v2/modules'),
+      add: <K extends LegacyKey>(key: K, item: LegacyItems[K] | (Partial<LegacyItems[K]> & { id: string })) =>
+        request<{ item: LegacyItems[K]; updatedAt: string }>('POST', `/api/v2/modules/${key}`, { item }),
+      update: <K extends LegacyKey>(key: K, id: string, patch: LegacyPatch<K>) =>
+        request<{ item: LegacyItems[K]; updatedAt: string }>('PATCH', `/api/v2/modules/${key}/${encodeURIComponent(id)}`, patch),
+      remove: (key: LegacyKey, id: string) => request<{ ok: true; updatedAt: string }>('DELETE', `/api/v2/modules/${key}/${encodeURIComponent(id)}`),
+      reorder: (key: LegacyKey, ids: string[]) => request<{ ok: true; updatedAt: string }>('PUT', `/api/v2/modules/${key}/order`, { ids }),
     },
 
     partner: {

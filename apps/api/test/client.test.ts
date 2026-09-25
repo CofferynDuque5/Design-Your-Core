@@ -145,4 +145,18 @@ describe('@dyc/api-client', () => {
     expect(data.checkIns).toHaveLength(1);
     expect(data.habits[0].logs).toEqual([{ date: today, done: true }]);
   });
+  it('edita los módulos de la app anterior elemento a elemento', async () => {
+    const api = await signedIn();
+    await api.modules.add('todos', { id: 'a', title: 'Uno', done: false });
+    await api.modules.add('todos', { id: 'b', title: 'Dos', done: false });
+    await api.modules.add('subtasks', { id: 's', todoId: 'a', title: 'Paso', done: false });
+    const upd = await api.modules.update('todos', 'a', { done: true });
+    expect(upd.item).toEqual({ id: 'a', title: 'Uno', done: true });
+    await api.modules.reorder('todos', ['b', 'a']);
+    await api.modules.remove('todos', 'a');
+    const { data } = await api.modules.get();
+    expect(data.todos).toEqual([{ id: 'b', title: 'Dos', done: false }]);
+    expect(data.subtasks).toEqual([]);
+    expect((await api.legacy.get()).data).toEqual(data);
+  });
 });
