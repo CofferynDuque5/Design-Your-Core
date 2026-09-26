@@ -4,6 +4,7 @@ import { ArrowRight, Download, LogOut } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { api } from '../app/api';
+import { useShowCycle } from '../app/prefs';
 import { keys, useProfile } from '../app/queries';
 import { useSession } from '../app/session';
 import { useTheme, type ThemePreference } from '../app/theme';
@@ -31,7 +32,7 @@ export function Profile() {
         <Link to="/mas" className="card link-card">
           <span>
             <strong>Más herramientas</strong>
-            <span className="muted"> · agenda, finanzas, notas y el resto de módulos de la app anterior</span>
+            <span className="muted"> · agenda, materias, finanzas, metas, ejercicio, sueño, diario y el resto de la app anterior</span>
           </span>
           <ArrowRight size={18} aria-hidden="true" />
         </Link>
@@ -173,7 +174,28 @@ function PreferencesSection() {
           </div>
         )}
       </div>
+      <CycleSetting />
     </section>
+  );
+}
+
+function CycleSetting() {
+  const { showCycle, setShowCycle } = useShowCycle();
+  return (
+    <div className="setting-row">
+      <span className="setting-row__text">
+        <span className="field__label" id="cycle-setting">
+          Ciclo menstrual
+        </span>
+        <span className="field__hint" id="cycle-setting-hint">
+          Muestra Ciclo en el menú y tus días de regla en el Calendario. Es el mismo ajuste que usa la app anterior. Siempre puedes abrirlo desde Más.
+        </span>
+      </span>
+      <label className="switch">
+        <input type="checkbox" role="switch" checked={showCycle} onChange={() => setShowCycle(!showCycle)} aria-labelledby="cycle-setting" aria-describedby="cycle-setting-hint" />
+        <span aria-hidden="true" />
+      </label>
+    </div>
   );
 }
 

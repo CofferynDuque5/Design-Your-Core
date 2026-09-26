@@ -7,15 +7,39 @@ import { UpdatePrompt } from '../components/UpdatePrompt';
 import { Forgot } from '../pages/auth/Forgot';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
+import { Agenda } from '../pages/Agenda';
+import { Assistant } from '../pages/Assistant';
+import { Breathe } from '../pages/Breathe';
+import { Calendar } from '../pages/Calendar';
 import { CheckIn } from '../pages/CheckIn';
 import { Challenges } from '../pages/Challenges';
+import { Content } from '../pages/Content';
+import { Cycle } from '../pages/Cycle';
+import { Exercise } from '../pages/Exercise';
+import { Finance } from '../pages/Finance';
+import { Goals } from '../pages/Goals';
+import { Journal } from '../pages/Journal';
+import { Pets } from '../pages/Pets';
+import { Routine } from '../pages/Routine';
+import { Sleep } from '../pages/Sleep';
+import { Focus } from '../pages/Focus';
 import { Habits } from '../pages/Habits';
+import { Ideas } from '../pages/Ideas';
 import { More } from '../pages/More';
+import { NotebookDetail, Notebooks } from '../pages/Notebooks';
+import { NoteEditor, Notes } from '../pages/Notes';
 import { NotFound } from '../pages/NotFound';
 import { Onboarding } from '../pages/Onboarding';
 import { Profile } from '../pages/Profile';
 import { Progress } from '../pages/Progress';
+import { Projects } from '../pages/Projects';
+import { Roadmaps } from '../pages/Roadmaps';
+import { Schedule } from '../pages/Schedule';
+import { Subjects } from '../pages/Subjects';
 import { Today } from '../pages/Today';
+import { Todos } from '../pages/Todos';
+import { Vault } from '../pages/Vault';
+import { Work } from '../pages/Work';
 import { useProfile } from './queries';
 import { SessionProvider, useSession } from './session';
 import { ToastProvider } from './toast';
@@ -75,6 +99,32 @@ export function AppRoutes() {
         <Route path="habitos" element={<Habits />} />
         <Route path="perfil" element={<Profile />} />
         <Route path="mas" element={<More />} />
+        <Route path="agenda" element={<Agenda />} />
+        <Route path="pendientes" element={<Todos />} />
+        <Route path="calendario" element={<Calendar />} />
+        <Route path="horario" element={<Schedule />} />
+        <Route path="enfoque" element={<Focus />} />
+        <Route path="materias" element={<Subjects />} />
+        <Route path="proyectos" element={<Projects />} />
+        <Route path="roadmaps" element={<Roadmaps />} />
+        <Route path="cuadernos" element={<Notebooks />} />
+        <Route path="cuadernos/:id" element={<NotebookDetail />} />
+        <Route path="contenido" element={<Content />} />
+        <Route path="ideas" element={<Ideas />} />
+        <Route path="finanzas" element={<Finance />} />
+        <Route path="metas" element={<Goals />} />
+        <Route path="mascotas" element={<Pets />} />
+        <Route path="ciclo" element={<Cycle />} />
+        <Route path="ejercicio" element={<Exercise />} />
+        <Route path="sueno" element={<Sleep />} />
+        <Route path="diario" element={<Journal />} />
+        <Route path="rutina" element={<Routine />} />
+        <Route path="notas" element={<Notes />} />
+        <Route path="notas/:id" element={<NoteEditor />} />
+        <Route path="boveda" element={<Vault />} />
+        <Route path="asistente" element={<Assistant />} />
+        <Route path="trabajo" element={<Work />} />
+        <Route path="respiracion" element={<Breathe />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

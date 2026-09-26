@@ -1,7 +1,7 @@
 import { ApiError } from '@dyc/api-client';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { CloudOff, RotateCw } from 'lucide-react-native';
-import { forwardRef, type ReactNode } from 'react';
+import { forwardRef, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -60,17 +60,21 @@ export function Screen({
   onRefresh,
   edges = ['top'],
   contentStyle,
+  scrollRef,
 }: {
   children: ReactNode;
   refreshing?: boolean;
   onRefresh?: () => void;
   edges?: Array<'top' | 'bottom'>;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Para volver arriba desde la pantalla (abrir una entrada del Diario). */
+  scrollRef?: Ref<ScrollView>;
 }) {
   const { colors } = useTheme();
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[styles.screen, contentStyle]}
         keyboardShouldPersistTaps="handled"
         refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.inkMuted} /> : undefined}
@@ -128,6 +132,7 @@ export function Button({
   icon,
   small,
   accessibilityHint,
+  accessibilityLabel,
   style,
 }: {
   label: string;
@@ -138,6 +143,8 @@ export function Button({
   icon?: ReactNode;
   small?: boolean;
   accessibilityHint?: string;
+  /** Nombre para lectores cuando el texto visible no basta («Reabrir» → «Reabrir «Cálculo I»»). */
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
@@ -155,6 +162,7 @@ export function Button({
       accessibilityRole="button"
       accessibilityState={{ disabled: !!off, busy: !!busy }}
       accessibilityHint={accessibilityHint}
+      accessibilityLabel={accessibilityLabel}
       disabled={off}
       onPress={onPress}
       style={({ pressed }) => [
@@ -241,17 +249,32 @@ export function Scale({ legend, value, onChange, low, high }: { legend: string; 
   );
 }
 
-export function Segmented<V extends string>({ label, value, options, onChange }: { label: string; value: V; options: Array<{ value: V; label: string }>; onChange: (v: V) => void }) {
+export function Segmented<V extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: V;
+  /** `a11yLabel`: nombre completo para lectores cuando la etiqueta visible es corta. */
+  options: Array<{ value: V; label: string; a11yLabel?: string }>;
+  onChange: (v: V) => void;
+  disabled?: boolean;
+}) {
   const { colors } = useTheme();
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.segmented, { backgroundColor: colors.surfaceSunken }]}>
+    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.segmented, { backgroundColor: colors.surfaceSunken }, disabled && { opacity: 0.55 }]}>
       {options.map((o) => {
         const on = o.value === value;
         return (
           <Pressable
             key={o.value}
             accessibilityRole="radio"
-            accessibilityState={{ checked: on }}
+            accessibilityState={{ checked: on, disabled: !!disabled }}
+            accessibilityLabel={o.a11yLabel}
+            disabled={disabled}
             onPress={() => onChange(o.value)}
             style={[styles.segment, on && { backgroundColor: colors.surface, borderColor: colors.line }]}
           >

@@ -89,3 +89,7 @@ export const challengePatchSchema = z.object({ status: z.enum(['completed', 'aba
 export const periodSchema = z.enum(['day', 'week', 'month']);
 
 export const accountDeleteSchema = z.object({ password: z.string().min(1).max(200) }).strict();
+
+/** Ajustes de la cuenta que comparten la app anterior y la nueva (`user.showCycle`). */
+export const userSettingsSchema = z.object({ showCycle: z.boolean() }).strict();
+export type UserSettings = z.infer<typeof userSettingsSchema>;

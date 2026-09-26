@@ -1,5 +1,5 @@
 import type { Dashboard, Profile, TokenPair } from '@dyc/api-client';
-import { PILLAR_IDS } from '@dyc/core';
+import { applyLegacyOp, legacyObject, PILLAR_IDS, type LegacyData, type LegacyItems, type LegacyKey, type LegacyObjectKey } from '@dyc/core';
 
 export type Handler = (body: unknown, url: URL) => [number, unknown] | unknown;
 
@@ -59,3 +59,47 @@ export const dashboard = (over: Partial<Dashboard> = {}): Dashboard => ({
   onboarded: true,
   ...over,
 });
+
+/**
+ * API falsa de las herramientas con el documento de la app anterior en
+ * memoria: aplica cada cambio de /api/v2/modules como el servidor (con
+ * `applyLegacyOp`, también los borrados en cascada) y guarda cada llamada.
+ */
+export function fakeModules(initial: LegacyData, over: Record<string, Handler> = {}) {
+  let doc = initial;
+  const parts = (url: URL) => url.pathname.split('/').slice(4) as [LegacyKey, string?];
+  const api = fakeFetch({
+    'GET /api/v2/profile': () => ({ profile: profile() }),
+    'GET /api/v2/modules': () => ({ data: doc, updatedAt: '2026-09-26T10:00:00.000Z' }),
+    'POST /api/v2/modules/:key': (b, url) => {
+      const item = (b as { item: LegacyItems[LegacyKey] }).item;
+      doc = applyLegacyOp(doc, parts(url)[0], { type: 'add', item });
+      return [201, { item, updatedAt: 'x' }];
+    },
+    'PUT /api/v2/modules/:key/order': (b, url) => {
+      doc = applyLegacyOp(doc, parts(url)[0], { type: 'reorder', ids: (b as { ids: string[] }).ids });
+      return { ok: true, updatedAt: 'x' };
+    },
+    'PATCH /api/v2/modules/:key/:id': (b, url) => {
+      const [key, id] = parts(url);
+      doc = applyLegacyOp(doc, key, { type: 'update', id: decodeURIComponent(id ?? ''), patch: b as object });
+      return { item: b, updatedAt: 'x' };
+    },
+    'DELETE /api/v2/modules/:key/:id': (_b, url) => {
+      const [key, id] = parts(url);
+      doc = applyLegacyOp(doc, key, { type: 'remove', id: decodeURIComponent(id ?? '') });
+      return { ok: true, updatedAt: 'x' };
+    },
+    // Objetos (`cycle`, `dayLog`, `budget`): PATCH fusiona sobre lo guardado y los valores por defecto.
+    'PATCH /api/v2/modules/:key': (b, url) => {
+      const key = parts(url)[0] as unknown as LegacyObjectKey;
+      const value = { ...legacyObject(doc, key), ...(b as object) };
+      doc = { ...doc, [key]: value };
+      return { value, updatedAt: 'x' };
+    },
+    // Ajustes de la cuenta (mostrar Ciclo).
+    'PATCH /api/v2/me': (b) => ({ user: { ...USER, ...(b as object) } }),
+    ...over,
+  });
+  return { ...api, doc: () => doc };
+}

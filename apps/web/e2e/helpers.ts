@@ -37,3 +37,24 @@ export async function signIn(page: Page, address: string, password = PASSWORD) {
   await page.getByLabel('Contraseña').fill(password);
   await page.getByRole('button', { name: 'Entrar' }).click();
 }
+
+/** Token de la sesión web (lo guarda la app en localStorage). */
+export async function sessionToken(page: Page): Promise<string> {
+  const token = await page.evaluate(() => localStorage.getItem('dyc.token'));
+  expect(token).toBeTruthy();
+  return token as string;
+}
+
+/** Deja el documento de la app anterior como si lo hubiera guardado ella (PUT /api/sync). */
+export async function seedLegacy(page: Page, data: Record<string, unknown>) {
+  const token = await sessionToken(page);
+  const res = await page.request.put('/api/sync', { data: { data }, headers: { Authorization: `Bearer ${token}` } });
+  expect(res.ok()).toBe(true);
+}
+
+/** Lee el documento completo como lo leería la app anterior (GET /api/sync). */
+export async function readLegacy(page: Page): Promise<Record<string, unknown>> {
+  const token = await sessionToken(page);
+  const res = await page.request.get('/api/sync', { headers: { Authorization: `Bearer ${token}` } });
+  return (await res.json()).data;
+}

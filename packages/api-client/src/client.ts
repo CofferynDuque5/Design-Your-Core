@@ -1,4 +1,4 @@
-import type { CheckInInput, Day, HabitInput, HabitPatch, Period, ProfileInput } from '@dyc/core';
+import type { CheckInInput, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
@@ -91,6 +91,8 @@ export function createClient(opts: ClientOptions) {
       register: (b: { email: string; password: string; name?: string; gender?: User['gender'] }) => request<Session>('POST', '/api/auth/register', b),
       login: (b: { email: string; password: string }) => request<Session>('POST', '/api/auth/login', b),
       me: () => request<{ user: User }>('GET', '/api/me').then((r) => r.user),
+      /** Ajustes de la cuenta compartidos con la app anterior (mostrar Ciclo). */
+      updateMe: (b: UserSettings) => request<{ user: User }>('PATCH', '/api/v2/me', b).then((r) => r.user),
       forgotPassword: (email: string) => request<{ ok: true; message: string }>('POST', '/api/auth/forgot-password', { email }),
       changePassword: (current: string, next: string) => request<{ ok: true; token: string }>('POST', '/api/auth/change-password', { current, next }),
       logoutOthers: () => request<{ ok: true; token: string }>('POST', '/api/auth/logout-others'),
@@ -149,9 +151,49 @@ export function createClient(opts: ClientOptions) {
       remove: (password: string) => request<{ ok: true }>('DELETE', '/api/v2/account', { password }),
     },
 
-    /** Datos de la app anterior (v1): un documento JSON por persona. Solo lectura desde la app nueva. */
+    /** Datos de la app anterior (v1): un documento JSON por persona. Para editar, usa `modules`. */
     legacy: {
       get: () => request<{ data: Record<string, unknown>; updatedAt: string | null }>('GET', '/api/sync'),
+      /** Imágenes de los apuntes que la app anterior subió a la nube (`coreimg:<id>`): `{ id: dataURL }`. */
+      images: (ids: string[]) => request<{ images: Record<string, string> }>('POST', '/api/images/fetch', { ids }),
+      /** Sube imágenes `{ id: dataURL }` (máx. 50, 4 MB cada una); `count` = las que se guardaron. La app anterior las descarga igual. */
+      uploadImages: (images: Record<string, string>) => request<{ ok: true; count: number }>('POST', '/api/images', { images }),
+    },
+
+    /**
+     * Módulos de la app anterior elemento a elemento (Agenda, Pendientes,
+     * Calendario, Horario, Enfoque, Materias, Proyectos, Roadmaps, Cuadernos,
+     * Contenido, Ideas, Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño,
+     * Diario, Rutina, Notas, Trabajo y Respiración) sobre el mismo documento de /api/sync. Los temas, hitos
+     * y pasos se cambian enviando su lista completa en `update`. Las claves que
+     * son un objeto (`cycle`, `dayLog`, `budget`) se guardan con `set` o `patch`.
+     */
+    modules: {
+      get: () => request<{ data: LegacyData; updatedAt: string | null }>('GET', '/api/v2/modules'),
+      add: <K extends LegacyKey>(key: K, item: LegacyItems[K] | (Partial<LegacyItems[K]> & { id: string })) =>
+        request<{ item: LegacyItems[K]; updatedAt: string }>('POST', `/api/v2/modules/${key}`, { item }),
+      update: <K extends LegacyKey>(key: K, id: string, patch: LegacyPatch<K>) =>
+        request<{ item: LegacyItems[K]; updatedAt: string }>('PATCH', `/api/v2/modules/${key}/${encodeURIComponent(id)}`, patch),
+      remove: (key: LegacyKey, id: string) => request<{ ok: true; updatedAt: string }>('DELETE', `/api/v2/modules/${key}/${encodeURIComponent(id)}`),
+      reorder: (key: LegacyKey, ids: string[]) => request<{ ok: true; updatedAt: string }>('PUT', `/api/v2/modules/${key}/order`, { ids }),
+      set: <K extends LegacyObjectKey>(key: K, value: LegacyObjects[K]) => request<{ value: LegacyObjects[K]; updatedAt: string }>('PUT', `/api/v2/modules/${key}`, value),
+      patch: <K extends LegacyObjectKey>(key: K, patch: Partial<LegacyObjects[K]>) => request<{ value: LegacyObjects[K]; updatedAt: string }>('PATCH', `/api/v2/modules/${key}`, patch),
+    },
+
+    /**
+     * Bóveda cifrada (`vaultSecure`). Todo llega ya cifrado desde el navegador:
+     * la API solo valida la forma. `create` no sustituye una bóveda existente
+     * (409); `migrate` añade entradas cifradas y quita de la lista antigua
+     * `vault` las que cifran, en una sola escritura.
+     */
+    vault: {
+      create: (vault: VaultSecure) => request<{ value: VaultSecure; updatedAt: string }>('PUT', '/api/v2/modules/vaultSecure', vault),
+      destroy: () => request<{ ok: true; updatedAt: string }>('DELETE', '/api/v2/modules/vaultSecure'),
+      add: (item: VaultItem) => request<{ item: VaultItem; updatedAt: string }>('POST', '/api/v2/modules/vaultSecure/items', { item }),
+      update: (item: VaultItem) => request<{ item: VaultItem; updatedAt: string }>('PUT', `/api/v2/modules/vaultSecure/items/${encodeURIComponent(item.id)}`, { iv: item.iv, ct: item.ct }),
+      remove: (id: string) => request<{ ok: true; updatedAt: string }>('DELETE', `/api/v2/modules/vaultSecure/items/${encodeURIComponent(id)}`),
+      migrate: (items: VaultItem[], legacyIds: string[]) =>
+        request<{ migrated: number; remaining: number; updatedAt: string }>('POST', '/api/v2/modules/vaultSecure/migrate', { items, legacyIds }),
     },
 
     partner: {
