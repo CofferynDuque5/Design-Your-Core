@@ -1,4 +1,4 @@
-import { addDays, diffDays, isDay, type Day } from './dates.js';
+import { addDays, diffDays, isDay, periodRange, type Day } from './dates.js';
 import { daysLabel, plural, shortDay } from './format.js';
 import {
   BOX_COLORS,
@@ -14,6 +14,13 @@ import {
   hhmmToHours,
   IDEA_CATEGORIES,
   JOURNAL_MOODS,
+  MEDITATION_KIND,
+  NOTE_DEFAULT_SUBJECT,
+  NOTE_DEFAULT_TITLE,
+  noteTag,
+  splitTags,
+  WORK_PROJECTS,
+  WORK_STATUSES,
   legacyList,
   legacyObject,
   nextDue,
@@ -31,6 +38,8 @@ import {
   type LegacyData,
   type LegacyIdea,
   type LegacyJournal,
+  type LegacyMeditation,
+  type LegacyNote,
   type LegacyNoteBox,
   type LegacyPetCare,
   type LegacyReminder,
@@ -40,7 +49,11 @@ import {
   type ProjectStatus,
   type StepState,
   type TxType,
+  type WorkProject,
+  type WorkStatus,
+  type LegacyWorkItem,
 } from './legacy.js';
+import { markdownToText } from './markdown.js';
 import { legacyVault, vaultSecureOf } from './vault.js';
 
 /**
@@ -769,3 +782,110 @@ export function toggleWeekday(days: string, iso: string): string {
   const next = days.includes(iso) ? days.replace(iso, '') : [...days, iso].sort().join('');
   return next || days;
 }
+
+// ---------- Tanda 4: Notas, Trabajo y Respiración ----------
+
+/** Orden alfabético español sin distinguir mayúsculas ni tildes. */
+export const byNameEs = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
+
+/** Texto para buscar: sin tildes y en minúsculas («Física» encuentra «fisica»). */
+export const searchFold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// Una nota con datos raros se muestra con los valores por defecto, sin cambiar el dato.
+export const noteSubjectOf = (n: Pick<LegacyNote, 'subject'>): string => (typeof n.subject === 'string' && n.subject.trim() ? n.subject.trim() : NOTE_DEFAULT_SUBJECT);
+export const noteTitleOf = (n: Pick<LegacyNote, 'title'>): string => (typeof n.title === 'string' && n.title.trim() ? n.title : NOTE_DEFAULT_TITLE);
+export const noteBodyOf = (n: Pick<LegacyNote, 'body'>): string => (typeof n.body === 'string' ? n.body : '');
+/** Color de la nota: el guardado (`tag`) o el calculado de su materia. */
+export const noteColorOf = (n: Pick<LegacyNote, 'tag' | 'subject'>): string => safeColor(n.tag, noteTag(noteSubjectOf(n)));
+/** Texto de la tarjeta: el principio de la nota sin marcas de Markdown. */
+export const notePreview = (n: Pick<LegacyNote, 'body'>): string => markdownToText(noteBodyOf(n).slice(0, 1500)).slice(0, 160);
+
+/** Etiquetas de todas las notas, en minúsculas, sin repetir y en orden alfabético. */
+export const noteTagList = (notes: Array<Pick<LegacyNote, 'tags'>>): string[] =>
+  Array.from(new Set(notes.flatMap((n) => splitTags(n.tags).map((t) => t.toLowerCase())))).sort(byNameEs);
+
+/** Notas que coinciden con la búsqueda (título, materia, etiquetas y texto) y con la etiqueta elegida. */
+export function filterNotes<N extends LegacyNote>(notes: N[], query: string, tag: string): N[] {
+  const q = searchFold(query.trim());
+  return notes.filter(
+    (n) =>
+      (!tag || splitTags(n.tags).some((t) => t.toLowerCase() === tag)) &&
+      (!q || searchFold(`${noteTitleOf(n)} ${noteSubjectOf(n)} ${n.tags ?? ''} ${noteBodyOf(n).slice(0, 20_000)}`).includes(q)),
+  );
+}
+
+/** Biblioteca por materia, como la app anterior: materias en orden alfabético. */
+export function groupNotesBySubject<N extends LegacyNote>(notes: N[]): Array<[string, N[]]> {
+  const map = new Map<string, N[]>();
+  for (const n of notes) map.set(noteSubjectOf(n), [...(map.get(noteSubjectOf(n)) ?? []), n]);
+  return [...map].sort(([a], [b]) => byNameEs(a, b));
+}
+
+// Proyecto y estado desconocidos (datos raros) se muestran como el primero, sin cambiar el dato.
+export const workProjectOf = (w: Pick<LegacyWorkItem, 'project'>): WorkProject => (WORK_PROJECTS.includes(w.project) ? w.project : 'p1');
+export const workStatusOf = (w: Pick<LegacyWorkItem, 'status'>): WorkStatus => (WORK_STATUSES.includes(w.status) ? w.status : 'todo');
+
+/** Mismos grupos que la app anterior: en curso, por hacer y hecho. */
+export const WORK_BUCKETS: Array<{ id: 'curso' | 'todo' | 'hecho'; label: string }> = [
+  { id: 'curso', label: 'En curso' },
+  { id: 'todo', label: 'Por hacer' },
+  { id: 'hecho', label: 'Hecho' },
+];
+export const workBucketOf = (w: Pick<LegacyWorkItem, 'done' | 'status'>): 'curso' | 'todo' | 'hecho' => (w.done ? 'hecho' : workStatusOf(w));
+
+export type BreathPhase = 'in' | 'hold' | 'out';
+export type BreathPatternId = 'caja' | '478';
+
+/** Técnicas de respiración de la app anterior (fases con sus segundos). */
+export const BREATH_PATTERNS: Record<BreathPatternId, { label: string; hint: string; phases: Array<[BreathPhase, number]> }> = {
+  caja: { label: 'Caja 4-4-4-4', hint: 'Inhala 4, mantén 4, exhala 4 y mantén 4 segundos. Ayuda a calmarte y concentrarte.', phases: [['in', 4], ['hold', 4], ['out', 4], ['hold', 4]] },
+  '478': { label: '4-7-8', hint: 'Inhala 4, mantén 7 y exhala 8 segundos. Ayuda a relajarte antes de dormir.', phases: [['in', 4], ['hold', 7], ['out', 8]] },
+};
+/** Orden fijo: «478» parece un número y Object.keys lo pondría primero. */
+export const BREATH_PATTERN_ORDER: BreathPatternId[] = ['caja', '478'];
+export const BREATH_PHASE_LABEL: Record<BreathPhase, string> = { in: 'Inhala', hold: 'Mantén', out: 'Exhala' };
+export const BREATH_DURATIONS = [1, 3, 5] as const;
+export type BreathMinutes = (typeof BREATH_DURATIONS)[number];
+
+/** Duración de un ciclo completo de la técnica, en milisegundos. */
+export const breathCycleMs = (pattern: BreathPatternId) => BREATH_PATTERNS[pattern].phases.reduce((s, [, n]) => s + n, 0) * 1000;
+
+/** Fase de la respiración en un momento de la sesión (en milisegundos desde el inicio). */
+export function breathPhase(pattern: BreathPatternId, ms: number): { phase: BreathPhase; index: number; secondsLeft: number; seconds: number } {
+  const phases = BREATH_PATTERNS[pattern].phases;
+  let t = ms % breathCycleMs(pattern);
+  for (let i = 0; i < phases.length; i++) {
+    const len = phases[i][1] * 1000;
+    if (t < len) return { phase: phases[i][0], index: i, seconds: phases[i][1], secondsLeft: Math.ceil((len - t) / 1000) };
+    t -= len;
+  }
+  return { phase: phases[0][0], index: 0, seconds: phases[0][1], secondsLeft: phases[0][1] };
+}
+
+/** El círculo está grande al inhalar y al mantener después de inhalar; pequeño en lo demás. */
+export function breathExpanded(pattern: BreathPatternId, index: number): boolean {
+  const phases = BREATH_PATTERNS[pattern].phases;
+  const phase = phases[index][0];
+  const prev = phases[(index + phases.length - 1) % phases.length][0];
+  return phase === 'in' || (phase === 'hold' && prev === 'in');
+}
+
+/** 90500 → "1:31" (el reloj de Respiración). */
+export const breathClock = (ms: number) => {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** Minutos de hoy, de esta semana y sesiones válidas de Respiración (día en UTC, como la app anterior). */
+export function meditationStats(sessions: LegacyMeditation[], today: Day) {
+  const valid = sessions.filter((s) => isDay(s.date) && typeof s.minutes === 'number');
+  const week = periodRange('week', today);
+  return {
+    valid,
+    todayMinutes: valid.filter((s) => s.date === today).reduce((n, s) => n + s.minutes, 0),
+    weekMinutes: valid.filter((s) => s.date >= week.from && s.date <= week.to).reduce((n, s) => n + s.minutes, 0),
+  };
+}
+
+/** Nombre del tipo de sesión («Respiración» para la de la app anterior o sin tipo). */
+export const meditationKindLabel = (kind: unknown) => (kind === MEDITATION_KIND || !kind || typeof kind !== 'string' ? 'Respiración' : kind);

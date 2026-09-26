@@ -1,4 +1,16 @@
-import { WORK_PROJECT_INFO, WORK_PROJECTS, WORK_STATUS_INFO, WORK_STATUSES, type LegacyWorkItem, type WorkProject, type WorkStatus } from '@dyc/core';
+import {
+  WORK_BUCKETS as BUCKETS,
+  WORK_PROJECT_INFO,
+  WORK_PROJECTS,
+  WORK_STATUS_INFO,
+  WORK_STATUSES,
+  workBucketOf as bucketOf,
+  workProjectOf as projectOf,
+  workStatusOf as statusOf,
+  type LegacyWorkItem,
+  type WorkProject,
+  type WorkStatus,
+} from '@dyc/core';
 import { Info, Pencil, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -7,18 +19,6 @@ import { Dialog } from '../components/Dialog';
 import { Segmented, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions } from '../components/ToolParts';
-
-/** Proyecto y estado desconocidos (datos raros) se muestran como el primero, sin cambiar el dato. */
-const projectOf = (w: LegacyWorkItem): WorkProject => (WORK_PROJECTS.includes(w.project) ? w.project : 'p1');
-const statusOf = (w: LegacyWorkItem): WorkStatus => (WORK_STATUSES.includes(w.status) ? w.status : 'todo');
-
-// Mismos grupos que la app anterior: en curso, por hacer y hecho.
-const BUCKETS: Array<{ id: 'curso' | 'todo' | 'hecho'; label: string }> = [
-  { id: 'curso', label: 'En curso' },
-  { id: 'todo', label: 'Por hacer' },
-  { id: 'hecho', label: 'Hecho' },
-];
-const bucketOf = (w: LegacyWorkItem) => (w.done ? 'hecho' : statusOf(w));
 
 export function Work() {
   const legacy = useLegacyData();

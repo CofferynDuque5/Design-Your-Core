@@ -1,4 +1,23 @@
-import { NOTE_DEFAULT_SUBJECT, NOTE_DEFAULT_TITLE, noteDateLabel, noteTag, splitTags, type LegacyNote } from '@dyc/core';
+import {
+  applyFormat,
+  byNameEs,
+  filterNotes,
+  groupNotesBySubject,
+  insertBlock,
+  NOTE_DEFAULT_SUBJECT,
+  NOTE_DEFAULT_TITLE,
+  noteBodyOf as bodyOf,
+  noteColorOf as colorOf,
+  noteDateLabel,
+  notePreview as previewOf,
+  noteSubjectOf as subjectOf,
+  noteTag,
+  noteTagList,
+  noteTitleOf as titleOf,
+  splitTags,
+  type FormatKind,
+  type LegacyNote,
+} from '@dyc/core';
 import { useIsMutating } from '@tanstack/react-query';
 import { ArrowLeft, Bold, Code, Heading2, ImagePlus, Italic, List, ListChecks, Plus, Quote, Search, Trash2 } from 'lucide-react';
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
@@ -9,20 +28,10 @@ import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
 import { Segmented, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { ConfirmDelete, safeColor } from '../components/ToolParts';
+import { ConfirmDelete } from '../components/ToolParts';
 import { plural } from '../lib/format';
-import { Markdown, markdownToText } from '../lib/markdown';
-import { applyFormat, insertBlock, type FormatKind } from '../lib/noteFormat';
+import { Markdown } from '../lib/markdown';
 import { useAutosave } from '../lib/tools';
-
-const byName = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
-const subjectOf = (n: LegacyNote) => (typeof n.subject === 'string' && n.subject.trim() ? n.subject.trim() : NOTE_DEFAULT_SUBJECT);
-const titleOf = (n: LegacyNote) => (typeof n.title === 'string' && n.title.trim() ? n.title : NOTE_DEFAULT_TITLE);
-const bodyOf = (n: LegacyNote) => (typeof n.body === 'string' ? n.body : '');
-const colorOf = (n: LegacyNote) => safeColor(n.tag, noteTag(subjectOf(n)));
-/** Texto de la tarjeta: el principio de la nota sin marcas de Markdown. */
-const previewOf = (n: LegacyNote) => markdownToText(bodyOf(n).slice(0, 1500)).slice(0, 160);
-const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // ---------- Biblioteca ----------
 
@@ -39,21 +48,10 @@ export function Notes() {
     if (opening && notes.some((n) => n.id === opening)) navigate(`/notas/${encodeURIComponent(opening)}`, { state: { fresh: true } });
   }, [opening, notes, navigate]);
 
-  const tags = useMemo(() => Array.from(new Set(notes.flatMap((n) => splitTags(n.tags).map((t) => t.toLowerCase())))).sort(byName), [notes]);
-  const shown = useMemo(() => {
-    const q = norm(query.trim());
-    return notes.filter(
-      (n) =>
-        (!tag || splitTags(n.tags).some((t) => t.toLowerCase() === tag)) &&
-        (!q || norm(`${titleOf(n)} ${subjectOf(n)} ${n.tags ?? ''} ${bodyOf(n).slice(0, 20_000)}`).includes(q)),
-    );
-  }, [notes, query, tag]);
+  const tags = useMemo(() => noteTagList(notes), [notes]);
+  const shown = useMemo(() => filterNotes(notes, query, tag), [notes, query, tag]);
   // Biblioteca por materia, como la app anterior.
-  const groups = useMemo(() => {
-    const map = new Map<string, LegacyNote[]>();
-    for (const n of shown) map.set(subjectOf(n), [...(map.get(subjectOf(n)) ?? []), n]);
-    return [...map].sort(([a], [b]) => byName(a, b));
-  }, [shown]);
+  const groups = useMemo(() => groupNotesBySubject(shown), [shown]);
 
   const create = () => {
     const subject = NOTE_DEFAULT_SUBJECT;
@@ -166,7 +164,7 @@ export function NoteEditor() {
       </div>
     );
   }
-  return <Editor key={note.id} note={note} subjects={Array.from(new Set(notes.map(subjectOf))).sort(byName)} />;
+  return <Editor key={note.id} note={note} subjects={Array.from(new Set(notes.map(subjectOf))).sort(byNameEs)} />;
 }
 
 function BackLink() {

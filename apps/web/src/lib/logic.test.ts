@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Markdown, markdownToText } from './markdown';
-import { applyFormat, insertBlock } from './noteFormat';
+import { applyFormat, insertBlock } from '@dyc/core';
 
 const md = (text: string, resolveImage?: (ref: string) => string | null | undefined) => render(createElement(Markdown, { text, resolveImage })).container;
 
