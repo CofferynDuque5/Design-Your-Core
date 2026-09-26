@@ -87,6 +87,7 @@ function Root({ fontsReady }: { fontsReady: boolean }) {
         </Stack.Protected>
         <Stack.Protected guard={signedIn && onboarded}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(herramientas)" />
           <Stack.Screen name="check-in" options={{ presentation: 'modal' }} />
         </Stack.Protected>
       </Stack>

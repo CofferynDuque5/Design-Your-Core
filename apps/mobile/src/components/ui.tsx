@@ -241,17 +241,32 @@ export function Scale({ legend, value, onChange, low, high }: { legend: string; 
   );
 }
 
-export function Segmented<V extends string>({ label, value, options, onChange }: { label: string; value: V; options: Array<{ value: V; label: string }>; onChange: (v: V) => void }) {
+export function Segmented<V extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: V;
+  /** `a11yLabel`: nombre completo para lectores cuando la etiqueta visible es corta. */
+  options: Array<{ value: V; label: string; a11yLabel?: string }>;
+  onChange: (v: V) => void;
+  disabled?: boolean;
+}) {
   const { colors } = useTheme();
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.segmented, { backgroundColor: colors.surfaceSunken }]}>
+    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.segmented, { backgroundColor: colors.surfaceSunken }, disabled && { opacity: 0.55 }]}>
       {options.map((o) => {
         const on = o.value === value;
         return (
           <Pressable
             key={o.value}
             accessibilityRole="radio"
-            accessibilityState={{ checked: on }}
+            accessibilityState={{ checked: on, disabled: !!disabled }}
+            accessibilityLabel={o.a11yLabel}
+            disabled={disabled}
             onPress={() => onChange(o.value)}
             style={[styles.segment, on && { backgroundColor: colors.surface, borderColor: colors.line }]}
           >
