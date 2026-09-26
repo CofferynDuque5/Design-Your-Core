@@ -62,6 +62,11 @@ const LEGACY = {
   journal: [{ id: 'j1', date: '2026-09-19', mood: '😄', gratitude: '', note: 'Buen día' }],
   routines: [{ id: 'rt1', title: 'Tomar vitaminas', time: '08:00', days: '1234567', icon: 'bell', sound: true, enabled: true }],
   meals: [{ id: 'ml1', label: 'Desayuno', time: '07:30', note: 'Avena', dateKey: TODAY }],
+  notes: [
+    { id: 'nt1', title: 'Ondas', subject: 'Física', date: '20 sept', tag: '#4F7CFF', excerpt: '', body: '# Ondas\n**Periodo** y [fuente](https://example.com)\n\n- [x] Repasar\n\n```\nT = 1/f\n```\n\n> Cita\n\n![](data:image/png;base64,iVBORw0KGgo=)', commit: false, tags: 'examen', shareId: null },
+  ],
+  workItems: [{ id: 'wk1', title: 'Informe mensual', project: 'p1', status: 'curso', done: false, due: 'Viernes' }],
+  meditations: [{ id: 'md1', date: TODAY, minutes: 3, kind: 'respiracion' }],
 };
 
 const HABIT = { id: 'h1', title: 'Caminar 10 minutos', pillar: 'movimiento', days: '1111111', startsOn: '2026-09-01', archived: false, createdAt: '2026-09-01T00:00:00.000Z', recent: [] };
@@ -109,7 +114,7 @@ describe('accesibilidad de la app móvil', () => {
     for (const [path, marker] of [
       ['/progreso', 'Tus pilares'],
       ['/retos', 'Catálogo'],
-      ['/habitos', 'Caminar 10 minutos'],
+      ['/habitos', 'Mostrar archivados'],
       ['/perfil', 'Apariencia'],
       ['/check-in', 'Ánimo y mente'],
       ['/mas', 'Organización'],
@@ -134,10 +139,18 @@ describe('accesibilidad de la app móvil', () => {
       ['/sueno', 'Horas por noche'],
       ['/diario', 'Buen día'],
       ['/rutina', 'Tomar vitaminas'],
+      ['/notas', 'Ondas'],
+      ['/notas/nt1', 'Guardado'],
+      ['/trabajo', 'Informe mensual'],
+      ['/respiracion', 'Tus minutos de calma'],
     ] as const) {
       await act(async () => router.push(path));
       expect(await screen.findAllByText(marker)).not.toHaveLength(0);
       expect({ path, problems: problems() }).toEqual({ path, problems: [] });
+      // Los interruptores de toda la app llevan el pulgar blanco (se ve en el tema oscuro).
+      if (path === '/habitos') expect(screen.getByRole('switch', { name: 'Mostrar archivados' })).toBeOnTheScreen();
+      if (path === '/perfil') expect(screen.getByRole('switch', { name: 'Recordatorio diario' })).toBeOnTheScreen();
+      for (const sw of screen.queryAllByRole('switch')) expect({ path, thumb: sw.props.thumbTintColor }).toEqual({ path, thumb: '#FFFFFF' });
     }
 
     // Hojas y paneles de las herramientas.
@@ -145,6 +158,19 @@ describe('accesibilidad de la app móvil', () => {
     fireEvent.press(await screen.findByRole('button', { name: /^Pasos y opciones de «Llamar al dentista»/ }));
     expect(await screen.findByText('Buscar el número')).toBeOnTheScreen();
     expect({ path: 'pendientes abierto', problems: problems() }).toEqual({ path: 'pendientes abierto', problems: [] });
+    // El editor de notas en «Escribir», con su barra de formato, y la confirmación de borrar.
+    await act(async () => router.push('/notas/nt1'));
+    fireEvent.press(await screen.findByRole('radio', { name: 'Escribir' }));
+    expect(await screen.findByRole('button', { name: 'Negrita' })).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Borrar nota' }));
+    expect(await screen.findByRole('button', { name: 'Borrar definitivamente' })).toBeOnTheScreen();
+    expect({ path: 'nota (escribir)', problems: problems() }).toEqual({ path: 'nota (escribir)', problems: [] });
+    // Respiración en marcha.
+    await act(async () => router.push('/respiracion'));
+    fireEvent.press(await screen.findByRole('button', { name: 'Empezar' }));
+    expect(await screen.findByRole('button', { name: 'Pausar' })).toBeOnTheScreen();
+    expect({ path: 'respiración (en marcha)', problems: problems() }).toEqual({ path: 'respiración (en marcha)', problems: [] });
+    fireEvent.press(screen.getByRole('button', { name: 'Terminar' }));
     // Temas, hitos y la confirmación de borrar dentro de una hoja.
     for (const [path, button, marker] of [
       ['/materias', 'Temas de «Cálculo»: 1 de 1 vistos', 'Límites'],
@@ -177,6 +203,7 @@ describe('accesibilidad de la app móvil', () => {
       ['/sueno', 'Registrar noche', 'Te acostaste'],
       ['/rutina', 'Nueva rutina', 'Qué haces'],
       ['/rutina', 'Editar Desayuno de las 07:30', 'Qué comiste (opcional)'],
+      ['/trabajo', 'Editar «Informe mensual»', 'Para cuándo (opcional)'],
     ] as const) {
       await act(async () => router.push(path));
       fireEvent.press(await screen.findByRole('button', { name: button }));
@@ -192,5 +219,6 @@ describe('accesibilidad de la app móvil', () => {
       // El velo de la hoja la cierra (queda fuera del foco del lector mientras está abierta).
       fireEvent.press(screen.UNSAFE_getAllByProps({ accessibilityLabel: 'Cerrar' }).at(-1)!);
     }
-  });
+    // Recorre más de 30 pantallas y hojas: con el resto de paquetes en paralelo tarda más que el límite general.
+  }, 120_000);
 });
