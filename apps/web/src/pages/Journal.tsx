@@ -1,4 +1,4 @@
-import { addDays, isDay, JOURNAL_MOODS, longDay, shortDay, utcDayKey, type LegacyJournal } from '@dyc/core';
+import { byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, shortDay, utcDayKey, type LegacyJournal } from '@dyc/core';
 import { Trash2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -20,7 +20,7 @@ export function Journal() {
   // Una entrada por fecha, con el día en UTC como la app anterior.
   const today = utcDayKey();
   const [date, setDate] = useState(today);
-  const entries = useMemo(() => journal.filter((j) => isDay(j.date)).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)), [journal]);
+  const entries = useMemo(() => journal.filter((j) => isDay(j.date)).sort(byDateDesc), [journal]);
   const entry = entries.find((j) => j.date === date);
   // La app anterior creaba la entrada al abrir la sección; aquí se crea con lo primero que escribes.
   const created = useRef(new Map<string, string>());
@@ -48,20 +48,8 @@ export function Journal() {
     });
   };
 
-  const stats = useMemo(() => {
-    const days = new Set(entries.map((e) => e.date));
-    let day = days.has(today) ? today : addDays(today, -1);
-    let streak = 0;
-    while (days.has(day)) {
-      streak++;
-      day = addDays(day, -1);
-    }
-    const counts = new Map<string, number>();
-    for (const e of entries.slice(0, 30)) if (e.mood) counts.set(e.mood, (counts.get(e.mood) ?? 0) + 1);
-    const top = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
-    return { month: entries.filter((e) => e.date.startsWith(today.slice(0, 7))).length, streak, top };
-  }, [entries, today]);
-  const topLabel = JOURNAL_MOODS.find((m) => m.emoji === stats.top)?.label;
+  const stats = useMemo(() => journalStats(entries, today), [entries, today]);
+  const topLabel = stats.topLabel;
 
   return (
     <div className="page">

@@ -1,4 +1,4 @@
-import { diffDays, GOAL_CATEGORIES, GOAL_CATEGORY_INFO, goalPercent, goalStep, goalToggleDone, isDay, shortDay, type GoalCategory, type LegacyGoal } from '@dyc/core';
+import { GOAL_CATEGORIES, GOAL_CATEGORY_INFO, goalCategoryOf as categoryOf, goalDeadlineLabel as deadlineLabel, goalPercent, goalStep, goalToggleDone, isDay, shortDay, type GoalCategory, type LegacyGoal } from '@dyc/core';
 import { CalendarClock, Check, Minus, Pencil, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -10,18 +10,7 @@ import { FormActions, Meter, Stats } from '../components/ToolParts';
 import { localDayKey } from '../lib/tools';
 
 type Filter = 'todas' | GoalCategory;
-/** Una categoría desconocida se muestra como «Personal», sin cambiar el dato. */
-const categoryOf = (g: LegacyGoal): GoalCategory => (GOAL_CATEGORIES.includes(g.category) ? g.category : 'personal');
 const num = (x: unknown, fallback = 0) => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
-
-/** "Vence hoy", "Faltan 3 días", "Venció hace 2 días". */
-function deadlineLabel(deadline: string, today: string): { text: string; late: boolean } | null {
-  if (!isDay(deadline)) return null;
-  const d = diffDays(today, deadline);
-  if (d === 0) return { text: 'Vence hoy', late: false };
-  if (d > 0) return { text: `${d === 1 ? 'Falta 1 día' : `Faltan ${d} días`} · ${shortDay(deadline)}`, late: false };
-  return { text: `Venció hace ${-d === 1 ? '1 día' : `${-d} días`} · ${shortDay(deadline)}`, late: true };
-}
 
 export function Goals() {
   const legacy = useLegacyData();

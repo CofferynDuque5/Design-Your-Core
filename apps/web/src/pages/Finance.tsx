@@ -1,4 +1,4 @@
-import { monthSummary, shortDay, TX_CATEGORIES, TX_TYPE_INFO, TX_TYPES, utcDayKey, type LegacyTransaction, type TxType } from '@dyc/core';
+import { monthSummary, parseAmount, shortDay, TX_CATEGORIES, TX_TYPE_INFO, TX_TYPES, txTypeOf as typeOf, utcDayKey, type LegacyTransaction, type TxType } from '@dyc/core';
 import { Pencil, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../app/legacy';
@@ -12,14 +12,6 @@ import { money } from '../lib/tools';
 
 const SHOWN_MAX = 300;
 const TYPE_OPTIONS = TX_TYPES.map((t) => ({ value: t, label: TX_TYPE_INFO[t].label }));
-const typeOf = (t: LegacyTransaction): TxType => (t.type === 'income' ? 'income' : 'expense');
-
-/** "12,30" o "12.30" → 12.3 (hasta dos decimales). null si no es una cantidad. */
-function parseAmount(text: string): number | null {
-  const t = text.trim().replace(/\s/g, '');
-  if (!/^\d+([.,]\d{1,2})?$/.test(t)) return null;
-  return Number(t.replace(',', '.'));
-}
 
 /** Presupuesto que la app anterior guardaba en este navegador (solo como sugerencia). */
 function oldBudget(): number | null {

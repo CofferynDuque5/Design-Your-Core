@@ -1,19 +1,21 @@
 import {
-  addDays,
   cycleInfo,
   cyclePredictions,
+  daySpan as span,
   diffDays,
   isDay,
   longDay,
+  monthEnd as lastOfMonth,
   PERIOD_FLOW_INFO,
   PERIOD_FLOWS,
   PERIOD_MOODS,
   PERIOD_SYMPTOMS,
+  periodFlowOf as flowOf,
+  periodReminder,
   periodRuns,
   shortDay,
   splitTags,
   type LegacyPeriodDay,
-  type PeriodFlow,
 } from '@dyc/core';
 import { CalendarPlus, Lock } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
@@ -27,11 +29,6 @@ import { MonthNav, MoodPicker, Stats } from '../components/ToolParts';
 import { localDayKey, monthWeeks, useAutosave, WEEK_HEAD } from '../lib/tools';
 
 const FLOW_OPTIONS = PERIOD_FLOWS.map((f) => ({ value: f, label: PERIOD_FLOW_INFO[f].label }));
-const flowOf = (p: LegacyPeriodDay): PeriodFlow => (PERIOD_FLOWS.includes(p.flow) ? p.flow : 'medium');
-/** «24–28 sept» dentro del mismo mes; si no, «30 sept – 3 oct». */
-const span = (a: string, b: string) => (a === b ? shortDay(a) : a.slice(0, 7) === b.slice(0, 7) ? `${Number(a.slice(8))}–${shortDay(b)}` : `${shortDay(a)} – ${shortDay(b)}`);
-const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-const lastOfMonth = (month: string) => addDays(`${month.slice(0, 7)}-01`, new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate() - 1);
 
 export function Cycle() {
   const legacy = useLegacyData();
@@ -294,9 +291,9 @@ function CycleSettings({ cycleLength, periodLength, nextStart }: { cycleLength: 
   // Como la app anterior: un evento del Calendario el día del mes previsto.
   const remind = () => {
     if (!nextStart) return;
-    const day = Number(nextStart.slice(8));
-    reminders.add({ id: newId(), day, title: '🩸 Posible inicio del periodo', when: MONTHS[Number(nextStart.slice(5, 7)) - 1], color: '#EC6A9C', icon: 'doc', on: true });
-    toast(`Aviso añadido al Calendario el día ${day}. Los eventos se repiten cada mes: bórralo cuando pase.`);
+    const item = periodReminder(newId(), nextStart);
+    reminders.add(item);
+    toast(`Aviso añadido al Calendario el día ${item.day}. Los eventos se repiten cada mes: bórralo cuando pase.`);
   };
 
   return (

@@ -1,4 +1,4 @@
-import { CARE_KIND_INFO, CARE_KINDS, daysLabel, nextDue, PET_SPECIES, PET_SPECIES_INFO, utcDayKey, type CareKind, type LegacyPet, type LegacyPetCare, type PetSpecies } from '@dyc/core';
+import { CARE_KIND_INFO, CARE_KINDS, careKindOf as kindOf, careWhen, nextDue, PET_SPECIES, PET_SPECIES_INFO, petSpeciesOf as speciesOf, utcDayKey, weekdaysOf as validDays, type CareKind, type LegacyPet, type LegacyPetCare, type PetSpecies } from '@dyc/core';
 import { Pencil, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -9,32 +9,6 @@ import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions, Stats, WeekdayPicker } from '../components/ToolParts';
 import { plural } from '../lib/format';
 import { useNow } from '../lib/tools';
-
-const WEEKDAY_LONG = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-/** Valores desconocidos se muestran como los de por defecto, sin cambiar el dato. */
-const speciesOf = (p: LegacyPet): PetSpecies => (PET_SPECIES.includes(p.species) ? p.species : 'other');
-const kindOf = (c: LegacyPetCare): CareKind => (CARE_KINDS.includes(c.kind) ? c.kind : 'otro');
-const validDays = (d: unknown) => (typeof d === 'string' && /^[1-7]{1,7}$/.test(d) ? d : '1234567');
-
-/** "Hoy a las 08:00 · pendiente", "Mañana a las 18:00", "El jueves". */
-function dueLabel(care: LegacyPetCare, now: Date): string {
-  const due = nextDue(care, now);
-  if (!due) return 'Aviso desactivado';
-  const at = due.time ? ` a las ${due.time}` : '';
-  if (due.inDays === 0) return `Hoy${at}${due.late ? ' · pendiente' : ''}`;
-  if (due.inDays === 1) return `Mañana${at}`;
-  // Si solo toca un día a la semana, «Los sábados» ya dice cuándo es el próximo.
-  if (validDays(care.days).length === 1) return `${daysLabel(validDays(care.days))}${at}`;
-  const iso = ((now.getDay() === 0 ? 7 : now.getDay()) - 1 + due.inDays) % 7;
-  return `El ${WEEKDAY_LONG[iso]}${at}`;
-}
-
-function careWhen(care: LegacyPetCare, done: boolean, now: Date): string {
-  const days = daysLabel(validDays(care.days));
-  if (done) return `Hecho hoy · ${days}`;
-  const due = dueLabel(care, now);
-  return due.startsWith(days) ? due : `${due} · ${days}`;
-}
 
 export function Pets() {
   const legacy = useLegacyData();

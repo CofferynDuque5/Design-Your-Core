@@ -1,29 +1,45 @@
-import { addDays, isDay, type Day } from './dates.js';
-import { plural } from './format.js';
+import { addDays, diffDays, isDay, type Day } from './dates.js';
+import { daysLabel, plural, shortDay } from './format.js';
 import {
   BOX_COLORS,
+  CARE_KIND_INFO,
+  CARE_KINDS,
   CODE_BOX_COLOR,
   CODE_LANGS,
   CONTENT_PLATFORMS,
   CONTENT_STAGES,
   cycleInfo,
+  GOAL_CATEGORIES,
   cyclePredictions,
   hhmmToHours,
   IDEA_CATEGORIES,
+  JOURNAL_MOODS,
   legacyList,
   legacyObject,
+  nextDue,
+  PERIOD_FLOWS,
+  PET_SPECIES,
   PROJECT_STATUSES,
+  SLEEP_QUALITY_LABELS,
+  type CareKind,
   type ContentPlatform,
   type ContentStage,
+  type GoalCategory,
   type IdeaCategory,
   type LegacyClass,
   type LegacyContent,
   type LegacyData,
   type LegacyIdea,
+  type LegacyJournal,
   type LegacyNoteBox,
+  type LegacyPetCare,
   type LegacyReminder,
+  type LegacyRoutine,
+  type PeriodFlow,
+  type PetSpecies,
   type ProjectStatus,
   type StepState,
+  type TxType,
 } from './legacy.js';
 import { legacyVault, vaultSecureOf } from './vault.js';
 
@@ -624,3 +640,132 @@ export const coreImageIds = (text: string): string[] => Array.from(new Set(Array
 
 /** Imágenes incrustadas en base64 en un texto, sin repetir. */
 export const inlineImages = (text: string): string[] => Array.from(new Set(text.match(DATA_IMG_IN_TEXT) ?? []));
+
+// ---------- Tanda 3: Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario y Rutina ----------
+
+/** "12,30" o "12.30" → 12.3 (hasta dos decimales). null si no es una cantidad. */
+export function parseAmount(text: string): number | null {
+  const t = text.trim().replace(/\s/g, '');
+  if (!/^\d+([.,]\d{1,2})?$/.test(t)) return null;
+  return Number(t.replace(',', '.'));
+}
+
+/** Todo lo que no es `income` cuenta como gasto, como la app anterior. */
+export const txTypeOf = (t: { type?: unknown }): TxType => (t.type === 'income' ? 'income' : 'expense');
+
+/** Del más reciente al más antiguo por `date` (historiales de Finanzas, Ejercicio, Sueño y Diario). */
+export const byDateDesc = <T extends { date: string }>(a: T, b: T) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+
+/** Por hora "HH:MM"; sin hora, al final (rutinas, comidas y cuidados). */
+export const byTime = <T extends { time?: string }>(a: T, b: T) => (a.time || '99').localeCompare(b.time || '99');
+
+// Un valor desconocido se muestra como el de por defecto, sin cambiar el dato.
+export const goalCategoryOf = (g: { category?: unknown }): GoalCategory => (GOAL_CATEGORIES.includes(g.category as GoalCategory) ? (g.category as GoalCategory) : 'personal');
+export const petSpeciesOf = (p: { species?: unknown }): PetSpecies => (PET_SPECIES.includes(p.species as PetSpecies) ? (p.species as PetSpecies) : 'other');
+export const careKindOf = (c: { kind?: unknown }): CareKind => (CARE_KINDS.includes(c.kind as CareKind) ? (c.kind as CareKind) : 'otro');
+export const periodFlowOf = (p: { flow?: unknown }): PeriodFlow => (PERIOD_FLOWS.includes(p.flow as PeriodFlow) ? (p.flow as PeriodFlow) : 'medium');
+
+/** Días de la semana guardados ("1234567", 1 = lunes); si no son válidos, todos (el valor por defecto de la app anterior). */
+export const weekdaysOf = (d: unknown): string => (typeof d === 'string' && /^[1-7]{1,7}$/.test(d) ? d : '1234567');
+
+/** «Vence hoy», «Faltan 3 días · 29 sept», «Venció hace 2 días · 24 sept». null sin fecha válida. */
+export function goalDeadlineLabel(deadline: unknown, today: Day): { text: string; late: boolean } | null {
+  if (!isDay(deadline)) return null;
+  const d = diffDays(today, deadline);
+  if (d === 0) return { text: 'Vence hoy', late: false };
+  if (d > 0) return { text: `${d === 1 ? 'Falta 1 día' : `Faltan ${d} días`} · ${shortDay(deadline)}`, late: false };
+  return { text: `Venció hace ${-d === 1 ? '1 día' : `${-d} días`} · ${shortDay(deadline)}`, late: true };
+}
+
+/** Nombre de cada día de la semana (1 = lunes): «El jueves» y nombres para lectores del selector de días. */
+export const WEEKDAY_LONG_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'] as const;
+
+/** Cuándo toca un cuidado: «Hoy a las 08:00 · pendiente», «Mañana a las 18:00», «El jueves», «Los sábados». */
+export function careDueLabel(care: Pick<LegacyPetCare, 'days' | 'time' | 'enabled' | 'lastDone'>, now: Date): string {
+  const due = nextDue(care, now);
+  if (!due) return 'Aviso desactivado';
+  const at = due.time ? ` a las ${due.time}` : '';
+  if (due.inDays === 0) return `Hoy${at}${due.late ? ' · pendiente' : ''}`;
+  if (due.inDays === 1) return `Mañana${at}`;
+  // Si solo toca un día a la semana, «Los sábados» ya dice cuándo es el próximo.
+  const days = weekdaysOf(care.days);
+  if (days.length === 1) return `${daysLabel(days)}${at}`;
+  const iso = ((now.getDay() === 0 ? 7 : now.getDay()) - 1 + due.inDays) % 7;
+  return `El ${WEEKDAY_LONG_NAMES[iso]}${at}`;
+}
+
+/** Línea de un cuidado: «Hecho hoy · Todos los días» o cuándo toca con sus días. */
+export function careWhen(care: Pick<LegacyPetCare, 'days' | 'time' | 'enabled' | 'lastDone'>, done: boolean, now: Date): string {
+  const days = daysLabel(weekdaysOf(care.days));
+  if (done) return `Hecho hoy · ${days}`;
+  const due = careDueLabel(care, now);
+  return due.startsWith(days) ? due : `${due} · ${days}`;
+}
+
+/** «24–28 sept» dentro del mismo mes; si no, «30 sept – 3 oct». */
+export const daySpan = (a: Day, b: Day) => (a === b ? shortDay(a) : a.slice(0, 7) === b.slice(0, 7) ? `${Number(a.slice(8))}–${shortDay(b)}` : `${shortDay(a)} – ${shortDay(b)}`);
+
+/** Último día del mes de `month` ("2026-09-01" → "2026-09-30"). */
+export const monthEnd = (month: Day): Day => addDays(`${month.slice(0, 7)}-01`, daysInMonth(`${month.slice(0, 7)}-01`) - 1);
+
+/** Nombres de los meses en minúscula, como el `when` de los avisos de Ciclo. */
+export const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'] as const;
+
+/** Color del aviso de Ciclo: el rosa de la paleta de eventos (el #E5487D de la app anterior no está en ella). */
+export const PERIOD_REMINDER_COLOR = '#EC6A9C';
+
+/** «Recordarme el próximo periodo»: un evento del Calendario el día del mes previsto, como la app anterior. */
+export const periodReminder = (id: string, nextStart: Day): LegacyReminder => ({
+  id,
+  day: Number(nextStart.slice(8)),
+  title: '🩸 Posible inicio del periodo',
+  when: MONTH_NAMES[Number(nextStart.slice(5, 7)) - 1],
+  color: PERIOD_REMINDER_COLOR,
+  icon: 'doc',
+  on: true,
+});
+
+/** «Agendar» un plan de Ejercicio: una rutina diaria a las 18:00, como la app anterior. */
+export const workoutRoutine = (id: string, plan: string): LegacyRoutine => ({ id, title: `🏋️ Entreno: ${plan}`, time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
+
+/** Calidad de una noche: «Buena (4/5)» o «Sin calidad». */
+export const sleepQualityLabel = (q: unknown) => (typeof q === 'number' && Number.isInteger(q) && q >= 1 && q <= 5 ? `${SLEEP_QUALITY_LABELS[q - 1]} (${q}/5)` : 'Sin calidad');
+
+/** Cifras del Diario: entradas de este mes (UTC), racha de días seguidos y ánimo más frecuente de las últimas 30. */
+export function journalStats(list: Array<Pick<LegacyJournal, 'date' | 'mood'>>, today: Day): { month: number; streak: number; top: string | null; topLabel: string | null } {
+  const entries = list.filter((j) => isDay(j.date)).sort(byDateDesc);
+  const days = new Set(entries.map((e) => e.date));
+  let day = days.has(today) ? today : addDays(today, -1);
+  let streak = 0;
+  while (days.has(day)) {
+    streak++;
+    day = addDays(day, -1);
+  }
+  const counts = new Map<string, number>();
+  for (const e of entries.slice(0, 30)) if (typeof e.mood === 'string' && e.mood) counts.set(e.mood, (counts.get(e.mood) ?? 0) + 1);
+  const top = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  return {
+    month: entries.filter((e) => e.date.startsWith(today.slice(0, 7))).length,
+    streak,
+    top,
+    topLabel: JOURNAL_MOODS.find((m) => m.emoji === top)?.label ?? null,
+  };
+}
+
+/** Filtro de días de Rutina: 0 = todos, 1 = lunes … 7 = domingo. */
+export const ROUTINE_DAY_FILTERS = [
+  { iso: 0, short: 'Todos', long: 'Todos los días' },
+  { iso: 1, short: 'L', long: 'Lunes' },
+  { iso: 2, short: 'M', long: 'Martes' },
+  { iso: 3, short: 'X', long: 'Miércoles' },
+  { iso: 4, short: 'J', long: 'Jueves' },
+  { iso: 5, short: 'V', long: 'Viernes' },
+  { iso: 6, short: 'S', long: 'Sábado' },
+  { iso: 7, short: 'D', long: 'Domingo' },
+] as const;
+
+/** Añadir o quitar un día ("135" + 2 → "1235"). Nunca deja la lista vacía (devuelve la anterior). */
+export function toggleWeekday(days: string, iso: string): string {
+  const next = days.includes(iso) ? days.replace(iso, '') : [...days, iso].sort().join('');
+  return next || days;
+}

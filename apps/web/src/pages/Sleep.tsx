@@ -1,4 +1,4 @@
-import { isDay, shortDay, SLEEP_QUALITY_LABELS, sleepMinutes, sleepStats, utcDayKey, type LegacySleep } from '@dyc/core';
+import { byDateDesc, isDay, shortDay, sleepMinutes, sleepQualityLabel as qualityLabel, sleepStats, utcDayKey, type LegacySleep } from '@dyc/core';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -13,8 +13,6 @@ import { minutesLabel } from '../lib/tools';
 const HISTORY_MAX = 60;
 const CHART_NIGHTS = 14;
 const HOURS = new Intl.NumberFormat('es', { maximumFractionDigits: 1 });
-const byDateDesc = (a: LegacySleep, b: LegacySleep) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
-const qualityLabel = (q: unknown) => (typeof q === 'number' && q >= 1 && q <= 5 ? `${SLEEP_QUALITY_LABELS[q - 1]} (${q}/5)` : 'Sin calidad');
 
 export function Sleep() {
   const legacy = useLegacyData();

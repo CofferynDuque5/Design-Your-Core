@@ -1,4 +1,4 @@
-import { daysLabel, monthLabel, WEEKDAYS, type LegacyCheckItem } from '@dyc/core';
+import { daysLabel, monthLabel, toggleWeekday, WEEKDAY_LONG_NAMES, WEEKDAYS, type LegacyCheckItem } from '@dyc/core';
 import { ChevronLeft, ChevronRight, Info, Trash2 } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -145,13 +145,11 @@ export { optionsWith, paletteWith, safeColor } from '@dyc/core';
 
 // ---------- Tanda 3 ----------
 
-const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-
 /** Días de la semana como en la app anterior ("1234567", 1 = lunes). Nunca deja la lista vacía. */
 export function WeekdayPicker({ legend, value, onChange, hint }: { legend: string; value: string; onChange: (days: string) => void; hint?: ReactNode }) {
   const toggle = (iso: string) => {
-    const next = value.includes(iso) ? value.replace(iso, '') : [...value, iso].sort().join('');
-    if (next) onChange(next);
+    const next = toggleWeekday(value, iso);
+    if (next !== value) onChange(next);
   };
   return (
     <fieldset className="field">
@@ -162,7 +160,7 @@ export function WeekdayPicker({ legend, value, onChange, hint }: { legend: strin
             <input type="checkbox" checked={value.includes(w.iso)} onChange={() => toggle(w.iso)} />
             <span>
               <span aria-hidden="true">{w.label}</span>
-              <span className="visually-hidden">{WEEKDAY_NAMES[i]}</span>
+              <span className="visually-hidden">{WEEKDAY_LONG_NAMES[i]}</span>
             </span>
           </label>
         ))}

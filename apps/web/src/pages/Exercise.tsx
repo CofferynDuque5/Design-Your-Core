@@ -1,4 +1,4 @@
-import { isDay, shortDay, utcDayKey, workoutStats, WORKOUT_PLANS, type LegacyWorkout } from '@dyc/core';
+import { byDateDesc, isDay, shortDay, utcDayKey, workoutRoutine, workoutStats, WORKOUT_PLANS, type LegacyWorkout } from '@dyc/core';
 import { CalendarPlus, Check, Dumbbell, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -10,7 +10,6 @@ import { EmptyState, ErrorState, Loading } from '../components/States';
 import { CheckInNote, FormActions, Stats } from '../components/ToolParts';
 
 const HISTORY_MAX = 60;
-const byDateDesc = (a: LegacyWorkout, b: LegacyWorkout) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 
 export function Exercise() {
   const legacy = useLegacyData();
@@ -31,7 +30,7 @@ export function Exercise() {
   };
   // Como la app anterior: una rutina diaria a las 18:00.
   const schedule = (plan: string) => {
-    routines.add({ id: newId(), title: `🏋️ Entreno: ${plan}`, time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
+    routines.add(workoutRoutine(newId(), plan));
     toast(`«${plan}» añadido a tu Rutina, todos los días a las 18:00.`);
   };
   const remove = (w: LegacyWorkout) => {

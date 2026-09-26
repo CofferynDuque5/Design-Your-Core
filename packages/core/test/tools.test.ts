@@ -32,7 +32,27 @@ import {
   TOOL_GROUPS,
   toolStatus,
   validClass,
+  byDateDesc,
+  byTime,
+  careDueLabel,
+  careKindOf,
+  careWhen,
+  daySpan,
+  goalCategoryOf,
+  goalDeadlineLabel,
+  journalStats,
+  monthEnd,
+  parseAmount,
+  periodFlowOf,
+  periodReminder,
+  petSpeciesOf,
+  sleepQualityLabel,
+  toggleWeekday,
+  txTypeOf,
+  weekdaysOf,
+  workoutRoutine,
 } from '../src/tools.js';
+import { utcDayKey } from '../src/legacy.js';
 
 // Catálogo de «Más» y utilidades de las herramientas que comparten la web y el móvil.
 describe('herramientas compartidas', () => {
@@ -180,5 +200,74 @@ describe('herramientas compartidas', () => {
     expect(coreImageIds(text)).toEqual(['abc_1', 'zz-9']);
     expect(inlineImages(text)).toEqual(['data:image/png;base64,iVBOR=']);
     expect(inlineImages('sin imágenes')).toEqual([]);
+  });
+
+  it('tanda 3: montos, tipos, categorías y valores desconocidos', () => {
+    expect(parseAmount('12,30')).toBe(12.3);
+    expect(parseAmount(' 1 200 ')).toBe(1200);
+    expect(parseAmount('0.5')).toBe(0.5);
+    expect(parseAmount('12.345')).toBeNull();
+    expect(parseAmount('-3')).toBeNull();
+    expect(parseAmount('doce')).toBeNull();
+    expect(txTypeOf({ type: 'income' })).toBe('income');
+    expect(txTypeOf({ type: 'raro' })).toBe('expense');
+    expect(goalCategoryOf({ category: 'dinero' })).toBe('dinero');
+    expect(goalCategoryOf({ category: 'viajes' })).toBe('personal');
+    expect(petSpeciesOf({ species: 'dragon' })).toBe('other');
+    expect(careKindOf({ kind: 'paseo' })).toBe('paseo');
+    expect(periodFlowOf({ flow: 'x' })).toBe('medium');
+    expect(weekdaysOf('135')).toBe('135');
+    expect(weekdaysOf('089')).toBe('1234567');
+    expect(weekdaysOf(undefined)).toBe('1234567');
+    expect(toggleWeekday('135', '2')).toBe('1235');
+    expect(toggleWeekday('135', '3')).toBe('15');
+    expect(toggleWeekday('4', '4')).toBe('4');
+    const byDate = [{ date: '2026-09-01' }, { date: '2026-09-20' }, { date: '2026-09-05' }].sort(byDateDesc);
+    expect(byDate.map((d) => d.date)).toEqual(['2026-09-20', '2026-09-05', '2026-09-01']);
+    expect([{ time: '' }, { time: '18:00' }, { time: '07:30' }].sort(byTime).map((x) => x.time)).toEqual(['07:30', '18:00', '']);
+  });
+
+  it('tanda 3: fechas límite, periodos, avisos y rutinas', () => {
+    expect(goalDeadlineLabel('2026-09-26', '2026-09-26')).toEqual({ text: 'Vence hoy', late: false });
+    expect(goalDeadlineLabel('2026-09-27', '2026-09-26')).toEqual({ text: 'Falta 1 día · 27 sept', late: false });
+    expect(goalDeadlineLabel('2026-09-29', '2026-09-26')).toEqual({ text: 'Faltan 3 días · 29 sept', late: false });
+    expect(goalDeadlineLabel('2026-09-24', '2026-09-26')).toEqual({ text: 'Venció hace 2 días · 24 sept', late: true });
+    expect(goalDeadlineLabel('', '2026-09-26')).toBeNull();
+    expect(daySpan('2026-09-24', '2026-09-24')).toBe('24 sept');
+    expect(daySpan('2026-09-24', '2026-09-28')).toBe('24–28 sept');
+    expect(daySpan('2026-09-30', '2026-10-03')).toBe('30 sept – 3 oct');
+    expect(monthEnd('2026-02-01')).toBe('2026-02-28');
+    expect(monthEnd('2028-02-10')).toBe('2028-02-29');
+    expect(monthEnd('2026-09-15')).toBe('2026-09-30');
+    expect(periodReminder('r1', '2026-10-24')).toEqual({ id: 'r1', day: 24, title: '🩸 Posible inicio del periodo', when: 'octubre', color: '#EC6A9C', icon: 'doc', on: true });
+    expect(workoutRoutine('o1', 'Full body')).toEqual({ id: 'o1', title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
+    expect(sleepQualityLabel(4)).toBe('Buena (4/5)');
+    expect(sleepQualityLabel(0)).toBe('Sin calidad');
+    expect(sleepQualityLabel('5')).toBe('Sin calidad');
+  });
+
+  it('tanda 3: cuándo toca cada cuidado de mascota', () => {
+    // Sábado 26 de septiembre de 2026, 10:00 (hora local).
+    const now = new Date(2026, 8, 26, 10, 0);
+    const today = utcDayKey(now);
+    const care = (over: Record<string, unknown>) => ({ days: '1234567', time: '', enabled: true, lastDone: '', ...over });
+    expect(careDueLabel(care({ time: '08:00' }), now)).toBe('Hoy a las 08:00 · pendiente');
+    expect(careWhen(care({ time: '08:00' }), false, now)).toBe('Hoy a las 08:00 · pendiente · Todos los días');
+    expect(careDueLabel(care({ time: '20:00' }), now)).toBe('Hoy a las 20:00');
+    expect(careDueLabel(care({ days: '7' }), now)).toBe('Mañana');
+    expect(careDueLabel(care({ days: '12345', time: '07:00' }), now)).toBe('El lunes a las 07:00');
+    expect(careDueLabel(care({ days: '6', time: '18:00', lastDone: today }), now)).toBe('Los sábados a las 18:00');
+    expect(careWhen(care({ days: '6', time: '18:00', lastDone: today }), false, now)).toBe('Los sábados a las 18:00');
+    expect(careWhen(care({ days: '12345' }), true, now)).toBe('Hecho hoy · Entre semana');
+    expect(careDueLabel(care({ enabled: false }), now)).toBe('Aviso desactivado');
+  });
+
+  it('tanda 3: cifras del Diario', () => {
+    const j = (date: string, mood = '') => ({ date, mood });
+    const stats = journalStats([j('2026-09-26', '🙂'), j('2026-09-25', '😄'), j('2026-09-24', '🙂'), j('2026-09-20'), j('2026-08-31', '😣'), j('mal')], '2026-09-26');
+    expect(stats).toEqual({ month: 4, streak: 3, top: '🙂', topLabel: 'Bien' });
+    // Sin entrada hoy, la racha cuenta desde ayer.
+    expect(journalStats([j('2026-09-25'), j('2026-09-24')], '2026-09-26')).toEqual({ month: 2, streak: 2, top: null, topLabel: null });
+    expect(journalStats([], '2026-09-26').streak).toBe(0);
   });
 });

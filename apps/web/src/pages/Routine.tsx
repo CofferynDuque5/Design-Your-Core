@@ -1,4 +1,4 @@
-import { daysLabel, MEAL_LABELS, onWeekday, utcDayKey, waterToday, WATER_GOAL_DEFAULT, type LegacyMeal, type LegacyRoutine } from '@dyc/core';
+import { byTime, daysLabel, MEAL_LABELS, onWeekday, ROUTINE_DAY_FILTERS as DAY_FILTERS, utcDayKey, waterToday, WATER_GOAL_DEFAULT, weekdaysOf as validDays, type LegacyMeal, type LegacyRoutine } from '@dyc/core';
 import { GlassWater, Minus, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../app/legacy';
@@ -8,19 +8,6 @@ import { SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { CheckInNote, FormActions, Meter, optionsWith, WeekdayPicker } from '../components/ToolParts';
 import { isoDay, localTime } from '../lib/tools';
-
-const DAY_FILTERS = [
-  { iso: 0, short: 'Todos', long: 'Todos los días' },
-  { iso: 1, short: 'L', long: 'Lunes' },
-  { iso: 2, short: 'M', long: 'Martes' },
-  { iso: 3, short: 'X', long: 'Miércoles' },
-  { iso: 4, short: 'J', long: 'Jueves' },
-  { iso: 5, short: 'V', long: 'Viernes' },
-  { iso: 6, short: 'S', long: 'Sábado' },
-  { iso: 7, short: 'D', long: 'Domingo' },
-];
-const validDays = (d: unknown) => (typeof d === 'string' && /^[1-7]{1,7}$/.test(d) ? d : '1234567');
-const byTime = <T extends { time?: string }>(a: T, b: T) => (a.time || '99').localeCompare(b.time || '99');
 
 export function Routine() {
   const legacy = useLegacyData();
