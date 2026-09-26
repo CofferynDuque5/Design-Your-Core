@@ -41,6 +41,16 @@ const LEGACY = {
   reminders: [{ id: 'r1', day: Number(TODAY.slice(8)), title: 'Pagar la luz', when: '', color: '#0FA968', icon: 'doc', on: true }],
   classes: [{ id: 'c1', day: 3, start: '10:00', end: '11:00', title: 'Física', room: 'B-2', color: '#4F7CFF', subject: '' }],
   focus: [{ id: 'f1', mode: 'focus', seconds: 1500, dateKey: TODAY }],
+  subjects: [{ id: 'm1', name: 'Cálculo', teacher: 'Dra. Morales', room: 'A-201', color: '#4F7CFF', nextClass: 'Lunes 8:00', topics: [{ id: 't1', name: 'Límites', done: true }] }],
+  projects: [{ id: 'p1', title: 'Ensayo de Historia', subject: 'Cálculo', deadline: '20 SEP', status: 'curso', color: '#4F7CFF', milestones: [{ id: 'h1', name: 'Borrador', date: '', done: false }] }],
+  roadmaps: [{ id: 'r1', name: 'Ingeniería', color: '#8B5CF6', steps: [{ id: 's1', name: 'Álgebra', done: true }, { id: 's2', name: 'Cálculo I', done: false }] }],
+  notebooks: [{ id: 'n1', title: 'Apuntes de cálculo', category: 'Universidad', subject: 'Cálculo', topic: 'Derivadas', color: '#4F7CFF', emoji: '🧮' }],
+  noteBoxes: [
+    { id: 'x1', notebookId: 'n1', title: 'Regla de la cadena', text: 'Derivar fuera por dentro', color: '#FFF7D6', kind: 'text', lang: '' },
+    { id: 'x2', notebookId: 'n1', title: 'derivada.py', text: 'def d(f): pass', color: '#1e1e2e', kind: 'code', lang: 'python' },
+  ],
+  content: [{ id: 'v1', title: 'Probé 100 apps', stage: 'guion', platform: 'youtube', notes: '', script: 'Gancho', due: '12 sep' }],
+  ideas: [{ id: 'i1', title: 'App de apuntes', body: '', category: 'app', tags: 'estudio' }],
 };
 
 const HABIT = { id: 'h1', title: 'Caminar 10 minutos', pillar: 'movimiento', days: '1111111', startsOn: '2026-09-01', archived: false, createdAt: '2026-09-01T00:00:00.000Z', recent: [] };
@@ -98,6 +108,13 @@ describe('accesibilidad de la app móvil', () => {
       ['/calendario', 'Pagar la luz'],
       ['/horario', 'Física'],
       ['/enfoque', 'Últimas sesiones'],
+      ['/materias', 'Dra. Morales'],
+      ['/proyectos', 'Ensayo de Historia'],
+      ['/roadmaps', 'Ingeniería'],
+      ['/cuadernos', 'Apuntes de cálculo'],
+      ['/cuadernos/n1', 'Cajitas'],
+      ['/contenido', 'Probé 100 apps'],
+      ['/ideas', 'App de apuntes'],
     ] as const) {
       await act(async () => router.push(path));
       expect(await screen.findAllByText(marker)).not.toHaveLength(0);
@@ -109,15 +126,41 @@ describe('accesibilidad de la app móvil', () => {
     fireEvent.press(await screen.findByRole('button', { name: /^Pasos y opciones de «Llamar al dentista»/ }));
     expect(await screen.findByText('Buscar el número')).toBeOnTheScreen();
     expect({ path: 'pendientes abierto', problems: problems() }).toEqual({ path: 'pendientes abierto', problems: [] });
+    // Temas, hitos y la confirmación de borrar dentro de una hoja.
+    for (const [path, button, marker] of [
+      ['/materias', 'Temas de «Cálculo»: 1 de 1 vistos', 'Límites'],
+      ['/proyectos', 'Hitos de «Ensayo de Historia»: 0 de 1 hechos', 'Borrador'],
+    ] as const) {
+      await act(async () => router.push(path));
+      fireEvent.press(await screen.findByRole('button', { name: button }));
+      expect(await screen.findAllByText(marker)).not.toHaveLength(0);
+      expect({ path: `${path} (abierto)`, problems: problems() }).toEqual({ path: `${path} (abierto)`, problems: [] });
+    }
     for (const [path, button, marker] of [
       ['/agenda', 'Nuevo bloque', 'Duración'],
       ['/calendario', 'Nuevo evento', 'Día del mes'],
       ['/horario', 'Nueva clase', 'Aula (opcional)'],
+      ['/materias', 'Nueva materia', 'Próxima clase (opcional)'],
+      ['/proyectos', 'Editar «Ensayo de Historia»', 'Entrega (opcional)'],
+      ['/roadmaps', 'Nuevo roadmap', 'Añadir roadmap'],
+      ['/cuadernos', 'Nuevo cuaderno', 'Icono'],
+      ['/cuadernos/n1', 'Decorar', 'Icono'],
+      ['/cuadernos/n1', 'Lenguaje de la cajita de código «derivada.py»: python', 'Lenguaje'],
+      ['/cuadernos/n1', 'Color de la cajita «Regla de la cadena»', 'Color de la cajita'],
+      ['/contenido', 'Editar «Probé 100 apps»', 'Etapa'],
+      ['/ideas', 'Editar «App de apuntes»', 'Categoría'],
     ] as const) {
       await act(async () => router.push(path));
       fireEvent.press(await screen.findByRole('button', { name: button }));
       expect(await screen.findAllByText(marker)).not.toHaveLength(0);
       expect({ path: `${path} (hoja)`, problems: problems() }).toEqual({ path: `${path} (hoja)`, problems: [] });
+      // La confirmación de borrar también se puede leer.
+      const del = screen.queryByRole('button', { name: 'Borrar' });
+      if (del) {
+        fireEvent.press(del);
+        expect(await screen.findByRole('button', { name: 'Borrar definitivamente' })).toBeOnTheScreen();
+        expect({ path: `${path} (borrar)`, problems: problems() }).toEqual({ path: `${path} (borrar)`, problems: [] });
+      }
       // El velo de la hoja la cierra (queda fuera del foco del lector mientras está abierta).
       fireEvent.press(screen.UNSAFE_getAllByProps({ accessibilityLabel: 'Cerrar' }).at(-1)!);
     }
