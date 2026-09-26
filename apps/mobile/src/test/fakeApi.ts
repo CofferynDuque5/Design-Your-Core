@@ -1,5 +1,5 @@
 import type { Dashboard, Profile, TokenPair } from '@dyc/api-client';
-import { applyLegacyOp, PILLAR_IDS, type LegacyData, type LegacyItems, type LegacyKey } from '@dyc/core';
+import { applyLegacyOp, legacyObject, PILLAR_IDS, type LegacyData, type LegacyItems, type LegacyKey, type LegacyObjectKey } from '@dyc/core';
 
 export type Handler = (body: unknown, url: URL) => [number, unknown] | unknown;
 
@@ -90,6 +90,15 @@ export function fakeModules(initial: LegacyData, over: Record<string, Handler> =
       doc = applyLegacyOp(doc, key, { type: 'remove', id: decodeURIComponent(id ?? '') });
       return { ok: true, updatedAt: 'x' };
     },
+    // Objetos (`cycle`, `dayLog`, `budget`): PATCH fusiona sobre lo guardado y los valores por defecto.
+    'PATCH /api/v2/modules/:key': (b, url) => {
+      const key = parts(url)[0] as unknown as LegacyObjectKey;
+      const value = { ...legacyObject(doc, key), ...(b as object) };
+      doc = { ...doc, [key]: value };
+      return { value, updatedAt: 'x' };
+    },
+    // Ajustes de la cuenta (mostrar Ciclo).
+    'PATCH /api/v2/me': (b) => ({ user: { ...USER, ...(b as object) } }),
     ...over,
   });
   return { ...api, doc: () => doc };

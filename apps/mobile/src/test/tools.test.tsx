@@ -75,9 +75,12 @@ describe('herramientas en el móvil', () => {
     expect(screen.getByRole('button', { name: 'Pendientes, 2 por hacer' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Enfoque, 1 sesión' })).toBeOnTheScreen();
 
-    fireEvent.press(screen.getByRole('link', { name: 'Finanzas, 1 movimiento, en la web' }));
-    expect(openURL).toHaveBeenCalledWith('https://app.designyourcore.nvcorx.com/finanzas');
-    expect(screen.getAllByText('En la web')).toHaveLength(13);
+    fireEvent.press(screen.getByRole('link', { name: 'Trabajo, Vacío, en la web' }));
+    expect(openURL).toHaveBeenCalledWith('https://app.designyourcore.nvcorx.com/trabajo');
+    // Solo quedan en la web Trabajo, Notas, Bóveda, Asistente y Respiración.
+    expect(screen.getAllByText('En la web')).toHaveLength(5);
+    expect(screen.getByRole('button', { name: 'Finanzas, 1 movimiento' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Ejercicio, 1 entreno' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Materias, 1 materia' })).toBeOnTheScreen();
 
     fireEvent.press(screen.getByRole('button', { name: 'Horario, 2 clases' }));

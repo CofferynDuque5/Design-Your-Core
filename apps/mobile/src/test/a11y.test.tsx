@@ -51,6 +51,17 @@ const LEGACY = {
   ],
   content: [{ id: 'v1', title: 'Probé 100 apps', stage: 'guion', platform: 'youtube', notes: '', script: 'Gancho', due: '12 sep' }],
   ideas: [{ id: 'i1', title: 'App de apuntes', body: '', category: 'app', tags: 'estudio' }],
+  transactions: [{ id: 'x1', date: TODAY, amount: 45.5, type: 'expense', category: 'Comida', note: 'Mercado' }],
+  budget: { monthly: 500 },
+  goals: [{ id: 'g1', title: 'Publicar 8 videos', target: 8, current: 3, unit: 'videos', deadline: '', category: 'creador', done: false }],
+  pets: [{ id: 'pet1', name: 'Luna', species: 'cat', note: '' }],
+  petCares: [{ id: 'pc1', petId: 'pet1', kind: 'comida', title: 'Darle de comer', time: '08:00', days: '1234567', sound: true, enabled: true, lastDone: '' }],
+  period: [{ id: 'pd1', date: TODAY, flow: 'medium', symptoms: 'Cólicos', mood: '', note: '' }],
+  workouts: [{ id: 'w1', date: TODAY, plan: 'Core express', minutes: 15 }],
+  sleep: [{ id: 'z1', date: TODAY, bedtime: '23:30', waketime: '07:15', quality: 4, note: '' }],
+  journal: [{ id: 'j1', date: '2026-09-19', mood: '😄', gratitude: '', note: 'Buen día' }],
+  routines: [{ id: 'rt1', title: 'Tomar vitaminas', time: '08:00', days: '1234567', icon: 'bell', sound: true, enabled: true }],
+  meals: [{ id: 'ml1', label: 'Desayuno', time: '07:30', note: 'Avena', dateKey: TODAY }],
 };
 
 const HABIT = { id: 'h1', title: 'Caminar 10 minutos', pillar: 'movimiento', days: '1111111', startsOn: '2026-09-01', archived: false, createdAt: '2026-09-01T00:00:00.000Z', recent: [] };
@@ -115,6 +126,14 @@ describe('accesibilidad de la app móvil', () => {
       ['/cuadernos/n1', 'Cajitas'],
       ['/contenido', 'Probé 100 apps'],
       ['/ideas', 'App de apuntes'],
+      ['/finanzas', 'Gastos por categoría'],
+      ['/metas', 'Publicar 8 videos'],
+      ['/mascotas', 'Darle de comer'],
+      ['/ciclo', 'Tus últimos periodos'],
+      ['/ejercicio', 'Historial'],
+      ['/sueno', 'Horas por noche'],
+      ['/diario', 'Buen día'],
+      ['/rutina', 'Tomar vitaminas'],
     ] as const) {
       await act(async () => router.push(path));
       expect(await screen.findAllByText(marker)).not.toHaveLength(0);
@@ -149,6 +168,15 @@ describe('accesibilidad de la app móvil', () => {
       ['/cuadernos/n1', 'Color de la cajita «Regla de la cadena»', 'Color de la cajita'],
       ['/contenido', 'Editar «Probé 100 apps»', 'Etapa'],
       ['/ideas', 'Editar «App de apuntes»', 'Categoría'],
+      ['/finanzas', 'Nuevo movimiento', 'Monto'],
+      ['/finanzas', 'Cambiar el presupuesto', 'Cuánto quieres gastar al mes'],
+      ['/metas', 'Editar «Publicar 8 videos»', 'Fecha límite (opcional)'],
+      ['/mascotas', 'Editar a Luna', 'Especie'],
+      ['/mascotas', 'Editar «Darle de comer» de Luna', 'Qué hay que hacer'],
+      ['/ejercicio', 'Registrar entreno', 'Minutos'],
+      ['/sueno', 'Registrar noche', 'Te acostaste'],
+      ['/rutina', 'Nueva rutina', 'Qué haces'],
+      ['/rutina', 'Editar Desayuno de las 07:30', 'Qué comiste (opcional)'],
     ] as const) {
       await act(async () => router.push(path));
       fireEvent.press(await screen.findByRole('button', { name: button }));
