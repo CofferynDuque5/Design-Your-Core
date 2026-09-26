@@ -1,10 +1,13 @@
 import {
   applyLegacyOp,
   legacyList,
+  legacyObject,
   newLegacyId,
   type LegacyData,
   type LegacyItems,
   type LegacyKey,
+  type LegacyObjectKey,
+  type LegacyObjects,
   type LegacyOp,
   type LegacyPatch,
 } from '@dyc/core';
@@ -78,4 +81,38 @@ export function useModule<K extends LegacyKey>(key: K) {
     }),
     [mutate],
   );
+}
+
+/** Un objeto del documento (`cycle`, `dayLog`, `budget`) con sus valores por defecto. */
+export function useLegacyObject<K extends LegacyObjectKey>(data: LegacyData | undefined, key: K, today?: string): LegacyObjects[K] {
+  return useMemo(() => legacyObject(data, key, today), [data, key, today]);
+}
+
+/**
+ * Cambios en una clave que es un objeto (PATCH /api/v2/modules/:key): se
+ * fusionan al instante con lo guardado (conservando lo desconocido), van en
+ * la misma cola que las listas y se deshacen con un aviso si la API falla.
+ */
+export function useModuleObject<K extends LegacyObjectKey>(key: K) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { mutate } = useMutation({
+    mutationKey: ['legacy', key],
+    scope: { id: 'legacy' },
+    mutationFn: (patch: Partial<LegacyObjects[K]>) => api.modules.patch(key, patch),
+    onMutate: async (patch) => {
+      await qc.cancelQueries({ queryKey: LEGACY_QUERY });
+      const prev = qc.getQueryData<Legacy>(LEGACY_QUERY);
+      if (prev) qc.setQueryData<Legacy>(LEGACY_QUERY, { ...prev, data: { ...prev.data, [key]: { ...legacyObject(prev.data, key), ...patch } } });
+      return { prev };
+    },
+    onError: (e, _patch, ctx) => {
+      if (ctx?.prev) qc.setQueryData(LEGACY_QUERY, ctx.prev);
+      toast(errorMessage(e), { tone: 'error' });
+    },
+    onSettled: () => {
+      if (qc.isMutating({ mutationKey: ['legacy'] }) <= 1) return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
+    },
+  });
+  return useMemo(() => ({ patch: (patch: Partial<LegacyObjects[K]>) => mutate(patch) }), [mutate]);
 }

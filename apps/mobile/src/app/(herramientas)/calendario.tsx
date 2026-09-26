@@ -13,7 +13,6 @@ import {
   PERIOD_FLOW_INFO,
   PREDICTED_PERIOD_COLOR,
   REMINDER_COLORS,
-  shiftMonth,
   WEEK_HEAD,
   type CalendarGoal,
   type CalendarJournal,
@@ -24,16 +23,16 @@ import {
   type LegacyReminder,
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
-import { ChevronLeft, ChevronRight, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { ColorSwatches, Dot, IconButton, Stepper, ToolScreen } from '../../components/tools';
+import { ColorSwatches, Dot, IconButton, MonthNav, Stepper, Toggle, ToolScreen } from '../../components/tools';
 import { Button, Card, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { useAuth } from '../../lib/api';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
-import { openOnWeb } from '../../lib/web';
 
 /** Colores de las marcas, los mismos que en la web. */
 function useMarkColors(): Record<CalendarMark, string> {
@@ -59,8 +58,7 @@ export default function Calendar() {
   const marks = useMemo(() => calendarMarks(data, month, cycleDays), [data, month, cycleDays]);
   const weeks = monthWeeks(month);
 
-  const go = (delta: number) => {
-    const m = shiftMonth(month, delta);
+  const go = (m: Day) => {
     setMonth(m);
     setSelected(m.slice(0, 7) === today.slice(0, 7) ? today : m);
   };
@@ -79,29 +77,7 @@ export default function Calendar() {
       ) : (
         <>
           <Card style={{ paddingHorizontal: space[3] }}>
-            <View style={s.nav}>
-              <IconButton label="Mes anterior" onPress={() => go(-1)}>
-                <ChevronLeft size={22} color={colors.primary} />
-              </IconButton>
-              <T v="heading" accessibilityRole="header" accessibilityLiveRegion="polite" style={{ flex: 1, textAlign: 'center' }}>
-                {monthLabel(month)}
-              </T>
-              <IconButton label="Mes siguiente" onPress={() => go(1)}>
-                <ChevronRight size={22} color={colors.primary} />
-              </IconButton>
-            </View>
-            {month.slice(0, 7) !== today.slice(0, 7) && (
-              <Button
-                small
-                variant="link"
-                label="Volver a hoy"
-                style={{ alignSelf: 'center', marginTop: -space[2] }}
-                onPress={() => {
-                  setMonth(`${today.slice(0, 7)}-01`);
-                  setSelected(today);
-                }}
-              />
-            )}
+            <MonthNav month={month} current={today} onChange={go} />
             <View style={s.week} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
               {WEEK_HEAD.map(([short, long]) => (
                 <T key={long} v="small" tint="subtle" style={[s.cell, { textAlign: 'center', fontFamily: fonts.medium }]}>
@@ -218,15 +194,7 @@ function DayPanel({
                   {r.when ? `${r.when} · ` : ''}día {r.day} de cada mes{r.on === false ? ' · desactivado' : ''}
                 </T>
               </View>
-              <Switch
-                accessibilityLabel={`Activo: «${r.title}»`}
-                value={r.on !== false}
-                onValueChange={() => actions.update(r.id, { on: r.on === false })}
-                trackColor={{ true: colors.primary, false: colors.lineStrong }}
-                thumbColor={colors.surface}
-                // En la vista web el pulgar activo tiene su propio color (verde azulado por defecto).
-                {...({ activeThumbColor: colors.surface } as object)}
-              />
+              <Toggle label={`Activo: «${r.title}»`} value={r.on !== false} onChange={() => actions.update(r.id, { on: r.on === false })} />
               <IconButton label={`Editar «${r.title}»`} onPress={() => onEdit(r)}>
                 <Pencil size={18} color={colors.inkMuted} />
               </IconButton>
@@ -256,6 +224,7 @@ function DayPanel({
 
 function ReadOnlyItem({ color, title, meta, cycleLink }: { color: string; title: string; meta?: string; cycleLink?: boolean }) {
   const { colors } = useTheme();
+  const router = useRouter();
   return (
     <View style={s.item}>
       <Dot color={color} size={12} />
@@ -268,11 +237,11 @@ function ReadOnlyItem({ color, title, meta, cycleLink }: { color: string; title:
         )}
       </View>
       {cycleLink && (
-        <Pressable accessibilityRole="link" accessibilityLabel="Ver en Ciclo, en la web" onPress={() => openOnWeb('/ciclo')} style={s.link}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ver en Ciclo" onPress={() => router.push('/ciclo')} style={({ pressed }) => [s.link, pressed && { opacity: 0.7 }]}>
           <T v="small" tint="primary" style={{ fontFamily: fonts.medium }}>
-            Ciclo
+            Ver en Ciclo
           </T>
-          <ExternalLink size={14} color={colors.primary} />
+          <ChevronRight size={14} color={colors.primary} />
         </Pressable>
       )}
     </View>
@@ -317,7 +286,6 @@ function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder |
 }
 
 const s = StyleSheet.create({
-  nav: { flexDirection: 'row', alignItems: 'center' },
   week: { flexDirection: 'row' },
   cell: { width: `${100 / 7}%`, alignItems: 'center', paddingVertical: 2 },
   day: { width: touchTarget, height: touchTarget + 4, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 2 },

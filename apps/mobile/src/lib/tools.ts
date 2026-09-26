@@ -70,6 +70,14 @@ export const NATIVE_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'cuadernos',
   'contenido',
   'ideas',
+  'finanzas',
+  'metas',
+  'mascotas',
+  'ciclo',
+  'ejercicio',
+  'sueno',
+  'diario',
+  'rutina',
 ]);
 
 /** La hora actual, refrescada cada minuto (línea de «ahora», próxima clase). */

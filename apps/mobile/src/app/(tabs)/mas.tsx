@@ -75,7 +75,7 @@ function ToolRow({ tool, status }: { tool: ToolInfo; status: string }) {
             </View>
           )}
         </View>
-        <T v="small" tint="muted" numberOfLines={2}>
+        <T v="small" tint="muted" numberOfLines={3}>
           {tool.description}
         </T>
       </View>

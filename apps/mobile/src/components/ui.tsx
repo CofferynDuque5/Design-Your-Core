@@ -1,7 +1,7 @@
 import { ApiError } from '@dyc/api-client';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { CloudOff, RotateCw } from 'lucide-react-native';
-import { forwardRef, type ReactNode } from 'react';
+import { forwardRef, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -60,17 +60,21 @@ export function Screen({
   onRefresh,
   edges = ['top'],
   contentStyle,
+  scrollRef,
 }: {
   children: ReactNode;
   refreshing?: boolean;
   onRefresh?: () => void;
   edges?: Array<'top' | 'bottom'>;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Para volver arriba desde la pantalla (abrir una entrada del Diario). */
+  scrollRef?: Ref<ScrollView>;
 }) {
   const { colors } = useTheme();
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[styles.screen, contentStyle]}
         keyboardShouldPersistTaps="handled"
         refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.inkMuted} /> : undefined}

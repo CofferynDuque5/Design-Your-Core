@@ -1,15 +1,32 @@
-import { COLOR_NAMES, type LegacyCheckItem } from '@dyc/core';
+import {
+  addDays,
+  COLOR_NAMES,
+  daysInMonth,
+  daysLabel,
+  HHMM_RE,
+  monthLabel,
+  normalizeHHMM,
+  shiftMonth,
+  shortDay,
+  toggleWeekday,
+  WEEKDAY_LONG_NAMES,
+  weekdayShort,
+  WEEKDAYS,
+  type Day,
+  type LegacyCheckItem,
+} from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter, type Href } from 'expo-router';
-import { Check, ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Minus, Plus, Trash2 } from 'lucide-react-native';
+import { useState, type ReactNode, type Ref } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '../lib/theme';
 import { Button, Card, Field, PageHeader, Screen, T, fonts } from './ui';
 
 // Piezas comunes de las herramientas de la app anterior en el móvil
 // (tanda 1: Agenda, Pendientes, Calendario, Horario y Enfoque; tanda 2:
-// Materias, Proyectos, Roadmaps, Cuadernos, Contenido e Ideas).
+// Materias, Proyectos, Roadmaps, Cuadernos, Contenido e Ideas; tanda 3:
+// Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario y Rutina).
 
 /**
  * Pantalla de una herramienta: vuelve a «Más» (o a donde diga `back`) y
@@ -25,6 +42,7 @@ export function ToolScreen({
   eyebrow = 'Herramientas',
   back = { label: 'Más', href: '/mas' },
   header,
+  scrollRef,
 }: {
   title: string;
   right?: ReactNode;
@@ -34,11 +52,12 @@ export function ToolScreen({
   eyebrow?: string;
   back?: { label: string; href: Href };
   header?: ReactNode;
+  scrollRef?: Ref<ScrollView>;
 }) {
   const router = useRouter();
   const { colors } = useTheme();
   return (
-    <Screen refreshing={refreshing} onRefresh={onRefresh} edges={['top', 'bottom']}>
+    <Screen refreshing={refreshing} onRefresh={onRefresh} edges={['top', 'bottom']} scrollRef={scrollRef}>
       <View style={{ gap: space[2] }}>
         <Pressable
           accessibilityRole="button"
@@ -267,14 +286,14 @@ export function DotChoices<V extends string>({
   );
 }
 
-/** Cifras de cabecera en dos o tres columnas. */
-export function Stats({ items }: { items: Array<{ value: string; label: string }> }) {
+/** Cifras de cabecera en dos o tres columnas; `color` tiñe la cifra (ingresos, balance negativo). */
+export function Stats({ items }: { items: Array<{ value: string; label: string; color?: string }> }) {
   return (
     <View style={s.stats}>
       {items.map((it) => (
         <Card key={it.label} style={[s.stat, items.length === 3 && { flexBasis: '28%', padding: space[3] }]}>
           <View accessible accessibilityLabel={`${it.label}: ${it.value}`}>
-            <T v="title" style={{ fontVariant: ['tabular-nums'] }}>
+            <T v="title" style={[{ fontVariant: ['tabular-nums'] }, items.length === 3 && { fontSize: 24, lineHeight: 30 }, it.color ? { color: it.color } : null]}>
               {it.value}
             </T>
             <T v="small" tint="muted">
@@ -465,6 +484,218 @@ export function Pill({ children, color, a11yLabel }: { children: ReactNode; colo
   );
 }
 
+// ---------- Tanda 3 ----------
+
+const THUMB = '#FFFFFF';
+
+/** Interruptor con los colores del tema y nombre para lectores («Activa: «Leer»»). */
+export function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  const { colors } = useTheme();
+  return (
+    <Switch
+      accessibilityLabel={label}
+      value={value}
+      onValueChange={onChange}
+      trackColor={{ true: colors.primary, false: colors.lineStrong }}
+      // Pulgar blanco como en iOS: en el tema oscuro se sigue viendo sobre la pista apagada.
+      thumbColor={THUMB}
+      // En la vista web el pulgar activo tiene su propio color (verde azulado por defecto).
+      {...({ activeThumbColor: THUMB } as object)}
+    />
+  );
+}
+
+/** Mes anterior y siguiente con el nombre del mes (que se anuncia al cambiar) y «Volver a hoy». */
+export function MonthNav({ month, current, onChange }: { month: Day; current: Day; onChange: (month: Day) => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: space[1] }}>
+      <View style={s.monthNav}>
+        <IconButton label="Mes anterior" onPress={() => onChange(shiftMonth(month, -1))}>
+          <ChevronLeft size={22} color={colors.primary} />
+        </IconButton>
+        <T v="heading" accessibilityRole="header" accessibilityLiveRegion="polite" style={{ flex: 1, textAlign: 'center' }}>
+          {monthLabel(month)}
+        </T>
+        <IconButton label="Mes siguiente" onPress={() => onChange(shiftMonth(month, 1))}>
+          <ChevronRight size={22} color={colors.primary} />
+        </IconButton>
+      </View>
+      {month.slice(0, 7) !== current.slice(0, 7) && <Button small variant="link" label="Volver a hoy" style={{ alignSelf: 'center', marginTop: -space[2] }} onPress={() => onChange(`${current.slice(0, 7)}-01`)} />}
+    </View>
+  );
+}
+
+/** El mismo día `n` meses antes o después (el 31 pasa al último día del mes si no lo tiene). */
+function addMonths(day: Day, n: number): Day {
+  const first = shiftMonth(`${day.slice(0, 7)}-01`, n);
+  return addDays(first, Math.min(Number(day.slice(8)), daysInMonth(first)) - 1);
+}
+
+/** «sáb 26 sept» y el año si no es el actual. */
+export const dayText = (d: Day, today: Day) => `${weekdayShort(d)} ${shortDay(d)}${d.slice(0, 4) !== today.slice(0, 4) ? ` ${d.slice(0, 4)}` : ''}`;
+
+/**
+ * Una fecha con botones de día anterior y siguiente (sin selectores nativos,
+ * como las horas de la Agenda). `months` añade saltos de un mes (fechas
+ * límite lejanas); `optional` permite dejarla sin fecha ("").
+ */
+export function DayStepper({
+  label,
+  value,
+  onChange,
+  today,
+  max,
+  hint,
+  months,
+  optional,
+}: {
+  label: string;
+  value: Day | '';
+  onChange: (d: Day | '') => void;
+  today: Day;
+  max?: Day;
+  hint?: string;
+  months?: boolean;
+  optional?: { add: string; remove: string };
+}) {
+  const { colors } = useTheme();
+  if (!value) {
+    return (
+      <View style={{ gap: space[1] }}>
+        <T v="label">{label}</T>
+        <Button variant="secondary" label={optional?.add ?? 'Poner fecha'} icon={<Plus size={16} color={colors.primary} />} onPress={() => onChange(today)} style={{ alignSelf: 'flex-start' }} />
+      </View>
+    );
+  }
+  const clamp = (d: Day) => (max && d > max ? max : d);
+  return (
+    <View style={{ gap: space[2] }}>
+      <View style={{ flexDirection: 'row' }}>
+        <Stepper
+          label={label}
+          value={`${dayText(value, today)}${value === today ? ' · hoy' : ''}`}
+          onDec={() => onChange(addDays(value, -1))}
+          onInc={() => onChange(clamp(addDays(value, 1)))}
+          incDisabled={!!max && value >= max}
+          decLabel="Día anterior"
+          incLabel="Día siguiente"
+          hint={hint}
+        />
+      </View>
+      {(months || optional || value !== today) && (
+        <View style={s.dayLinks}>
+          {months && <Button small variant="link" label="Un mes antes" onPress={() => onChange(addMonths(value, -1))} />}
+          {months && <Button small variant="link" label="Un mes después" onPress={() => onChange(clamp(addMonths(value, 1)))} disabled={!!max && value >= max} />}
+          {value !== today && <Button small variant="link" label="Hoy" onPress={() => onChange(today)} />}
+          {optional && <Button small variant="link" label={optional.remove} onPress={() => onChange('')} />}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Hora "HH:MM" escrita a mano («8:30» u «0830» se guardan «08:30»). */
+export function TimeField({ label, value, onChange, optional, hint }: { label: string; value: string; onChange: (v: string) => void; optional?: boolean; hint?: string }) {
+  const bad = !!value.trim() && !HHMM_RE.test(normalizeHHMM(value));
+  return (
+    <Field
+      label={label}
+      value={value}
+      onChangeText={onChange}
+      onBlur={() => onChange(normalizeHHMM(value))}
+      maxLength={5}
+      placeholder={optional ? 'Sin hora' : '08:00'}
+      keyboardType="numbers-and-punctuation"
+      error={bad || (!optional && !value.trim()) ? 'Usa HH:MM, por ejemplo 08:30.' : null}
+      hint={hint}
+    />
+  );
+}
+
+/** Días de la semana como en la app anterior ("1234567", 1 = lunes). Nunca deja la lista vacía. */
+export function WeekdayPicker({ legend, value, onChange, hint }: { legend: string; value: string; onChange: (days: string) => void; hint?: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: space[2] }}>
+      <T v="label">{legend}</T>
+      <View accessibilityLabel={legend} style={{ flexDirection: 'row', gap: space[1] }}>
+        {WEEKDAYS.map((w, i) => {
+          const on = value.includes(w.iso);
+          return (
+            <Pressable
+              key={w.iso}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+              accessibilityLabel={WEEKDAY_LONG_NAMES[i]}
+              onPress={() => onChange(toggleWeekday(value, w.iso))}
+              style={[s.weekday, { borderColor: on ? colors.primary : colors.lineStrong, backgroundColor: on ? colors.primary : colors.surface }]}
+            >
+              <T v="label" style={{ color: on ? colors.onPrimary : colors.inkMuted, fontFamily: fonts.semibold }}>
+                {w.label}
+              </T>
+            </Pressable>
+          );
+        })}
+      </View>
+      <T v="small" tint="muted">
+        {hint ?? daysLabel(value)}
+      </T>
+    </View>
+  );
+}
+
+/** Ánimo con emoji como fichas de una sola elección. Tocar el elegido lo quita (se guarda ""). */
+export function MoodPicker({ legend, moods, value, onChange, hideLegend }: { legend: string; moods: ReadonlyArray<{ emoji: string; label: string }>; value: string; onChange: (mood: string) => void; hideLegend?: boolean }) {
+  const { colors } = useTheme();
+  const known = moods.some((m) => m.emoji === value);
+  const options = [...moods, ...(value && !known ? [{ emoji: value, label: 'Guardado antes' }] : [])];
+  return (
+    <View style={{ gap: space[2] }}>
+      {!hideLegend && <T v="label">{legend}</T>}
+      <View accessibilityRole="radiogroup" accessibilityLabel={legend} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+        {options.map((m) => {
+          const on = value === m.emoji;
+          return (
+            <Pressable
+              key={m.emoji}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: on }}
+              accessibilityLabel={m.label}
+              onPress={() => onChange(on ? '' : m.emoji)}
+              style={[s.dotChip, { borderColor: on ? colors.primary : colors.lineStrong, backgroundColor: on ? colors.primarySoft : colors.surface }]}
+            >
+              <T v="body" style={{ fontSize: 18 }} importantForAccessibility="no">
+                {m.emoji}
+              </T>
+              <T v="small" style={{ fontFamily: fonts.medium, color: on ? colors.ink : colors.inkMuted }}>
+                {m.label}
+              </T>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/** Recuerda que el check-in diario registra aparte lo que puntúa en los pilares. */
+export function CheckInNote({ children }: { children: string }) {
+  const { colors } = useTheme();
+  const router = useRouter();
+  return (
+    <Card tone="sunken" style={{ flexDirection: 'row', gap: space[3], alignItems: 'flex-start' }}>
+      <Info size={18} color={colors.inkMuted} style={{ marginTop: 2 }} />
+      <View style={{ flex: 1, gap: space[1] }}>
+        <T v="small" tint="muted">
+          {children}
+        </T>
+        <Button small variant="link" label="Ir al check-in" style={{ alignSelf: 'flex-start', minHeight: touchTarget }} onPress={() => router.push('/check-in')} />
+      </View>
+    </Card>
+  );
+}
+
 const s = StyleSheet.create({
   back: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: touchTarget, alignSelf: 'flex-start', marginLeft: -space[1], paddingRight: space[3] },
   iconBtn: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center' },
@@ -483,4 +714,7 @@ const s = StyleSheet.create({
   confirm: { borderWidth: 1, borderRadius: radius.md, padding: space[4], gap: space[3] },
   suggestion: { minHeight: 36, justifyContent: 'center', paddingHorizontal: space[3], borderRadius: radius.pill, borderWidth: 1 },
   pill: { borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 2, alignSelf: 'flex-start' },
+  monthNav: { flexDirection: 'row', alignItems: 'center' },
+  dayLinks: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space[4], marginTop: -space[1] },
+  weekday: { flex: 1, height: touchTarget, borderRadius: touchTarget / 2, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });
