@@ -1,4 +1,27 @@
-import { addDays, COLOR_NAMES, cycleInfo, cyclePredictions, isDay, isoWeekday, legacyList, legacyObject, longDay, monthLabel, PERIOD_FLOW_INFO, REMINDER_COLORS, type Day, type LegacyReminder } from '@dyc/core';
+import {
+  CALENDAR_MARKS,
+  calendarCycleDays,
+  calendarMarks,
+  COLOR_NAMES,
+  describeCalendarDay,
+  isoWeekday,
+  addDays,
+  legacyList,
+  longDay,
+  looseList,
+  monthLabel,
+  PERIOD_FLOW_INFO,
+  REMINDER_COLORS,
+  daysInMonth,
+  shiftMonth,
+  WEEK_HEAD,
+  type CalendarGoal as Goal,
+  type CalendarJournal as Journal,
+  type CalendarMark as MarkKind,
+  type CalendarWorkout as Workout,
+  type Day,
+  type LegacyReminder,
+} from '@dyc/core';
 import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
@@ -10,50 +33,17 @@ import { ColorPicker, SelectField, TextField } from '../components/Form';
 import { ErrorState, Loading } from '../components/States';
 import { localDayKey } from '../lib/tools';
 
-// Marcas de solo lectura que vienen de otras secciones de la app anterior.
-const MARKS = {
-  event: { label: 'Evento', className: 'mark--event' },
-  workout: { label: 'Entreno', className: 'mark--workout' },
-  goal: { label: 'Meta', className: 'mark--goal' },
-  journal: { label: 'Diario', className: 'mark--journal' },
-  // Solo si Ciclo está activado, como en la app anterior (`user.showCycle`).
-  period: { label: 'Regla', className: 'mark--period' },
-  predicted: { label: 'Regla prevista', className: 'mark--predicted' },
-} as const;
-type MarkKind = keyof typeof MARKS;
-
-const WEEK_HEAD = [
-  ['L', 'lunes'],
-  ['M', 'martes'],
-  ['X', 'miércoles'],
-  ['J', 'jueves'],
-  ['V', 'viernes'],
-  ['S', 'sábado'],
-  ['D', 'domingo'],
-] as const;
-
-interface Workout {
-  date?: unknown;
-  plan?: unknown;
-  minutes?: unknown;
-}
-interface Goal {
-  deadline?: unknown;
-  title?: unknown;
-}
-interface Journal {
-  date?: unknown;
-  mood?: unknown;
-  note?: unknown;
-  gratitude?: unknown;
-}
-
-const arr = <T,>(data: Record<string, unknown>, key: string): T[] => (Array.isArray(data[key]) ? (data[key] as T[]).filter((x) => x && typeof x === 'object') : []);
-const daysInMonth = (month: Day) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
-const shiftMonth = (month: Day, n: number) => {
-  const d = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1));
-  return d.toISOString().slice(0, 10);
+// Marcas de solo lectura que vienen de otras secciones de la app anterior (textos y cálculo en @dyc/core).
+const MARKS: Record<MarkKind, { label: string; className: string }> = {
+  event: { label: CALENDAR_MARKS.event, className: 'mark--event' },
+  workout: { label: CALENDAR_MARKS.workout, className: 'mark--workout' },
+  goal: { label: CALENDAR_MARKS.goal, className: 'mark--goal' },
+  journal: { label: CALENDAR_MARKS.journal, className: 'mark--journal' },
+  period: { label: CALENDAR_MARKS.period, className: 'mark--period' },
+  predicted: { label: CALENDAR_MARKS.predicted, className: 'mark--predicted' },
 };
+
+const arr = <T,>(data: Record<string, unknown>, key: string): T[] => looseList<T>(data, key);
 
 export function Calendar() {
   const legacy = useLegacyData();
@@ -65,36 +55,10 @@ export function Calendar() {
   const reminders = useLegacyList(legacy.data?.data, 'reminders');
   const showCycle = !!useSession().user?.showCycle;
   // Regla registrada y prevista (misma estimación que en Ciclo; ver docs/modulos.md).
-  const cycleDays = useMemo(() => {
-    if (!showCycle) return { period: new Set<Day>(), predicted: new Set<Day>() };
-    const d = legacy.data?.data ?? {};
-    const period = legacyList(d, 'period');
-    const cycle = legacyObject(d, 'cycle');
-    const registered = new Set(period.map((p) => p.date).filter(isDay));
-    const end = addDays(month, daysInMonth(month) - 1);
-    return { period: registered, predicted: cyclePredictions(cycleInfo(period, cycle, today), cycle, month, end, registered).period };
-  }, [showCycle, legacy.data, month, today]);
+  const cycleDays = useMemo(() => calendarCycleDays(legacy.data?.data, month, today, showCycle), [showCycle, legacy.data, month, today]);
 
   // Qué hay cada día del mes visible.
-  const marks = useMemo(() => {
-    const byDay = new Map<Day, Set<MarkKind>>();
-    const add = (d: unknown, k: MarkKind) => {
-      if (typeof d !== 'string' || !d.startsWith(month.slice(0, 7))) return;
-      const key = d.slice(0, 10);
-      byDay.set(key, (byDay.get(key) ?? new Set()).add(k));
-    };
-    // Los eventos solo guardan el día del mes: se repiten todos los meses.
-    for (const r of legacyList(legacy.data?.data, 'reminders')) {
-      if (r.on !== false && Number.isInteger(r.day) && r.day >= 1 && r.day <= daysInMonth(month)) add(`${month.slice(0, 8)}${String(r.day).padStart(2, '0')}`, 'event');
-    }
-    const d = legacy.data?.data ?? {};
-    arr<Workout>(d, 'workouts').forEach((w) => add(w.date, 'workout'));
-    arr<Goal>(d, 'goals').forEach((g) => add(g.deadline, 'goal'));
-    arr<Journal>(d, 'journal').forEach((j) => add(j.date, 'journal'));
-    cycleDays.period.forEach((day) => add(day, 'period'));
-    cycleDays.predicted.forEach((day) => add(day, 'predicted'));
-    return byDay;
-  }, [legacy.data, month, cycleDays]);
+  const marks = useMemo(() => calendarMarks(legacy.data?.data, month, cycleDays), [legacy.data, month, cycleDays]);
 
   const n = daysInMonth(month);
   const lead = isoWeekday(month) - 1;
@@ -108,14 +72,7 @@ export function Calendar() {
     setSelected(m.slice(0, 7) === today.slice(0, 7) ? today : m);
   };
 
-  const describe = (d: Day) => {
-    const set = marks.get(d);
-    if (!set) return '';
-    const dayNum = Number(d.slice(8));
-    const events = reminders.filter((r) => r.on !== false && r.day === dayNum).length;
-    const parts = [...set].map((k) => (k === 'event' ? `${events} ${events === 1 ? 'evento' : 'eventos'}` : MARKS[k].label.toLowerCase()));
-    return `: ${parts.join(', ')}`;
-  };
+  const describe = (d: Day) => describeCalendarDay(d, marks, reminders);
 
   return (
     <div className="page">

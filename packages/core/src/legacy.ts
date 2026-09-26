@@ -1147,6 +1147,48 @@ export function reorderById<T extends { id: string }>(list: T[], ids: string[]):
   return [...used, ...list.filter((x) => !used.has(x))];
 }
 
+/** Un cambio de una lista del documento, tal como lo envían la web y el móvil a /api/v2/modules. */
+export type LegacyOp<K extends LegacyKey> =
+  | { type: 'add'; item: LegacyItems[K] }
+  | { type: 'update'; id: string; patch: LegacyPatch<K> }
+  | { type: 'remove'; id: string }
+  | { type: 'reorder'; ids: string[] };
+
+/** Aplica un cambio en la copia local igual que lo hará el servidor (para las vistas optimistas). */
+export function applyLegacyOp<K extends LegacyKey>(data: LegacyData, key: K, op: LegacyOp<K>): LegacyData {
+  const list = legacyList(data, key) as Array<LegacyItems[K]>;
+  switch (op.type) {
+    case 'add': {
+      // Enfoque, finanzas, entrenos, sueño y respiración: lo más reciente primero, como en el servidor.
+      const max = LEGACY_NEWEST_FIRST[key];
+      return { ...data, [key]: max ? [op.item, ...list].slice(0, max) : [...list, op.item] };
+    }
+    case 'update': {
+      // Con los campos derivados (extracto y color de una nota, `rem` de una tarea), como el servidor.
+      const patch = deriveLegacyPatch(key, op.patch as Record<string, unknown>);
+      return { ...data, [key]: list.map((x) => (x.id === op.id ? mergeLegacyItem(key, x, patch) : x)) };
+    }
+    case 'remove': {
+      // Pendiente → subtareas, cuaderno → cajitas y mascota → cuidados se borran juntos, como en el servidor.
+      const child = LEGACY_CHILDREN[key];
+      return {
+        ...data,
+        [key]: list.filter((x) => x.id !== op.id),
+        ...(child ? { [child.key]: legacyList(data, child.key).filter((s) => (s as unknown as Record<string, unknown>)[child.field] !== op.id) } : {}),
+      };
+    }
+    case 'reorder':
+      return { ...data, [key]: reorderById(list, op.ids) };
+  }
+}
+
+/** Id nuevo como en la app anterior: randomUUID si existe (navegador) o uno aleatorio con la fecha (React Native). */
+export function newLegacyId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (typeof c?.randomUUID === 'function') return c.randomUUID();
+  return `id_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+
 // ---------- Enfoque (Pomodoro) ----------
 
 /** Día en UTC, como guarda la app anterior (`toISOString().slice(0,10)`). */

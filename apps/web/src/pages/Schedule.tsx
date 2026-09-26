@@ -1,4 +1,4 @@
-import { CLASS_COLORS, CLASS_DAYS, COLOR_NAMES, hhmmToHours, type LegacyClass } from '@dyc/core';
+import { CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, validClass, type LegacyClass } from '@dyc/core';
 import { Clock, MapPin, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -6,11 +6,11 @@ import { PageHeader } from '../components/AppShell';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { durationLabel, isoDay, layoutLanes, nowHours, useNow } from '../lib/tools';
+import { isoDay, layoutLanes, nowHours, useNow } from '../lib/tools';
 
-const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const DAY_NAMES = CLASS_DAY_NAMES;
 const HOUR = 52; // px por hora
-const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const TIME_RE = HHMM_RE;
 
 interface Subject {
   id: string;
@@ -19,31 +19,8 @@ interface Subject {
   room?: string;
 }
 
-const validClass = (c: LegacyClass) => Number.isInteger(c.day) && c.day >= 1 && c.day <= 7 && TIME_RE.test(c.start) && TIME_RE.test(c.end) && c.end > c.start;
 const byStart = (a: LegacyClass, b: LegacyClass) => a.start.localeCompare(b.start);
-
-/** La clase en curso o la siguiente de la semana (las clases se repiten cada semana). */
-function nextClass(classes: LegacyClass[], now: Date) {
-  const nowMin = (isoDay(now) - 1) * 1440 + now.getHours() * 60 + now.getMinutes();
-  let best: { c: LegacyClass; wait: number; ongoing: boolean } | null = null;
-  for (const c of classes) {
-    const start = (c.day - 1) * 1440 + hhmmToHours(c.start) * 60;
-    const end = (c.day - 1) * 1440 + hhmmToHours(c.end) * 60;
-    const ongoing = nowMin >= start && nowMin < end;
-    const wait = ongoing ? -1 : (start - nowMin + 7 * 1440) % (7 * 1440);
-    if (!best || wait < best.wait) best = { c, wait, ongoing };
-  }
-  return best;
-}
-
-function whenLabel(c: LegacyClass, wait: number, ongoing: boolean, now: Date) {
-  if (ongoing) return `Ahora, hasta las ${c.end}`;
-  const today = isoDay(now);
-  const inDays = (c.day - today + 7) % 7;
-  if (inDays === 0 && wait < 1440) return `Hoy a las ${c.start} · en ${durationLabel(Math.max(wait, 1) / 60)}`;
-  if (inDays === 1) return `Mañana a las ${c.start}`;
-  return `${DAY_NAMES[c.day - 1]} a las ${c.start}`;
-}
+const whenLabel = classWhenLabel;
 
 export function Schedule() {
   const legacy = useLegacyData();
@@ -58,7 +35,7 @@ export function Schedule() {
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i);
   const nowH = nowHours(now);
   const next = nextClass(classes, now);
-  const describe = (c: LegacyClass) => `${c.title}, ${DAY_NAMES[c.day - 1].toLowerCase()} de ${c.start} a ${c.end}${c.room ? `, aula ${c.room}` : ''}. Editar`;
+  const describe = (c: LegacyClass) => `${classDescription(c)}. Editar`;
 
   return (
     <div className="page">

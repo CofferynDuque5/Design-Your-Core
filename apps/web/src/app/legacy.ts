@@ -1,16 +1,14 @@
 import {
-  deriveLegacyPatch,
-  LEGACY_CHILDREN,
-  LEGACY_NEWEST_FIRST,
+  applyLegacyOp,
   legacyList,
   legacyObject,
-  mergeLegacyItem,
-  reorderById,
+  newLegacyId,
   type LegacyData,
   type LegacyItems,
   type LegacyKey,
   type LegacyObjectKey,
   type LegacyObjects,
+  type LegacyOp,
   type LegacyPatch,
 } from '@dyc/core';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,44 +39,9 @@ export function newSubId(): string {
 }
 
 /** Id nuevo como en la app anterior. */
-export function newId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  return `id_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-}
+export const newId = newLegacyId;
 
-type Op<K extends LegacyKey> =
-  | { type: 'add'; item: LegacyItems[K] }
-  | { type: 'update'; id: string; patch: LegacyPatch<K> }
-  | { type: 'remove'; id: string }
-  | { type: 'reorder'; ids: string[] };
-
-/** Aplica el cambio en la caché igual que lo hará el servidor. */
-function apply<K extends LegacyKey>(data: LegacyData, key: K, op: Op<K>): LegacyData {
-  const list = legacyList(data, key) as Array<LegacyItems[K]>;
-  switch (op.type) {
-    case 'add': {
-      // Enfoque, finanzas, entrenos, sueño y respiración: lo más reciente primero, como en el servidor.
-      const max = LEGACY_NEWEST_FIRST[key];
-      return { ...data, [key]: max ? [op.item, ...list].slice(0, max) : [...list, op.item] };
-    }
-    case 'update': {
-      // Con los campos derivados (extracto y color de una nota, `rem` de una tarea), como el servidor.
-      const patch = deriveLegacyPatch(key, op.patch as Record<string, unknown>);
-      return { ...data, [key]: list.map((x) => (x.id === op.id ? mergeLegacyItem(key, x, patch) : x)) };
-    }
-    case 'remove': {
-      // Pendiente → subtareas, cuaderno → cajitas y mascota → cuidados se borran juntos, como en el servidor.
-      const child = LEGACY_CHILDREN[key];
-      return {
-        ...data,
-        [key]: list.filter((x) => x.id !== op.id),
-        ...(child ? { [child.key]: legacyList(data, child.key).filter((s) => (s as unknown as Record<string, unknown>)[child.field] !== op.id) } : {}),
-      };
-    }
-    case 'reorder':
-      return { ...data, [key]: reorderById(list, op.ids) };
-  }
-}
+type Op<K extends LegacyKey> = LegacyOp<K>;
 
 function send<K extends LegacyKey>(key: K, op: Op<K>): Promise<{ updatedAt: string }> {
   switch (op.type) {
@@ -105,7 +68,7 @@ export function useModule<K extends LegacyKey>(key: K) {
     onMutate: async (op) => {
       await qc.cancelQueries({ queryKey: LEGACY_QUERY });
       const prev = qc.getQueryData<Legacy>(LEGACY_QUERY);
-      if (prev) qc.setQueryData<Legacy>(LEGACY_QUERY, { ...prev, data: apply(prev.data, key, op) });
+      if (prev) qc.setQueryData<Legacy>(LEGACY_QUERY, { ...prev, data: applyLegacyOp(prev.data, key, op) });
       return { prev };
     },
     onError: (e, _op, ctx) => {

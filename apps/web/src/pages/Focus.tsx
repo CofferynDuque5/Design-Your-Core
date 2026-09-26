@@ -1,26 +1,17 @@
-import { FOCUS_MODE_INFO, FOCUS_MODES, focusStats, nextFocusMode, shortDay, utcDayKey, type FocusMode } from '@dyc/core';
+import { FOCUS_MODE_INFO, FOCUS_MODES, focusClock, focusSpoken, focusStats, hoursShort, nextFocusMode, shortDay, utcDayKey, type FocusMode } from '@dyc/core';
 import { Pause, Play, RotateCcw, SkipForward } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { Segmented } from '../components/Form';
 import { ErrorState, Loading } from '../components/States';
-import { hoursShort } from '../lib/tools';
 
 type Status = 'idle' | 'running' | 'paused';
 const MODE_OPTIONS = FOCUS_MODES.map((m) => ({ value: m, label: FOCUS_MODE_INFO[m].label }));
 const totalMs = (m: FocusMode) => FOCUS_MODE_INFO[m].minutes * 60_000;
 
-const clock = (ms: number) => {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-};
-const spoken = (ms: number) => {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return [m && `${m} ${m === 1 ? 'minuto' : 'minutos'}`, r && `${r} ${r === 1 ? 'segundo' : 'segundos'}`].filter(Boolean).join(' y ') || '0 segundos';
-};
+const clock = focusClock;
+const spoken = focusSpoken;
 
 export function Focus() {
   const legacy = useLegacyData();

@@ -1,3 +1,4 @@
+import { toolStatus } from '@dyc/core';
 import { ChevronRight, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router';
 import { useLegacyData } from '../app/legacy';
@@ -5,7 +6,6 @@ import { useSession } from '../app/session';
 import { TOOL_GROUPS, TOOLS } from '../app/tools';
 import { PageHeader } from '../components/AppShell';
 import { ErrorState, Loading } from '../components/States';
-import { plural } from '../lib/format';
 
 export function More() {
   const legacy = useLegacyData();
@@ -33,9 +33,9 @@ export function More() {
                     {g.label}
                   </h3>
                   <ul className="tool-links" aria-labelledby={`tools-${g.id}`}>
-                    {TOOLS.filter((t) => t.group === g.id).map(({ to, label, icon: Icon, description, count, unit, note, optIn }) => {
-                      const n = count ? count(legacy.data.data) : 0;
-                      const status = count && unit ? (n ? plural(n, unit[0], unit[1]) : 'Vacío') : (note ?? '');
+                    {TOOLS.filter((t) => t.group === g.id).map((tool) => {
+                      const { to, label, icon: Icon, description, optIn } = tool;
+                      const status = toolStatus(tool, legacy.data.data);
                       return (
                         <li key={to}>
                           <Link to={to} className="card tool-link">
