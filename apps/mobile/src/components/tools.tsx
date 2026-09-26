@@ -1,28 +1,39 @@
-import { COLOR_NAMES } from '@dyc/core';
+import { COLOR_NAMES, type LegacyCheckItem } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
-import { useRouter } from 'expo-router';
-import { Check, ChevronLeft, Minus, Plus } from 'lucide-react-native';
-import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
+import { Check, ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '../lib/theme';
-import { Card, PageHeader, Screen, T, fonts } from './ui';
+import { Button, Card, Field, PageHeader, Screen, T, fonts } from './ui';
 
 // Piezas comunes de las herramientas de la app anterior en el móvil
-// (Agenda, Pendientes, Calendario, Horario y Enfoque).
+// (tanda 1: Agenda, Pendientes, Calendario, Horario y Enfoque; tanda 2:
+// Materias, Proyectos, Roadmaps, Cuadernos, Contenido e Ideas).
 
-/** Pantalla de una herramienta: vuelve a «Más» y lleva la cabecera editorial de siempre. */
+/**
+ * Pantalla de una herramienta: vuelve a «Más» (o a donde diga `back`) y
+ * lleva la cabecera editorial de siempre. `header` sustituye la cabecera
+ * (la portada de un cuaderno).
+ */
 export function ToolScreen({
   title,
   right,
   children,
   refreshing,
   onRefresh,
+  eyebrow = 'Herramientas',
+  back = { label: 'Más', href: '/mas' },
+  header,
 }: {
   title: string;
   right?: ReactNode;
   children: ReactNode;
   refreshing?: boolean;
   onRefresh?: () => void;
+  eyebrow?: string;
+  back?: { label: string; href: Href };
+  header?: ReactNode;
 }) {
   const router = useRouter();
   const { colors } = useTheme();
@@ -31,17 +42,17 @@ export function ToolScreen({
       <View style={{ gap: space[2] }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Volver a Más"
-          onPress={() => (router.canGoBack() ? router.back() : router.navigate('/mas'))}
+          accessibilityLabel={`Volver a ${back.label}`}
+          onPress={() => (router.canGoBack() ? router.back() : router.navigate(back.href))}
           hitSlop={4}
           style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}
         >
           <ChevronLeft size={20} color={colors.primary} />
           <T v="label" tint="primary">
-            Más
+            {back.label}
           </T>
         </Pressable>
-        <PageHeader eyebrow="Herramientas" title={title} right={right} />
+        {header ?? <PageHeader eyebrow={eyebrow} title={title} right={right} />}
       </View>
       {children}
     </Screen>
@@ -76,9 +87,23 @@ export function tint(hex: string, over: string, amount: number): string {
   return `#${a.map((v, i) => Math.round(v * amount + b[i] * (1 - amount)).toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** Punto de color (tipo de bloque, prioridad, evento). */
+/** Punto de color (tipo de bloque, prioridad, evento). Un color casi negro lleva borde en el tema oscuro (TikTok). */
 export function Dot({ color, size = 10 }: { color: string; size?: number }) {
-  return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />;
+  const { colors, name } = useTheme();
+  const ring = name === 'dark' && luminance(color) < 0.08;
+  return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, borderWidth: ring ? 1 : 0, borderColor: colors.inkMuted }} />;
+}
+
+/** Luminancia relativa (0 negro, 1 blanco) de un color hex. */
+function luminance(hex: string): number {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return 1;
+  const n = parseInt(m[1], 16);
+  const ch = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255);
 }
 
 /** Casilla grande con su texto; toda la fila es el objetivo táctil. */
@@ -169,7 +194,7 @@ export function Stepper({
 
 /** Paleta de colores como grupo de opciones, con el nombre de cada color para lectores. */
 export function ColorSwatches({ legend, colors: palette, value, onChange }: { legend: string; colors: readonly string[]; value: string; onChange: (c: string) => void }) {
-  const { colors } = useTheme();
+  const { colors, name } = useTheme();
   return (
     <View style={{ gap: space[2] }}>
       <T v="label">{legend}</T>
@@ -185,7 +210,7 @@ export function ColorSwatches({ legend, colors: palette, value, onChange }: { le
               onPress={() => onChange(c)}
               style={[s.swatch, { borderColor: on ? colors.ink : 'transparent' }]}
             >
-              <View style={[s.swatchInner, { backgroundColor: c }]}>{on && <Check size={16} strokeWidth={3} color="#FFFFFF" />}</View>
+              <View style={[s.swatchInner, { backgroundColor: c }, (name === 'dark' ? luminance(c) < 0.08 : luminance(c) > 0.8) && { borderWidth: 1, borderColor: name === 'dark' ? colors.inkMuted : colors.lineStrong }]}>{on && <Check size={16} strokeWidth={3} color={luminance(c) > 0.6 ? "#1B2230" : "#FFFFFF"} />}</View>
             </Pressable>
           );
         })}
@@ -194,25 +219,43 @@ export function ColorSwatches({ legend, colors: palette, value, onChange }: { le
   );
 }
 
-/** Opciones de una sola elección como fichas con punto de color (tipo, prioridad). */
-export function DotChoices<V extends string>({ legend, options, value, onChange }: { legend: string; options: Array<{ value: V; label: string; color: string }>; value: V; onChange: (v: V) => void }) {
+/**
+ * Opciones de una sola elección como fichas, con punto de color si lo
+ * llevan (tipo, prioridad, plataforma). `a11yLabel`: nombre para lectores
+ * cuando la ficha solo muestra un icono o emoji. `hideLegend`: la leyenda
+ * solo se lee (el contexto ya la muestra).
+ */
+export function DotChoices<V extends string>({
+  legend,
+  options,
+  value,
+  onChange,
+  hideLegend,
+}: {
+  legend: string;
+  options: Array<{ value: V; label: string; color?: string; a11yLabel?: string }>;
+  value: V;
+  onChange: (v: V) => void;
+  hideLegend?: boolean;
+}) {
   const { colors } = useTheme();
   return (
     <View style={{ gap: space[2] }}>
-      <T v="label">{legend}</T>
+      {!hideLegend && <T v="label">{legend}</T>}
       <View accessibilityRole="radiogroup" accessibilityLabel={legend} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         {options.map((o) => {
           const on = o.value === value;
+          const accent = o.color ?? colors.primary;
           return (
             <Pressable
               key={o.value}
               accessibilityRole="radio"
               accessibilityState={{ checked: on }}
-              accessibilityLabel={o.label}
+              accessibilityLabel={o.a11yLabel ?? o.label}
               onPress={() => onChange(o.value)}
-              style={[s.dotChip, { borderColor: on ? o.color : colors.lineStrong, backgroundColor: on ? `${o.color}1F` : colors.surface }]}
+              style={[s.dotChip, { borderColor: on ? accent : colors.lineStrong, backgroundColor: on ? (o.color ? `${o.color}1F` : colors.primarySoft) : colors.surface }]}
             >
-              <Dot color={o.color} />
+              {o.color && <Dot color={o.color} />}
               <T v="small" style={{ fontFamily: fonts.medium, color: on ? colors.ink : colors.inkMuted }}>
                 {o.label}
               </T>
@@ -224,12 +267,12 @@ export function DotChoices<V extends string>({ legend, options, value, onChange 
   );
 }
 
-/** Cifras de cabecera en dos columnas. */
+/** Cifras de cabecera en dos o tres columnas. */
 export function Stats({ items }: { items: Array<{ value: string; label: string }> }) {
   return (
     <View style={s.stats}>
       {items.map((it) => (
-        <Card key={it.label} style={s.stat}>
+        <Card key={it.label} style={[s.stat, items.length === 3 && { flexBasis: '28%', padding: space[3] }]}>
           <View accessible accessibilityLabel={`${it.label}: ${it.value}`}>
             <T v="title" style={{ fontVariant: ['tabular-nums'] }}>
               {it.value}
@@ -240,6 +283,184 @@ export function Stats({ items }: { items: Array<{ value: string; label: string }
           </View>
         </Card>
       ))}
+    </View>
+  );
+}
+
+// ---------- Tanda 2 ----------
+
+/** Barra de avance con el color del elemento; se lee como «Avance de X, 40 %». */
+export function Meter({ value, label, color }: { value: number; label: string; color?: string }) {
+  const { colors } = useTheme();
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={{ min: 0, max: 100, now: v, text: `${v} %` }}
+      style={[s.meter, { backgroundColor: colors.surfaceSunken }]}
+    >
+      <View style={{ width: `${v}%`, height: '100%', borderRadius: radius.pill, backgroundColor: color ?? colors.primary }} />
+    </View>
+  );
+}
+
+/** Botón que abre y cierra una lista (temas, hitos) con su cuenta. */
+export function Disclosure({ label, count, open, onToggle, a11yLabel }: { label: string; count?: string; open: boolean; onToggle: () => void; a11yLabel: string }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel={a11yLabel}
+      onPress={onToggle}
+      style={({ pressed }) => [s.disclosure, pressed && { opacity: 0.7 }]}
+    >
+      <T v="label" tint="primary">
+        {label}
+      </T>
+      {count ? (
+        <T v="small" tint="muted" style={{ fontVariant: ['tabular-nums'] }}>
+          {count}
+        </T>
+      ) : null}
+      {open ? <ChevronUp size={18} color={colors.primary} /> : <ChevronDown size={18} color={colors.primary} />}
+    </Pressable>
+  );
+}
+
+/**
+ * Temas o hitos con casillas. Cada cambio devuelve la lista completa, que se
+ * guarda con un PATCH del elemento que la contiene (como la web).
+ */
+export function CheckList<I extends LegacyCheckItem>({
+  items,
+  onChange,
+  owner,
+  noun,
+  listLabel,
+  placeholder,
+  make,
+  color,
+}: {
+  items: I[];
+  onChange: (next: I[]) => void;
+  /** Nombre del elemento que las contiene, para las etiquetas. */
+  owner: string;
+  /** "tema", "hito"… */
+  noun: string;
+  listLabel: string;
+  placeholder: string;
+  make: (name: string) => I;
+  color?: string;
+}) {
+  const { colors } = useTheme();
+  const [name, setName] = useState('');
+  const add = () => {
+    if (!name.trim()) return;
+    onChange([...items, make(name.trim())]);
+    setName('');
+  };
+  return (
+    <View style={[s.checklist, { borderLeftColor: colors.line }]}>
+      {items.length > 0 && (
+        <View accessibilityLabel={`${listLabel} de «${owner}»`}>
+          {items.map((it) => (
+            <CheckRow
+              key={it.id}
+              title={it.name || 'Sin nombre'}
+              done={it.done}
+              color={color}
+              onToggle={() => onChange(items.map((x) => (x.id === it.id ? { ...x, done: !x.done } : x)))}
+              trailing={
+                <IconButton label={`Borrar ${noun} «${it.name}»`} onPress={() => onChange(items.filter((x) => x.id !== it.id))}>
+                  <Trash2 size={16} color={colors.inkMuted} />
+                </IconButton>
+              }
+            />
+          ))}
+        </View>
+      )}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space[2] }}>
+        <View style={{ flex: 1 }}>
+          <Field
+            label={`Nuevo ${noun}`}
+            accessibilityLabel={`Nuevo ${noun} de «${owner}»`}
+            value={name}
+            onChangeText={setName}
+            maxLength={300}
+            placeholder={placeholder}
+            returnKeyType="done"
+            onSubmitEditing={add}
+          />
+        </View>
+        <Button small variant="secondary" label="Añadir" onPress={add} disabled={!name.trim()} />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Guardar y, si se puede, borrar pidiendo confirmación en el mismo sitio
+ * (como la web): «Borrar» se cambia por el aviso con «Borrar definitivamente».
+ */
+export function FormActions({ submitLabel, onSubmit, disabled, onDelete, confirm }: { submitLabel: string; onSubmit: () => void; disabled?: boolean; onDelete?: () => void; confirm?: string }) {
+  const { colors } = useTheme();
+  const [asking, setAsking] = useState(false);
+  if (asking && onDelete) {
+    return (
+      <View accessibilityRole="alert" style={[s.confirm, { backgroundColor: colors.dangerSoft, borderColor: colors.danger }]}>
+        <T v="small">{confirm}</T>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+          <Button small variant="danger" label="Borrar definitivamente" onPress={onDelete} />
+          <Button small variant="ghost" label="Cancelar" onPress={() => setAsking(false)} />
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={{ gap: space[2] }}>
+      <Button label={submitLabel} onPress={onSubmit} disabled={disabled} />
+      {onDelete && <Button variant="ghost" label="Borrar" icon={<Trash2 size={16} color={colors.primary} />} onPress={() => setAsking(true)} />}
+    </View>
+  );
+}
+
+/** Valores que ya existen para un campo de texto libre (como el `datalist` de la web): tocar uno lo rellena. */
+export function Suggestions({ field, values, current, onPick }: { field: string; values: string[]; current: string; onPick: (v: string) => void }) {
+  const { colors } = useTheme();
+  const q = current.trim().toLowerCase();
+  const shown = values.filter((v) => v.toLowerCase() !== q && (!q || v.toLowerCase().includes(q))).slice(0, 8);
+  if (!shown.length) return null;
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space[2] }} style={{ marginTop: -space[2] }}>
+      {shown.map((v) => (
+        <Pressable
+          key={v}
+          accessibilityRole="button"
+          accessibilityLabel={`${field}: usar «${v}»`}
+          hitSlop={4}
+          onPress={() => onPick(v)}
+          style={({ pressed }) => [s.suggestion, { borderColor: colors.lineStrong, backgroundColor: colors.surfaceSunken, opacity: pressed ? 0.7 : 1 }]}
+        >
+          <T v="small" tint="muted" style={{ fontFamily: fonts.medium }}>
+            {v}
+          </T>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+/** Etiqueta pequeña de solo lectura (estado, etapa, clase). */
+export function Pill({ children, color, a11yLabel }: { children: ReactNode; color?: string; a11yLabel?: string }) {
+  const { colors } = useTheme();
+  return (
+    <View accessible={!!a11yLabel} accessibilityLabel={a11yLabel} style={[s.pill, { backgroundColor: color ? `${color}24` : colors.surfaceSunken }]}>
+      <T v="small" style={{ fontSize: 13, lineHeight: 18, fontFamily: fonts.medium, color: colors.inkMuted }}>
+        {children}
+      </T>
     </View>
   );
 }
@@ -256,4 +477,10 @@ const s = StyleSheet.create({
   dotChip: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: touchTarget, paddingHorizontal: space[3], borderRadius: radius.pill, borderWidth: 1 },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   stat: { flexGrow: 1, flexBasis: '45%', gap: space[1] },
+  meter: { height: 8, borderRadius: radius.pill, overflow: 'hidden' },
+  disclosure: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: touchTarget, alignSelf: 'flex-start', paddingRight: space[2] },
+  checklist: { marginLeft: 12, paddingLeft: space[4], borderLeftWidth: 2, gap: space[2] },
+  confirm: { borderWidth: 1, borderRadius: radius.md, padding: space[4], gap: space[3] },
+  suggestion: { minHeight: 36, justifyContent: 'center', paddingHorizontal: space[3], borderRadius: radius.pill, borderWidth: 1 },
+  pill: { borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 2, alignSelf: 'flex-start' },
 });

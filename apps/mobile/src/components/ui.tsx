@@ -128,6 +128,7 @@ export function Button({
   icon,
   small,
   accessibilityHint,
+  accessibilityLabel,
   style,
 }: {
   label: string;
@@ -138,6 +139,8 @@ export function Button({
   icon?: ReactNode;
   small?: boolean;
   accessibilityHint?: string;
+  /** Nombre para lectores cuando el texto visible no basta («Reabrir» → «Reabrir «Cálculo I»»). */
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
@@ -155,6 +158,7 @@ export function Button({
       accessibilityRole="button"
       accessibilityState={{ disabled: !!off, busy: !!busy }}
       accessibilityHint={accessibilityHint}
+      accessibilityLabel={accessibilityLabel}
       disabled={off}
       onPress={onPress}
       style={({ pressed }) => [

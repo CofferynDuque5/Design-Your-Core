@@ -1,9 +1,9 @@
-import { applyLegacyOp, localDayKey, utcDayKey, type LegacyData, type LegacyItems, type LegacyKey } from '@dyc/core';
+import { localDayKey, utcDayKey, type LegacyData } from '@dyc/core';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import * as SecureStore from 'expo-secure-store';
 import { Linking } from 'react-native';
 import { auth } from '../lib/api';
-import { fakeFetch, profile, tokens, type Handler } from './fakeApi';
+import { fakeModules, tokens, type Handler } from './fakeApi';
 
 // Herramientas de la app anterior en el móvil: «Más», Agenda, Pendientes,
 // Calendario, Horario y Enfoque, con el enrutador real y una API falsa que
@@ -44,34 +44,7 @@ function legacyDoc(): LegacyData {
 }
 
 /** API falsa con el documento en memoria: aplica cada cambio como el servidor. */
-function setup(over: Record<string, Handler> = {}) {
-  let doc = legacyDoc();
-  const parts = (url: URL) => url.pathname.split('/').slice(4) as [LegacyKey, string?];
-  return fakeFetch({
-    'GET /api/v2/profile': () => ({ profile: profile() }),
-    'GET /api/v2/modules': () => ({ data: doc, updatedAt: '2026-09-26T10:00:00.000Z' }),
-    'POST /api/v2/modules/:key': (b, url) => {
-      const item = (b as { item: LegacyItems[LegacyKey] }).item;
-      doc = applyLegacyOp(doc, parts(url)[0], { type: 'add', item });
-      return [201, { item, updatedAt: 'x' }];
-    },
-    'PUT /api/v2/modules/:key/order': (b, url) => {
-      doc = applyLegacyOp(doc, parts(url)[0], { type: 'reorder', ids: (b as { ids: string[] }).ids });
-      return { ok: true, updatedAt: 'x' };
-    },
-    'PATCH /api/v2/modules/:key/:id': (b, url) => {
-      const [key, id] = parts(url);
-      doc = applyLegacyOp(doc, key, { type: 'update', id: decodeURIComponent(id ?? ''), patch: b as object });
-      return { item: b, updatedAt: 'x' };
-    },
-    'DELETE /api/v2/modules/:key/:id': (_b, url) => {
-      const [key, id] = parts(url);
-      doc = applyLegacyOp(doc, key, { type: 'remove', id: decodeURIComponent(id ?? '') });
-      return { ok: true, updatedAt: 'x' };
-    },
-    ...over,
-  });
-}
+const setup = (over: Record<string, Handler> = {}) => fakeModules(legacyDoc(), over);
 
 type Api = ReturnType<typeof setup>;
 const writes = (api: Api) => api.calls.filter((c) => c.method !== 'GET');
@@ -104,7 +77,8 @@ describe('herramientas en el móvil', () => {
 
     fireEvent.press(screen.getByRole('link', { name: 'Finanzas, 1 movimiento, en la web' }));
     expect(openURL).toHaveBeenCalledWith('https://app.designyourcore.nvcorx.com/finanzas');
-    expect(screen.getAllByText('En la web')).toHaveLength(19);
+    expect(screen.getAllByText('En la web')).toHaveLength(13);
+    expect(screen.getByRole('button', { name: 'Materias, 1 materia' })).toBeOnTheScreen();
 
     fireEvent.press(screen.getByRole('button', { name: 'Horario, 2 clases' }));
     expect(await screen.findByText('Nueva clase')).toBeOnTheScreen();
