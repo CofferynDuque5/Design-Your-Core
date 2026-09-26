@@ -6,7 +6,8 @@ App de Design Your Core para iOS y Android. Usa Expo SDK 57 con Expo Router y co
 
 - **Acceso**: entrar, crear cuenta y recuperar contraseña. La sesión usa un token de acceso de 15 minutos y uno de renovación de 90 días que rota en cada uso. Ambos se guardan en el llavero del sistema (`expo-secure-store`). Sin conexión la sesión se conserva; solo se cierra si la API rechaza la renovación.
 - **Bienvenida** en cuatro pasos: pilares de enfoque, punto de partida, ritmo y primer reto.
-- **Pestañas**: Hoy, Progreso (día, semana y mes), Retos, Hábitos y Perfil. El check-in completo se abre como hoja modal.
+- **Pestañas**: Hoy, Progreso (día, semana y mes), Retos, Hábitos, Perfil y Más. El check-in completo se abre como hoja modal.
+- **Más**: todas las herramientas de la app anterior, agrupadas como en la barra lateral de la web (Organización, Estudio y trabajo, Conocimiento, Vida personal y Salud) y con su número de elementos. **Agenda, Pendientes, Calendario, Horario y Enfoque** ya tienen pantalla en el móvil; el resto aparece como «En la web» y se abre en el navegador (`EXPO_PUBLIC_WEB_URL`, por defecto `https://app.designyourcore.nvcorx.com`). Usan el mismo documento y la misma API que la web (`/api/v2/modules`, ver [docs/modulos.md](../../docs/modulos.md)): los cambios se ven al instante y, si la API falla, se deshacen con un aviso.
 - **Tema** claro u oscuro según el sistema, o fijado desde Perfil.
 - **Recordatorio diario** del check-in (notificación local, funciona sin servidor). Al tocarlo se abre el check-in.
 - **Eliminar la cuenta** desde Perfil, como exigen las tiendas.
@@ -19,7 +20,7 @@ Con la API en marcha (`pnpm dev:api` en la raíz):
 pnpm dev:mobile        # o: pnpm --filter @dyc/mobile start
 ```
 
-Escanea el QR con Expo Go. En desarrollo la app llama a `http://<IP del ordenador>:4600`; el teléfono y el ordenador tienen que estar en la misma red. Para usar otra API, crea `.env` a partir de `.env.example` y define `EXPO_PUBLIC_API_URL`.
+Escanea el QR con Expo Go. En desarrollo la app llama a `http://<IP del ordenador>:4600`; el teléfono y el ordenador tienen que estar en la misma red. Para usar otra API, crea `.env` a partir de `.env.example` y define `EXPO_PUBLIC_API_URL` (y `EXPO_PUBLIC_WEB_URL` para la web a la que llevan las herramientas que aún no están en el móvil).
 
 La vista web (`pnpm --filter @dyc/mobile web`) sirve para revisar pantallas rápido; en ella no hay notificaciones.
 
@@ -33,7 +34,8 @@ pnpm --filter @dyc/mobile typecheck
 - `src/lib/auth.test.ts`: guardar, recuperar, renovar y cerrar la sesión.
 - `src/lib/notifications.test.ts`: programar y quitar el recordatorio, y el caso sin permiso.
 - `src/test/app.test.tsx`: recorridos con el enrutador real y una API falsa (entrar, bienvenida, error de acceso, renovación automática del token caducado).
-- `src/test/a11y.test.tsx`: en cada pantalla, todo lo que se puede tocar tiene un rol y un nombre que VoiceOver y TalkBack pueden leer, y cada campo tiene etiqueta.
+- `src/test/tools.test.tsx`: «Más» y las herramientas (Agenda, Pendientes, Calendario, Horario y Enfoque) con una API falsa que aplica cada cambio como el servidor: crear, editar, borrar, reordenar, el temporizador y deshacer si la API falla.
+- `src/test/a11y.test.tsx`: en cada pantalla (también «Más», las herramientas y sus hojas), todo lo que se puede tocar tiene un rol y un nombre que VoiceOver y TalkBack pueden leer, y cada campo tiene etiqueta.
 
 ## Iconos
 

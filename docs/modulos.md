@@ -148,3 +148,13 @@ Al crear se completan los valores por defecto de la app anterior (`kind: "study"
 - La conversación solo vive en memoria: se pierde al recargar o salir. Las respuestas usan el mismo Markdown seguro que las notas.
 - Herramientas: `add_todo`, `add_task`, `add_idea`, `add_goal`, `add_transaction`, `log_water`, `log_workout`, `log_sleep`, `add_journal` y `add_routine`, con los parámetros de la app anterior (`log_workout` pide además los minutos, porque `workouts` exige al menos 1). Cada llamada se muestra como **acción propuesta** con lo que se va a guardar y los botones «Hacer» y «Descartar»; **nada se escribe sin «Hacer»**, y entonces se guarda con esta misma API de módulos (validada antes con los esquemas de `@dyc/core`). El resultado de cada acción se envía al modelo con el siguiente mensaje. `add_journal` añade a la entrada de hoy si ya existe (una por día).
 - No hay Content-Security-Policy en la web ni en su `.htaccess`; si se añade, `connect-src` debe permitir `https://generativelanguage.googleapis.com`.
+
+## En el móvil
+
+La app móvil tiene una pestaña **Más** con el mismo catálogo que la web (`TOOL_CATALOG` en `@dyc/core`: grupos, textos y cuentas). La tanda 1 ya tiene pantalla nativa: **Agenda** (`/agenda`, con `?vista=tareas`), **Pendientes**, **Calendario**, **Horario** y **Enfoque**. Las demás se muestran como «En la web» y se abren en el navegador (`EXPO_PUBLIC_WEB_URL`).
+
+- Una sola consulta (`['legacy']`, `GET /api/v2/modules`) y los mismos cambios elemento a elemento, en cola y optimistas: el cálculo del cambio en la copia local (`applyLegacyOp`) está en `@dyc/core` y lo comparten la web y el móvil. Si la API falla, se deshace y aparece un aviso.
+- Mismos formatos: horas decimales en `blocks`, `HH:MM` en `classes` (se acepta «8:30» u «0830» y se guarda «08:30»), `reminders.day` como día del mes, día local en Calendario y Horario y día UTC en Enfoque (lo más reciente primero, máximo 500).
+- Sin selectores nativos (no se añaden dependencias): las horas de los bloques y el día del mes de los eventos se eligen con botones de menos y más en pasos de media hora o de un día.
+- Enfoque: el temporizador vive en la pantalla, como en la web; si la app pasa a segundo plano, al volver termina la sesión si ya se cumplió el tiempo.
+- Los ids nuevos usan `crypto.randomUUID` si existe y, si no (React Native), `id_` + texto aleatorio y la fecha, como la app anterior.
