@@ -1,4 +1,5 @@
 import {
+  byWeekday,
   CLASS_DAYS,
   checkItems,
   checkItemsPayload,
@@ -8,6 +9,7 @@ import {
   PROJECT_STATUS_INFO,
   PROJECT_STATUSES,
   projectProgress,
+  projectStatusOf,
   type LegacyClass,
   type LegacyMilestone,
   type LegacyProject,
@@ -33,7 +35,7 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
 ];
 const STATUS_OPTIONS = PROJECT_STATUSES.map((s) => ({ value: s, label: PROJECT_STATUS_INFO[s].label }));
 /** Un estado desconocido se muestra como «En curso», sin cambiar el dato. */
-const statusOf = (p: LegacyProject): ProjectStatus => (PROJECT_STATUSES.includes(p.status) ? p.status : 'curso');
+const statusOf = projectStatusOf;
 
 export function Projects() {
   const legacy = useLegacyData();
@@ -101,7 +103,7 @@ function ProjectCard({ project: p, subjects, classes, onEdit }: { project: Proje
   const done = p.milestones.filter((m) => m.done).length;
   // La materia va por nombre; su primera clase de la semana, como en la app anterior.
   const subject = p.subject ? subjects.find((s) => s.name === p.subject) : undefined;
-  const firstClass = subject ? classes.filter((c) => c.subject === subject.id).sort((a, b) => a.day - b.day || String(a.start).localeCompare(String(b.start)))[0] : undefined;
+  const firstClass = subject ? classes.filter((c) => c.subject === subject.id).sort(byWeekday)[0] : undefined;
   const panelId = `milestones-${p.id}`;
   const titleId = `project-${p.id}`;
 

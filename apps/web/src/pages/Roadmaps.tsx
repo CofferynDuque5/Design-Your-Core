@@ -1,4 +1,4 @@
-import { checkItems, checkItemsPayload, COLOR_NAMES, donePercent, ROADMAP_COLORS, stepStates, type LegacyCheckItem, type LegacyRoadmap, type StepState } from '@dyc/core';
+import { checkItems, checkItemsPayload, COLOR_NAMES, donePercent, ROADMAP_COLORS, STEP_STATE_LABEL, stepStates, type LegacyCheckItem, type LegacyRoadmap } from '@dyc/core';
 import { ArrowRight, Check, Lock, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useId, useMemo, useState, type FormEvent } from 'react';
 import { newId, newSubId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -10,7 +10,7 @@ import { FormActions, Meter, paletteWith, safeColor } from '../components/ToolPa
 import { plural } from '../lib/format';
 
 type Roadmap = LegacyRoadmap & { steps: LegacyCheckItem[] };
-const STATE_LABEL: Record<StepState, string> = { done: 'Completada', current: 'En curso', next: 'Siguiente', locked: 'Bloqueada' };
+const STATE_LABEL = STEP_STATE_LABEL;
 
 export function Roadmaps() {
   const legacy = useLegacyData();

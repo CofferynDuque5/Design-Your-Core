@@ -1,3 +1,4 @@
+import { CORE_IMG, coreImageIds, DATA_IMAGE } from '@dyc/core';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import type { ImageResolver } from '../lib/markdown';
@@ -11,15 +12,13 @@ import { newId } from './legacy';
  * incrustadas en base64 que dejaba la app anterior.
  */
 
-export const CORE_IMG = /coreimg:([A-Za-z0-9_-]{1,80})/g;
-const DATA_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/i;
 /** Mismo límite que la API (4 MB por imagen). */
 const MAX_BYTES = 4 * 1024 * 1024;
 
 /** Imágenes subidas en esta visita: se ven al momento, sin volver a descargarlas. */
 const uploaded = new Map<string, string>();
 
-export const coreImageIds = (text: string) => Array.from(new Set(Array.from(text.matchAll(CORE_IMG), (m) => m[1])));
+export { CORE_IMG, coreImageIds };
 
 /** Carga de la nube las imágenes `coreimg:` de un texto y devuelve con qué mostrarlas. */
 export function useCoreImages(text: string): ImageResolver {

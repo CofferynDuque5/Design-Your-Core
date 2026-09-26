@@ -140,14 +140,8 @@ export function CheckList<T extends LegacyCheckItem>({
   );
 }
 
-/** Color guardado si es un hex válido; si no, el de reserva. */
-export const safeColor = (c: unknown, fallback: string): string => (typeof c === 'string' && /^#[0-9A-Fa-f]{6}$/.test(c) ? c : fallback);
-
-/** Paleta con el color actual añadido si no está en ella (datos antiguos o copiados de una materia). */
-export const paletteWith = (palette: readonly string[], color: string): string[] => (palette.some((c) => c.toLowerCase() === color.toLowerCase()) ? [...palette] : [...palette, color]);
-
-/** Opciones de un select con el valor actual añadido si no está en la lista. */
-export const optionsWith = (list: readonly string[], value: string): string[] => (!value || list.includes(value) ? [...list] : [...list, value]);
+// Colores y opciones con el valor guardado incluido: viven en @dyc/core (los comparte el móvil).
+export { optionsWith, paletteWith, safeColor } from '@dyc/core';
 
 // ---------- Tanda 3 ----------
 

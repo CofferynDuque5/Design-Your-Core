@@ -1,4 +1,4 @@
-import { CLASS_DAYS, checkItems, checkItemsPayload, COLOR_NAMES, donePercent, legacyList, SUBJECT_COLORS, type LegacyCheckItem, type LegacyClass, type LegacySubject } from '@dyc/core';
+import { byWeekday, CLASS_DAYS, checkItems, checkItemsPayload, COLOR_NAMES, donePercent, legacyList, SUBJECT_COLORS, type LegacyCheckItem, type LegacyClass, type LegacySubject } from '@dyc/core';
 import { CalendarPlus, ChevronDown, Clock, MapPin, Pencil, Plus, User } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
@@ -62,7 +62,7 @@ export function Subjects() {
   );
 }
 
-const byWeek = (a: LegacyClass, b: LegacyClass) => a.day - b.day || String(a.start).localeCompare(String(b.start));
+const byWeek = byWeekday;
 
 function SubjectCard({ subject: s, classes, onEdit }: { subject: Subject; classes: LegacyClass[]; onEdit: () => void }) {
   const subjects = useModule('subjects');

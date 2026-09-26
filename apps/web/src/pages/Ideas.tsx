@@ -1,4 +1,4 @@
-import { IDEA_CATEGORIES, IDEA_CATEGORY_INFO, splitTags, type IdeaCategory, type LegacyIdea } from '@dyc/core';
+import { IDEA_CATEGORIES, ideaCategoryOf, IDEA_CATEGORY_INFO, splitTags, type IdeaCategory, type LegacyIdea } from '@dyc/core';
 import { Lightbulb, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -14,7 +14,7 @@ import { useAutosave } from '../lib/tools';
 type Filter = 'todas' | IdeaCategory;
 const EXAMPLES = ['App de hábitos', 'Landing para portfolio', 'Reel para Instagram'];
 /** Una categoría desconocida se muestra como «Otro», sin cambiar el dato. */
-const categoryOf = (i: LegacyIdea): IdeaCategory => (IDEA_CATEGORIES.includes(i.category) ? i.category : 'otro');
+const categoryOf = ideaCategoryOf;
 
 export function Ideas() {
   const legacy = useLegacyData();

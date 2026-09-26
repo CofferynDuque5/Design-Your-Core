@@ -3,6 +3,7 @@ import {
   legacyList,
   legacyObject,
   newLegacyId,
+  newLegacySubId,
   type LegacyData,
   type LegacyItems,
   type LegacyKey,
@@ -33,10 +34,7 @@ export function useLegacyList<K extends LegacyKey>(data: LegacyData | undefined,
 }
 
 /** Id de un tema, hito o paso: randomUUID o "x" + 7 caracteres, como la app anterior. */
-export function newSubId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  return `x${Math.random().toString(36).slice(2, 9)}`;
-}
+export const newSubId = newLegacySubId;
 
 /** Id nuevo como en la app anterior. */
 export const newId = newLegacyId;

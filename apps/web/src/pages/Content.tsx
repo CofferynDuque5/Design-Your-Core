@@ -1,4 +1,4 @@
-import { CONTENT_PLATFORM_INFO, CONTENT_PLATFORMS, CONTENT_STAGE_INFO, CONTENT_STAGES, type ContentPlatform, type ContentStage, type LegacyContent } from '@dyc/core';
+import { contentPlatformOf, contentStageOf, CONTENT_PLATFORM_INFO, CONTENT_PLATFORMS, CONTENT_STAGE_INFO, CONTENT_STAGES, type ContentPlatform, type ContentStage, type LegacyContent } from '@dyc/core';
 import { CalendarClock, Pencil, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -9,8 +9,8 @@ import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions, Stats } from '../components/ToolParts';
 
 /** Valores desconocidos se muestran como los de por defecto, sin cambiar el dato. */
-const platformOf = (c: LegacyContent): ContentPlatform => (CONTENT_PLATFORMS.includes(c.platform) ? c.platform : 'otro');
-const stageOf = (c: LegacyContent): ContentStage => (CONTENT_STAGES.includes(c.stage) ? c.stage : 'idea');
+const platformOf = contentPlatformOf;
+const stageOf = contentStageOf;
 
 export function Content() {
   const legacy = useLegacyData();

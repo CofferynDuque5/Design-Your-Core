@@ -1,4 +1,4 @@
-import { BOX_COLORS, CODE_BOX_COLOR, CODE_LANGS, COLOR_NAMES, NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, type LegacyNoteBox, type LegacyNotebook } from '@dyc/core';
+import { BOX_COLORS, CODE_LANGS, COLOR_NAMES, coreImageIds, inlineImages, legacySubjectNames, newNoteBox, NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, noteBoxKind, uniqueTexts, type LegacyNoteBox, type LegacyNotebook } from '@dyc/core';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Code2, Copy, ImageOff, Palette, Plus, Trash2, Type } from 'lucide-react';
 import { useId, useMemo, useState, type FormEvent } from 'react';
@@ -14,8 +14,8 @@ import { FormActions, optionsWith, paletteWith, safeColor } from '../components/
 import { plural } from '../lib/format';
 import { useAutosave } from '../lib/tools';
 
-const uniq = (list: unknown[]) => Array.from(new Set(list.filter((x): x is string => typeof x === 'string' && !!x.trim()))).sort((a, b) => a.localeCompare(b, 'es'));
-const kindOf = (b: LegacyNoteBox) => (b.kind === 'code' ? 'code' : 'text');
+const uniq = uniqueTexts;
+const kindOf = noteBoxKind;
 
 // ---------- Lista de cuadernos ----------
 
@@ -139,10 +139,7 @@ function Tags({ notebook: n }: { notebook: LegacyNotebook }) {
   );
 }
 
-function subjectNames(data: Record<string, unknown> | undefined): string[] {
-  const list = data?.subjects;
-  return Array.isArray(list) ? uniq(list.map((s) => (s && typeof s === 'object' ? (s as { name?: unknown }).name : null))) : [];
-}
+const subjectNames = legacySubjectNames;
 
 function NotebookForm({ notebook, all, subjects, boxCount = 0, onDone, onDeleted }: { notebook: LegacyNotebook | null; all: LegacyNotebook[]; subjects: string[]; boxCount?: number; onDone: () => void; onDeleted?: () => void }) {
   const actions = useModule('notebooks');
@@ -233,7 +230,7 @@ export function NotebookDetail() {
 
   const addBox = (kind: 'text' | 'code') => {
     if (!notebook) return;
-    const box: LegacyNoteBox = { id: newId(), notebookId: notebook.id, title: '', text: '', color: kind === 'code' ? CODE_BOX_COLOR : BOX_COLORS[0], kind, lang: kind === 'code' ? CODE_LANGS[0] : '' };
+    const box = newNoteBox(newId(), notebook.id, kind);
     actions.add(box);
     setAdded(box.id);
   };
@@ -449,17 +446,14 @@ function CodeBox({ box, n, autoFocus }: { box: LegacyNoteBox; n: number; autoFoc
 
 // ---------- Imágenes de la app anterior ----------
 
-const CORE_IMG = /coreimg:([A-Za-z0-9_-]{1,80})/g;
-const DATA_IMG = /data:image\/[a-z+.-]+;base64,[A-Za-z0-9+/=]+/g;
-
 /**
  * La app anterior referencia las imágenes como `coreimg:<id>` (guardadas en el
  * navegador y, con nube, en /api/images) o las incrusta en base64. Aquí se
  * muestran las que se pueden leer; subir imágenes llegará más adelante.
  */
 function BoxImages({ text }: { text: string }) {
-  const ids = useMemo(() => Array.from(new Set(Array.from(text.matchAll(CORE_IMG), (m) => m[1]))), [text]);
-  const inline = useMemo(() => Array.from(new Set(text.match(DATA_IMG) ?? [])), [text]);
+  const ids = useMemo(() => coreImageIds(text), [text]);
+  const inline = useMemo(() => inlineImages(text), [text]);
   const cloud = useQuery({ queryKey: ['legacy-images', ids], queryFn: () => api.legacy.images(ids.slice(0, 100)), enabled: ids.length > 0, staleTime: Infinity });
   if (!ids.length && !inline.length) return null;
   const found = cloud.data?.images ?? {};

@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { applyLegacyOp, newLegacyId, type LegacyData } from '../src/legacy.js';
 import {
+  byWeekday,
   calendarCycleDays,
+  contentPlatformOf,
+  contentStageOf,
+  coreImageIds,
+  ideaCategoryOf,
+  inlineImages,
+  legacySubjectNames,
+  newLegacySubId,
+  newNoteBox,
+  noteBoxKind,
+  optionsWith,
+  paletteWith,
+  projectStatusOf,
+  safeColor,
+  uniqueTexts,
   calendarMarks,
   classWhenLabel,
   describeCalendarDay,
@@ -117,5 +132,53 @@ describe('herramientas compartidas', () => {
     expect(describeCalendarDay('2026-09-05', marks, data.reminders ?? [])).toBe(': 1 evento, entreno');
     expect(shiftMonth('2026-12-01', 1)).toBe('2027-01-01');
     expect(shiftMonth('2026-01-01', -1)).toBe('2025-12-01');
+  });
+
+  it('tanda 2: colores y opciones conservan el valor guardado', () => {
+    expect(safeColor('#12abEF', '#000000')).toBe('#12abEF');
+    expect(safeColor('rojo', '#000000')).toBe('#000000');
+    expect(safeColor(undefined, '#4F7CFF')).toBe('#4F7CFF');
+    expect(paletteWith(['#4F7CFF', '#0FA968'], '#4f7cff')).toEqual(['#4F7CFF', '#0FA968']);
+    expect(paletteWith(['#4F7CFF'], '#123456')).toEqual(['#4F7CFF', '#123456']);
+    expect(optionsWith(['js', 'ts'], 'rust')).toEqual(['js', 'ts', 'rust']);
+    expect(optionsWith(['js', 'ts'], '')).toEqual(['js', 'ts']);
+  });
+
+  it('tanda 2: valores desconocidos se muestran como los de por defecto', () => {
+    expect(projectStatusOf({ status: 'revision' })).toBe('revision');
+    expect(projectStatusOf({ status: 'raro' })).toBe('curso');
+    expect(contentPlatformOf({ platform: 'vimeo' as never })).toBe('otro');
+    expect(contentStageOf({ stage: 'grabar' })).toBe('grabar');
+    expect(contentStageOf({ stage: undefined as never })).toBe('idea');
+    expect(ideaCategoryOf({ category: 'web' })).toBe('web');
+    expect(ideaCategoryOf({ category: 'x' as never })).toBe('otro');
+    expect(noteBoxKind({ kind: 'code' })).toBe('code');
+    expect(noteBoxKind({ kind: 'dibujo' as never })).toBe('text');
+  });
+
+  it('tanda 2: cajitas nuevas, ids de pasos, textos únicos y materias', () => {
+    expect(newNoteBox('b1', 'n1', 'text')).toEqual({ id: 'b1', notebookId: 'n1', title: '', text: '', color: '#FFF7D6', kind: 'text', lang: '' });
+    expect(newNoteBox('b2', 'n1', 'code')).toEqual({ id: 'b2', notebookId: 'n1', title: '', text: '', color: '#1e1e2e', kind: 'code', lang: 'js' });
+    const g = globalThis as { crypto?: unknown };
+    const saved = Object.getOwnPropertyDescriptor(g, 'crypto');
+    Object.defineProperty(g, 'crypto', { value: undefined, configurable: true });
+    try {
+      expect(newLegacySubId()).toMatch(/^x[a-z0-9]{1,7}$/);
+    } finally {
+      if (saved) Object.defineProperty(g, 'crypto', saved);
+    }
+    expect(uniqueTexts(['Física', '', '  ', 'Álgebra', 'Física', 3, null, 'Cálculo'])).toEqual(['Álgebra', 'Cálculo', 'Física']);
+    expect(legacySubjectNames({ subjects: [{ name: 'Física' }, { name: '' }, null, { name: 'Arte' }] })).toEqual(['Arte', 'Física']);
+    expect(legacySubjectNames({ subjects: 'roto' })).toEqual([]);
+  });
+
+  it('tanda 2: clases por semana e imágenes de las cajitas', () => {
+    const c = (day: number, start: string) => ({ id: `${day}${start}`, day, start, end: '23:00', title: '', room: '', color: '', subject: '' });
+    expect([c(3, '08:00'), c(1, '10:00'), c(1, '08:00')].sort(byWeekday).map((x) => x.id)).toEqual(['108:00', '110:00', '308:00']);
+    const text = 'Mira ![a](coreimg:abc_1) y coreimg:abc_1 y ![b](coreimg:zz-9)\n![c](data:image/png;base64,iVBOR=) data:image/png;base64,iVBOR=';
+    expect(coreImageIds(text)).toEqual(['abc_1', 'zz-9']);
+    expect(coreImageIds(text)).toEqual(['abc_1', 'zz-9']);
+    expect(inlineImages(text)).toEqual(['data:image/png;base64,iVBOR=']);
+    expect(inlineImages('sin imágenes')).toEqual([]);
   });
 });

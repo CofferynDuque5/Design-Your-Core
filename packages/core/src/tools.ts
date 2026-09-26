@@ -1,14 +1,29 @@
 import { addDays, isDay, type Day } from './dates.js';
 import { plural } from './format.js';
 import {
+  BOX_COLORS,
+  CODE_BOX_COLOR,
+  CODE_LANGS,
+  CONTENT_PLATFORMS,
+  CONTENT_STAGES,
   cycleInfo,
   cyclePredictions,
   hhmmToHours,
+  IDEA_CATEGORIES,
   legacyList,
   legacyObject,
+  PROJECT_STATUSES,
+  type ContentPlatform,
+  type ContentStage,
+  type IdeaCategory,
   type LegacyClass,
+  type LegacyContent,
   type LegacyData,
+  type LegacyIdea,
+  type LegacyNoteBox,
   type LegacyReminder,
+  type ProjectStatus,
+  type StepState,
 } from './legacy.js';
 import { legacyVault, vaultSecureOf } from './vault.js';
 
@@ -543,3 +558,69 @@ export function describeCalendarDay(day: Day, marks: Map<Day, Set<CalendarMark>>
   const parts = [...set].map((k) => (k === 'event' ? `${events} ${events === 1 ? 'evento' : 'eventos'}` : CALENDAR_MARKS[k].toLowerCase()));
   return `: ${parts.join(', ')}`;
 }
+
+// ---------- Tanda 2: Materias, Proyectos, Roadmaps, Cuadernos, Contenido e Ideas ----------
+
+/** Color guardado si es un hex válido; si no, el de reserva. */
+export const safeColor = (c: unknown, fallback: string): string => (typeof c === 'string' && /^#[0-9A-Fa-f]{6}$/.test(c) ? c : fallback);
+
+/** Paleta con el color actual añadido si no está en ella (datos antiguos o copiados de una materia). */
+export const paletteWith = (palette: readonly string[], color: string): string[] => (palette.some((c) => c.toLowerCase() === color.toLowerCase()) ? [...palette] : [...palette, color]);
+
+/** Opciones de una lista con el valor actual añadido si no está en ella. */
+export const optionsWith = (list: readonly string[], value: string): string[] => (!value || list.includes(value) ? [...list] : [...list, value]);
+
+/** Id de un tema, hito o paso: randomUUID o "x" + 7 caracteres, como la app anterior. */
+export function newLegacySubId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (typeof c?.randomUUID === 'function') return c.randomUUID();
+  return `x${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/** Textos distintos y no vacíos, en orden alfabético español (filtros y sugerencias de Cuadernos). */
+export const uniqueTexts = (list: unknown[]): string[] =>
+  Array.from(new Set(list.filter((x): x is string => typeof x === 'string' && !!x.trim()))).sort((a, b) => a.localeCompare(b, 'es'));
+
+/** Nombres de las materias del documento (sugerencias de Cuadernos). */
+export function legacySubjectNames(data: Record<string, unknown> | undefined): string[] {
+  const list = data?.subjects;
+  return Array.isArray(list) ? uniqueTexts(list.map((s) => (s && typeof s === 'object' ? (s as { name?: unknown }).name : null))) : [];
+}
+
+// Un valor desconocido se muestra como el de por defecto, sin cambiar el dato.
+export const projectStatusOf = (p: { status?: unknown }): ProjectStatus => (PROJECT_STATUSES.includes(p.status as ProjectStatus) ? (p.status as ProjectStatus) : 'curso');
+export const contentPlatformOf = (c: Pick<LegacyContent, 'platform'>): ContentPlatform => (CONTENT_PLATFORMS.includes(c.platform) ? c.platform : 'otro');
+export const contentStageOf = (c: Pick<LegacyContent, 'stage'>): ContentStage => (CONTENT_STAGES.includes(c.stage) ? c.stage : 'idea');
+export const ideaCategoryOf = (i: Pick<LegacyIdea, 'category'>): IdeaCategory => (IDEA_CATEGORIES.includes(i.category) ? i.category : 'otro');
+
+/** Nombre de cada estado de un paso de roadmap. */
+export const STEP_STATE_LABEL: Record<StepState, string> = { done: 'Completada', current: 'En curso', next: 'Siguiente', locked: 'Bloqueada' };
+
+/** Clases por día de la semana y hora (la primera es la «próxima» de una materia). */
+export const byWeekday = (a: LegacyClass, b: LegacyClass) => a.day - b.day || String(a.start).localeCompare(String(b.start));
+
+/** Tipo de una cajita: cualquier otro valor es de texto, como en la app anterior. */
+export const noteBoxKind = (b: Pick<LegacyNoteBox, 'kind'>): 'text' | 'code' => (b.kind === 'code' ? 'code' : 'text');
+
+/** Cajita nueva como la crea la app anterior: amarilla de texto, o de código oscura en `js`. */
+export const newNoteBox = (id: string, notebookId: string, kind: 'text' | 'code'): LegacyNoteBox => ({
+  id,
+  notebookId,
+  title: '',
+  text: '',
+  color: kind === 'code' ? CODE_BOX_COLOR : BOX_COLORS[0],
+  kind,
+  lang: kind === 'code' ? CODE_LANGS[0] : '',
+});
+
+/** Referencia a una imagen de la app anterior (`coreimg:<id>`), guardada en la nube con /api/images. */
+export const CORE_IMG = /coreimg:([A-Za-z0-9_-]{1,80})/g;
+const DATA_IMG_IN_TEXT = /data:image\/[a-z+.-]+;base64,[A-Za-z0-9+/=]+/g;
+/** Imagen en base64 que se puede mostrar sin riesgo (solo formatos de imagen de mapa de bits). */
+export const DATA_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/i;
+
+/** Ids `coreimg:` de un texto, sin repetir. */
+export const coreImageIds = (text: string): string[] => Array.from(new Set(Array.from(text.matchAll(CORE_IMG), (m) => m[1])));
+
+/** Imágenes incrustadas en base64 en un texto, sin repetir. */
+export const inlineImages = (text: string): string[] => Array.from(new Set(text.match(DATA_IMG_IN_TEXT) ?? []));
