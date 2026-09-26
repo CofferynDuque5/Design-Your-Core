@@ -7,18 +7,19 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Card, ErrorState, Loading, PageHeader, Screen, SectionHeader, T, fonts } from '../../components/ui';
 import { useLegacyData } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
-import { NATIVE_TOOLS, TOOL_ICONS } from '../../lib/tools';
+import { NATIVE_TOOLS, TOOL_ICONS, WEB_ONLY_REASONS } from '../../lib/tools';
 import { openOnWeb } from '../../lib/web';
 
 export default function More() {
   const legacy = useLegacyData();
-  const onWeb = TOOL_CATALOG.filter((t) => !NATIVE_TOOLS.has(t.id)).length;
+  const onWeb = TOOL_CATALOG.filter((t) => !NATIVE_TOOLS.has(t.id)).map((t) => t.label);
 
   return (
     <Screen refreshing={legacy.isRefetching} onRefresh={() => legacy.refetch()}>
       <PageHeader eyebrow="Más" title="Tus herramientas" />
       <T v="body" tint="muted" style={{ marginTop: -space[3] }}>
-        Todo lo de la app anterior, con tus datos. {NATIVE_TOOLS.size} ya están en el móvil; las otras {onWeb} se abren en la web mientras llegan.
+        Todo lo de la app anterior, con tus datos: {NATIVE_TOOLS.size} herramientas en el móvil.
+        {onWeb.length > 0 && ` ${listEs(onWeb)} se ${onWeb.length === 1 ? 'abre' : 'abren'} en la web: ${onWeb.length === 1 ? 'necesita' : 'necesitan'} el navegador para proteger tus claves.`}
       </T>
       {legacy.isPending ? (
         <Loading label="Cargando tus herramientas" />
@@ -43,6 +44,9 @@ export default function More() {
   );
 }
 
+/** «Bóveda y Asistente», «A, B y C». */
+const listEs = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`);
+
 function Divider() {
   const { colors } = useTheme();
   return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.line, marginLeft: 52 }} />;
@@ -53,11 +57,12 @@ function ToolRow({ tool, status }: { tool: ToolInfo; status: string }) {
   const { colors } = useTheme();
   const Icon = TOOL_ICONS[tool.id];
   const native = NATIVE_TOOLS.has(tool.id);
+  const reason = native ? null : (WEB_ONLY_REASONS[tool.id] ?? 'Se abre en la web.');
   return (
     <Pressable
       accessibilityRole={native ? 'button' : 'link'}
       accessibilityLabel={`${tool.label}, ${status}${native ? '' : ', en la web'}`}
-      accessibilityHint={native ? tool.description : `${tool.description}. Se abre en el navegador.`}
+      accessibilityHint={native ? tool.description : `${tool.description}. ${reason}`}
       onPress={() => (native ? router.push(tool.path as Href) : openOnWeb(tool.path))}
       style={({ pressed }) => [s.row, pressed && { opacity: 0.7 }]}
     >
@@ -78,6 +83,11 @@ function ToolRow({ tool, status }: { tool: ToolInfo; status: string }) {
         <T v="small" tint="muted" numberOfLines={3}>
           {tool.description}
         </T>
+        {reason && (
+          <T v="small" tint="subtle" numberOfLines={3}>
+            {reason}
+          </T>
+        )}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2, maxWidth: 104 }}>
         <T v="small" tint="subtle" style={{ fontVariant: ['tabular-nums'], textAlign: 'right' }} numberOfLines={2}>

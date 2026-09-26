@@ -4,9 +4,10 @@ import { radius, space, touchTarget } from '@dyc/tokens';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, Check, Pencil, Plus } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { pillarShort, PillarTag } from '../../components/pillar';
 import { Sheet } from '../../components/Sheet';
+import { Toggle } from '../../components/tools';
 import { Button, Card, Chip, EmptyState, ErrorState, errorMessage, Field, Loading, PageHeader, Screen, T, fonts } from '../../components/ui';
 import { api } from '../../lib/api';
 import { keys, useHabits, useRefresh } from '../../lib/queries';
@@ -55,13 +56,7 @@ export default function Habits() {
             <T v="label" nativeID="archived-label">
               Mostrar archivados
             </T>
-            <Switch
-              accessibilityLabel="Mostrar archivados"
-              value={showArchived}
-              onValueChange={setShowArchived}
-              trackColor={{ true: colors.primary, false: colors.lineStrong }}
-              thumbColor={colors.surface}
-            />
+            <Toggle label="Mostrar archivados" value={showArchived} onChange={setShowArchived} />
           </View>
           {showArchived &&
             (archived.length ? (

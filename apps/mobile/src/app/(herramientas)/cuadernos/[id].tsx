@@ -17,8 +17,9 @@ import { radius, space, touchTarget } from '@dyc/tokens';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronDown, Code2, Copy, ImageOff, Palette, Trash2, Type } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { FitImage, MONO } from '../../../components/markdown';
 import { NotebookForm, NotebookTags } from '../../../components/notebooks';
 import { Sheet } from '../../../components/Sheet';
 import { ColorSwatches, DotChoices, IconButton, tint, ToolScreen } from '../../../components/tools';
@@ -30,7 +31,6 @@ import { useToast } from '../../../lib/toast';
 import { copyOrShare, useAutosave } from '../../../lib/tools';
 
 const BACK = { label: 'Cuadernos', href: '/cuadernos' } as const;
-const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' });
 // Colores fijos del editor de código, como en la web y la app anterior (siempre oscuro).
 const CODE = { bg: '#1e1e2e', head: '#181825', line: '#2a2a3c', ink: '#cdd6f4', muted: '#a6adc8', subtle: '#7f849c' };
 
@@ -316,7 +316,7 @@ function BoxImages({ text, muted }: { text: string; muted: string }) {
   return (
     <View style={{ gap: space[2] }}>
       {sources.map((src, i) => (
-        <BoxImage key={i} src={src} label={`Imagen ${i + 1} de la cajita`} />
+        <FitImage key={i} src={src} label={`Imagen ${i + 1} de la cajita`} />
       ))}
       {missing > 0 && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
@@ -328,27 +328,6 @@ function BoxImages({ text, muted }: { text: string; muted: string }) {
       )}
     </View>
   );
-}
-
-/** Imagen a todo el ancho con su proporción real (16:9 mientras se lee). */
-function BoxImage({ src, label }: { src: string; label: string }) {
-  const [ratio, setRatio] = useState(16 / 9);
-  useEffect(() => {
-    let alive = true;
-    try {
-      Image.getSize(
-        src,
-        (w, h) => alive && w > 0 && h > 0 && setRatio(Math.max(0.5, Math.min(3, w / h))),
-        () => undefined,
-      );
-    } catch {
-      // Si no se puede medir, se queda en 16:9.
-    }
-    return () => {
-      alive = false;
-    };
-  }, [src]);
-  return <Image source={{ uri: src }} accessibilityLabel={label} accessibilityRole="image" resizeMode="contain" style={[st.image, { aspectRatio: ratio }]} />;
 }
 
 const st = StyleSheet.create({
@@ -365,5 +344,4 @@ const st = StyleSheet.create({
   codeTitle: { flex: 1, minWidth: 0, minHeight: touchTarget, paddingHorizontal: space[1] },
   lang: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 32, paddingHorizontal: space[2], borderRadius: radius.sm, borderWidth: 1, marginHorizontal: space[1] },
   codeText: { fontSize: 14, lineHeight: 20, padding: space[3], textAlignVertical: 'top' },
-  image: { width: '100%', borderRadius: radius.sm },
 });

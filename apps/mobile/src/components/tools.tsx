@@ -26,7 +26,8 @@ import { Button, Card, Field, PageHeader, Screen, T, fonts } from './ui';
 // Piezas comunes de las herramientas de la app anterior en el móvil
 // (tanda 1: Agenda, Pendientes, Calendario, Horario y Enfoque; tanda 2:
 // Materias, Proyectos, Roadmaps, Cuadernos, Contenido e Ideas; tanda 3:
-// Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario y Rutina).
+// Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario y Rutina;
+// tanda 4: Notas, Trabajo y Respiración).
 
 /**
  * Pantalla de una herramienta: vuelve a «Más» (o a donde diga `back`) y
@@ -420,6 +421,20 @@ export function CheckList<I extends LegacyCheckItem>({
   );
 }
 
+/** Aviso de borrar en el mismo sitio, con «Borrar definitivamente» y «Cancelar». */
+export function ConfirmDelete({ children, onConfirm, onCancel }: { children: string; onConfirm: () => void; onCancel: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <View accessibilityRole="alert" style={[s.confirm, { backgroundColor: colors.dangerSoft, borderColor: colors.danger }]}>
+      <T v="small">{children}</T>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+        <Button small variant="danger" label="Borrar definitivamente" onPress={onConfirm} />
+        <Button small variant="ghost" label="Cancelar" onPress={onCancel} />
+      </View>
+    </View>
+  );
+}
+
 /**
  * Guardar y, si se puede, borrar pidiendo confirmación en el mismo sitio
  * (como la web): «Borrar» se cambia por el aviso con «Borrar definitivamente».
@@ -429,13 +444,9 @@ export function FormActions({ submitLabel, onSubmit, disabled, onDelete, confirm
   const [asking, setAsking] = useState(false);
   if (asking && onDelete) {
     return (
-      <View accessibilityRole="alert" style={[s.confirm, { backgroundColor: colors.dangerSoft, borderColor: colors.danger }]}>
-        <T v="small">{confirm}</T>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-          <Button small variant="danger" label="Borrar definitivamente" onPress={onDelete} />
-          <Button small variant="ghost" label="Cancelar" onPress={() => setAsking(false)} />
-        </View>
-      </View>
+      <ConfirmDelete onConfirm={onDelete} onCancel={() => setAsking(false)}>
+        {confirm ?? ''}
+      </ConfirmDelete>
     );
   }
   return (
@@ -488,13 +499,17 @@ export function Pill({ children, color, a11yLabel }: { children: ReactNode; colo
 
 const THUMB = '#FFFFFF';
 
-/** Interruptor con los colores del tema y nombre para lectores («Activa: «Leer»»). */
-export function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+/**
+ * Interruptor con los colores del tema y nombre para lectores («Activa:
+ * «Leer»»). Es el de toda la app: herramientas, Hábitos y Perfil.
+ */
+export function Toggle({ label, value, onChange, disabled }: { label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   const { colors } = useTheme();
   return (
     <Switch
       accessibilityLabel={label}
       value={value}
+      disabled={disabled}
       onValueChange={onChange}
       trackColor={{ true: colors.primary, false: colors.lineStrong }}
       // Pulgar blanco como en iOS: en el tema oscuro se sigue viendo sobre la pista apagada.

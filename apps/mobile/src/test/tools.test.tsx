@@ -66,19 +66,29 @@ describe('herramientas en el móvil', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it('Más agrupa las herramientas con sus cuentas y abre en la web las que faltan', async () => {
+  it('Más agrupa las herramientas con sus cuentas y abre en la web solo Bóveda y Asistente', async () => {
     setup();
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     await open('/mas', 'Tus herramientas');
     for (const g of ['Organización', 'Estudio y trabajo', 'Conocimiento', 'Vida personal', 'Salud']) expect(await screen.findByText(g)).toBeOnTheScreen();
+    expect(screen.getByText(/22 herramientas en el móvil\. Bóveda y Asistente se abren en la web: necesitan el navegador para proteger tus claves\./)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Agenda, 4 elementos' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Pendientes, 2 por hacer' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Enfoque, 1 sesión' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Trabajo, Vacío' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Notas, Vacío' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Respiración, Vacío' })).toBeOnTheScreen();
 
-    fireEvent.press(screen.getByRole('link', { name: 'Trabajo, Vacío, en la web' }));
-    expect(openURL).toHaveBeenCalledWith('https://app.designyourcore.nvcorx.com/trabajo');
-    // Solo quedan en la web Trabajo, Notas, Bóveda, Asistente y Respiración.
-    expect(screen.getAllByText('En la web')).toHaveLength(5);
+    // Solo quedan en la web Bóveda y Asistente, y la fila dice por qué.
+    expect(screen.getAllByText('En la web')).toHaveLength(2);
+    const assistant = screen.getByRole('link', { name: 'Asistente, Con tu clave, en la web' });
+    expect(assistant).toHaveProp('accessibilityHint', 'Chat con Gemini usando tu propia clave. Se abre en la web: tu clave de Gemini solo se guarda en tu navegador.');
+    expect(screen.getByText('Se abre en la web: tu clave de Gemini solo se guarda en tu navegador.')).toBeOnTheScreen();
+    fireEvent.press(assistant);
+    expect(openURL).toHaveBeenCalledWith('https://app.designyourcore.nvcorx.com/asistente');
+    fireEvent.press(screen.getByRole('link', { name: 'Bóveda, Vacío, en la web' }));
+    expect(openURL).toHaveBeenCalledWith('https://app.designyourcore.nvcorx.com/boveda');
+    expect(screen.getByText('Se abre en la web: el cifrado de tus contraseñas solo funciona en el navegador.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Finanzas, 1 movimiento' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Ejercicio, 1 entreno' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Materias, 1 materia' })).toBeOnTheScreen();
