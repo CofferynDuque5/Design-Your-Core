@@ -7,6 +7,7 @@ import { api } from '../app/api';
 import { useShowCycle } from '../app/prefs';
 import { keys, useProfile } from '../app/queries';
 import { useSession } from '../app/session';
+import { STYLE_OPTIONS, useStyle } from '../app/style';
 import { useTheme, type ThemePreference } from '../app/theme';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
@@ -114,6 +115,7 @@ function timeZones(): string[] {
 
 function PreferencesSection() {
   const [theme, setTheme] = useTheme();
+  const [style, setStyle] = useStyle();
   const profile = useProfile();
   const qc = useQueryClient();
   const toast = useToast();
@@ -149,6 +151,26 @@ function PreferencesSection() {
           ]}
         />
       </div>
+      <fieldset className="field">
+        <legend className="field__label">Estilo visual</legend>
+        <div className="style-picker">
+          {STYLE_OPTIONS.map((o) => (
+            <label key={o.value} className="style-option">
+              <input type="radio" name="visual-style" value={o.value} checked={style === o.value} onChange={() => setStyle(o.value)} aria-describedby={`style-hint-${o.value}`} />
+              <span className="style-option__preview" data-preview={o.value} aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="style-option__label">{o.label}</span>
+              <span className="style-option__hint" id={`style-hint-${o.value}`}>
+                {o.hint}
+              </span>
+            </label>
+          ))}
+        </div>
+        <span className="field__hint">Se aplica al momento, en claro y en oscuro, y se recuerda en este navegador.</span>
+      </fieldset>
       <div className="field">
         <label className="field__label" htmlFor="tz">
           Zona horaria
