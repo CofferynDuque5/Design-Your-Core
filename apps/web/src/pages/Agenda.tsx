@@ -22,7 +22,7 @@ export function Agenda() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Herramientas" title="Agenda">
+      <PageHeader eyebrow="Organización" title="Agenda">
         <Segmented label="Vista" options={VIEWS} value={view} onChange={(v) => setParams(v === 'dia' ? {} : { vista: v }, { replace: true })} />
       </PageHeader>
       {legacy.isPending ? (

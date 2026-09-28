@@ -69,8 +69,9 @@ export function Finance() {
           </div>
           <Stats
             items={[
-              { value: <span className="amount amount--income">+{money(summary.income)}</span>, label: 'Ingresos' },
-              { value: <span className="amount">−{money(summary.expense)}</span>, label: 'Gastos' },
+              // Sin signo cuando es cero: «0», no «+0» ni «−0».
+              { value: <span className="amount amount--income">{summary.income ? '+' : ''}{money(summary.income)}</span>, label: 'Ingresos' },
+              { value: <span className="amount">{summary.expense ? '−' : ''}{money(summary.expense)}</span>, label: 'Gastos' },
               { value: <span className={`amount${summary.balance < 0 ? ' amount--negative' : ''}`}>{summary.balance < 0 ? '−' : ''}{money(Math.abs(summary.balance))}</span>, label: 'Balance' },
             ]}
           />

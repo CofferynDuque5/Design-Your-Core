@@ -53,7 +53,7 @@ export function Projects() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Herramientas" title="Proyectos">
+      <PageHeader eyebrow="Estudio y trabajo" title="Proyectos">
         <button type="button" className="btn" onClick={() => setEditing('new')} disabled={!legacy.data}>
           <Plus size={18} aria-hidden="true" /> Nuevo proyecto
         </button>

@@ -26,7 +26,7 @@ export function Subjects() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Herramientas" title="Materias">
+      <PageHeader eyebrow="Estudio y trabajo" title="Materias">
         <button type="button" className="btn" onClick={() => setEditing('new')} disabled={!legacy.data}>
           <Plus size={18} aria-hidden="true" /> Nueva materia
         </button>

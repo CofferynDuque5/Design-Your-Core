@@ -31,7 +31,7 @@ export function Content() {
 
   return (
     <div className="page page--narrow">
-      <PageHeader eyebrow="Herramientas" title="Contenido" />
+      <PageHeader eyebrow="Estudio y trabajo" title="Contenido" />
       {legacy.isPending ? (
         <Loading label="Cargando tu contenido" />
       ) : legacy.isError ? (

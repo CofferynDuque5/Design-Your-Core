@@ -17,11 +17,22 @@
     font: inherit;
   }
 
+  /* Casillas y radios nativos con el color de la marca (en oscuro se veían grises o blancos). */
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--color-primary);
+  }
+
   fieldset {
     margin: 0;
     padding: 0;
     border: 0;
     min-width: 0;
+  }
+
+  /* Sin el sangrado de 2 px del navegador: las leyendas se alinean con las etiquetas. */
+  legend {
+    padding: 0;
   }
 
   ul {
@@ -364,9 +375,23 @@
     background: var(--color-surface);
   }
 
+  /* En pantallas estrechas las tarjetas dejan algo más de sitio al contenido. */
+  @media (max-width: 480px) {
+    .card {
+      padding: var(--space-5);
+    }
+  }
+
   .card--list {
     gap: 0;
     padding: var(--space-2) var(--space-4);
+  }
+
+  /* Listas en tarjeta: mismo margen lateral que las demás tarjetas en pantallas anchas. */
+  @media (min-width: 768px) {
+    .card--list {
+      padding: var(--space-3) var(--space-6);
+    }
   }
 
   .card-grid {
@@ -872,6 +897,25 @@
 
   .stats .stat__value {
     font-size: var(--text-h3);
+  }
+
+  /* Tres cifras en un móvil: más pequeñas para que «6 h 59 min» no se parta. */
+  @media (max-width: 480px) {
+    .stats {
+      gap: var(--space-2);
+    }
+
+    .stats .card {
+      padding: var(--space-3);
+    }
+
+    .stats .stat__value {
+      font-size: var(--text-title);
+    }
+
+    .stats .stat__label {
+      font-size: var(--text-caption);
+    }
   }
 
   .pillar-bars {
@@ -1542,8 +1586,24 @@
   }
 
   @media (min-width: 768px) {
+    /* Etiquetas en la misma línea (el campo es más alto que los chips) y el botón abajo. */
     .add-task {
       grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: start;
+    }
+
+    .add-task > .btn {
+      align-self: end;
+    }
+
+    .add-task .chip-radio span {
+      min-height: 44px;
+    }
+
+    /* Chips centrados a la altura del campo de texto (44 px + borde y relleno). */
+    .add-task .chips {
+      min-height: 50px;
+      align-items: center;
     }
   }
 
@@ -1639,6 +1699,11 @@
     font-size: var(--text-body);
     font-weight: var(--weight-semibold);
     letter-spacing: 0;
+  }
+
+  /* Como título de una tarjeta normal, sin el hueco extra que necesita en las listas. */
+  .card:not(.card--list) > .list-count:first-child {
+    padding-block: 0;
   }
 
   .todo {

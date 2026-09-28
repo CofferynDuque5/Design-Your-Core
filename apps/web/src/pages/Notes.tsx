@@ -72,7 +72,7 @@ export function Notes() {
       ) : legacy.isError ? (
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
       ) : notes.length === 0 ? (
-        <EmptyState title="Aún no tienes notas" action={<button type="button" className="btn btn--secondary btn--sm" onClick={create}>Escribir la primera</button>}>
+        <EmptyState title="Aún no tienes notas" action={<button type="button" className="btn btn--secondary" onClick={create}>Escribir la primera</button>}>
           Guarda apuntes en Markdown con títulos, listas, casillas, código e imágenes, agrupados por materia.
         </EmptyState>
       ) : (
@@ -157,7 +157,7 @@ export function NoteEditor() {
         ) : legacy.isError ? (
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
-          <EmptyState title="Esta nota ya no existe" action={<Link to="/notas" className="btn btn--secondary btn--sm">Ver tus notas</Link>}>
+          <EmptyState title="Esta nota ya no existe" action={<Link to="/notas" className="btn btn--secondary">Ver tus notas</Link>}>
             Puede que la hayas borrado aquí o en la app anterior.
           </EmptyState>
         )}

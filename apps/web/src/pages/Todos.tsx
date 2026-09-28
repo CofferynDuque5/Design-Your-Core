@@ -30,7 +30,7 @@ export function Todos() {
 
   return (
     <div className="page page--narrow">
-      <PageHeader eyebrow="Herramientas" title="Pendientes" />
+      <PageHeader eyebrow="Organización" title="Pendientes" />
       {legacy.isPending ? (
         <Loading label="Cargando tus pendientes" />
       ) : legacy.isError ? (

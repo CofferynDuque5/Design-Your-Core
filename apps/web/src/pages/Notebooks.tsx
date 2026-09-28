@@ -36,7 +36,7 @@ export function Notebooks() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Herramientas" title="Cuadernos">
+      <PageHeader eyebrow="Estudio y trabajo" title="Cuadernos">
         <button type="button" className="btn" onClick={() => setCreating(true)} disabled={!legacy.data}>
           <Plus size={18} aria-hidden="true" /> Nuevo cuaderno
         </button>
@@ -245,7 +245,7 @@ export function NotebookDetail() {
         ) : legacy.isError ? (
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
-          <EmptyState title="Este cuaderno ya no existe" action={<Link to="/cuadernos" className="btn btn--secondary btn--sm">Ver tus cuadernos</Link>}>
+          <EmptyState title="Este cuaderno ya no existe" action={<Link to="/cuadernos" className="btn btn--secondary">Ver tus cuadernos</Link>}>
             Puede que lo hayas borrado aquí o en la app anterior.
           </EmptyState>
         )}

@@ -39,7 +39,7 @@ export function Schedule() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Herramientas" title="Horario">
+      <PageHeader eyebrow="Organización" title="Horario">
         <button type="button" className="btn" onClick={() => setEditing('new')} disabled={!legacy.data}>
           <Plus size={18} aria-hidden="true" /> Nueva clase
         </button>

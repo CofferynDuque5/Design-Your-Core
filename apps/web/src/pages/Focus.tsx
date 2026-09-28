@@ -96,7 +96,7 @@ export function Focus() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Herramientas" title="Enfoque" />
+      <PageHeader eyebrow="Organización" title="Enfoque" />
       <div className="focus-layout">
         <section className="card card--raised timer" aria-labelledby="timer-title">
           <h2 id="timer-title" className="visually-hidden">

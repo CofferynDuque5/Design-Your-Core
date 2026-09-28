@@ -52,7 +52,7 @@ export function Ideas() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Herramientas" title="Ideas">
+      <PageHeader eyebrow="Estudio y trabajo" title="Ideas">
         {ideas.length > 0 && <span className="chip numeric">{plural(ideas.length, 'guardada', 'guardadas')}</span>}
       </PageHeader>
       {legacy.isPending ? (
