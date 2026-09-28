@@ -9,7 +9,7 @@ Plataforma de bienestar personal construida alrededor de seis pilares: energía 
 | Cliente de la API | `packages/api-client` | Cliente tipado de la API, compartido por la web y la app móvil |
 | API | `apps/api` | v1 compatible con la app actual + v2 con pilares, check-ins, hábitos con historial, retos, panel y recomendaciones. Pruebas de integración |
 | Lógica compartida | `packages/core` | Pilares, fechas, validación, puntuaciones, catálogo de retos y recomendaciones. La usan la API, la web y la app móvil |
-| Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html). La web tiene cuatro estilos visuales (Editorial, Minimalista, Cristal y Suave): [docs/estilos.md](docs/estilos.md) |
+| Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html). La web tiene cuatro estilos visuales (Editorial, Minimalista, Cristal y Suave), cinco tipografías y cinco paletas de color: [docs/estilos.md](docs/estilos.md) |
 | App web | `apps/web` | PWA en React: acceso, onboarding, Hoy, check-in, hábitos, retos, progreso día/semana/mes, perfil y ajustes, sección Más. Pruebas de componentes y de punta a punta |
 | Sitio de marca | `apps/site` | Astro estático: portada con los seis pilares, cómo funciona, principios, privacidad y 404. Pruebas del HTML generado y de accesibilidad con axe |
 | App móvil | `apps/mobile` | Expo (iOS y Android): acceso con sesión renovable guardada en el llavero, bienvenida, Hoy, check-in, hábitos, retos, progreso, perfil, tema claro/oscuro y recordatorio diario. Pruebas de sesión, recordatorio y recorridos con el enrutador real |
@@ -100,5 +100,5 @@ packages/
   tokens/         Design tokens → CSS y tema para React Native
 docs/
   design-system/  Guía visual generada desde los tokens
-  estilos.md      Estilos visuales de la web y cómo cambiar el de por defecto
+  estilos.md      Estilos, tipografías y paletas de la web, y cómo cambiar los de por defecto
 ```

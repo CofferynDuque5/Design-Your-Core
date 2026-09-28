@@ -231,6 +231,64 @@ test('estilos visuales: pantallas representativas en cada estilo', async ({ page
   }
 });
 
+test('paletas y tipografías: cada una en tres pantallas', async ({ page }) => {
+  // Paletas y tipografías solo cambian tokens: basta con tres pantallas y el estilo por defecto
+  // (el contraste de cada paleta con cada estilo lo comprueban las pruebas unitarias).
+  test.setTimeout(240_000);
+  await register(page, 'a11y-paletas');
+  await onboard(page);
+  const today = new Date().toISOString().slice(0, 10);
+  await seedLegacy(page, {
+    blocks: [{ id: 'b1', label: 'Estudiar', sub: 'Cálculo', start: 9, dur: 1.5, kind: 'study' }],
+    tasks: [{ id: 't1', title: 'Entregar ensayo', pri: 'alta', time: null, rem: false, done: false, tags: '' }],
+    transactions: [
+      { id: 'tx1', date: today, amount: 1200, type: 'income', category: 'Sueldo', note: '' },
+      { id: 'tx2', date: today, amount: 45.5, type: 'expense', category: 'Comida', note: 'Mercado' },
+    ],
+    budget: { monthly: 500 },
+  });
+  const screens = ['/', '/agenda', '/finanzas'];
+
+  for (const [palette, option] of [
+    ['salvia', /^Salvia/],
+    ['terracota', /^Terracota/],
+    ['lavanda', /^Lavanda/],
+    ['grafito', /^Grafito/],
+    ['azul', /^Azul/],
+  ] as const) {
+    await page.goto('/perfil');
+    await page.getByRole('group', { name: 'Color' }).getByRole('radio', { name: option }).check();
+    await expect(page.locator('html')).toHaveAttribute('data-palette', palette);
+    for (const path of screens) {
+      await page.goto(path);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.locator('html')).toHaveAttribute('data-palette', palette);
+      await expectAccessible(page, `${path} (paleta ${palette})`);
+    }
+  }
+
+  for (const [font, option, family] of [
+    ['moderna', /^Moderna/, 'Manrope'],
+    ['geometrica', /^Geométrica/, 'Outfit'],
+    ['elegante', /^Elegante/, 'Fraunces'],
+    ['amable', /^Amable/, 'Nunito'],
+    ['clasica', /^Clásica/, 'Newsreader'],
+  ] as const) {
+    await page.goto('/perfil');
+    await page.getByRole('group', { name: 'Tipografía' }).getByRole('radio', { name: option }).check();
+    await expect(page.locator('html')).toHaveAttribute('data-font', font);
+    for (const path of screens) {
+      await page.goto(path);
+      const h1 = page.getByRole('heading', { level: 1 });
+      await expect(h1).toBeVisible();
+      // La fuente elegida se carga al arrancar (aunque no sea la del paquete inicial) y se usa en los títulos.
+      await expect(h1).toHaveCSS('font-family', new RegExp(`^"?${family}`));
+      await expect.poll(() => page.evaluate((f) => document.fonts.load(`16px "${f}"`).then((faces) => faces.length), family)).toBeGreaterThan(0);
+      await expectAccessible(page, `${path} (tipografía ${font})`);
+    }
+  }
+});
+
 test('bóveda: crear, desbloqueada, bloqueada y sus diálogos', async ({ page }) => {
   test.setTimeout(120_000);
   await register(page, 'a11y-boveda');
