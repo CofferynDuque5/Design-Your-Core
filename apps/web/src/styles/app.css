@@ -315,7 +315,7 @@
   .section-title {
     font-family: var(--font-display);
     font-size: var(--text-h3);
-    font-weight: var(--weight-regular);
+    font-weight: var(--weight-display);
     letter-spacing: var(--tracking-display);
     line-height: var(--leading-snug);
   }
@@ -603,6 +603,7 @@
 
   .score-ring__value {
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: calc(var(--text-body) * 1.05);
     line-height: 1;
   }
@@ -705,6 +706,7 @@
 
   .challenge__title {
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: var(--text-title);
     letter-spacing: var(--tracking-display);
   }
@@ -957,6 +959,7 @@
   .pillar-bars__value {
     grid-area: value;
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: var(--text-title);
   }
 
@@ -1993,7 +1996,7 @@
   .next-class__title {
     font-family: var(--font-display);
     font-size: var(--text-h3);
-    font-weight: var(--weight-regular);
+    font-weight: var(--weight-display);
     line-height: var(--leading-snug);
   }
 
@@ -2165,6 +2168,7 @@
 
   .timer__time {
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: clamp(3rem, 14vw, 4.25rem);
     line-height: 1;
     letter-spacing: var(--tracking-display);
@@ -2441,7 +2445,7 @@
     min-width: 0;
     font-family: var(--font-display);
     font-size: var(--text-title);
-    font-weight: var(--weight-regular);
+    font-weight: var(--weight-display);
     letter-spacing: var(--tracking-display);
     line-height: var(--leading-snug);
     overflow-wrap: anywhere;
@@ -3137,6 +3141,7 @@
   .pipeline__count {
     color: var(--color-ink);
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: var(--text-h3);
     line-height: 1.1;
   }
@@ -3462,6 +3467,172 @@
     background: #4459A6;
   }
 
+  /* Perfil: tipografía. Cada muestra usa su letra (ver styles/tipografias.css). */
+  .font-option__sample {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 72px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: calc(var(--radius-lg) - 6px);
+    background: var(--color-surface-sunken);
+    color: var(--color-ink);
+  }
+
+  .font-option__sample b {
+    font-size: var(--text-h3);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+  }
+
+  .font-option__sample span {
+    color: var(--color-ink-muted);
+    font-size: var(--text-small);
+    line-height: var(--leading-snug);
+  }
+
+  /* Perfil: color. Cada muestra enseña el fondo, el color principal, el acento (foco) y el tono suave de la paleta en el tema actual. */
+  .palette-swatch {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    height: 56px;
+    border-radius: calc(var(--radius-lg) - 6px);
+    background: var(--sw-bg);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  }
+
+  .palette-swatch i {
+    display: block;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgb(127 127 127 / 0.25);
+  }
+
+  .palette-swatch i:nth-child(1) {
+    width: 34px;
+    height: 34px;
+    background: var(--sw-primary);
+  }
+
+  .palette-swatch i:nth-child(2) {
+    background: var(--sw-accent);
+  }
+
+  .palette-swatch i:nth-child(3) {
+    background: var(--sw-soft);
+  }
+
+  [data-swatch='azul'] {
+    --sw-bg: #F4F3EF;
+    --sw-primary: #1E3A5F;
+    --sw-accent: #2F6FB5;
+    --sw-soft: #E2E8F0;
+  }
+
+  [data-swatch='salvia'] {
+    --sw-bg: #F2F4F0;
+    --sw-primary: #2F5D46;
+    --sw-accent: #357A57;
+    --sw-soft: #E0EBE3;
+  }
+
+  [data-swatch='terracota'] {
+    --sw-bg: #F6F2EE;
+    --sw-primary: #96482C;
+    --sw-accent: #B25733;
+    --sw-soft: #F5E3DA;
+  }
+
+  [data-swatch='lavanda'] {
+    --sw-bg: #F5F3F7;
+    --sw-primary: #563A87;
+    --sw-accent: #7351B8;
+    --sw-soft: #EAE4F4;
+  }
+
+  [data-swatch='grafito'] {
+    --sw-bg: #F3F3F1;
+    --sw-primary: #2E3136;
+    --sw-accent: #B5552A;
+    --sw-soft: #F2E7DF;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) [data-swatch='azul'] {
+      --sw-bg: #111418;
+      --sw-primary: #9DB9E0;
+      --sw-accent: #8DB8F0;
+      --sw-soft: #1E2A3A;
+    }
+
+    :root:not([data-theme='light']) [data-swatch='salvia'] {
+      --sw-bg: #0F1411;
+      --sw-primary: #9CCBAE;
+      --sw-accent: #8FCCA6;
+      --sw-soft: #1C2B23;
+    }
+
+    :root:not([data-theme='light']) [data-swatch='terracota'] {
+      --sw-bg: #151110;
+      --sw-primary: #EBA78A;
+      --sw-accent: #EE9F7E;
+      --sw-soft: #35231B;
+    }
+
+    :root:not([data-theme='light']) [data-swatch='lavanda'] {
+      --sw-bg: #121017;
+      --sw-primary: #C4B0EC;
+      --sw-accent: #BBA4EE;
+      --sw-soft: #28213A;
+    }
+
+    :root:not([data-theme='light']) [data-swatch='grafito'] {
+      --sw-bg: #111213;
+      --sw-primary: #D6D6D3;
+      --sw-accent: #EE9D6C;
+      --sw-soft: #2F241E;
+    }
+  }
+
+  [data-theme='dark'] [data-swatch='azul'] {
+    --sw-bg: #111418;
+    --sw-primary: #9DB9E0;
+    --sw-accent: #8DB8F0;
+    --sw-soft: #1E2A3A;
+  }
+
+  [data-theme='dark'] [data-swatch='salvia'] {
+    --sw-bg: #0F1411;
+    --sw-primary: #9CCBAE;
+    --sw-accent: #8FCCA6;
+    --sw-soft: #1C2B23;
+  }
+
+  [data-theme='dark'] [data-swatch='terracota'] {
+    --sw-bg: #151110;
+    --sw-primary: #EBA78A;
+    --sw-accent: #EE9F7E;
+    --sw-soft: #35231B;
+  }
+
+  [data-theme='dark'] [data-swatch='lavanda'] {
+    --sw-bg: #121017;
+    --sw-primary: #C4B0EC;
+    --sw-accent: #BBA4EE;
+    --sw-soft: #28213A;
+  }
+
+  [data-theme='dark'] [data-swatch='grafito'] {
+    --sw-bg: #111213;
+    --sw-primary: #D6D6D3;
+    --sw-accent: #EE9D6C;
+    --sw-soft: #2F241E;
+  }
+
   /* Ajuste con interruptor (Perfil y Ciclo) */
   .setting-row {
     display: flex;
@@ -3674,6 +3845,7 @@
 
   .goal-count__value {
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: var(--text-h3);
   }
 
@@ -4085,6 +4257,7 @@
 
   .water-card__count .numeric {
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: var(--text-h2);
   }
 
@@ -4197,6 +4370,7 @@
     background: transparent;
     color: var(--color-ink);
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: var(--text-h1);
     line-height: 1.15;
   }
@@ -4498,6 +4672,7 @@
 
   .breathe__phase {
     font-family: var(--font-display);
+    font-weight: var(--weight-display);
     font-size: var(--text-h2);
   }
 

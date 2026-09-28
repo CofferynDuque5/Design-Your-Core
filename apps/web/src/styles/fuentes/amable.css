@@ -1,0 +1,6 @@
+/* Amable: Nunito, redondeada, para títulos y texto. Se carga solo al elegirla (ver src/app/font.ts). */
+@import '@fontsource/nunito/latin-300.css';
+@import '@fontsource/nunito/latin-400.css';
+@import '@fontsource/nunito/latin-500.css';
+@import '@fontsource/nunito/latin-600.css';
+@import '@fontsource/nunito/latin-700.css';

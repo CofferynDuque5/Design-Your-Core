@@ -1,11 +1,10 @@
-import { useCallback, useSyncExternalStore } from 'react';
-import { read, write } from '../lib/storage';
+import { visualPreference } from './preference';
 
 /**
- * Estilo visual de la app, independiente del tema claro/oscuro. Se guarda en
- * este navegador (como el tema) y se aplica con `data-style` en <html>; cada
- * estilo es una capa de CSS en styles/estilos/ que solo cambia tokens y unos
- * pocos componentes.
+ * Estilo visual de la app, independiente del tema claro/oscuro, de la
+ * tipografía y de la paleta. Se guarda en este navegador (como el tema) y se
+ * aplica con `data-style` en <html>; cada estilo es una capa de CSS en
+ * styles/estilos/ que solo cambia tokens y unos pocos componentes.
  */
 export type StylePreference = 'editorial' | 'minimal' | 'glass' | 'suave';
 
@@ -22,37 +21,15 @@ export const STYLE_OPTIONS: ReadonlyArray<{ value: StylePreference; label: strin
   { value: 'suave', label: 'Suave', hint: 'Formas redondeadas, tonos pastel y sombras ligeras.' },
 ];
 
-const KEY = 'dyc.style';
-const VALUES = new Set<string>(STYLE_OPTIONS.map((o) => o.value));
-const listeners = new Set<() => void>();
+const pref = visualPreference<StylePreference>({
+  key: 'dyc.style',
+  attribute: 'style',
+  values: STYLE_OPTIONS.map((o) => o.value),
+  defaultValue: DEFAULT_STYLE,
+});
 
-export function isStyle(v: unknown): v is StylePreference {
-  return typeof v === 'string' && VALUES.has(v);
-}
-
+export const isStyle = pref.is;
 /** Estilo guardado en este navegador, o el de por defecto. */
-export function storedStyle(): StylePreference {
-  const v = read(KEY);
-  return isStyle(v) ? v : DEFAULT_STYLE;
-}
-
-export function applyStyle(style: StylePreference): void {
-  document.documentElement.dataset.style = style;
-}
-
-export function useStyle(): [StylePreference, (s: StylePreference) => void] {
-  const style = useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    storedStyle,
-  );
-  const set = useCallback((s: StylePreference) => {
-    // El de por defecto no se guarda: si cambia, quien no eligió nada lo recibe.
-    write(KEY, s === DEFAULT_STYLE ? null : s);
-    applyStyle(s);
-    listeners.forEach((l) => l());
-  }, []);
-  return [style, set];
-}
+export const storedStyle = pref.stored;
+export const applyStyle = pref.apply;
+export const useStyle = pref.use;

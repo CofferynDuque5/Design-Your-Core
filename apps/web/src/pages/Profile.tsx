@@ -7,6 +7,8 @@ import { api } from '../app/api';
 import { useShowCycle } from '../app/prefs';
 import { keys, useProfile } from '../app/queries';
 import { useSession } from '../app/session';
+import { FONT_OPTIONS, loadAllFonts, useFont } from '../app/font';
+import { PALETTE_OPTIONS, usePalette } from '../app/palette';
 import { STYLE_OPTIONS, useStyle } from '../app/style';
 import { useTheme, type ThemePreference } from '../app/theme';
 import { useToast } from '../app/toast';
@@ -171,6 +173,8 @@ function PreferencesSection() {
         </div>
         <span className="field__hint">Se aplica al momento, en claro y en oscuro, y se recuerda en este navegador.</span>
       </fieldset>
+      <FontPicker />
+      <PalettePicker />
       <div className="field">
         <label className="field__label" htmlFor="tz">
           Zona horaria
@@ -198,6 +202,61 @@ function PreferencesSection() {
       </div>
       <CycleSetting />
     </section>
+  );
+}
+
+function FontPicker() {
+  const [font, setFont] = useFont();
+  // Cada opción se muestra con su letra: se cargan todas (el navegador solo descarga lo que pinta).
+  useEffect(() => {
+    void loadAllFonts();
+  }, []);
+  return (
+    <fieldset className="field">
+      <legend className="field__label">Tipografía</legend>
+      <div className="style-picker">
+        {FONT_OPTIONS.map((o) => (
+          <label key={o.value} className="style-option" data-font-option={o.value}>
+            <input type="radio" name="font" value={o.value} checked={font === o.value} onChange={() => setFont(o.value)} aria-describedby={`font-hint-${o.value}`} />
+            <span className="font-option__sample" aria-hidden="true">
+              <b>Tu día</b>
+              <span>Pasos pequeños, cada día.</span>
+            </span>
+            <span className="style-option__label">{o.label}</span>
+            <span className="style-option__hint" id={`font-hint-${o.value}`}>
+              {o.hint}
+            </span>
+          </label>
+        ))}
+      </div>
+      <span className="field__hint">Letra de los títulos y del texto. Funciona con cualquier estilo y se recuerda en este navegador.</span>
+    </fieldset>
+  );
+}
+
+function PalettePicker() {
+  const [palette, setPalette] = usePalette();
+  return (
+    <fieldset className="field">
+      <legend className="field__label">Color</legend>
+      <div className="style-picker">
+        {PALETTE_OPTIONS.map((o) => (
+          <label key={o.value} className="style-option">
+            <input type="radio" name="palette" value={o.value} checked={palette === o.value} onChange={() => setPalette(o.value)} aria-describedby={`palette-hint-${o.value}`} />
+            <span className="palette-swatch" data-swatch={o.value} aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="style-option__label">{o.label}</span>
+            <span className="style-option__hint" id={`palette-hint-${o.value}`}>
+              {o.hint}
+            </span>
+          </label>
+        ))}
+      </div>
+      <span className="field__hint">Color de botones, enlaces y selección, con su versión clara y oscura, en cualquier estilo. Se recuerda en este navegador.</span>
+    </fieldset>
   );
 }
 

@@ -1,0 +1,639 @@
+/*
+ * Paletas de color (Perfil → Color). Se activan con <html data-palette="…">,
+ * independientes del estilo, la tipografía y el tema.
+ *
+ * «Azul» es la paleta de cada estilo tal cual (tokens.css y styles/estilos/)
+ * y no añade nada. Las demás cambian, para cada estilo y en claro y oscuro:
+ *   - el color de marca: --color-primary, -hover, -soft, --color-on-primary
+ *     y el foco (--color-focus);
+ *   - un leve tinte de los neutros: fondo, superficies y líneas;
+ *   - en Cristal, además, las manchas del fondo (--glass-blob-1…4);
+ *   - en Minimalista, solo el acento y el foco: el estilo sigue monocromo.
+ * Los colores de estado (éxito, aviso, peligro) y de los pilares no cambian.
+ *
+ * Cada bloque va bajo [data-style][data-palette] para ganar a los tokens del
+ * estilo (0,3,0 en claro; 0,4,0 en oscuro), y este archivo se importa después
+ * de los estilos. Los tres bloques de cada pareja (claro, oscuro del sistema y
+ * oscuro elegido) definen los mismos colores. src/app/palette.test.ts lee este
+ * archivo y comprueba el contraste WCAG AA de cada paleta × estilo × tema.
+ */
+
+/* ==================== Salvia: verde salvia profundo. ==================== */
+
+/* Editorial */
+:root[data-style='editorial'][data-palette='salvia'] {
+  --color-primary: #2F5D46;
+  --color-primary-hover: #244A37;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #E0EBE3;
+  --color-focus: #357A57;
+  --color-bg: #F2F4F0;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #E8ECE6;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #D8DED5;
+  --color-line-strong: #BCC5B9;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='editorial'][data-palette='salvia']:not([data-theme='light']) {
+    --color-primary: #9CCBAE;
+    --color-primary-hover: #B6DBC4;
+    --color-on-primary: #0F2218;
+    --color-primary-soft: #1C2B23;
+    --color-focus: #8FCCA6;
+    --color-bg: #0F1411;
+    --color-surface: #161C18;
+    --color-surface-sunken: #0B0F0D;
+    --color-surface-raised: #1E2621;
+    --color-line: #28322C;
+    --color-line-strong: #3A463F;
+  }
+}
+:root[data-style='editorial'][data-palette='salvia'][data-theme='dark'] {
+  --color-primary: #9CCBAE;
+  --color-primary-hover: #B6DBC4;
+  --color-on-primary: #0F2218;
+  --color-primary-soft: #1C2B23;
+  --color-focus: #8FCCA6;
+  --color-bg: #0F1411;
+  --color-surface: #161C18;
+  --color-surface-sunken: #0B0F0D;
+  --color-surface-raised: #1E2621;
+  --color-line: #28322C;
+  --color-line-strong: #3A463F;
+}
+
+/* Minimalista (solo el acento y el foco: el estilo es monocromo) */
+:root[data-style='minimal'][data-palette='salvia'] {
+  --minimal-accent: #2E7A55;
+  --color-focus: #2E7A55;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='minimal'][data-palette='salvia']:not([data-theme='light']) {
+    --minimal-accent: #86CDA4;
+    --color-focus: #86CDA4;
+  }
+}
+:root[data-style='minimal'][data-palette='salvia'][data-theme='dark'] {
+  --minimal-accent: #86CDA4;
+  --color-focus: #86CDA4;
+}
+
+/* Cristal (también las manchas del fondo) */
+:root[data-style='glass'][data-palette='salvia'] {
+  --color-primary: #2F6048;
+  --color-primary-hover: #244C39;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #DFEDE5;
+  --color-focus: #2F7A55;
+  --color-bg: #EEF3EF;
+  --color-surface-sunken: #E6ECE7;
+  --color-line: #D5DED8;
+  --color-line-strong: #B8C5BC;
+  --glass-blob-1: #D2EAD8;
+  --glass-blob-2: #F0E4C6;
+  --glass-blob-3: #C8E2DF;
+  --glass-blob-4: #E0E9CB;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='glass'][data-palette='salvia']:not([data-theme='light']) {
+    --color-primary: #A6D4B8;
+    --color-primary-hover: #BFE1CC;
+    --color-on-primary: #0F2218;
+    --color-primary-soft: #1C2E24;
+    --color-focus: #93D1AB;
+    --color-bg: #0D1210;
+    --color-surface-sunken: #0F1512;
+    --color-line: #26322B;
+    --color-line-strong: #38473F;
+    --glass-blob-1: #173A2B;
+    --glass-blob-2: #2F3A1A;
+    --glass-blob-3: #12353A;
+    --glass-blob-4: #35331B;
+  }
+}
+:root[data-style='glass'][data-palette='salvia'][data-theme='dark'] {
+  --color-primary: #A6D4B8;
+  --color-primary-hover: #BFE1CC;
+  --color-on-primary: #0F2218;
+  --color-primary-soft: #1C2E24;
+  --color-focus: #93D1AB;
+  --color-bg: #0D1210;
+  --color-surface-sunken: #0F1512;
+  --color-line: #26322B;
+  --color-line-strong: #38473F;
+  --glass-blob-1: #173A2B;
+  --glass-blob-2: #2F3A1A;
+  --glass-blob-3: #12353A;
+  --glass-blob-4: #35331B;
+}
+
+/* Suave */
+:root[data-style='suave'][data-palette='salvia'] {
+  --color-primary: #3A6B52;
+  --color-primary-hover: #2F5A44;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #E2F0E7;
+  --color-focus: #3F8A62;
+  --color-bg: #F2F6F3;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #E9F0EB;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #E0E8E2;
+  --color-line-strong: #C5D3C9;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='suave'][data-palette='salvia']:not([data-theme='light']) {
+    --color-primary: #A8D8BB;
+    --color-primary-hover: #C0E4CE;
+    --color-on-primary: #10241A;
+    --color-primary-soft: #203328;
+    --color-focus: #97D3AF;
+    --color-bg: #121814;
+    --color-surface: #1A221D;
+    --color-surface-sunken: #101512;
+    --color-surface-raised: #222D26;
+    --color-line: #29342D;
+    --color-line-strong: #3A4840;
+    --suave-card-border: #27312B;
+  }
+}
+:root[data-style='suave'][data-palette='salvia'][data-theme='dark'] {
+  --color-primary: #A8D8BB;
+  --color-primary-hover: #C0E4CE;
+  --color-on-primary: #10241A;
+  --color-primary-soft: #203328;
+  --color-focus: #97D3AF;
+  --color-bg: #121814;
+  --color-surface: #1A221D;
+  --color-surface-sunken: #101512;
+  --color-surface-raised: #222D26;
+  --color-line: #29342D;
+  --color-line-strong: #3A4840;
+  --suave-card-border: #27312B;
+}
+
+/* ==================== Terracota: arcilla cálida. ==================== */
+
+/* Editorial */
+:root[data-style='editorial'][data-palette='terracota'] {
+  --color-primary: #96482C;
+  --color-primary-hover: #7C3B24;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #F5E3DA;
+  --color-focus: #B25733;
+  --color-bg: #F6F2EE;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #EEE7E1;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #E1D8D0;
+  --color-line-strong: #C9BCB1;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='editorial'][data-palette='terracota']:not([data-theme='light']) {
+    --color-primary: #EBA78A;
+    --color-primary-hover: #F2BFA8;
+    --color-on-primary: #2A140B;
+    --color-primary-soft: #35231B;
+    --color-focus: #EE9F7E;
+    --color-bg: #151110;
+    --color-surface: #1D1816;
+    --color-surface-sunken: #100D0C;
+    --color-surface-raised: #26201D;
+    --color-line: #332A26;
+    --color-line-strong: #473A34;
+  }
+}
+:root[data-style='editorial'][data-palette='terracota'][data-theme='dark'] {
+  --color-primary: #EBA78A;
+  --color-primary-hover: #F2BFA8;
+  --color-on-primary: #2A140B;
+  --color-primary-soft: #35231B;
+  --color-focus: #EE9F7E;
+  --color-bg: #151110;
+  --color-surface: #1D1816;
+  --color-surface-sunken: #100D0C;
+  --color-surface-raised: #26201D;
+  --color-line: #332A26;
+  --color-line-strong: #473A34;
+}
+
+/* Minimalista (solo el acento y el foco: el estilo es monocromo) */
+:root[data-style='minimal'][data-palette='terracota'] {
+  --minimal-accent: #B0512D;
+  --color-focus: #B0512D;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='minimal'][data-palette='terracota']:not([data-theme='light']) {
+    --minimal-accent: #F0A284;
+    --color-focus: #F0A284;
+  }
+}
+:root[data-style='minimal'][data-palette='terracota'][data-theme='dark'] {
+  --minimal-accent: #F0A284;
+  --color-focus: #F0A284;
+}
+
+/* Cristal (también las manchas del fondo) */
+:root[data-style='glass'][data-palette='terracota'] {
+  --color-primary: #8F412A;
+  --color-primary-hover: #763522;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #F6E3DA;
+  --color-focus: #B4552F;
+  --color-bg: #F6F0EC;
+  --color-surface-sunken: #EFE7E1;
+  --color-line: #E4D8D0;
+  --color-line-strong: #CDBDB2;
+  --glass-blob-1: #F7CDB8;
+  --glass-blob-2: #F4DDB5;
+  --glass-blob-3: #EDD0D8;
+  --glass-blob-4: #E6DDC8;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='glass'][data-palette='terracota']:not([data-theme='light']) {
+    --color-primary: #F0AE92;
+    --color-primary-hover: #F5C4AE;
+    --color-on-primary: #2A140B;
+    --color-primary-soft: #362219;
+    --color-focus: #EFA487;
+    --color-bg: #140F0D;
+    --color-surface-sunken: #110D0B;
+    --color-line: #362B25;
+    --color-line-strong: #4A3C34;
+    --glass-blob-1: #4A2319;
+    --glass-blob-2: #3D2E14;
+    --glass-blob-3: #3F1C28;
+    --glass-blob-4: #2F2A1A;
+  }
+}
+:root[data-style='glass'][data-palette='terracota'][data-theme='dark'] {
+  --color-primary: #F0AE92;
+  --color-primary-hover: #F5C4AE;
+  --color-on-primary: #2A140B;
+  --color-primary-soft: #362219;
+  --color-focus: #EFA487;
+  --color-bg: #140F0D;
+  --color-surface-sunken: #110D0B;
+  --color-line: #362B25;
+  --color-line-strong: #4A3C34;
+  --glass-blob-1: #4A2319;
+  --glass-blob-2: #3D2E14;
+  --glass-blob-3: #3F1C28;
+  --glass-blob-4: #2F2A1A;
+}
+
+/* Suave */
+:root[data-style='suave'][data-palette='terracota'] {
+  --color-primary: #9C4B2F;
+  --color-primary-hover: #843F27;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #F9E7DE;
+  --color-focus: #C0603A;
+  --color-bg: #F9F4F1;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #F3EBE6;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #EDE3DC;
+  --color-line-strong: #D6C7BD;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='suave'][data-palette='terracota']:not([data-theme='light']) {
+    --color-primary: #F2B49A;
+    --color-primary-hover: #F6C8B4;
+    --color-on-primary: #2B160C;
+    --color-primary-soft: #3A261D;
+    --color-focus: #EFA98C;
+    --color-bg: #17120F;
+    --color-surface: #221B17;
+    --color-surface-sunken: #140F0D;
+    --color-surface-raised: #2C231E;
+    --color-line: #362C26;
+    --color-line-strong: #4A3D35;
+    --suave-card-border: #332923;
+  }
+}
+:root[data-style='suave'][data-palette='terracota'][data-theme='dark'] {
+  --color-primary: #F2B49A;
+  --color-primary-hover: #F6C8B4;
+  --color-on-primary: #2B160C;
+  --color-primary-soft: #3A261D;
+  --color-focus: #EFA98C;
+  --color-bg: #17120F;
+  --color-surface: #221B17;
+  --color-surface-sunken: #140F0D;
+  --color-surface-raised: #2C231E;
+  --color-line: #362C26;
+  --color-line-strong: #4A3D35;
+  --suave-card-border: #332923;
+}
+
+/* ==================== Lavanda: violeta y ciruela. ==================== */
+
+/* Editorial */
+:root[data-style='editorial'][data-palette='lavanda'] {
+  --color-primary: #563A87;
+  --color-primary-hover: #452E6E;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #EAE4F4;
+  --color-focus: #7351B8;
+  --color-bg: #F5F3F7;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #ECE8F0;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #DDD8E3;
+  --color-line-strong: #C4BDCD;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='editorial'][data-palette='lavanda']:not([data-theme='light']) {
+    --color-primary: #C4B0EC;
+    --color-primary-hover: #D6C8F2;
+    --color-on-primary: #1E1433;
+    --color-primary-soft: #28213A;
+    --color-focus: #BBA4EE;
+    --color-bg: #121017;
+    --color-surface: #1A1721;
+    --color-surface-sunken: #0D0C11;
+    --color-surface-raised: #221E2B;
+    --color-line: #2D2837;
+    --color-line-strong: #403A4D;
+  }
+}
+:root[data-style='editorial'][data-palette='lavanda'][data-theme='dark'] {
+  --color-primary: #C4B0EC;
+  --color-primary-hover: #D6C8F2;
+  --color-on-primary: #1E1433;
+  --color-primary-soft: #28213A;
+  --color-focus: #BBA4EE;
+  --color-bg: #121017;
+  --color-surface: #1A1721;
+  --color-surface-sunken: #0D0C11;
+  --color-surface-raised: #221E2B;
+  --color-line: #2D2837;
+  --color-line-strong: #403A4D;
+}
+
+/* Minimalista (solo el acento y el foco: el estilo es monocromo) */
+:root[data-style='minimal'][data-palette='lavanda'] {
+  --minimal-accent: #6B48C4;
+  --color-focus: #6B48C4;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='minimal'][data-palette='lavanda']:not([data-theme='light']) {
+    --minimal-accent: #B9A2F2;
+    --color-focus: #B9A2F2;
+  }
+}
+:root[data-style='minimal'][data-palette='lavanda'][data-theme='dark'] {
+  --minimal-accent: #B9A2F2;
+  --color-focus: #B9A2F2;
+}
+
+/* Cristal (también las manchas del fondo) */
+:root[data-style='glass'][data-palette='lavanda'] {
+  --color-primary: #5A3E96;
+  --color-primary-hover: #4A3180;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #ECE5F8;
+  --color-focus: #7050C8;
+  --color-bg: #F2F0F8;
+  --color-surface-sunken: #EAE7F3;
+  --color-line: #DCD8E8;
+  --color-line-strong: #C1BBD3;
+  --glass-blob-1: #DDD0F5;
+  --glass-blob-2: #F3CFE3;
+  --glass-blob-3: #CBD5F5;
+  --glass-blob-4: #E7D9F0;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='glass'][data-palette='lavanda']:not([data-theme='light']) {
+    --color-primary: #C7B4F2;
+    --color-primary-hover: #D8CBF6;
+    --color-on-primary: #1E1433;
+    --color-primary-soft: #2A2240;
+    --color-focus: #B9A3F0;
+    --color-bg: #100E17;
+    --color-surface-sunken: #0F0D15;
+    --color-line: #2D283A;
+    --color-line-strong: #413A52;
+    --glass-blob-1: #2E1F52;
+    --glass-blob-2: #3F1B3A;
+    --glass-blob-3: #1A2350;
+    --glass-blob-4: #2A1E44;
+  }
+}
+:root[data-style='glass'][data-palette='lavanda'][data-theme='dark'] {
+  --color-primary: #C7B4F2;
+  --color-primary-hover: #D8CBF6;
+  --color-on-primary: #1E1433;
+  --color-primary-soft: #2A2240;
+  --color-focus: #B9A3F0;
+  --color-bg: #100E17;
+  --color-surface-sunken: #0F0D15;
+  --color-line: #2D283A;
+  --color-line-strong: #413A52;
+  --glass-blob-1: #2E1F52;
+  --glass-blob-2: #3F1B3A;
+  --glass-blob-3: #1A2350;
+  --glass-blob-4: #2A1E44;
+}
+
+/* Suave */
+:root[data-style='suave'][data-palette='lavanda'] {
+  --color-primary: #65499F;
+  --color-primary-hover: #553B8A;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #EEE8FA;
+  --color-focus: #7A5CD0;
+  --color-bg: #F5F3FA;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #EDE9F6;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #E6E1F0;
+  --color-line-strong: #CCC5DD;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='suave'][data-palette='lavanda']:not([data-theme='light']) {
+    --color-primary: #CDBAF4;
+    --color-primary-hover: #DDD0F8;
+    --color-on-primary: #1F1535;
+    --color-primary-soft: #2E2645;
+    --color-focus: #BDA8F2;
+    --color-bg: #15131C;
+    --color-surface: #1E1B28;
+    --color-surface-sunken: #12101A;
+    --color-surface-raised: #272335;
+    --color-line: #2E2A3B;
+    --color-line-strong: #423C53;
+    --suave-card-border: #2C2838;
+  }
+}
+:root[data-style='suave'][data-palette='lavanda'][data-theme='dark'] {
+  --color-primary: #CDBAF4;
+  --color-primary-hover: #DDD0F8;
+  --color-on-primary: #1F1535;
+  --color-primary-soft: #2E2645;
+  --color-focus: #BDA8F2;
+  --color-bg: #15131C;
+  --color-surface: #1E1B28;
+  --color-surface-sunken: #12101A;
+  --color-surface-raised: #272335;
+  --color-line: #2E2A3B;
+  --color-line-strong: #423C53;
+  --suave-card-border: #2C2838;
+}
+
+/* ==================== Grafito: casi monocromo, con un acento cálido (cobre) en el foco y la selección. ==================== */
+
+/* Editorial */
+:root[data-style='editorial'][data-palette='grafito'] {
+  --color-primary: #2E3136;
+  --color-primary-hover: #1D1F22;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #F2E7DF;
+  --color-focus: #B5552A;
+  --color-bg: #F3F3F1;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #EAEAE7;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #DADAD6;
+  --color-line-strong: #C0C0BB;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='editorial'][data-palette='grafito']:not([data-theme='light']) {
+    --color-primary: #D6D6D3;
+    --color-primary-hover: #EAEAE7;
+    --color-on-primary: #17181B;
+    --color-primary-soft: #2F241E;
+    --color-focus: #EE9D6C;
+    --color-bg: #111213;
+    --color-surface: #18191B;
+    --color-surface-sunken: #0C0D0E;
+    --color-surface-raised: #202124;
+    --color-line: #2A2B2E;
+    --color-line-strong: #3C3D41;
+  }
+}
+:root[data-style='editorial'][data-palette='grafito'][data-theme='dark'] {
+  --color-primary: #D6D6D3;
+  --color-primary-hover: #EAEAE7;
+  --color-on-primary: #17181B;
+  --color-primary-soft: #2F241E;
+  --color-focus: #EE9D6C;
+  --color-bg: #111213;
+  --color-surface: #18191B;
+  --color-surface-sunken: #0C0D0E;
+  --color-surface-raised: #202124;
+  --color-line: #2A2B2E;
+  --color-line-strong: #3C3D41;
+}
+
+/* Minimalista (solo el acento y el foco: el estilo es monocromo) */
+:root[data-style='minimal'][data-palette='grafito'] {
+  --minimal-accent: #B5552A;
+  --color-focus: #B5552A;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='minimal'][data-palette='grafito']:not([data-theme='light']) {
+    --minimal-accent: #EE9D6C;
+    --color-focus: #EE9D6C;
+  }
+}
+:root[data-style='minimal'][data-palette='grafito'][data-theme='dark'] {
+  --minimal-accent: #EE9D6C;
+  --color-focus: #EE9D6C;
+}
+
+/* Cristal (también las manchas del fondo) */
+:root[data-style='glass'][data-palette='grafito'] {
+  --color-primary: #2F3238;
+  --color-primary-hover: #1F2125;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #F1E6DE;
+  --color-focus: #B5552A;
+  --color-bg: #F0F0EF;
+  --color-surface-sunken: #E8E8E6;
+  --color-line: #D9D9D6;
+  --color-line-strong: #BDBDB8;
+  --glass-blob-1: #DCDCDA;
+  --glass-blob-2: #D3D6DB;
+  --glass-blob-3: #F2D5C2;
+  --glass-blob-4: #E4E2DE;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='glass'][data-palette='grafito']:not([data-theme='light']) {
+    --color-primary: #DADAD7;
+    --color-primary-hover: #EDEDEA;
+    --color-on-primary: #17181B;
+    --color-primary-soft: #2E231D;
+    --color-focus: #F0A070;
+    --color-bg: #0E0F10;
+    --color-surface-sunken: #0F1011;
+    --color-line: #2B2C2F;
+    --color-line-strong: #3E3F43;
+    --glass-blob-1: #2A2B2E;
+    --glass-blob-2: #1E2126;
+    --glass-blob-3: #45261A;
+    --glass-blob-4: #2C2A27;
+  }
+}
+:root[data-style='glass'][data-palette='grafito'][data-theme='dark'] {
+  --color-primary: #DADAD7;
+  --color-primary-hover: #EDEDEA;
+  --color-on-primary: #17181B;
+  --color-primary-soft: #2E231D;
+  --color-focus: #F0A070;
+  --color-bg: #0E0F10;
+  --color-surface-sunken: #0F1011;
+  --color-line: #2B2C2F;
+  --color-line-strong: #3E3F43;
+  --glass-blob-1: #2A2B2E;
+  --glass-blob-2: #1E2126;
+  --glass-blob-3: #45261A;
+  --glass-blob-4: #2C2A27;
+}
+
+/* Suave */
+:root[data-style='suave'][data-palette='grafito'] {
+  --color-primary: #474A52;
+  --color-primary-hover: #36383E;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #F5EAE2;
+  --color-focus: #B8592E;
+  --color-bg: #F4F4F3;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #ECECEA;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #E4E4E1;
+  --color-line-strong: #CACAC5;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='suave'][data-palette='grafito']:not([data-theme='light']) {
+    --color-primary: #DEDEDB;
+    --color-primary-hover: #EEEEEB;
+    --color-on-primary: #18191B;
+    --color-primary-soft: #33271F;
+    --color-focus: #F0A677;
+    --color-bg: #141516;
+    --color-surface: #1D1E20;
+    --color-surface-sunken: #111213;
+    --color-surface-raised: #26272A;
+    --color-line: #2C2D30;
+    --color-line-strong: #404145;
+    --suave-card-border: #2A2B2E;
+  }
+}
+:root[data-style='suave'][data-palette='grafito'][data-theme='dark'] {
+  --color-primary: #DEDEDB;
+  --color-primary-hover: #EEEEEB;
+  --color-on-primary: #18191B;
+  --color-primary-soft: #33271F;
+  --color-focus: #F0A677;
+  --color-bg: #141516;
+  --color-surface: #1D1E20;
+  --color-surface-sunken: #111213;
+  --color-surface-raised: #26272A;
+  --color-line: #2C2D30;
+  --color-line-strong: #404145;
+  --suave-card-border: #2A2B2E;
+}

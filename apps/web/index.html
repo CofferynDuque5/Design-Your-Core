@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es" data-style="editorial">
+<html lang="es" data-style="editorial" data-font="clasica" data-palette="azul">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -10,13 +10,18 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Design Your Core</title>
     <script>
-      // Aplica el tema y el estilo guardados antes de pintar, para evitar un destello.
-      // El estilo por defecto es el data-style de <html> (ver src/app/style.ts).
+      // Aplica el tema, el estilo, la tipografía y la paleta guardados antes de pintar,
+      // para evitar un destello. Los valores por defecto son los data-* de <html>
+      // (ver src/app/style.ts, font.ts y palette.ts).
       try {
         var t = localStorage.getItem('dyc.theme');
         if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
         var s = localStorage.getItem('dyc.style');
         if (['editorial', 'minimal', 'glass', 'suave'].indexOf(s) >= 0) document.documentElement.dataset.style = s;
+        var f = localStorage.getItem('dyc.font');
+        if (['clasica', 'moderna', 'geometrica', 'elegante', 'amable'].indexOf(f) >= 0) document.documentElement.dataset.font = f;
+        var p = localStorage.getItem('dyc.palette');
+        if (['azul', 'salvia', 'terracota', 'lavanda', 'grafito'].indexOf(p) >= 0) document.documentElement.dataset.palette = p;
       } catch (e) {}
     </script>
   </head>

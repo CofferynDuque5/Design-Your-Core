@@ -1,10 +1,9 @@
-import { color, contrast, pillars, type ThemeName } from '@dyc/tokens';
+import { contrast, pillars, type ThemeName } from '@dyc/tokens';
 import { act, renderHook } from '@testing-library/react';
-import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
+import { baseVars, block, over, srcFile, type Vars } from '../test/cssVars';
+import { PALETTE_OPTIONS, type PalettePreference } from './palette';
 import { applyStyle, DEFAULT_STYLE, STYLE_OPTIONS, storedStyle, useStyle, type StylePreference } from './style';
-
-const file = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 afterEach(() => {
   delete document.documentElement.dataset.style;
@@ -37,7 +36,7 @@ describe('preferencia de estilo visual', () => {
   });
 
   it('index.html pinta el estilo por defecto y conoce todos los estilos antes de cargar la app', () => {
-    const html = file('../../index.html');
+    const html = srcFile('../index.html');
     expect(html).toMatch(new RegExp(`<html [^>]*data-style="${DEFAULT_STYLE}"`));
     const list = /\[([^\]]*)\]\.indexOf\(s\)/.exec(html)?.[1] ?? '';
     const inScript = [...list.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort();
@@ -45,56 +44,25 @@ describe('preferencia de estilo visual', () => {
   });
 });
 
-// ---------- Contraste de cada estilo (WCAG AA) leyendo sus archivos CSS ----------
-
-type Vars = Record<string, string>;
-
-/** Variables del primer bloque `selector { … }` a partir de `from`. */
-function block(css: string, selector: string, from = 0): Vars {
-  const start = css.indexOf(`${selector} {`, from);
-  if (start < 0) throw new Error(`No está el bloque ${selector}`);
-  const body = css.slice(css.indexOf('{', start) + 1, css.indexOf('}', start));
-  return Object.fromEntries([...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-}
-
-function baseVars(theme: ThemeName): Vars {
-  const vars: Vars = {};
-  for (const [k, v] of Object.entries(color[theme])) vars[`--color-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`] = v;
-  for (const p of pillars) {
-    vars[`--pillar-${p.id}`] = p.color[theme];
-    vars[`--pillar-${p.id}-soft`] = p.soft[theme];
-    vars[`--pillar-${p.id}-chart`] = p.chart[theme];
-  }
-  return vars;
-}
-
-const hex = (n: number) => Math.round(n).toString(16).padStart(2, '0');
-function rgb(value: string): [number, number, number, number] {
-  const h = /^#([0-9a-f]{6})$/i.exec(value);
-  if (h) {
-    const n = parseInt(h[1], 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
-  }
-  const m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/.exec(value);
-  if (!m) throw new Error(`Color no reconocido: ${value}`);
-  return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
-}
-/** Color translúcido `top` sobre el opaco `under`, como hex. */
-function over(top: string, under: string): string {
-  const [r, g, b, a] = rgb(top);
-  const [r2, g2, b2] = rgb(under);
-  return `#${hex(r * a + r2 * (1 - a))}${hex(g * a + g2 * (1 - a))}${hex(b * a + b2 * (1 - a))}`;
-}
+// ---------- Contraste de cada estilo con cada paleta (WCAG AA) leyendo sus archivos CSS ----------
 
 const styles = STYLE_OPTIONS.map((o) => o.value).filter((s) => s !== 'editorial') as Exclude<StylePreference, 'editorial'>[];
-const css = Object.fromEntries(styles.map((s) => [s, file(`../styles/estilos/${s}.css`)])) as Record<(typeof styles)[number], string>;
+const css = Object.fromEntries(styles.map((s) => [s, srcFile(`styles/estilos/${s}.css`)])) as Record<(typeof styles)[number], string>;
+const paletteCss = srcFile('styles/paletas.css');
 
-function themeVars(style: StylePreference, theme: ThemeName): Vars {
-  const base = baseVars(theme);
-  if (style === 'editorial') return base;
-  const light = block(css[style], `:root[data-style='${style}']`);
-  if (theme === 'light') return { ...base, ...light };
-  return { ...base, ...light, ...block(css[style], `:root[data-style='${style}'][data-theme='dark']`) };
+/** Variables efectivas: tokens base, el estilo y la paleta encima (Azul es la del estilo, sin cambios). */
+function themeVars(style: StylePreference, theme: ThemeName, palette: PalettePreference = 'azul'): Vars {
+  const vars = { ...baseVars(theme) };
+  if (style !== 'editorial') {
+    Object.assign(vars, block(css[style], `:root[data-style='${style}']`));
+    if (theme === 'dark') Object.assign(vars, block(css[style], `:root[data-style='${style}'][data-theme='dark']`));
+  }
+  if (palette !== 'azul') {
+    const sel = `:root[data-style='${style}'][data-palette='${palette}']`;
+    Object.assign(vars, block(paletteCss, sel));
+    if (theme === 'dark') Object.assign(vars, block(paletteCss, `${sel}[data-theme='dark']`));
+  }
+  return vars;
 }
 
 const TEXT = ['--color-ink', '--color-ink-muted', '--color-ink-subtle', '--color-primary'];
@@ -112,8 +80,10 @@ describe.each(styles)('estilo %s', (style) => {
   });
 });
 
-describe.each(STYLE_OPTIONS.map((o) => o.value).flatMap((s) => (['light', 'dark'] as const).map((t) => [s, t] as const)))('contraste de %s en tema %s', (style, theme) => {
-  const v = themeVars(style, theme);
+const combos = STYLE_OPTIONS.flatMap((s) => PALETTE_OPTIONS.flatMap((p) => (['light', 'dark'] as const).map((t) => [s.value, p.value, t] as const)));
+
+describe.each(combos)('contraste de %s con la paleta %s en tema %s', (style, palette, theme) => {
+  const v = themeVars(style, theme, palette);
   const surfaces = ['--color-bg', '--color-surface', '--color-surface-sunken', '--color-primary-soft'];
 
   it('el texto se lee sobre fondo, tarjetas y zonas hundidas (4,5:1)', () => {
@@ -122,6 +92,7 @@ describe.each(STYLE_OPTIONS.map((o) => o.value).flatMap((s) => (['light', 'dark'
 
   it('botón principal, estados, pilares y foco', () => {
     expect(contrast(v['--color-on-primary'], v['--color-primary'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(v['--color-on-primary'], v['--color-primary-hover']), 'botón principal al pasar el ratón').toBeGreaterThanOrEqual(4.5);
     for (const t of STATES) expect(contrast(v[t], v['--color-surface']), t).toBeGreaterThanOrEqual(4.5);
     for (const p of PILLARS) {
       expect(contrast(v[p], v['--color-surface']), p).toBeGreaterThanOrEqual(4.5);
@@ -130,6 +101,9 @@ describe.each(STYLE_OPTIONS.map((o) => o.value).flatMap((s) => (['light', 'dark'
       expect(contrast(v[`${p}-chart`], v['--color-surface']), `${p}-chart`).toBeGreaterThanOrEqual(3);
     }
     expect(contrast(v['--color-focus'], v['--color-bg'])).toBeGreaterThanOrEqual(3);
+    expect(contrast(v['--color-focus'], v['--color-surface'])).toBeGreaterThanOrEqual(3);
+    // Minimalista: el único acento (enlace activo, pestaña activa) se distingue como el foco.
+    if (style === 'minimal') for (const s of ['--color-bg', '--color-surface']) expect(contrast(v['--minimal-accent'], v[s]), `acento sobre ${s}`).toBeGreaterThanOrEqual(3);
   });
 
   if (style !== 'glass') return;
