@@ -191,6 +191,46 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   await expectAccessible(page, 'diálogo de borrar cuenta');
 });
 
+test('estilos visuales: pantallas representativas en cada estilo', async ({ page }) => {
+  // Cada estilo solo cambia tokens y unos pocos componentes: basta con una muestra de pantallas.
+  test.setTimeout(360_000);
+  await register(page, 'a11y-estilos');
+  await onboard(page);
+  const today = new Date().toISOString().slice(0, 10);
+  await seedLegacy(page, {
+    blocks: [{ id: 'b1', label: 'Estudiar', sub: 'Cálculo', start: 9, dur: 1.5, kind: 'study' }],
+    todos: [
+      { id: 'td1', title: 'Pagar la luz', done: false },
+      { id: 'td2', title: 'Llamar al banco', done: true },
+    ],
+    transactions: [
+      { id: 'tx1', date: today, amount: 1200, type: 'income', category: 'Sueldo', note: '' },
+      { id: 'tx2', date: today, amount: 45.5, type: 'expense', category: 'Comida', note: 'Mercado' },
+    ],
+    budget: { monthly: 500 },
+    notes: [{ id: 'n1', title: 'Ondas', subject: 'Física', date: '3 sept', tag: '#4F7CFF', excerpt: 'Repasar', body: 'Repasar la **frecuencia**', commit: false, tags: 'examen', shareId: null }],
+    vault: [{ id: 'v1', name: 'Banco Sol', mono: 'BS', user: 'ana.perez', pass: 'Clave-Plana-123' }],
+  });
+
+  for (const [style, option] of [
+    ['minimal', /^Minimalista/],
+    ['glass', /^Cristal \(glassmorphism\)/],
+    ['suave', /^Suave/],
+    ['editorial', /^Editorial/],
+  ] as const) {
+    // Se elige en Perfil, como lo haría la persona; el estilo se aplica al momento y se recuerda.
+    await page.goto('/perfil');
+    await page.getByRole('radio', { name: option }).check();
+    await expect(page.locator('html')).toHaveAttribute('data-style', style);
+    for (const path of ['/', '/progreso', '/agenda', '/pendientes', '/finanzas', '/notas', '/boveda', '/mas', '/perfil']) {
+      await page.goto(path);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.locator('html')).toHaveAttribute('data-style', style);
+      await expectAccessible(page, `${path} (estilo ${style})`);
+    }
+  }
+});
+
 test('bóveda: crear, desbloqueada, bloqueada y sus diálogos', async ({ page }) => {
   test.setTimeout(120_000);
   await register(page, 'a11y-boveda');
