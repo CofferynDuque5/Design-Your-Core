@@ -226,8 +226,9 @@ describe('herramientas en el móvil', () => {
 
   it('Horario: próxima clase, crea, edita y borra clases con horas HH:MM', async () => {
     const api = setup();
-    await open('/horario', 'Física');
-    expect(screen.getByText(/^(Próxima clase|Clase en curso)$/)).toBeOnTheScreen();
+    // «Física» sale dos veces cuando es la próxima clase (según el día y la hora en que corre la prueba).
+    await open('/horario', /^(Próxima clase|Clase en curso)$/);
+    expect(screen.getAllByText('Física').length).toBeGreaterThan(0);
 
     fireEvent.press(screen.getByRole('button', { name: 'Nueva clase' }));
     fireEvent.changeText(await screen.findByLabelText('Nombre'), 'Química');
