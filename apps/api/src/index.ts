@@ -1,4 +1,7 @@
 import { PrismaClient } from '@prisma/client';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
 import { isPlaceholderDatabaseUrl, loadConfig, loadEnvFiles } from './config.js';
 import { migrate } from './db/migrate.js';
@@ -18,7 +21,11 @@ const prisma = new PrismaClient();
 // Las pruebas de punta a punta crean muchas cuentas desde la misma IP: con
 // NODE_ENV=test los límites de peticiones se relajan. Nunca en producción.
 const limits = process.env.NODE_ENV === 'test' ? { general: 10_000, strict: 1_000 } : undefined;
-const app = createApp({ prisma, config, mailer: createMailer(config.smtp), limits });
+// Paquete de cPanel: si la app web viene en public/ (junto a dist/), se sirve desde aquí
+// y web y API comparten dominio.
+const webRoot = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
+const serveWeb = existsSync(join(webRoot, 'index.html'));
+const app = createApp({ prisma, config, mailer: createMailer(config.smtp), limits, webRoot: serveWeb ? webRoot : undefined });
 
 // No dejar caer el proceso por un rechazo/excepción no controlados.
 process.on('unhandledRejection', (r) => console.error('[core-cloud] unhandledRejection:', r));
@@ -27,7 +34,7 @@ process.on('uncaughtException', (e) => console.error('[core-cloud] uncaughtExcep
 // Crea o actualiza las tablas (migrations/*.sql) antes de aceptar peticiones.
 await migrate(prisma).catch((e) => console.error('[core-cloud] error de migración:', e instanceof Error ? e.message : e));
 
-const server = app.listen(config.port, () => console.log(`[core-cloud] listening on ${config.port}`));
+const server = app.listen(config.port, () => console.log(`[core-cloud] listening on ${config.port}${serveWeb ? ' (con la app web)' : ''}`));
 
 // Apagado limpio (cierra conexiones de Prisma).
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {

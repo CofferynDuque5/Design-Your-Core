@@ -9,8 +9,8 @@ Son las únicas cosas que el código no puede decidir. Mientras no se decidan, s
 | Decisión | Valor provisional | Dónde se cambia |
 |---|---|---|
 | Dominio del sitio de marca | `https://designyourcore.nvcorx.com` | `SITE_URL` en `apps/site/.env.production` |
-| Dominio de la app web | `https://app.designyourcore.nvcorx.com` | `PUBLIC_APP_URL` (sitio) y `CLIENT_ORIGIN` (API) |
-| Dominio de la API | `https://designyourcorebackend.nvcorx.com` (el que ya usa la app publicada) | `VITE_API_URL` (web), `eas.json` (móvil), `PUBLIC_URL` (API) |
+| Dominio de la app web y de la API | `https://designyourcorepanel.nvcorx.com`: la app Node sirve las dos (el ZIP de la API trae la web) | `DYC_API_URL` al empaquetar, `CLIENT_ORIGIN` y `PUBLIC_URL` (API) |
+| Dominio que usan la app publicada y la móvil | `https://designyourcorebackend.nvcorx.com` | `eas.json` (móvil). Debe llevar a la misma app Node para que sigan funcionando |
 | Identificador de la app en las tiendas | `com.nvcorx.designyourcore` | `apps/mobile/app.json`. **No se puede cambiar después de publicar** |
 | Correo de contacto en la página de privacidad | ninguno | `PUBLIC_CONTACT_EMAIL` (sitio) |
 | Bóveda de contraseñas de la app anterior | la app nueva no la muestra, pero sus datos siguen guardados en la cuenta | Guardaba contraseñas en texto plano: se recomienda borrar esos datos |

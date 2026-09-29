@@ -77,8 +77,9 @@ function demoHtml(): Plugin {
             },
           ],
           navigateFallback: '/index.html',
-          // La API nunca se cachea: los datos van por TanStack Query.
-          navigateFallbackDenylist: [/^\/api\//],
+          // La API nunca se cachea: los datos van por TanStack Query. /reset es la página de la
+          // API para elegir contraseña nueva (cuando web y API comparten dominio).
+          navigateFallbackDenylist: [/^\/api\//, /^\/reset/],
         },
       }),
     ],

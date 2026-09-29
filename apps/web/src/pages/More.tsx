@@ -10,7 +10,8 @@ import { ErrorState, Loading } from '../components/States';
 export function More() {
   const legacy = useLegacyData();
   const { user } = useSession();
-  const legacyUrl = import.meta.env.VITE_LEGACY_APP_URL;
+  // Si la app nueva ocupa el dominio de la anterior, el enlace apuntaría a sí misma.
+  const legacyUrl = sameOrigin(import.meta.env.VITE_LEGACY_APP_URL) ? undefined : import.meta.env.VITE_LEGACY_APP_URL;
 
   return (
     <div className="page page--narrow">
@@ -79,4 +80,13 @@ export function More() {
       </div>
     </div>
   );
+}
+
+function sameOrigin(url: string | undefined) {
+  if (!url) return false;
+  try {
+    return new URL(url).origin === window.location.origin;
+  } catch {
+    return false;
+  }
 }

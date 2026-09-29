@@ -2,6 +2,8 @@
 // Se usa «Extraer» del Administrador de archivos, sin mover nada después:
 // - API: trae la carpeta core-api/ (DYC_API_FOLDER). Se extrae en la carpeta de
 //   inicio y queda en el «Application root» de la app Node. Incluye LEEME.txt.
+//   Trae también la app web (core-api/public y la carpeta del dominio): la API la
+//   sirve en su mismo dominio, así que con este ZIP basta para tener web + API.
 // - Web y sitio: los archivos van en la raíz del ZIP y se extraen en la carpeta del dominio.
 //
 //   pnpm package
@@ -21,8 +23,10 @@ const OUT = join(ROOT, 'release');
 const STAGE = join(OUT, '.stage');
 
 const url = (v) => v.replace(/\/+$/, '');
-const API_URL = url(process.env.DYC_API_URL || 'https://designyourcorebackend.nvcorx.com');
-const APP_URL = url(process.env.DYC_APP_URL || 'https://app.designyourcore.nvcorx.com');
+// Nathan tiene la app Node en la raíz de designyourcorepanel (2026-09-29): web y API
+// comparten ese dominio.
+const API_URL = url(process.env.DYC_API_URL || 'https://designyourcorepanel.nvcorx.com');
+const APP_URL = url(process.env.DYC_APP_URL || API_URL);
 const SITE_URL = url(process.env.DYC_SITE_URL || 'https://designyourcore.nvcorx.com');
 const CONTACT = process.env.DYC_CONTACT_EMAIL || '';
 const API_FOLDER = process.env.DYC_API_FOLDER || 'core-api';
@@ -71,15 +75,24 @@ PassengerStartupFile dist/index.js
 `,
 );
 cpSync(join(ROOT, 'apps/api/release'), apiDir, { recursive: true });
+// Web para el mismo dominio: sin VITE_API_URL llama a /api del dominio donde se abre.
+// Va en core-api/public (la sirve Express) y en la carpeta del dominio, por si
+// LiteSpeed entrega los archivos que existen antes de pasar a Node. Sin su .htaccess:
+// ahí manda el de Passenger.
+const sameOriginWeb = join(STAGE, 'web-mismo-dominio');
+run(`pnpm --filter @dyc/web exec vite build --outDir "${sameOriginWeb}" --emptyOutDir`, { VITE_API_URL: '', VITE_LEGACY_APP_URL: LEGACY_APP_URL });
+rmSync(join(sameOriginWeb, '.htaccess'));
+cpSync(sameOriginWeb, join(apiDir, 'public'), { recursive: true });
+cpSync(sameOriginWeb, docroot, { recursive: true });
 const config = readFileSync(join(apiDir, 'core-config.env.example'), 'utf8')
-  .replace(/^CLIENT_ORIGIN=.*$/m, `CLIENT_ORIGIN=${[APP_URL, ...LEGACY_ORIGINS].join(',')}`)
+  .replace(/^CLIENT_ORIGIN=.*$/m, `CLIENT_ORIGIN=${[...new Set([APP_URL, ...LEGACY_ORIGINS])].join(',')}`)
   .replace(/^PUBLIC_URL=.*$/m, `PUBLIC_URL=${API_URL}`);
 writeFileSync(join(apiDir, 'core-config.env.example'), config);
 writeFileSync(
   join(apiDir, 'LEEME.txt'),
   `
-Design Your Core · API ${version}
-Dominio: ${API_URL}
+Design Your Core · API y app web ${version}
+Dominio: ${API_URL} (la app web y la API van juntas en este dominio)
 
 1. En Neon crea una rama (Branch) de la base de datos: es tu copia de seguridad.
 2. En cPanel, «Setup Node.js App»: comprueba que el «Application root» de ${host(API_URL)} sea ${API_FOLDER}
@@ -87,7 +100,9 @@ Dominio: ${API_URL}
 3. Sube este ZIP a tu carpeta de inicio (${SERVER_HOME}, donde está public_html), selecciónalo
    y pulsa «Extraer». Acepta reemplazar los archivos. Deja:
    - la carpeta ${API_FOLDER} con la API;
-   - ${API_DOCROOT}/.htaccess (archivo oculto), que conecta el dominio con la app Node.
+   - ${API_DOCROOT}/.htaccess (archivo oculto), que conecta el dominio con la app Node,
+     y la app web en esa misma carpeta.
+   No extraigas encima el ZIP de la web: su .htaccess desconectaría la app Node.
    Tu core-config.env no se toca: este ZIP no trae uno.
 4. La configuración va en las variables de la app en «Setup Node.js App», o en ${API_FOLDER}/core-config.env
    (guía: core-config.env.example):
@@ -96,6 +111,7 @@ Dominio: ${API_URL}
    - CLIENT_ORIGIN y PUBLIC_URL: copia las líneas del ejemplo.
 5. En «Setup Node.js App»: archivo de inicio dist/index.js. Pulsa «Run NPM Install» y después «Start App».
 6. Abre ${API_URL}/api/health: debe decir {"ok":true,"service":"core-cloud"}.
+7. Abre ${API_URL}: aparece la pantalla para entrar.
 
 Al arrancar, la API añade sus tablas nuevas a la base de datos sin tocar las cuentas ni los datos.
 `.trimStart(),

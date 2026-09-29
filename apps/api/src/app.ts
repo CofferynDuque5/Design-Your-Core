@@ -13,6 +13,7 @@ import { partnerRoutes } from './routes/partner.js';
 import { resetRoutes } from './routes/reset.js';
 import { syncRoutes } from './routes/sync.js';
 import { v2Routes } from './v2/index.js';
+import { webRoutes } from './routes/web.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -20,9 +21,11 @@ export interface AppDeps {
   mailer: Mailer;
   /** Límites por ventana de 15 min. Solo se cambian en pruebas. */
   limits?: { general: number; strict: number };
+  /** Carpeta con la app web compilada, si se sirve en el mismo dominio que la API. */
+  webRoot?: string;
 }
 
-export function createApp({ prisma, config, mailer, limits = { general: 600, strict: 20 } }: AppDeps) {
+export function createApp({ prisma, config, mailer, limits = { general: 600, strict: 20 }, webRoot }: AppDeps) {
   const app = express();
   app.set('trust proxy', 1);
   app.use(helmet());
@@ -65,6 +68,8 @@ export function createApp({ prisma, config, mailer, limits = { general: 600, str
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Recurso no encontrado' });
   });
+
+  if (webRoot) app.use(webRoutes(webRoot));
 
   // Manejador de errores global: registra y responde 500 (sin filtrar detalles).
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {

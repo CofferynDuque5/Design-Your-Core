@@ -6,7 +6,7 @@ import { escapeHtml, sha256hex } from '../lib/security.js';
 
 // CSP permisiva SOLO para las páginas HTML de restablecimiento (autocontenidas).
 const resetPageCsp = (res: Response) =>
-  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'");
+  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; form-action 'self'; base-uri 'none'");
 
 function resetPage(token: string, error?: string): string {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Restablecer contraseña · Core</title><style>
