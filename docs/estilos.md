@@ -51,6 +51,7 @@ Cualquier combinación funciona en claro y en oscuro, en escritorio y en móvil 
 
 ## Cómo funciona
 
+- El **tema** por defecto es **oscuro** (`DEFAULT_THEME` en `src/app/theme.ts` y `data-theme="dark"` en `index.html`). En Perfil → Apariencia se puede elegir Claro o Sistema (sigue el tema del dispositivo; se guarda como `system`).
 - Las tres preferencias se guardan **en el navegador** (`localStorage`, claves `dyc.style`, `dyc.font` y `dyc.palette`), como el tema. No viajan a la API ni a otros dispositivos. El valor por defecto no se guarda: si cambia, quien no eligió nada lo recibe.
 - Se aplican con `data-style`, `data-font` y `data-palette` en `<html>`. Un script en `apps/web/index.html` los pone **antes de pintar**, igual que el tema, para que no haya destello; `main.tsx` los vuelve a aplicar y carga las fuentes de la tipografía elegida.
 - Las tres usan la misma pieza, `src/app/preference.ts`; cada una tiene su módulo (`style.ts`, `font.ts`, `palette.ts`) con sus opciones y textos.

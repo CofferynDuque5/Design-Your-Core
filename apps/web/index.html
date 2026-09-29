@@ -1,21 +1,22 @@
 <!doctype html>
-<html lang="es" data-style="editorial" data-font="clasica" data-palette="lima">
+<html lang="es" data-theme="dark" data-style="editorial" data-font="clasica" data-palette="lima">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="Tu bienestar en seis pilares, en pasos pequeños." />
-    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#111418" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#0A0B09" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Design Your Core</title>
     <script>
       // Aplica el tema, el estilo, la tipografía y la paleta guardados antes de pintar,
       // para evitar un destello. Los valores por defecto son los data-* de <html>
-      // (ver src/app/style.ts, font.ts y palette.ts).
+      // (ver src/app/theme.ts, style.ts, font.ts y palette.ts). «system» quita el tema
+      // para que decida prefers-color-scheme.
       try {
         var t = localStorage.getItem('dyc.theme');
         if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        else if (t === 'system') delete document.documentElement.dataset.theme;
         var s = localStorage.getItem('dyc.style');
         if (['editorial', 'minimal', 'glass', 'suave'].indexOf(s) >= 0) document.documentElement.dataset.style = s;
         var f = localStorage.getItem('dyc.font');

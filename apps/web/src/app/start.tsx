@@ -10,6 +10,7 @@ import { App } from './App';
 import { applyFont, storedFont } from './font';
 import { applyPalette, storedPalette } from './palette';
 import { applyStyle, storedStyle } from './style';
+import { applyTheme, storedTheme } from './theme';
 
 /**
  * Arranca la app. Las fuentes las pone quien llama: main.tsx las lleva en el
@@ -17,8 +18,9 @@ import { applyStyle, storedStyle } from './style';
  * `before` se pinta encima de la app (el aviso de la versión de prueba).
  */
 export function start(before?: ReactNode) {
-  // index.html ya aplicó estilo, tipografía y paleta antes de pintar; esto cubre el caso en
+  // index.html ya aplicó tema, estilo, tipografía y paleta antes de pintar; esto cubre el caso en
   // que su script no pudo y, además, carga las fuentes de una tipografía que no sea la clásica.
+  applyTheme(storedTheme());
   applyStyle(storedStyle());
   applyFont(storedFont());
   applyPalette(storedPalette());
