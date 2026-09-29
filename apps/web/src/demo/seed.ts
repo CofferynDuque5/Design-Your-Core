@@ -202,11 +202,19 @@ export function sampleLegacy(today: Day): Record<string, unknown> {
       { id: 'nb1', title: 'Apuntes de cálculo', category: 'Universidad', subject: 'Cálculo', topic: 'Integrales', color: '#4F7CFF', emoji: '🧮' },
       { id: 'nb2', title: 'Física general', category: 'Universidad', subject: 'Física', topic: 'Ondas', color: '#0FA968', emoji: '🔬' },
       { id: 'nb3', title: 'Recetas', category: 'Personal', subject: '', topic: 'Cenas rápidas', color: '#E8912A', emoji: '📗' },
+      { id: 'nb4', title: 'Química orgánica', category: 'Universidad', subject: 'Química', topic: 'Hidrocarburos', color: '#8B5CF6', emoji: '⚗️' },
+      { id: 'nb5', title: 'Programación I', category: 'Universidad', subject: 'Programación', topic: 'Python', color: '#111827', emoji: '💻' },
+      { id: 'nb6', title: 'Historia contemporánea', category: 'Universidad', subject: 'Historia', topic: 'Siglo XX', color: '#E5484D', emoji: '📖' },
+      { id: 'nb7', title: 'Literatura inglesa', category: 'Idiomas', subject: 'Literatura', topic: 'Shakespeare', color: '#EC6A9C', emoji: '📕' },
+      { id: 'nb8', title: 'Biología celular', category: 'Universidad', subject: 'Biología', topic: 'Mitosis', color: '#14B8A6', emoji: '🔬' },
     ],
     noteBoxes: [
       { id: 'bx1', notebookId: 'nb1', title: 'Regla de la cadena', text: 'La derivada de f(g(x)) es f′(g(x))·g′(x).', color: '#FFE8D6', kind: 'text', lang: '' },
       { id: 'bx2', notebookId: 'nb1', title: 'integral.py', text: 'from sympy import integrate, symbols\n\nx = symbols("x")\nprint(integrate(x * 2, x))', color: '#1e1e2e', kind: 'code', lang: 'python' },
       { id: 'bx3', notebookId: 'nb2', title: 'Velocidad de una onda', text: 'v = λ · f\nLa velocidad depende del medio, no de la fuente.', color: '#DDF3E4', kind: 'text', lang: '' },
+      { id: 'bx5', notebookId: 'nb4', title: 'Alcanos', text: 'CnH2n+2 · enlaces simples · metano, etano, propano…', color: '#EDE4FF', kind: 'text', lang: '' },
+      { id: 'bx6', notebookId: 'nb5', title: 'fizzbuzz.py', text: 'for i in range(1, 16):\n    print("Fizz" * (i % 3 == 0) + "Buzz" * (i % 5 == 0) or i)', color: '#1e1e2e', kind: 'code', lang: 'python' },
+      { id: 'bx7', notebookId: 'nb6', title: 'Fechas clave', text: '1914 · 1929 · 1939 · 1945 · 1989', color: '#FCE0EC', kind: 'text', lang: '' },
       { id: 'bx4', notebookId: 'nb3', title: 'Tortilla en 15 minutos', text: '4 huevos, 2 patatas pequeñas en láminas finas, cebolla al gusto. Sartén tapada a fuego medio.', color: '#FFF7D6', kind: 'text', lang: '' },
     ],
     content: [
@@ -296,6 +304,8 @@ export function sampleLegacy(today: Day): Record<string, unknown> {
       { id: 'o2', title: 'Meditar 10 minutos', time: '07:30', days: '12345', icon: 'bell', sound: true, enabled: true },
       { id: 'o3', title: 'Repasar el día', time: '21:30', days: '1234567', icon: 'bell', sound: true, enabled: true },
       { id: 'o4', title: 'Llamar a casa', time: '12:00', days: '67', icon: 'bell', sound: true, enabled: false },
+      // Creada por la app anterior desde Ejercicio: se muestra sin el emoji del principio.
+      { id: 'o5', title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true },
     ],
     meals: [
       { id: 'ml1', label: 'Desayuno', time: '08:15', note: 'Tostadas con tomate y café', dateKey: today },

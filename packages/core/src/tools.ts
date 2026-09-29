@@ -1,5 +1,6 @@
 import { addDays, diffDays, isDay, periodRange, type Day } from './dates.js';
 import { daysLabel, plural, shortDay } from './format.js';
+import { moodIcon } from './icons.js';
 import {
   BOX_COLORS,
   CARE_KIND_INFO,
@@ -13,7 +14,6 @@ import {
   cyclePredictions,
   hhmmToHours,
   IDEA_CATEGORIES,
-  JOURNAL_MOODS,
   MEDITATION_KIND,
   NOTE_DEFAULT_SUBJECT,
   NOTE_DEFAULT_TITLE,
@@ -731,7 +731,8 @@ export const PERIOD_REMINDER_COLOR = '#EC6A9C';
 export const periodReminder = (id: string, nextStart: Day): LegacyReminder => ({
   id,
   day: Number(nextStart.slice(8)),
-  title: '🩸 Posible inicio del periodo',
+  // Sin emoji delante (los de antes se muestran sin él con `displayTitle`).
+  title: 'Posible inicio del periodo',
   when: MONTH_NAMES[Number(nextStart.slice(5, 7)) - 1],
   color: PERIOD_REMINDER_COLOR,
   icon: 'doc',
@@ -739,7 +740,7 @@ export const periodReminder = (id: string, nextStart: Day): LegacyReminder => ({
 });
 
 /** «Agendar» un plan de Ejercicio: una rutina diaria a las 18:00, como la app anterior. */
-export const workoutRoutine = (id: string, plan: string): LegacyRoutine => ({ id, title: `🏋️ Entreno: ${plan}`, time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
+export const workoutRoutine = (id: string, plan: string): LegacyRoutine => ({ id, title: `Entreno: ${plan}`, time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
 
 /** Calidad de una noche: «Buena (4/5)» o «Sin calidad». */
 export const sleepQualityLabel = (q: unknown) => (typeof q === 'number' && Number.isInteger(q) && q >= 1 && q <= 5 ? `${SLEEP_QUALITY_LABELS[q - 1]} (${q}/5)` : 'Sin calidad');
@@ -761,7 +762,7 @@ export function journalStats(list: Array<Pick<LegacyJournal, 'date' | 'mood'>>, 
     month: entries.filter((e) => e.date.startsWith(today.slice(0, 7))).length,
     streak,
     top,
-    topLabel: JOURNAL_MOODS.find((m) => m.emoji === top)?.label ?? null,
+    topLabel: moodIcon(top)?.label ?? null,
   };
 }
 

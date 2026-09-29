@@ -1,4 +1,4 @@
-import { BOX_COLORS, CODE_LANGS, COLOR_NAMES, coreImageIds, inlineImages, legacySubjectNames, newNoteBox, NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, noteBoxKind, uniqueTexts, type LegacyNoteBox, type LegacyNotebook } from '@dyc/core';
+import { BOX_COLORS, CODE_LANGS, COLOR_NAMES, coreImageIds, inlineImages, legacySubjectNames, newNoteBox, NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, notebookIconOptions, noteBoxKind, sameEmoji, uniqueTexts, type LegacyNoteBox, type LegacyNotebook } from '@dyc/core';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Code2, Copy, ImageOff, Palette, Plus, Trash2, Type } from 'lucide-react';
 import { useId, useMemo, useState, type FormEvent } from 'react';
@@ -9,8 +9,10 @@ import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
+import { NotebookCover } from '../components/NotebookCover';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions, optionsWith, paletteWith, safeColor } from '../components/ToolParts';
+import { UiIcon } from '../components/UiIcon';
 import { plural } from '../lib/format';
 import { useAutosave } from '../lib/tools';
 
@@ -106,9 +108,7 @@ export function Notebooks() {
                 return (
                   <li key={n.id}>
                     <Link to={`/cuadernos/${encodeURIComponent(n.id)}`} className="notebook-card" style={{ ['--c' as string]: safeColor(n.color, NOTEBOOK_COLORS[0]) }}>
-                      <span className="notebook-card__cover" aria-hidden="true">
-                        {n.emoji || '📓'}
-                      </span>
+                      <NotebookCover notebook={n} variant="card" />
                       <span className="notebook-card__body">
                         <strong className="notebook-card__title">{n.title || 'Cuaderno'}</strong>
                         <Tags notebook={n} />
@@ -150,7 +150,7 @@ function NotebookForm({ notebook, all, subjects, boxCount = 0, onDone, onDeleted
   const [topic, setTopic] = useState(notebook?.topic ?? '');
   const [color, setColor] = useState(safeColor(notebook?.color, NOTEBOOK_COLORS[0]));
   const [emoji, setEmoji] = useState(notebook?.emoji || NOTEBOOK_EMOJIS[0]);
-  const emojis = optionsWith(NOTEBOOK_EMOJIS, emoji);
+  const icons = notebookIconOptions(emoji);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -187,11 +187,12 @@ function NotebookForm({ notebook, all, subjects, boxCount = 0, onDone, onDeleted
       <ColorPicker legend="Color" colors={paletteWith(NOTEBOOK_COLORS, color)} value={color} onChange={setColor} names={COLOR_NAMES} />
       <fieldset className="field">
         <legend className="field__label">Icono</legend>
-        <div className="emoji-picker">
-          {emojis.map((em) => (
-            <label key={em} className="emoji-option">
-              <input type="radio" name={`${listId}-emoji`} checked={emoji === em} onChange={() => setEmoji(em)} aria-label={`Icono ${em}`} />
-              <span aria-hidden="true">{em}</span>
+        <div className="icon-picker">
+          {/* Se guarda el emoji de siempre (lo lee la app anterior); se dibuja su icono. */}
+          {icons.map((o) => (
+            <label key={o.value} className="icon-option" title={o.label}>
+              <input type="radio" name={`${listId}-emoji`} checked={sameEmoji(emoji, o.value)} onChange={() => setEmoji(o.value)} aria-label={o.label} />
+              <UiIcon name={o.icon} size={20} />
             </label>
           ))}
         </div>
@@ -258,9 +259,7 @@ export function NotebookDetail() {
     <div className="page">
       <BackLink />
       <div className="notebook-hero" style={{ ['--c' as string]: color }}>
-        <span className="notebook-hero__emoji" aria-hidden="true">
-          {notebook.emoji || '📓'}
-        </span>
+        <NotebookCover notebook={notebook} variant="hero" />
         <div className="notebook-hero__text">
           <PageHeader eyebrow="Cuaderno" title={notebook.title || 'Cuaderno'} />
           <Tags notebook={notebook} />

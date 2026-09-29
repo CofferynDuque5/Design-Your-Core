@@ -1,4 +1,4 @@
-import { byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, shortDay, utcDayKey, type LegacyJournal } from '@dyc/core';
+import { byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, moodIcon, shortDay, utcDayKey, type LegacyJournal } from '@dyc/core';
 import { Trash2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -7,6 +7,7 @@ import { PageHeader } from '../components/AppShell';
 import { TextArea, TextField } from '../components/Form';
 import { ErrorState, Loading } from '../components/States';
 import { CheckInNote, MoodPicker, Stats } from '../components/ToolParts';
+import { UiIcon } from '../components/UiIcon';
 import { useAutosave } from '../lib/tools';
 
 const HISTORY_MAX = 60;
@@ -50,6 +51,7 @@ export function Journal() {
 
   const stats = useMemo(() => journalStats(entries, today), [entries, today]);
   const topLabel = stats.topLabel;
+  const topMood = moodIcon(stats.top);
 
   return (
     <div className="page">
@@ -64,7 +66,7 @@ export function Journal() {
             items={[
               { value: stats.month, label: stats.month === 1 ? 'Entrada este mes' : 'Entradas este mes' },
               { value: stats.streak, label: stats.streak === 1 ? 'Día seguido' : 'Días seguidos' },
-              { value: stats.top ? <span className="emoji" aria-hidden="true">{stats.top}</span> : '—', label: topLabel ? `Ánimo más frecuente: ${topLabel.toLowerCase()}` : 'Ánimo más frecuente' },
+              { value: topMood ? <UiIcon name={topMood.icon} size={28} className="stat__icon" /> : '—', label: topLabel ? `Ánimo más frecuente: ${topLabel.toLowerCase()}` : 'Ánimo más frecuente' },
             ]}
           />
           <div className="journal-layout">
@@ -78,13 +80,13 @@ export function Journal() {
               ) : (
                 <ul className="journal-list">
                   {entries.slice(0, HISTORY_MAX).map((j) => {
-                    const mood = JOURNAL_MOODS.find((m) => m.emoji === j.mood);
+                    const mood = moodIcon(j.mood);
                     const text = j.note?.trim() || j.gratitude?.trim() || 'Sin texto';
                     return (
                       <li key={j.id} className={j.date === date ? 'journal-list__item journal-list__item--on' : 'journal-list__item'}>
                         <button type="button" className="journal-list__open" onClick={() => setDate(j.date)} aria-current={j.date === date ? 'true' : undefined}>
-                          <span className="journal-list__mood emoji" aria-hidden="true">
-                            {j.mood || '·'}
+                          <span className="journal-list__mood" aria-hidden="true">
+                            {mood ? <UiIcon name={mood.icon} size={20} /> : '·'}
                           </span>
                           <span className="day-item__text">
                             <strong>

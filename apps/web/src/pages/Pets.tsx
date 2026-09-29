@@ -4,9 +4,10 @@ import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { Dialog } from '../components/Dialog';
-import { SelectField, TextField } from '../components/Form';
+import { TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, Stats, WeekdayPicker } from '../components/ToolParts';
+import { FormActions, IconChoices, Stats, WeekdayPicker } from '../components/ToolParts';
+import { UiIcon } from '../components/UiIcon';
 import { plural } from '../lib/format';
 import { useNow } from '../lib/tools';
 
@@ -84,8 +85,8 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
     <article className="card tool-card pet-card" style={{ ['--c' as string]: '#E8912A' }} aria-labelledby={titleId}>
       <div className="tool-card__head">
         <div className="pet-card__who">
-          <span className="pet-card__avatar emoji" aria-hidden="true">
-            {species.emoji}
+          <span className="pet-card__avatar" aria-hidden="true">
+            <UiIcon name={species.icon} size={24} />
           </span>
           <div>
             <h2 id={titleId} className="tool-card__title">
@@ -113,8 +114,8 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
             return (
               <li key={c.id} className={`care-row${done ? ' care-row--done' : ''}${off ? ' care-row--off' : ''}`}>
                 <input className="care-row__check" type="checkbox" checked={done} onChange={() => actions.update(c.id, { lastDone: done ? '' : today })} aria-label={`Hecho hoy: «${title}» de ${name}`} />
-                <span className="care-row__emoji emoji" aria-hidden="true">
-                  {kind.emoji}
+                <span className="care-row__icon" aria-hidden="true">
+                  <UiIcon name={kind.icon} size={18} />
                 </span>
                 <span className="care-row__text">
                   <strong>{title}</strong>
@@ -163,13 +164,7 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
   return (
     <form className="stack" onSubmit={submit}>
       <TextField label="Nombre" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required autoFocus placeholder="Luna" />
-      <SelectField label="Especie" value={species} onChange={(e) => setSpecies(e.target.value as PetSpecies)}>
-        {PET_SPECIES.map((s) => (
-          <option key={s} value={s}>
-            {PET_SPECIES_INFO[s].emoji} {PET_SPECIES_INFO[s].label}
-          </option>
-        ))}
-      </SelectField>
+      <IconChoices legend="Especie" value={species} onChange={setSpecies} options={PET_SPECIES.map((s) => ({ value: s, ...PET_SPECIES_INFO[s] }))} />
       <TextField label="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Raza, edad…" />
       <FormActions
         submitLabel={pet ? 'Guardar' : 'Añadir mascota'}
@@ -204,13 +199,7 @@ function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare |
   };
   return (
     <form className="stack" onSubmit={submit}>
-      <SelectField label="Tipo" value={kind} onChange={(e) => setKind(e.target.value as CareKind)}>
-        {CARE_KINDS.map((k) => (
-          <option key={k} value={k}>
-            {CARE_KIND_INFO[k].emoji} {CARE_KIND_INFO[k].label}
-          </option>
-        ))}
-      </SelectField>
+      <IconChoices legend="Tipo" value={kind} onChange={setKind} options={CARE_KINDS.map((k) => ({ value: k, ...CARE_KIND_INFO[k] }))} />
       <div className="grid-2">
         <TextField label="Qué hay que hacer" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} autoFocus placeholder={kind === 'comida' ? 'Darle de comer' : CARE_KIND_INFO[kind].label} />
         <TextField label="Hora (opcional)" type="time" value={time} onChange={(e) => setTime(e.target.value)} />

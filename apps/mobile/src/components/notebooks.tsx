@@ -1,10 +1,12 @@
-import { NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, optionsWith, paletteWith, plural, safeColor, uniqueTexts, type LegacyNotebook } from '@dyc/core';
-import { space } from '@dyc/tokens';
+import { NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, notebookIconOptions, paletteWith, plural, safeColor, sameEmoji, uniqueTexts, type LegacyNotebook } from '@dyc/core';
+import { radius, space, touchTarget } from '@dyc/tokens';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { useTheme } from '../lib/theme';
 import { newId, useModule } from '../lib/legacy';
-import { ColorSwatches, DotChoices, FormActions, Pill, Suggestions } from './tools';
-import { Field } from './ui';
+import { ColorSwatches, FormActions, Pill, Suggestions } from './tools';
+import { Field, T } from './ui';
+import { UiIcon } from './UiIcon';
 
 // Piezas de Cuadernos que comparten la lista y la pantalla de cada cuaderno.
 
@@ -61,7 +63,7 @@ export function NotebookForm({
       <Field label="Tema (opcional)" value={topic} onChangeText={setTopic} maxLength={120} placeholder="Derivadas" />
       <Suggestions field="Tema" values={uniqueTexts(all.map((n) => n.topic))} current={topic} onPick={setTopic} />
       <ColorSwatches legend="Color" colors={paletteWith(NOTEBOOK_COLORS, color)} value={color} onChange={setColor} />
-      <DotChoices legend="Icono" value={emoji} onChange={setEmoji} options={optionsWith(NOTEBOOK_EMOJIS, emoji).map((em) => ({ value: em, label: em, a11yLabel: `Icono ${em}` }))} />
+      <IconPicker value={emoji} onChange={setEmoji} />
       <FormActions
         submitLabel={notebook ? 'Guardar' : 'Crear cuaderno'}
         onSubmit={submit}
@@ -77,5 +79,42 @@ export function NotebookForm({
         confirm={`Se borrará «${notebook?.title || 'Cuaderno'}»${boxCount ? ` con ${plural(boxCount, 'cajita', 'cajitas')}` : ''}.`}
       />
     </ScrollView>
+  );
+}
+
+/** Icono del cuaderno: se guarda el emoji de siempre (lo lee la app anterior) y se dibuja su icono. */
+function IconPicker({ value, onChange }: { value: string; onChange: (emoji: string) => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: space[2] }}>
+      <T v="label">Icono</T>
+      <View accessibilityRole="radiogroup" accessibilityLabel="Icono" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+        {notebookIconOptions(value).map((o) => {
+          const on = sameEmoji(o.value, value);
+          return (
+            <Pressable
+              key={o.value}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: on }}
+              accessibilityLabel={o.label}
+              onPress={() => onChange(o.value)}
+              style={({ pressed }) => ({
+                width: touchTarget,
+                height: touchTarget,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: radius.md,
+                borderWidth: on ? 2 : 1,
+                borderColor: on ? colors.ink : colors.lineStrong,
+                backgroundColor: on ? colors.surfaceSunken : colors.surface,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <UiIcon name={o.icon} size={20} color={on ? colors.ink : colors.inkMuted} />
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }

@@ -1,7 +1,8 @@
-import { daysLabel, monthLabel, toggleWeekday, WEEKDAY_LONG_NAMES, WEEKDAYS, type LegacyCheckItem } from '@dyc/core';
+import { daysLabel, monthLabel, moodIcon, toggleWeekday, UNKNOWN_MOOD_ICON, WEEKDAY_LONG_NAMES, WEEKDAYS, type LegacyCheckItem, type UiIconName } from '@dyc/core';
 import { ChevronLeft, ChevronRight, Info, Trash2 } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { UiIcon } from './UiIcon';
 
 // Piezas comunes de las herramientas de la tanda 2 (Materias, Proyectos,
 // Roadmaps, Cuadernos, Contenido e Ideas).
@@ -170,7 +171,7 @@ export function WeekdayPicker({ legend, value, onChange, hint }: { legend: strin
   );
 }
 
-/** Ánimo con emoji (radios). Pulsar el elegido lo quita (se guarda ""). */
+/** Ánimo (radios): se guarda el emoji de siempre y se dibuja su icono. Pulsar el elegido lo quita (se guarda ""). */
 export function MoodPicker({ legend, moods, value, onChange, hideLegend }: { legend: string; moods: ReadonlyArray<{ emoji: string; label: string }>; value: string; onChange: (mood: string) => void; hideLegend?: boolean }) {
   const name = useId();
   const known = moods.some((m) => m.emoji === value);
@@ -181,8 +182,27 @@ export function MoodPicker({ legend, moods, value, onChange, hideLegend }: { leg
         {[...moods, ...(value && !known ? [{ emoji: value, label: 'Guardado antes' }] : [])].map((m) => (
           <label key={m.emoji} className="mood-option" title={m.label}>
             <input type="radio" name={name} checked={value === m.emoji} onChange={() => onChange(m.emoji)} onClick={() => value === m.emoji && onChange('')} />
-            <span className="emoji" aria-hidden="true">{m.emoji}</span>
+            <UiIcon name={moodIcon(m.emoji)?.icon ?? UNKNOWN_MOOD_ICON.icon} size={24} className="mood-option__icon" />
             <span className="mood-option__label">{m.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Elección única con icono y nombre (especie de mascota, tipo de cuidado…), como fichas. */
+export function IconChoices<V extends string>({ legend, options, value, onChange }: { legend: string; options: ReadonlyArray<{ value: V; label: string; icon: UiIconName }>; value: V; onChange: (v: V) => void }) {
+  const name = useId();
+  return (
+    <fieldset className="field">
+      <legend className="field__label">{legend}</legend>
+      <div className="icon-choices">
+        {options.map((o) => (
+          <label key={o.value} className="icon-choice">
+            <input type="radio" name={name} value={o.value} checked={value === o.value} onChange={() => onChange(o.value)} />
+            <UiIcon name={o.icon} size={18} />
+            <span>{o.label}</span>
           </label>
         ))}
       </div>

@@ -25,6 +25,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
 import { DotChoices, FormActions, IconButton, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T } from '../../components/ui';
+import { UiIcon } from '../../components/UiIcon';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
 import { useNow } from '../../lib/tools';
@@ -98,9 +99,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
     <Card style={[st.card, { borderLeftColor: PET_COLOR }]}>
       <View style={st.head}>
         <View style={[st.avatar, { backgroundColor: `${PET_COLOR}24` }]}>
-          <T v="title" style={{ fontSize: 26, lineHeight: 32 }} importantForAccessibility="no" accessibilityElementsHidden>
-            {species.emoji}
-          </T>
+          <UiIcon name={species.icon} size={24} color={colors.ink} />
         </View>
         <View style={{ flex: 1 }}>
           <T v="heading" accessibilityRole="header" style={{ fontSize: 19, lineHeight: 24 }}>
@@ -152,9 +151,7 @@ function CareRow({ care: c, petName, today, now, onEdit }: { care: LegacyPetCare
         style={({ pressed }) => [st.careHit, pressed && { opacity: 0.7 }]}
       >
         <View style={[st.box, { borderColor: done ? colors.success : colors.lineStrong, backgroundColor: done ? colors.success : 'transparent' }]}>{done && <Check size={16} strokeWidth={2.5} color={colors.surface} />}</View>
-        <T v="body" style={{ fontSize: 20 }} importantForAccessibility="no" accessibilityElementsHidden>
-          {kind.emoji}
-        </T>
+        <UiIcon name={kind.icon} size={18} color={colors.inkMuted} />
         <View style={{ flex: 1 }}>
           <T v="label" tint={done ? 'muted' : 'ink'} style={done && { textDecorationLine: 'line-through' }}>
             {title}
@@ -191,7 +188,7 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
         legend="Especie"
         value={species}
         onChange={setSpecies}
-        options={PET_SPECIES.map((sp) => ({ value: sp, label: `${PET_SPECIES_INFO[sp].emoji} ${PET_SPECIES_INFO[sp].label}`, a11yLabel: PET_SPECIES_INFO[sp].label }))}
+        options={PET_SPECIES.map((sp) => ({ value: sp, ...PET_SPECIES_INFO[sp] }))}
       />
       <Field label="Nota (opcional)" value={note} onChangeText={setNote} maxLength={300} placeholder="Raza, edad…" />
       <FormActions
@@ -230,7 +227,7 @@ function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare |
   };
   return (
     <ScrollView style={{ maxHeight: 620 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
-      <DotChoices legend="Tipo" value={kind} onChange={setKind} options={CARE_KINDS.map((k) => ({ value: k, label: `${CARE_KIND_INFO[k].emoji} ${CARE_KIND_INFO[k].label}`, a11yLabel: CARE_KIND_INFO[k].label }))} />
+      <DotChoices legend="Tipo" value={kind} onChange={setKind} options={CARE_KINDS.map((k) => ({ value: k, ...CARE_KIND_INFO[k] }))} />
       <Field label="Qué hay que hacer" value={title} onChangeText={setTitle} maxLength={120} placeholder={kind === 'comida' ? 'Darle de comer' : CARE_KIND_INFO[kind].label} />
       <TimeField label="Hora (opcional)" value={time} onChange={setTime} optional />
       <WeekdayPicker legend="Días" value={days} onChange={setDays} />

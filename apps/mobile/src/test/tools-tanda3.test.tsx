@@ -3,7 +3,7 @@ import { act, fireEvent, renderRouter, screen, waitFor, within } from 'expo-rout
 import * as SecureStore from 'expo-secure-store';
 import { auth } from '../lib/api';
 import { queryClient } from '../lib/queryClient';
-import { fakeModules, tokens, USER, type Handler } from './fakeApi';
+import { fakeModules, renderedText, tokens, USER, type Handler } from './fakeApi';
 
 // Herramientas de la tanda 3 en el móvil: Finanzas, Metas, Mascotas, Ciclo
 // (y sus marcas en el Calendario), Ejercicio, Sueño, Diario y Rutina, con el
@@ -269,7 +269,7 @@ describe('herramientas de la tanda 3 en el móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Recordarme el próximo periodo' }));
     const reminder = itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/reminders'));
     expect(reminder).toEqual({ ...periodReminder('x', addDays(local, 30)), id: expect.any(String) });
-    expect(reminder).toMatchObject({ title: '🩸 Posible inicio del periodo', color: '#EC6A9C', icon: 'doc', on: true });
+    expect(reminder).toMatchObject({ title: 'Posible inicio del periodo', color: '#EC6A9C', icon: 'doc', on: true });
 
     // Mostrar Ciclo: el mismo ajuste de la cuenta que la web (PATCH /api/v2/me).
     fireEvent(screen.getByRole('switch', { name: 'Mostrar Ciclo en el menú y en el Calendario' }), 'valueChange', true);
@@ -325,7 +325,7 @@ describe('herramientas de la tanda 3 en el móvil', () => {
     expect(await screen.findByText('Otra vez')).toBeOnTheScreen();
 
     fireEvent.press(screen.getByRole('button', { name: 'Agendar Full body en tu Rutina' }));
-    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/routines'))).toEqual({ id: expect.any(String), title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
+    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/routines'))).toEqual({ id: expect.any(String), title: 'Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
     expect(await screen.findByRole('button', { name: 'Ver rutina' })).toBeOnTheScreen();
 
     fireEvent.press(screen.getByRole('button', { name: 'Registrar entreno' }));
@@ -378,7 +378,10 @@ describe('herramientas de la tanda 3 en el móvil', () => {
   it('Diario: la entrada de hoy se crea con lo primero que eliges, luego se guarda sola; abrir y borrar otras', async () => {
     const api = setup();
     await open('/diario', 'Aún no hay entrada de este día: se crea con lo primero que escribas.');
-    expect(screen.getByLabelText('Ánimo más frecuente: genial: 😄')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Ánimo más frecuente: genial')).toBeOnTheScreen();
+    // Los ánimos se ven como iconos con su nombre; se sigue guardando el emoji.
+    expect(renderedText(screen.toJSON())).toContain('Cansancio');
+    expect(renderedText(screen.toJSON())).not.toMatch(/\p{Extended_Pictographic}/u);
 
     fireEvent.press(screen.getByRole('radio', { name: 'Genial' }));
     const created = itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/journal'));
@@ -395,6 +398,15 @@ describe('herramientas de la tanda 3 en el móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Borrar la entrada del 19 sept' }));
     await waitForWrite(api, 'DELETE', '/api/v2/modules/journal/j1');
     expect(await screen.findByText('Entrada del 19 sept eliminada.')).toBeOnTheScreen();
+  });
+
+  it('Rutina: los entrenos que la app anterior agendaba con emoji se ven sin él', async () => {
+    const doc = legacyDoc();
+    doc.routines = [{ id: 'rt9', title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true }];
+    setup({}, doc);
+    await open('/rutina', 'Entreno: Full body');
+    expect(screen.getByRole('switch', { name: 'Activa: «Entreno: Full body»' })).toBeOnTheScreen();
+    expect(renderedText(screen.toJSON())).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
   it('Rutina: agua de hoy desde cero, meta, rutinas por día y comidas', async () => {

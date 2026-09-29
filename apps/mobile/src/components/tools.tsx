@@ -5,15 +5,18 @@ import {
   daysLabel,
   HHMM_RE,
   monthLabel,
+  moodIcon,
   normalizeHHMM,
   shiftMonth,
   shortDay,
   toggleWeekday,
+  UNKNOWN_MOOD_ICON,
   WEEKDAY_LONG_NAMES,
   weekdayShort,
   WEEKDAYS,
   type Day,
   type LegacyCheckItem,
+  type UiIconName,
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter, type Href } from 'expo-router';
@@ -22,6 +25,7 @@ import { useState, type ReactNode, type Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '../lib/theme';
 import { Button, Card, Field, PageHeader, Screen, T, fonts } from './ui';
+import { UiIcon } from './UiIcon';
 
 // Piezas comunes de las herramientas de la app anterior en el móvil
 // (tanda 1: Agenda, Pendientes, Calendario, Horario y Enfoque; tanda 2:
@@ -253,7 +257,7 @@ export function DotChoices<V extends string>({
   hideLegend,
 }: {
   legend: string;
-  options: Array<{ value: V; label: string; color?: string; a11yLabel?: string }>;
+  options: Array<{ value: V; label: string; color?: string; a11yLabel?: string; icon?: UiIconName }>;
   value: V;
   onChange: (v: V) => void;
   hideLegend?: boolean;
@@ -276,6 +280,7 @@ export function DotChoices<V extends string>({
               style={[s.dotChip, { borderColor: on ? accent : colors.lineStrong, backgroundColor: on ? (o.color ? `${o.color}1F` : colors.primarySoft) : colors.surface }]}
             >
               {o.color && <Dot color={o.color} />}
+              {o.icon && <UiIcon name={o.icon} size={18} color={on ? colors.ink : colors.inkMuted} />}
               <T v="small" style={{ fontFamily: fonts.medium, color: on ? colors.ink : colors.inkMuted }}>
                 {o.label}
               </T>
@@ -288,15 +293,23 @@ export function DotChoices<V extends string>({
 }
 
 /** Cifras de cabecera en dos o tres columnas; `color` tiñe la cifra (ingresos, balance negativo). */
-export function Stats({ items }: { items: Array<{ value: string; label: string; color?: string }> }) {
+export function Stats({ items }: { items: Array<{ value: string; label: string; color?: string; icon?: UiIconName }> }) {
+  const { colors } = useTheme();
   return (
     <View style={s.stats}>
       {items.map((it) => (
         <Card key={it.label} style={[s.stat, items.length === 3 && { flexBasis: '28%', padding: space[3] }]}>
-          <View accessible accessibilityLabel={`${it.label}: ${it.value}`}>
-            <T v="title" style={[{ fontVariant: ['tabular-nums'] }, items.length === 3 && { fontSize: 24, lineHeight: 30 }, it.color ? { color: it.color } : null]}>
-              {it.value}
-            </T>
+          {/* Con icono (el ánimo más frecuente), la etiqueta ya lo nombra. */}
+          <View accessible accessibilityLabel={it.icon ? it.label : `${it.label}: ${it.value}`}>
+            {it.icon ? (
+              <View style={{ height: items.length === 3 ? 30 : 34, justifyContent: 'center' }}>
+                <UiIcon name={it.icon} size={26} color={it.color ?? colors.ink} />
+              </View>
+            ) : (
+              <T v="title" style={[{ fontVariant: ['tabular-nums'] }, items.length === 3 && { fontSize: 24, lineHeight: 30 }, it.color ? { color: it.color } : null]}>
+                {it.value}
+              </T>
+            )}
             <T v="small" tint="muted">
               {it.label}
             </T>
@@ -660,7 +673,7 @@ export function WeekdayPicker({ legend, value, onChange, hint }: { legend: strin
   );
 }
 
-/** Ánimo con emoji como fichas de una sola elección. Tocar el elegido lo quita (se guarda ""). */
+/** Ánimo como fichas de una sola elección: se guarda el emoji de siempre y se dibuja su icono. Tocar el elegido lo quita (se guarda ""). */
 export function MoodPicker({ legend, moods, value, onChange, hideLegend }: { legend: string; moods: ReadonlyArray<{ emoji: string; label: string }>; value: string; onChange: (mood: string) => void; hideLegend?: boolean }) {
   const { colors } = useTheme();
   const known = moods.some((m) => m.emoji === value);
@@ -680,9 +693,7 @@ export function MoodPicker({ legend, moods, value, onChange, hideLegend }: { leg
               onPress={() => onChange(on ? '' : m.emoji)}
               style={[s.dotChip, { borderColor: on ? colors.primary : colors.lineStrong, backgroundColor: on ? colors.primarySoft : colors.surface }]}
             >
-              <T v="body" style={{ fontSize: 18 }} importantForAccessibility="no">
-                {m.emoji}
-              </T>
+              <UiIcon name={moodIcon(m.emoji)?.icon ?? UNKNOWN_MOOD_ICON.icon} size={20} color={on ? colors.ink : colors.inkMuted} />
               <T v="small" style={{ fontFamily: fonts.medium, color: on ? colors.ink : colors.inkMuted }}>
                 {m.label}
               </T>

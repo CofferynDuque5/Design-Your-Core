@@ -4,12 +4,14 @@ import {
   calendarMarks,
   COLOR_NAMES,
   describeCalendarDay,
+  displayTitle,
   isoWeekday,
   addDays,
   legacyList,
   longDay,
   looseList,
   monthLabel,
+  moodIcon,
   PERIOD_FLOW_INFO,
   REMINDER_COLORS,
   daysInMonth,
@@ -31,6 +33,7 @@ import { PageHeader } from '../components/AppShell';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
 import { ErrorState, Loading } from '../components/States';
+import { UiIcon } from '../components/UiIcon';
 import { localDayKey } from '../lib/tools';
 
 // Marcas de solo lectura que vienen de otras secciones de la app anterior (textos y cálculo en @dyc/core).
@@ -203,28 +206,31 @@ function DayPanel({
         <p className="muted">Nada este día.</p>
       ) : (
         <ul className="day-items">
-          {events.map((r) => (
-            <li key={r.id} className={`day-item${r.on === false ? ' day-item--off' : ''}`}>
-              <span className="swatch-dot" style={{ ['--c' as string]: r.color }} aria-hidden="true" />
-              <span className="day-item__text">
-                <strong>{r.title}</strong>
-                <span className="muted small">
-                  {r.when ? `${r.when} · ` : ''}día {r.day} de cada mes{r.on === false ? ' · desactivado' : ''}
+          {events.map((r) => {
+            const title = displayTitle(r.title);
+            return (
+              <li key={r.id} className={`day-item${r.on === false ? ' day-item--off' : ''}`}>
+                <span className="swatch-dot" style={{ ['--c' as string]: r.color }} aria-hidden="true" />
+                <span className="day-item__text">
+                  <strong>{title}</strong>
+                  <span className="muted small">
+                    {r.when ? `${r.when} · ` : ''}día {r.day} de cada mes{r.on === false ? ' · desactivado' : ''}
+                  </span>
                 </span>
-              </span>
-              <label className="switch">
-                <input type="checkbox" role="switch" checked={r.on !== false} onChange={() => actions.update(r.id, { on: r.on === false })} />
-                <span aria-hidden="true" />
-                <span className="visually-hidden">Activo: «{r.title}»</span>
-              </label>
-              <button type="button" className="icon-btn" onClick={() => onEdit(r)} aria-label={`Editar «${r.title}»`}>
-                <Pencil size={18} aria-hidden="true" />
-              </button>
-              <button type="button" className="icon-btn" onClick={() => actions.remove(r.id)} aria-label={`Borrar «${r.title}»`}>
-                <Trash2 size={18} aria-hidden="true" />
-              </button>
-            </li>
-          ))}
+                <label className="switch">
+                  <input type="checkbox" role="switch" checked={r.on !== false} onChange={() => actions.update(r.id, { on: r.on === false })} />
+                  <span aria-hidden="true" />
+                  <span className="visually-hidden">Activo: «{title}»</span>
+                </label>
+                <button type="button" className="icon-btn" onClick={() => onEdit(r)} aria-label={`Editar «${title}»`}>
+                  <Pencil size={18} aria-hidden="true" />
+                </button>
+                <button type="button" className="icon-btn" onClick={() => actions.remove(r.id)} aria-label={`Borrar «${title}»`}>
+                  <Trash2 size={18} aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
           {workouts.map((w, i) => (
             <li key={`w${i}`} className="day-item">
               <span className="mark mark--workout" aria-hidden="true" />
@@ -269,7 +275,10 @@ function DayPanel({
             <li key={`j${i}`} className="day-item">
               <span className="mark mark--journal" aria-hidden="true" />
               <span className="day-item__text">
-                <strong>Diario {typeof j.mood === 'string' ? j.mood : ''}</strong>
+                <strong className="day-item__title">
+                  Diario
+                  <JournalMood mood={j.mood} />
+                </strong>
                 {typeof j.note === 'string' && j.note && <span className="muted small clamp-2">{j.note}</span>}
               </span>
             </li>
@@ -280,9 +289,21 @@ function DayPanel({
   );
 }
 
+/** Ánimo de una entrada del Diario: su icono y, para lectores de pantalla, su nombre. */
+function JournalMood({ mood }: { mood: unknown }) {
+  const m = moodIcon(mood);
+  if (!m) return null;
+  return (
+    <>
+      <UiIcon name={m.icon} size={16} className="day-item__mood" />
+      <span className="visually-hidden">, ánimo {m.label.toLowerCase()}</span>
+    </>
+  );
+}
+
 function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder | null; day: number; onDone: () => void }) {
   const actions = useModule('reminders');
-  const [title, setTitle] = useState(event?.title ?? '');
+  const [title, setTitle] = useState(displayTitle(event?.title));
   const [when, setWhen] = useState(event?.when ?? '');
   const [day, setDay] = useState(event?.day ?? initialDay);
   const [color, setColor] = useState<string>(event?.color && (REMINDER_COLORS as readonly string[]).includes(event.color) ? event.color : REMINDER_COLORS[0]);

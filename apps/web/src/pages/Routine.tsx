@@ -1,4 +1,4 @@
-import { byTime, daysLabel, MEAL_LABELS, onWeekday, ROUTINE_DAY_FILTERS as DAY_FILTERS, utcDayKey, waterToday, WATER_GOAL_DEFAULT, weekdaysOf as validDays, type LegacyMeal, type LegacyRoutine } from '@dyc/core';
+import { byTime, daysLabel, displayTitle, MEAL_LABELS, onWeekday, ROUTINE_DAY_FILTERS as DAY_FILTERS, utcDayKey, waterToday, WATER_GOAL_DEFAULT, weekdaysOf as validDays, type LegacyMeal, type LegacyRoutine } from '@dyc/core';
 import { GlassWater, Minus, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../app/legacy';
@@ -110,7 +110,7 @@ export function Routine() {
 
 function RoutineRow({ routine: r, onEdit }: { routine: LegacyRoutine; onEdit: () => void }) {
   const actions = useModule('routines');
-  const title = r.title || 'Sin título';
+  const title = displayTitle(r.title) || 'Sin título';
   const off = r.enabled === false;
   return (
     <li className={`routine-row${off ? ' routine-row--off' : ''}`}>
@@ -191,7 +191,7 @@ function MealRow({ meal: m, onEdit }: { meal: LegacyMeal; onEdit: () => void }) 
 
 function RoutineForm({ routine, day, onDone }: { routine: LegacyRoutine | null; day: number; onDone: () => void }) {
   const actions = useModule('routines');
-  const [title, setTitle] = useState(routine?.title ?? '');
+  const [title, setTitle] = useState(displayTitle(routine?.title));
   const [time, setTime] = useState(routine?.time ?? '08:00');
   // Una rutina nueva desde un día concreto empieza en todos los días (como la app anterior).
   const [days, setDays] = useState(validDays(routine?.days));
@@ -220,7 +220,7 @@ function RoutineForm({ routine, day, onDone }: { routine: LegacyRoutine | null; 
               }
             : undefined
         }
-        confirm={`Se borrará «${routine?.title || 'esta rutina'}».`}
+        confirm={`Se borrará «${displayTitle(routine?.title) || 'esta rutina'}».`}
       />
     </form>
   );

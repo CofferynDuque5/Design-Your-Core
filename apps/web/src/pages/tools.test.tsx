@@ -221,6 +221,28 @@ describe('Calendario', () => {
   });
 });
 
+describe('Títulos y ánimo guardados con emoji por la app anterior', () => {
+  it('el Calendario los muestra sin emoji y con el icono del ánimo', async () => {
+    withApi({}, (doc) => {
+      (doc.reminders as unknown[]).push({ id: 'r2', day: 14, title: '🩸 Posible inicio del periodo', when: 'octubre', color: '#EC6A9C', icon: 'doc', on: true });
+    });
+    const { container } = renderAt('/calendario');
+    await userEvent.click(await screen.findByRole('button', { name: / 14 de .*: 2 eventos/ }));
+    expect(screen.getByText('Posible inicio del periodo')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Activo: «Posible inicio del periodo»' })).toBeInTheDocument();
+    expect(container.querySelector('.day-items')?.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  it('la Rutina quita el emoji de los entrenos agendados antes', async () => {
+    withApi({}, (doc) => {
+      (doc.routines as unknown[]).push({ id: 'rt2', title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
+    });
+    renderAt('/rutina');
+    expect(await screen.findByText('Entreno: Full body')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Editar «Entreno: Full body»' })).toBeInTheDocument();
+  });
+});
+
 describe('Horario', () => {
   it('muestra la próxima clase y crea una desde una materia', async () => {
     const api = withApi();
@@ -521,12 +543,47 @@ describe('Cuadernos', () => {
     expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/noteBoxes/bx1', body: { text: "f(g(x))' = f'(g(x))·g'(x) ✓" } });
   });
 
+  it('dibuja una portada según la materia y guarda el emoji de siempre aunque se elija un icono', async () => {
+    const api = withApi({}, (doc) => {
+      // Uno guardado por la app anterior con un emoji que no está en la lista.
+      (doc.notebooks as unknown[]).push({ id: 'nb3', title: 'Varios', category: 'General', subject: '', topic: '', color: '#8B5CF6', emoji: '🦄' });
+    });
+    const { container } = renderAt('/cuadernos');
+    await screen.findByRole('link', { name: /Recetas/ });
+    // Cálculo → matemáticas; «Recetas» sin materia → cocina por el título; el resto, abstracta.
+    expect([...container.querySelectorAll('.notebook-cover')].map((c) => c.getAttribute('data-cover'))).toEqual(['math', 'cooking', 'abstract']);
+    for (const cover of container.querySelectorAll('.notebook-cover')) expect(cover).toHaveAttribute('aria-hidden', 'true');
+    // Ningún emoji a la vista: ni el de la lista ni el desconocido.
+    expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nuevo cuaderno' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo cuaderno' });
+    expect(within(dialog).getByRole('radio', { name: 'Cuaderno' })).toBeChecked();
+    await userEvent.type(within(dialog).getByLabelText('Título'), 'Laboratorio');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Microscopio' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear cuaderno' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/notebooks', body: { item: { title: 'Laboratorio', emoji: '🔬' } } });
+    expect(dialog.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  it('conserva el emoji desconocido de la app anterior como «Otro icono»', async () => {
+    const api = withApi({}, (doc) => {
+      (doc.notebooks as Array<Record<string, unknown>>)[0].emoji = '🦄';
+    });
+    renderAt('/cuadernos/nb1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Decorar' }));
+    const dialog = screen.getByRole('dialog', { name: 'Decorar cuaderno' });
+    expect(within(dialog).getByRole('radio', { name: 'Otro icono' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/notebooks/nb1', body: { emoji: '🦄' } });
+  });
+
   it('borrar un cuaderno borra sus cajitas y vuelve a la lista', async () => {
     const api = withApi();
     renderAt('/cuadernos/nb1');
     await userEvent.click(await screen.findByRole('button', { name: 'Decorar' }));
     const dialog = screen.getByRole('dialog', { name: 'Decorar cuaderno' });
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'Icono 📐' }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Escuadra' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Borrar' }));
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Se borrará «Apuntes de cálculo» con 2 cajitas.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Borrar definitivamente' }));
@@ -721,7 +778,8 @@ describe('Mascotas', () => {
 
     await userEvent.click(within(card).getByRole('button', { name: /Añadir cuidado/ }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo cuidado de Luna' });
-    await userEvent.selectOptions(within(dialog).getByLabelText('Tipo'), 'paseo');
+    expect(within(dialog).getByRole('radio', { name: 'Comida' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Paseo' }));
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'sábado' }));
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'domingo' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir cuidado' }));
@@ -733,6 +791,9 @@ describe('Mascotas', () => {
 
     await userEvent.click(within(card).getByRole('button', { name: 'Editar a Luna' }));
     const edit = screen.getByRole('dialog', { name: 'Editar mascota' });
+    // La especie se elige con fichas de icono y nombre (se guarda la clave, `cat`).
+    expect(within(edit).getByRole('radio', { name: 'Gato' })).toBeChecked();
+    expect(document.body.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     await userEvent.click(within(edit).getByRole('button', { name: 'Borrar' }));
     expect(within(edit).getByRole('alert')).toHaveTextContent('Se borrará a Luna con 2 cuidados.');
     await userEvent.click(within(edit).getByRole('button', { name: 'Borrar definitivamente' }));
@@ -769,7 +830,7 @@ describe('Ciclo', () => {
 
     await userEvent.click(within(settings).getByRole('button', { name: 'Recordarme el próximo periodo' }));
     const next = addDays(today, 30);
-    expect(writes(api)[5]).toMatchObject({ method: 'POST', path: '/api/v2/modules/reminders', body: { item: { day: Number(next.slice(8)), title: '🩸 Posible inicio del periodo', color: '#EC6A9C', on: true } } });
+    expect(writes(api)[5]).toMatchObject({ method: 'POST', path: '/api/v2/modules/reminders', body: { item: { day: Number(next.slice(8)), title: 'Posible inicio del periodo', color: '#EC6A9C', on: true } } });
   });
 
   it('se muestra u oculta en el menú con el ajuste de la cuenta', async () => {
@@ -813,7 +874,7 @@ describe('Ejercicio', () => {
     const week = screen.getByText(/Entrenos? esta semana/).previousElementSibling;
     await waitFor(() => expect(week).toHaveTextContent(/[1-9]/));
     await userEvent.click(screen.getByRole('button', { name: 'Agendar Full body en tu Rutina' }));
-    expect(writes(api)[1]).toMatchObject({ method: 'POST', path: '/api/v2/modules/routines', body: { item: { title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', enabled: true } } });
+    expect(writes(api)[1]).toMatchObject({ method: 'POST', path: '/api/v2/modules/routines', body: { item: { title: 'Entreno: Full body', time: '18:00', days: '1234567', enabled: true } } });
 
     await userEvent.click(screen.getByRole('button', { name: /Editar Core express del/ }));
     const dialog = screen.getByRole('dialog', { name: 'Editar entreno' });
@@ -849,7 +910,12 @@ describe('Diario', () => {
     const api = withApi();
     renderAt('/diario');
     expect(await screen.findByText(/se crea con lo primero que escribas/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('radio', { name: /Genial/ }));
+    // Seis ánimos con icono y nombre; se sigue guardando el emoji de la app anterior.
+    const moods = within(screen.getByRole('group', { name: '¿Cómo te sientes?' })).getAllByRole('radio');
+    expect(moods.map((r) => r.closest('label')?.textContent)).toEqual(['Genial', 'Bien', 'Normal', 'Bajo', 'Mal', 'Cansancio']);
+    expect(screen.getByText('Ánimo más frecuente: bien')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+    await userEvent.click(screen.getByRole('radio', { name: 'Genial' }));
     expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/journal', body: { item: { date: utcDayKey(), mood: '😄', gratitude: '', note: '' } } });
     const id = (writes(api)[0].body as { item: { id: string } }).item.id;
     await userEvent.type(screen.getByLabelText('Hoy agradezco…'), 'El sol');

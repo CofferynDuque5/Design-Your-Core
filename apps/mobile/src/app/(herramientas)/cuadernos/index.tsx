@@ -1,12 +1,13 @@
-import { legacySubjectNames, NOTEBOOK_COLORS, plural, safeColor, uniqueTexts, type LegacyNotebook } from '@dyc/core';
+import { legacySubjectNames, plural, uniqueTexts, type LegacyNotebook } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter, type Href } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { NotebookCover } from '../../../components/NotebookCover';
 import { NotebookForm, NotebookTags } from '../../../components/notebooks';
 import { Sheet } from '../../../components/Sheet';
-import { tint, ToolScreen } from '../../../components/tools';
+import { ToolScreen } from '../../../components/tools';
 import { Button, EmptyState, ErrorState, Loading, T, fonts } from '../../../components/ui';
 import { useLegacyData, useLegacyList } from '../../../lib/legacy';
 import { useTheme } from '../../../lib/theme';
@@ -143,8 +144,7 @@ function FilterRow({ legend, all, values, value, onChange }: { legend: string; a
 
 function NotebookCard({ notebook: n, count }: { notebook: LegacyNotebook; count: number }) {
   const router = useRouter();
-  const { colors, name } = useTheme();
-  const color = safeColor(n.color, NOTEBOOK_COLORS[0]);
+  const { colors } = useTheme();
   const title = n.title || 'Cuaderno';
   const tags = [n.category || 'General', n.subject, n.topic].filter(Boolean).join(', ');
   return (
@@ -155,11 +155,7 @@ function NotebookCard({ notebook: n, count }: { notebook: LegacyNotebook; count:
       onPress={() => router.push(`/cuadernos/${encodeURIComponent(n.id)}` as Href)}
       style={({ pressed }) => [st.card, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.8 : 1 }]}
     >
-      <View style={[st.cover, { backgroundColor: tint(color, colors.surface, name === 'dark' ? 0.32 : 0.2), borderBottomColor: color }]}>
-        <T v="title" style={{ fontSize: 34, lineHeight: 42 }}>
-          {n.emoji || '📓'}
-        </T>
-      </View>
+      <NotebookCover notebook={n} variant="card" />
       <View style={{ padding: space[3], gap: space[2], flex: 1 }}>
         <T v="label" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
           {title}
@@ -177,5 +173,4 @@ const st = StyleSheet.create({
   filter: { minHeight: touchTarget - 4, justifyContent: 'center', paddingHorizontal: space[3], borderRadius: radius.pill, borderWidth: 1 },
   row: { flexDirection: 'row', gap: space[3] },
   card: { flex: 1, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  cover: { height: 84, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3 },
 });

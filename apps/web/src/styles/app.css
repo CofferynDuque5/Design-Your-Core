@@ -1916,6 +1916,16 @@
     color: var(--color-ink-muted);
   }
 
+  .day-item__title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .day-item__mood {
+    color: var(--color-ink-muted);
+  }
+
   .day-items .mark {
     width: 12px;
     height: 12px;
@@ -2708,20 +2718,66 @@
     outline-offset: 2px;
   }
 
-  /* Portada con el lomo del cuaderno */
-  .notebook-card__cover,
-  .notebook-hero__emoji {
-    display: grid;
-    place-items: center;
-    background:
-      linear-gradient(90deg, rgb(0 0 0 / 0.18) 0 10px, transparent 10px 14px),
-      linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 78%, #fff));
-    font-size: 2.25rem;
-    line-height: 1;
+  /* Portada del cuaderno: dibujo de la materia sobre su color, con lomo e insignia (NotebookCover). */
+  .notebook-cover {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    background: var(--color-surface-sunken);
   }
 
-  .notebook-card__cover {
-    height: 88px;
+  .notebook-cover svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transition: transform var(--duration-base) var(--ease-standard);
+  }
+
+  .notebook-cover--card {
+    aspect-ratio: 32 / 15;
+  }
+
+  .notebook-card:hover .notebook-cover svg {
+    transform: scale(1.03);
+  }
+
+  .notebook-cover__badge {
+    position: absolute;
+    bottom: 10px;
+    left: calc(var(--cover-spine) + 10px);
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--cover-badge);
+    color: var(--cover-ink);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+  }
+
+  .notebook-cover--hero {
+    flex: none;
+    width: 96px;
+    aspect-ratio: 3 / 4;
+    border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+    box-shadow: var(--shadow-md);
+  }
+
+  .notebook-cover--hero .notebook-cover__badge {
+    bottom: 8px;
+    left: calc(var(--cover-spine) + 8px);
+    width: 26px;
+    height: 26px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .notebook-cover svg {
+      transition: none;
+    }
+
+    .notebook-card:hover .notebook-cover svg {
+      transform: none;
+    }
   }
 
   .notebook-card__body {
@@ -2770,14 +2826,6 @@
     align-items: center;
     gap: var(--space-4);
     margin-bottom: var(--space-8);
-  }
-
-  .notebook-hero__emoji {
-    width: 72px;
-    height: 88px;
-    padding-left: 10px;
-    border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
-    box-shadow: var(--shadow-sm);
   }
 
   .notebook-hero__text {
@@ -3042,13 +3090,13 @@
     tab-size: 2;
   }
 
-  .emoji-picker {
+  .icon-picker {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1);
   }
 
-  .emoji-option {
+  .icon-option {
     position: relative;
     display: grid;
     place-items: center;
@@ -3056,11 +3104,16 @@
     height: 44px;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-md);
-    font-size: 1.35rem;
+    color: var(--color-ink-muted);
     cursor: pointer;
   }
 
-  .emoji-option input {
+  .icon-option:hover {
+    border-color: var(--color-line-strong);
+    color: var(--color-ink);
+  }
+
+  .icon-option input {
     position: absolute;
     inset: 0;
     margin: 0;
@@ -3068,13 +3121,14 @@
     cursor: pointer;
   }
 
-  .emoji-option:has(input:checked) {
+  .icon-option:has(input:checked) {
     border-color: var(--color-ink);
     background: var(--color-surface-sunken);
     box-shadow: inset 0 0 0 1px var(--color-ink);
+    color: var(--color-ink);
   }
 
-  .emoji-option:has(input:focus-visible) {
+  .icon-option:has(input:focus-visible) {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
@@ -3687,7 +3741,7 @@
     margin-top: 2px;
   }
 
-  /* Ánimo con emoji */
+  /* Ánimo: icono de línea con su nombre (se guarda el emoji de siempre) */
   .mood-picker {
     display: flex;
     flex-wrap: wrap;
@@ -3705,9 +3759,13 @@
     border: 1px solid var(--color-line);
     border-radius: var(--radius-md);
     background: var(--color-surface);
-    font-size: 1.5rem;
+    color: var(--color-ink-muted);
     line-height: 1.1;
     cursor: pointer;
+  }
+
+  .mood-option__icon {
+    margin-block: 2px;
   }
 
   .mood-option input {
@@ -3730,6 +3788,53 @@
   .mood-option:has(input:checked) {
     border-color: var(--color-primary);
     background: var(--color-primary-soft);
+    color: var(--color-ink);
+  }
+
+  /* Fichas con icono (especie, tipo de cuidado) */
+  .icon-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .icon-choice {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--color-ink-muted);
+    font-size: var(--text-small);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+  }
+
+  .icon-choice input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .icon-choice:hover {
+    border-color: var(--color-line-strong);
+  }
+
+  .icon-choice:has(input:checked) {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    color: var(--color-ink);
+  }
+
+  .icon-choice:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
 
   .mood-option:has(input:checked) .mood-option__label {
@@ -3896,7 +4001,7 @@
     flex: none;
     border-radius: 50%;
     background: color-mix(in srgb, var(--c) 16%, var(--color-surface));
-    font-size: 1.75rem;
+    color: color-mix(in srgb, var(--c) 65%, var(--color-ink));
   }
 
   .care-list {
@@ -3924,8 +4029,10 @@
     accent-color: var(--color-success);
   }
 
-  .care-row__emoji {
-    font-size: 1.25rem;
+  .care-row__icon {
+    display: grid;
+    place-items: center;
+    color: var(--color-ink-muted);
   }
 
   .care-row__text {
@@ -4150,12 +4257,6 @@
     font-weight: var(--weight-semibold);
   }
 
-  /* Emoji siempre en color: sin esto, en algunos sistemas la fuente de reserva los dibuja en blanco y negro. */
-  .emoji {
-    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
-    font-variant-emoji: emoji;
-  }
-
   /* Diario */
   .journal-layout {
     display: grid;
@@ -4222,10 +4323,19 @@
   }
 
   .journal-list__mood {
-    width: 1.75rem;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
     flex: none;
-    font-size: 1.375rem;
-    text-align: center;
+    border-radius: 50%;
+    background: var(--color-surface-sunken);
+    color: var(--color-ink-muted);
+  }
+
+  .stat__icon {
+    display: block;
+    color: var(--color-ink);
   }
 
   /* Rutina */

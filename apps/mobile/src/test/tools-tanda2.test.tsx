@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Image, Share } from 'react-native';
 import { auth } from '../lib/api';
 import { queryClient } from '../lib/queryClient';
-import { fakeModules, tokens, type Handler } from './fakeApi';
+import { fakeModules, renderedText, tokens, type Handler } from './fakeApi';
 
 // Herramientas de la tanda 2 en el móvil: Materias, Proyectos, Roadmaps,
 // Cuadernos (lista y cuaderno), Contenido e Ideas, con el enrutador real y
@@ -259,6 +259,10 @@ describe('herramientas de la tanda 2 en el móvil', () => {
   it('Cuadernos: filtros en cascada, abrir un cuaderno y crear otro con sugerencias', async () => {
     const api = setup();
     await open('/cuadernos', 'Recetas');
+    // Portadas según la materia (Cálculo) o el título (Recetas), sin emojis a la vista.
+    expect(screen.getByTestId('notebook-cover-math', { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(screen.getByTestId('notebook-cover-cooking', { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(renderedText(screen.toJSON())).not.toMatch(/\p{Extended_Pictographic}/u);
     fireEvent.press(screen.getByRole('radio', { name: 'Categoría: Universidad' }));
     await waitFor(() => expect(screen.queryByText('Recetas')).toBeNull());
     expect(screen.getByRole('radio', { name: 'Materia: Cálculo' })).toBeOnTheScreen();
@@ -267,7 +271,9 @@ describe('herramientas de la tanda 2 en el móvil', () => {
 
     fireEvent.press(screen.getByRole('button', { name: 'Nuevo cuaderno' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Materia: usar «Cálculo»' }));
-    fireEvent.press(screen.getByRole('radio', { name: 'Icono 🧠' }));
+    expect(screen.getByRole('radio', { name: 'Cuaderno' })).toBeChecked();
+    fireEvent.press(screen.getByRole('radio', { name: 'Cerebro' }));
+    expect(renderedText(screen.toJSON())).not.toMatch(/\p{Extended_Pictographic}/u);
     fireEvent.press(screen.getByRole('radio', { name: 'Verde' }));
     fireEvent.press(screen.getByRole('button', { name: 'Crear cuaderno' }));
     // Sin título es «Cuaderno» y sin cambiar la categoría, «General», como la app anterior.

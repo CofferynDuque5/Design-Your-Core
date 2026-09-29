@@ -239,8 +239,8 @@ describe('herramientas compartidas', () => {
     expect(monthEnd('2026-02-01')).toBe('2026-02-28');
     expect(monthEnd('2028-02-10')).toBe('2028-02-29');
     expect(monthEnd('2026-09-15')).toBe('2026-09-30');
-    expect(periodReminder('r1', '2026-10-24')).toEqual({ id: 'r1', day: 24, title: '🩸 Posible inicio del periodo', when: 'octubre', color: '#EC6A9C', icon: 'doc', on: true });
-    expect(workoutRoutine('o1', 'Full body')).toEqual({ id: 'o1', title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
+    expect(periodReminder('r1', '2026-10-24')).toEqual({ id: 'r1', day: 24, title: 'Posible inicio del periodo', when: 'octubre', color: '#EC6A9C', icon: 'doc', on: true });
+    expect(workoutRoutine('o1', 'Full body')).toEqual({ id: 'o1', title: 'Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true });
     expect(sleepQualityLabel(4)).toBe('Buena (4/5)');
     expect(sleepQualityLabel(0)).toBe('Sin calidad');
     expect(sleepQualityLabel('5')).toBe('Sin calidad');

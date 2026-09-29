@@ -1,4 +1,4 @@
-import { byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, shortDay, utcDayKey, type Day, type LegacyJournal } from '@dyc/core';
+import { byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, moodIcon, shortDay, utcDayKey, type Day, type LegacyJournal } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { Trash2 } from 'lucide-react-native';
 import { Fragment, useMemo, useRef, useState } from 'react';
@@ -8,6 +8,7 @@ import { Card, ErrorState, Field, Loading, SectionHeader, T } from '../../compon
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
+import { UiIcon } from '../../components/UiIcon';
 import { useAutosave } from '../../lib/tools';
 
 const HISTORY_MAX = 60;
@@ -69,7 +70,7 @@ export default function Journal() {
             items={[
               { value: String(stats.month), label: stats.month === 1 ? 'Entrada este mes' : 'Entradas este mes' },
               { value: String(stats.streak), label: stats.streak === 1 ? 'Día seguido' : 'Días seguidos' },
-              { value: stats.top ?? '—', label: stats.topLabel ? `Ánimo más frecuente: ${stats.topLabel.toLowerCase()}` : 'Ánimo más frecuente' },
+              { value: '—', icon: moodIcon(stats.top)?.icon, label: stats.topLabel ? `Ánimo más frecuente: ${stats.topLabel.toLowerCase()}` : 'Ánimo más frecuente' },
             ]}
           />
           <Editor key={date} date={date} today={today} entry={entry} onSave={save} onDate={setDate} />
@@ -82,7 +83,7 @@ export default function Journal() {
             ) : (
               <Card style={{ paddingVertical: space[1], gap: 0 }}>
                 {entries.slice(0, HISTORY_MAX).map((j, i) => {
-                  const mood = JOURNAL_MOODS.find((m) => m.emoji === j.mood);
+                  const mood = moodIcon(j.mood);
                   const text = j.note?.trim() || j.gratitude?.trim() || 'Sin texto';
                   const on = j.date === date;
                   return (
@@ -97,9 +98,13 @@ export default function Journal() {
                           style={({ pressed }) => [st.rowHit, pressed && { opacity: 0.7 }]}
                         >
                           <View style={[st.mood, { backgroundColor: colors.surfaceSunken }]}>
-                            <T v="body" style={{ fontSize: 20 }}>
-                              {j.mood || '·'}
-                            </T>
+                            {mood ? (
+                              <UiIcon name={mood.icon} size={20} color={colors.inkMuted} />
+                            ) : (
+                              <T v="body" tint="muted">
+                                ·
+                              </T>
+                            )}
                           </View>
                           <View style={{ flex: 1 }}>
                             <T v="label">

@@ -1,6 +1,7 @@
 import {
   byTime,
   daysLabel,
+  displayTitle,
   HHMM_RE,
   isoDay,
   localTime,
@@ -142,7 +143,7 @@ export default function Routine() {
 function RoutineRow({ routine: r, onEdit }: { routine: LegacyRoutine; onEdit: () => void }) {
   const { colors } = useTheme();
   const actions = useModule('routines');
-  const title = r.title || 'Sin título';
+  const title = displayTitle(r.title) || 'Sin título';
   const off = r.enabled === false;
   return (
     <View style={[st.row, off && { opacity: 0.6 }]}>
@@ -242,7 +243,7 @@ function MealRow({ meal: m, onEdit }: { meal: LegacyMeal; onEdit: () => void }) 
 
 function RoutineForm({ routine, day, onDone }: { routine: LegacyRoutine | null; day: number; onDone: () => void }) {
   const actions = useModule('routines');
-  const [title, setTitle] = useState(routine?.title ?? '');
+  const [title, setTitle] = useState(displayTitle(routine?.title));
   const [time, setTime] = useState(routine?.time ?? '08:00');
   // Una rutina nueva desde un día concreto empieza en todos los días (como la app anterior).
   const [days, setDays] = useState(weekdaysOf(routine?.days));
@@ -272,7 +273,7 @@ function RoutineForm({ routine, day, onDone }: { routine: LegacyRoutine | null; 
               }
             : undefined
         }
-        confirm={`Se borrará «${routine?.title || 'esta rutina'}».`}
+        confirm={`Se borrará «${displayTitle(routine?.title) || 'esta rutina'}».`}
       />
     </ScrollView>
   );

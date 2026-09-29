@@ -58,6 +58,8 @@ La validación está en `@dyc/core` (`packages/core/src/legacy.ts`) y reproduce 
 | `workItems` | `title`, `project` `p1`\|`p2`\|`p3` (los tres proyectos fijos de la app anterior), `status` `todo`\|`curso`, `done`, `due` (texto libre) |
 | `meditations` | `date` (UTC), `minutes` entero 0–1440, `kind` (por defecto `respiracion`) |
 
+**Emojis guardados, iconos en pantalla.** `notebooks.emoji`, `journal.mood` y `period.mood` siguen guardando el emoji de la app anterior (📓, 😄…), pero la app nueva no los muestra: los dibuja con un icono de línea (Lucide) y un nombre en español (`moodIcon`, `notebookIcon` y `notebookIconOptions` en `packages/core/src/icons.ts`); un emoji que no conoce se ve con un icono genérico. Especies y cuidados guardan su clave (`dog`, `comida`) y se dibujan con el icono de `PET_SPECIES_INFO` y `CARE_KIND_INFO`. Los títulos que la app generaba con un emoji delante («🩸 Posible inicio del periodo», «🏋️ Entreno: …») ya se crean sin él y los antiguos se muestran sin él (`displayTitle`); el emoji que escribe la persona no se toca. La portada de cada cuaderno se dibuja según su materia (`notebookCoverArt` en `packages/core/src/covers.ts`) y no se guarda.
+
 `days` es el texto de la app anterior con los días en que toca: `"1234567"`, con **1 = lunes** y 7 = domingo, cada día una sola vez y al menos uno.
 
 | Objeto | Campos |

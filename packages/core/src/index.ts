@@ -2,6 +2,8 @@ export * from './challenges.js';
 export * from './checkin.js';
 export * from './dates.js';
 export * from './format.js';
+export * from './icons.js';
+export * from './covers.js';
 export * from './legacy.js';
 export * from './markdown.js';
 export * from './pillars.js';

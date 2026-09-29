@@ -375,8 +375,10 @@ test('cuadernos: cuaderno, cajitas de texto y de código con su lenguaje, y borr
   await dialog.getByLabel('Título').fill('Cálculo');
   await dialog.getByLabel('Categoría').fill('Universidad');
   await dialog.getByLabel('Tema (opcional)').fill('Derivadas');
-  await dialog.getByRole('radio', { name: 'Icono 🧮' }).check();
+  await dialog.getByRole('radio', { name: 'Calculadora' }).check();
   await dialog.getByRole('button', { name: 'Crear cuaderno' }).click();
+  // Se elige un icono, pero se guarda el emoji que entiende la app anterior.
+  await expect.poll(async () => ((await readLegacy(page)).notebooks as Array<{ title: string; emoji: string }>).find((n) => n.title === 'Cálculo')?.emoji).toBe('🧮');
 
   await page.getByLabel('Categoría').selectOption('Universidad');
   await expect(page.getByRole('link', { name: /Recetas/ })).toHaveCount(0);
@@ -548,7 +550,7 @@ test('mascotas y rutina: cuidados por días, borrado en cascada, agua y comidas'
   await expect(luna.getByRole('checkbox', { name: 'Hecho hoy: «Darle de comer» de Luna' })).toBeChecked();
   await luna.getByRole('button', { name: /Añadir cuidado/ }).click();
   let dialog = page.getByRole('dialog', { name: 'Nuevo cuidado de Luna' });
-  await dialog.getByLabel('Tipo').selectOption('paseo');
+  await dialog.getByRole('radio', { name: 'Paseo' }).check();
   await dialog.getByLabel('Hora (opcional)').fill('19:00');
   for (const d of ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']) await dialog.getByRole('checkbox', { name: d }).uncheck();
   await expect(dialog.getByText('Fines de semana')).toBeVisible();
@@ -556,7 +558,7 @@ test('mascotas y rutina: cuidados por días, borrado en cascada, agua y comidas'
   await page.getByRole('button', { name: 'Nueva mascota' }).click();
   dialog = page.getByRole('dialog', { name: 'Nueva mascota' });
   await dialog.getByLabel('Nombre').fill('Toby');
-  await dialog.getByLabel('Especie').selectOption('dog');
+  await dialog.getByRole('radio', { name: 'Perro' }).check();
   await dialog.getByRole('button', { name: 'Añadir mascota' }).click();
   await expect
     .poll(async () => (await readLegacy(page)).petCares)
@@ -674,7 +676,7 @@ test('ejercicio, sueño y diario: registrar, editar y guardar al escribir', asyn
     { id: expect.any(String), date: today, plan: 'Full body', minutes: 30 },
     { id: 'w_viejo', date: '2026-01-10', plan: 'Correr', minutes: 45 },
   ]);
-  expect(doc.routines).toEqual([{ id: expect.any(String), title: '🏋️ Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true }]);
+  expect(doc.routines).toEqual([{ id: expect.any(String), title: 'Entreno: Full body', time: '18:00', days: '1234567', icon: 'bell', sound: true, enabled: true }]);
 
   await page.goto('/sueno');
   await page.getByRole('button', { name: 'Registrar la de anoche' }).click();

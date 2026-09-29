@@ -3,12 +3,14 @@ import {
   calendarCycleDays,
   calendarMarks,
   describeCalendarDay,
+  displayTitle,
   legacyList,
   localDayKey,
   longDay,
   looseList,
   monthLabel,
   monthWeeks,
+  moodIcon,
   PERIOD_COLOR,
   PERIOD_FLOW_INFO,
   PREDICTED_PERIOD_COLOR,
@@ -21,6 +23,7 @@ import {
   type Day,
   type LegacyData,
   type LegacyReminder,
+  type UiIcon as IconInfo,
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter } from 'expo-router';
@@ -30,6 +33,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
 import { ColorSwatches, Dot, IconButton, MonthNav, Stepper, Toggle, ToolScreen } from '../../components/tools';
 import { Button, Card, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
+import { UiIcon } from '../../components/UiIcon';
 import { useAuth } from '../../lib/api';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -185,24 +189,27 @@ function DayPanel({
         </T>
       ) : (
         <View style={{ gap: space[1] }}>
-          {events.map((r) => (
-            <View key={r.id} style={[s.item, r.on === false && { opacity: 0.6 }]}>
-              <Dot color={r.color} size={12} />
-              <View style={{ flex: 1 }}>
-                <T v="label">{r.title}</T>
-                <T v="small" tint="muted">
-                  {r.when ? `${r.when} · ` : ''}día {r.day} de cada mes{r.on === false ? ' · desactivado' : ''}
-                </T>
+          {events.map((r) => {
+            const title = displayTitle(r.title);
+            return (
+              <View key={r.id} style={[s.item, r.on === false && { opacity: 0.6 }]}>
+                <Dot color={r.color} size={12} />
+                <View style={{ flex: 1 }}>
+                  <T v="label">{title}</T>
+                  <T v="small" tint="muted">
+                    {r.when ? `${r.when} · ` : ''}día {r.day} de cada mes{r.on === false ? ' · desactivado' : ''}
+                  </T>
+                </View>
+                <Toggle label={`Activo: «${title}»`} value={r.on !== false} onChange={() => actions.update(r.id, { on: r.on === false })} />
+                <IconButton label={`Editar «${title}»`} onPress={() => onEdit(r)}>
+                  <Pencil size={18} color={colors.inkMuted} />
+                </IconButton>
+                <IconButton label={`Borrar «${title}»`} onPress={() => actions.remove(r.id)}>
+                  <Trash2 size={18} color={colors.inkMuted} />
+                </IconButton>
               </View>
-              <Toggle label={`Activo: «${r.title}»`} value={r.on !== false} onChange={() => actions.update(r.id, { on: r.on === false })} />
-              <IconButton label={`Editar «${r.title}»`} onPress={() => onEdit(r)}>
-                <Pencil size={18} color={colors.inkMuted} />
-              </IconButton>
-              <IconButton label={`Borrar «${r.title}»`} onPress={() => actions.remove(r.id)}>
-                <Trash2 size={18} color={colors.inkMuted} />
-              </IconButton>
-            </View>
-          ))}
+            );
+          })}
           {workouts.map((w, i) => (
             <ReadOnlyItem key={`w${i}`} color={markColor.workout} title={`Entreno${typeof w.plan === 'string' && w.plan ? `: ${w.plan}` : ''}`} meta={typeof w.minutes === 'number' ? `${w.minutes} min` : undefined} />
           ))}
@@ -214,7 +221,7 @@ function DayPanel({
           )}
           {cycle?.predicted && <ReadOnlyItem color={markColor.predicted} title="Regla prevista" meta="Estimación, no consejo médico" cycleLink />}
           {journal.map((j, i) => (
-            <ReadOnlyItem key={`j${i}`} color={markColor.journal} title={`Diario ${typeof j.mood === 'string' ? j.mood : ''}`.trim()} meta={typeof j.note === 'string' && j.note ? j.note : undefined} />
+            <ReadOnlyItem key={`j${i}`} color={markColor.journal} title="Diario" mood={moodIcon(j.mood)} meta={typeof j.note === 'string' && j.note ? j.note : undefined} />
           ))}
         </View>
       )}
@@ -222,14 +229,22 @@ function DayPanel({
   );
 }
 
-function ReadOnlyItem({ color, title, meta, cycleLink }: { color: string; title: string; meta?: string; cycleLink?: boolean }) {
+function ReadOnlyItem({ color, title, mood, meta, cycleLink }: { color: string; title: string; mood?: IconInfo | null; meta?: string; cycleLink?: boolean }) {
   const { colors } = useTheme();
   const router = useRouter();
   return (
     <View style={s.item}>
       <Dot color={color} size={12} />
       <View style={{ flex: 1 }}>
-        <T v="label">{title}</T>
+        {mood ? (
+          // El ánimo del Diario, con su icono y su nombre para lectores de pantalla.
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }} accessible accessibilityLabel={`${title}, ánimo ${mood.label.toLowerCase()}`}>
+            <T v="label">{title}</T>
+            <UiIcon name={mood.icon} size={16} color={colors.inkMuted} />
+          </View>
+        ) : (
+          <T v="label">{title}</T>
+        )}
         {meta && (
           <T v="small" tint="muted" numberOfLines={2}>
             {meta}
@@ -250,7 +265,7 @@ function ReadOnlyItem({ color, title, meta, cycleLink }: { color: string; title:
 
 function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder | null; day: number; onDone: () => void }) {
   const actions = useModule('reminders');
-  const [title, setTitle] = useState(event?.title ?? '');
+  const [title, setTitle] = useState(displayTitle(event?.title));
   const [when, setWhen] = useState(event?.when ?? '');
   const [day, setDay] = useState(event?.day ?? initialDay);
   const [color, setColor] = useState<string>(event?.color && (REMINDER_COLORS as readonly string[]).includes(event.color) ? event.color : REMINDER_COLORS[0]);

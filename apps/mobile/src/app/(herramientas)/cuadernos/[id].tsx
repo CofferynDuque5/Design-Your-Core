@@ -20,6 +20,7 @@ import { ChevronDown, Code2, Copy, ImageOff, Palette, Trash2, Type } from 'lucid
 import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { FitImage, MONO } from '../../../components/markdown';
+import { NotebookCover } from '../../../components/NotebookCover';
 import { NotebookForm, NotebookTags } from '../../../components/notebooks';
 import { Sheet } from '../../../components/Sheet';
 import { ColorSwatches, DotChoices, IconButton, tint, ToolScreen } from '../../../components/tools';
@@ -81,11 +82,7 @@ export default function NotebookDetail() {
       header={
         <View style={[st.hero, { backgroundColor: tint(color, colors.bg, name === 'dark' ? 0.22 : 0.12), borderColor: tint(color, colors.bg, 0.35) }]}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[3] }}>
-            <View style={[st.emoji, { backgroundColor: colors.surface }]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-              <T v="title" style={{ fontSize: 30, lineHeight: 38 }}>
-                {notebook.emoji || '📓'}
-              </T>
-            </View>
+            <NotebookCover notebook={notebook} variant="hero" style={st.cover} />
             <View style={{ flex: 1 }}>
               <PageHeader eyebrow="Cuaderno" title={notebook.title || 'Cuaderno'} />
             </View>
@@ -332,7 +329,7 @@ function BoxImages({ text, muted }: { text: string; muted: string }) {
 
 const st = StyleSheet.create({
   hero: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: space[4], gap: space[3], marginTop: space[2] },
-  emoji: { width: 60, height: 60, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: space[2] },
+  cover: { marginTop: space[1], shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   box: { borderRadius: radius.md, borderWidth: 1, paddingHorizontal: space[3], paddingTop: space[1], paddingBottom: space[3], gap: space[2] },
   boxHead: { flexDirection: 'row', alignItems: 'center' },
   boxTitle: { flex: 1, minWidth: 0, minHeight: touchTarget, paddingHorizontal: space[1] },

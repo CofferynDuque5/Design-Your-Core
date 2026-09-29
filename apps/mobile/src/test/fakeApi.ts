@@ -103,3 +103,14 @@ export function fakeModules(initial: LegacyData, over: Record<string, Handler> =
   });
   return { ...api, doc: () => doc };
 }
+
+type Rendered = string | { children?: Rendered[] | null } | Rendered[] | null;
+
+/** Todo el texto dibujado en pantalla (para comprobar, por ejemplo, que no se ve ningún emoji). */
+export function renderedText(node: unknown): string {
+  const n = node as Rendered;
+  if (!n) return '';
+  if (typeof n === 'string') return n;
+  if (Array.isArray(n)) return n.map(renderedText).join(' ');
+  return (n.children ?? []).map(renderedText).join(' ');
+}

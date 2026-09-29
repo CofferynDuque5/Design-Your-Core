@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { addDays, diffDays, isDay, periodRange, type Day } from './dates.js';
+import type { UiIconName } from './icons.js';
 
 /**
  * Módulos de la app anterior ("Core"). Sus datos viven en el documento JSON de
@@ -83,6 +84,7 @@ export const NOTEBOOK_COLORS = ['#4F7CFF', '#0FA968', '#EC6A9C', '#8B5CF6', '#E8
 /** Fondos de las cajitas de texto; las de código usan siempre CODE_BOX_COLOR. */
 export const BOX_COLORS = ['#FFF7D6', '#DDF3E4', '#E3ECFF', '#FCE0EC', '#EDE4FF', '#FFE8D6', '#F1F3F5'] as const;
 export const CODE_BOX_COLOR = '#1e1e2e';
+/** Emojis que se GUARDAN como icono de un cuaderno (compatibles con la app anterior); se dibujan con `notebookIcon`. */
 export const NOTEBOOK_EMOJIS = ['📓', '📕', '📗', '📘', '📙', '🧠', '🔬', '🧮', '📐', '🌍', '💻', '🎨', '🎵', '⚗️', '📖', '✏️'] as const;
 /** Lenguajes de las cajitas de código (el primero es el de por defecto). */
 export const CODE_LANGS = ['js', 'ts', 'python', 'html', 'css', 'java', 'c++', 'c#', 'php', 'sql', 'bash', 'json', 'otro'] as const;
@@ -182,30 +184,32 @@ export const GOAL_CATEGORY_INFO: Record<GoalCategory, { label: string; color: st
 
 export const PET_SPECIES = ['dog', 'cat', 'rabbit', 'hamster', 'bird', 'fish', 'turtle', 'horse', 'cow', 'pig', 'chicken', 'reptile', 'other'] as const;
 export type PetSpecies = (typeof PET_SPECIES)[number];
-export const PET_SPECIES_INFO: Record<PetSpecies, { label: string; emoji: string }> = {
-  dog: { label: 'Perro', emoji: '🐶' },
-  cat: { label: 'Gato', emoji: '🐱' },
-  rabbit: { label: 'Conejo', emoji: '🐰' },
-  hamster: { label: 'Hámster', emoji: '🐹' },
-  bird: { label: 'Ave', emoji: '🐦' },
-  fish: { label: 'Pez', emoji: '🐠' },
-  turtle: { label: 'Tortuga', emoji: '🐢' },
-  horse: { label: 'Caballo', emoji: '🐴' },
-  cow: { label: 'Vaca', emoji: '🐮' },
-  pig: { label: 'Cerdo', emoji: '🐷' },
-  chicken: { label: 'Gallina', emoji: '🐔' },
-  reptile: { label: 'Reptil', emoji: '🦎' },
-  other: { label: 'Otra', emoji: '🐾' },
+/** Nombre e icono (Lucide) de cada especie. Se guarda la clave (`dog`), no el icono. */
+export const PET_SPECIES_INFO: Record<PetSpecies, { label: string; icon: UiIconName }> = {
+  dog: { label: 'Perro', icon: 'Dog' },
+  cat: { label: 'Gato', icon: 'Cat' },
+  rabbit: { label: 'Conejo', icon: 'Rabbit' },
+  hamster: { label: 'Hámster', icon: 'Rat' },
+  bird: { label: 'Ave', icon: 'Bird' },
+  fish: { label: 'Pez', icon: 'Fish' },
+  turtle: { label: 'Tortuga', icon: 'Turtle' },
+  horse: { label: 'Caballo', icon: 'PawPrint' },
+  cow: { label: 'Vaca', icon: 'Milk' },
+  pig: { label: 'Cerdo', icon: 'PiggyBank' },
+  chicken: { label: 'Gallina', icon: 'Egg' },
+  reptile: { label: 'Reptil', icon: 'Worm' },
+  other: { label: 'Otra', icon: 'PawPrint' },
 };
 
 export const CARE_KINDS = ['comida', 'agua', 'paseo', 'vet', 'otro'] as const;
 export type CareKind = (typeof CARE_KINDS)[number];
-export const CARE_KIND_INFO: Record<CareKind, { label: string; emoji: string }> = {
-  comida: { label: 'Comida', emoji: '🍖' },
-  agua: { label: 'Agua', emoji: '💧' },
-  paseo: { label: 'Paseo', emoji: '🦮' },
-  vet: { label: 'Veterinario', emoji: '🩺' },
-  otro: { label: 'Otro', emoji: '🐾' },
+/** Nombre e icono (Lucide) de cada tipo de cuidado. Se guarda la clave (`comida`). */
+export const CARE_KIND_INFO: Record<CareKind, { label: string; icon: UiIconName }> = {
+  comida: { label: 'Comida', icon: 'Bone' },
+  agua: { label: 'Agua', icon: 'Droplet' },
+  paseo: { label: 'Paseo', icon: 'Footprints' },
+  vet: { label: 'Veterinario', icon: 'Stethoscope' },
+  otro: { label: 'Otro', icon: 'PawPrint' },
 };
 
 export const PERIOD_FLOWS = ['light', 'medium', 'heavy'] as const;
@@ -217,24 +221,27 @@ export const PERIOD_FLOW_INFO: Record<PeriodFlow, { label: string; color: string
 };
 /** Se guardan como texto separado por comas, en español, igual que la app anterior. */
 export const PERIOD_SYMPTOMS = ['Cólicos', 'Dolor de cabeza', 'Fatiga', 'Antojos', 'Hinchazón', 'Acné', 'Sensibilidad', 'Náuseas'] as const;
-/** Ánimo del registro de regla (emoji guardado) con su nombre para lectores de pantalla. */
+/**
+ * Ánimo del registro de regla: `emoji` es lo que se GUARDA (igual que la app
+ * anterior); en pantalla se dibuja `icon` (Lucide) con `label` como nombre.
+ */
 export const PERIOD_MOODS = [
-  { emoji: '😀', label: 'Genial' },
-  { emoji: '🙂', label: 'Bien' },
-  { emoji: '😐', label: 'Normal' },
-  { emoji: '😔', label: 'Bajo' },
-  { emoji: '😣', label: 'Mal' },
-  { emoji: '😴', label: 'Cansancio' },
-] as const;
-/** Ánimo del Diario (la app anterior usa 😄 aquí y 😀 en Ciclo). */
+  { emoji: '😀', label: 'Genial', icon: 'Laugh' },
+  { emoji: '🙂', label: 'Bien', icon: 'Smile' },
+  { emoji: '😐', label: 'Normal', icon: 'Meh' },
+  { emoji: '😔', label: 'Bajo', icon: 'Frown' },
+  { emoji: '😣', label: 'Mal', icon: 'Angry' },
+  { emoji: '😴', label: 'Cansancio', icon: 'Bed' },
+] as const satisfies ReadonlyArray<{ emoji: string; label: string; icon: UiIconName }>;
+/** Ánimo del Diario (la app anterior guarda 😄 aquí y 😀 en Ciclo). */
 export const JOURNAL_MOODS = [
-  { emoji: '😄', label: 'Genial' },
-  { emoji: '🙂', label: 'Bien' },
-  { emoji: '😐', label: 'Normal' },
-  { emoji: '😔', label: 'Bajo' },
-  { emoji: '😣', label: 'Mal' },
-  { emoji: '😴', label: 'Cansancio' },
-] as const;
+  { emoji: '😄', label: 'Genial', icon: 'Laugh' },
+  { emoji: '🙂', label: 'Bien', icon: 'Smile' },
+  { emoji: '😐', label: 'Normal', icon: 'Meh' },
+  { emoji: '😔', label: 'Bajo', icon: 'Frown' },
+  { emoji: '😣', label: 'Mal', icon: 'Angry' },
+  { emoji: '😴', label: 'Cansancio', icon: 'Bed' },
+] as const satisfies ReadonlyArray<{ emoji: string; label: string; icon: UiIconName }>;
 
 /** Colores de los registros de salud en el Calendario, como la app anterior. */
 export const PERIOD_COLOR = '#E5484D';
