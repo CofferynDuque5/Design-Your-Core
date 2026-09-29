@@ -26,8 +26,11 @@ test('recorrido completo de una persona nueva', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Leer 10 páginas' })).toBeVisible();
   await page.goto('/');
   const habit = page.getByRole('checkbox', { name: /Leer 10 páginas/ });
+  // La casilla se marca al instante; se espera a que la API lo guarde antes de recargar.
+  const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/api\/v2\/habits\/[^/]+\/logs\//.test(r.url()) && r.ok());
   await habit.click();
   await expect(habit).toBeChecked();
+  await saved;
   await page.reload();
   await expect(page.getByRole('checkbox', { name: /Leer 10 páginas/ })).toBeChecked();
 
