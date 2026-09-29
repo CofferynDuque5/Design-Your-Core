@@ -3,7 +3,8 @@
  * independientes del estilo, la tipografía y el tema.
  *
  * «Azul» es la paleta de cada estilo tal cual (tokens.css y styles/estilos/)
- * y no añade nada. Las demás cambian, para cada estilo y en claro y oscuro:
+ * y no añade nada; la de por defecto es «Lima» (index.html y palette.ts).
+ * Las demás cambian, para cada estilo y en claro y oscuro:
  *   - el color de marca: --color-primary, -hover, -soft, --color-on-primary
  *     y el foco (--color-focus);
  *   - un leve tinte de los neutros: fondo, superficies y líneas;
@@ -17,6 +18,7 @@
  * oscuro elegido) definen los mismos colores. src/app/palette.test.ts lee este
  * archivo y comprueba el contraste WCAG AA de cada paleta × estilo × tema.
  */
+
 
 /* ==================== Salvia: verde salvia profundo. ==================== */
 
@@ -636,4 +638,159 @@
   --color-line: #2C2D30;
   --color-line-strong: #404145;
   --suave-card-border: #2A2B2E;
+}
+
+/* ==================== Lima: negro con verde lima. ==================== */
+
+/* Editorial */
+:root[data-style='editorial'][data-palette='lima'] {
+  --color-primary: #151714;
+  --color-primary-hover: #2B2E29;
+  --color-on-primary: #D4F53C;
+  --color-primary-soft: #EDF5D0;
+  --color-focus: #5B7A00;
+  --color-bg: #F3F4EF;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #E9EBE3;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #D9DCD2;
+  --color-line-strong: #BFC3B6;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='editorial'][data-palette='lima']:not([data-theme='light']) {
+    --color-primary: #C8F23A;
+    --color-primary-hover: #D8F86E;
+    --color-on-primary: #10120C;
+    --color-primary-soft: #1F2712;
+    --color-focus: #C8F23A;
+    --color-bg: #0A0B09;
+    --color-surface: #121410;
+    --color-surface-sunken: #060706;
+    --color-surface-raised: #1A1D17;
+    --color-line: #23261F;
+    --color-line-strong: #363A30;
+  }
+}
+:root[data-style='editorial'][data-palette='lima'][data-theme='dark'] {
+  --color-primary: #C8F23A;
+  --color-primary-hover: #D8F86E;
+  --color-on-primary: #10120C;
+  --color-primary-soft: #1F2712;
+  --color-focus: #C8F23A;
+  --color-bg: #0A0B09;
+  --color-surface: #121410;
+  --color-surface-sunken: #060706;
+  --color-surface-raised: #1A1D17;
+  --color-line: #23261F;
+  --color-line-strong: #363A30;
+}
+
+/* Minimalista (solo el acento y el foco: el estilo es monocromo) */
+:root[data-style='minimal'][data-palette='lima'] {
+  --minimal-accent: #4F7A00;
+  --color-focus: #4F7A00;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='minimal'][data-palette='lima']:not([data-theme='light']) {
+    --minimal-accent: #C8F23A;
+    --color-focus: #C8F23A;
+  }
+}
+:root[data-style='minimal'][data-palette='lima'][data-theme='dark'] {
+  --minimal-accent: #C8F23A;
+  --color-focus: #C8F23A;
+}
+
+/* Cristal (también las manchas del fondo) */
+:root[data-style='glass'][data-palette='lima'] {
+  --color-primary: #161814;
+  --color-primary-hover: #2C2F2A;
+  --color-on-primary: #D4F53C;
+  --color-primary-soft: #ECF5CC;
+  --color-focus: #557800;
+  --color-bg: #F1F3EC;
+  --color-surface-sunken: #E8EBE1;
+  --color-line: #D8DCCF;
+  --color-line-strong: #BCC2B2;
+  --glass-blob-1: #E4F5A8;
+  --glass-blob-2: #D9DDD2;
+  --glass-blob-3: #D6F2A8;
+  --glass-blob-4: #EEF3DA;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='glass'][data-palette='lima']:not([data-theme='light']) {
+    --color-primary: #CDF548;
+    --color-primary-hover: #DBF97A;
+    --color-on-primary: #10120C;
+    --color-primary-soft: #222B13;
+    --color-focus: #C8F23A;
+    --color-bg: #090A08;
+    --color-surface-sunken: #0B0C0A;
+    --color-line: #24281F;
+    --color-line-strong: #373C31;
+    --glass-blob-1: #26340B;
+    --glass-blob-2: #1A1C18;
+    --glass-blob-3: #2C3C0D;
+    --glass-blob-4: #202619;
+  }
+}
+:root[data-style='glass'][data-palette='lima'][data-theme='dark'] {
+  --color-primary: #CDF548;
+  --color-primary-hover: #DBF97A;
+  --color-on-primary: #10120C;
+  --color-primary-soft: #222B13;
+  --color-focus: #C8F23A;
+  --color-bg: #090A08;
+  --color-surface-sunken: #0B0C0A;
+  --color-line: #24281F;
+  --color-line-strong: #373C31;
+  --glass-blob-1: #26340B;
+  --glass-blob-2: #1A1C18;
+  --glass-blob-3: #2C3C0D;
+  --glass-blob-4: #202619;
+}
+
+/* Suave */
+:root[data-style='suave'][data-palette='lima'] {
+  --color-primary: #1E211C;
+  --color-primary-hover: #343830;
+  --color-on-primary: #D4F53C;
+  --color-primary-soft: #EFF7D6;
+  --color-focus: #5E8200;
+  --color-bg: #F5F6F1;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #EDEFE7;
+  --color-surface-raised: #FFFFFF;
+  --color-line: #E5E8DE;
+  --color-line-strong: #CACFBF;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='suave'][data-palette='lima']:not([data-theme='light']) {
+    --color-primary: #D0F550;
+    --color-primary-hover: #DEF982;
+    --color-on-primary: #11130D;
+    --color-primary-soft: #252E15;
+    --color-focus: #C8F23A;
+    --color-bg: #0E100C;
+    --color-surface: #171A14;
+    --color-surface-sunken: #0B0C0A;
+    --color-surface-raised: #20241C;
+    --color-line: #262A20;
+    --color-line-strong: #393E32;
+    --suave-card-border: #23271E;
+  }
+}
+:root[data-style='suave'][data-palette='lima'][data-theme='dark'] {
+  --color-primary: #D0F550;
+  --color-primary-hover: #DEF982;
+  --color-on-primary: #11130D;
+  --color-primary-soft: #252E15;
+  --color-focus: #C8F23A;
+  --color-bg: #0E100C;
+  --color-surface: #171A14;
+  --color-surface-sunken: #0B0C0A;
+  --color-surface-raised: #20241C;
+  --color-line: #262A20;
+  --color-line-strong: #393E32;
+  --suave-card-border: #23271E;
 }

@@ -8,13 +8,14 @@ import { visualPreference } from './preference';
  * cada estilo en styles/paletas.css; los colores de estado y de los pilares no
  * cambian.
  */
-export type PalettePreference = 'azul' | 'salvia' | 'terracota' | 'lavanda' | 'grafito';
+export type PalettePreference = 'azul' | 'salvia' | 'terracota' | 'lavanda' | 'grafito' | 'lima';
 
 /** Paleta por defecto. Debe coincidir con `data-palette` de <html> en index.html. */
-export const DEFAULT_PALETTE: PalettePreference = 'azul';
+export const DEFAULT_PALETTE: PalettePreference = 'lima';
 
 export const PALETTE_OPTIONS: ReadonlyArray<{ value: PalettePreference; label: string; hint: string }> = [
-  { value: 'azul', label: 'Azul', hint: 'Azul profundo: el de siempre.' },
+  { value: 'lima', label: 'Lima', hint: 'Negro con verde lima.' },
+  { value: 'azul', label: 'Azul', hint: 'Azul profundo y sereno.' },
   { value: 'salvia', label: 'Salvia', hint: 'Verde salvia, sereno y natural.' },
   { value: 'terracota', label: 'Terracota', hint: 'Arcilla cálida y tierra.' },
   { value: 'lavanda', label: 'Lavanda', hint: 'Violeta y ciruela.' },

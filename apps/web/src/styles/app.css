@@ -3561,6 +3561,13 @@
     --sw-soft: #F2E7DF;
   }
 
+  [data-swatch='lima'] {
+    --sw-bg: #F3F4EF;
+    --sw-primary: #151714;
+    --sw-accent: #C8F23A;
+    --sw-soft: #EDF5D0;
+  }
+
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme='light']) [data-swatch='azul'] {
       --sw-bg: #111418;
@@ -3595,6 +3602,13 @@
       --sw-primary: #D6D6D3;
       --sw-accent: #EE9D6C;
       --sw-soft: #2F241E;
+    }
+
+    :root:not([data-theme='light']) [data-swatch='lima'] {
+      --sw-bg: #0A0B09;
+      --sw-primary: #C8F23A;
+      --sw-accent: #D8F86E;
+      --sw-soft: #1F2712;
     }
   }
 
@@ -3631,6 +3645,13 @@
     --sw-primary: #D6D6D3;
     --sw-accent: #EE9D6C;
     --sw-soft: #2F241E;
+  }
+
+  [data-theme='dark'] [data-swatch='lima'] {
+    --sw-bg: #0A0B09;
+    --sw-primary: #C8F23A;
+    --sw-accent: #D8F86E;
+    --sw-soft: #1F2712;
   }
 
   /* Ajuste con interruptor (Perfil y Ciclo) */

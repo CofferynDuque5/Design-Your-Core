@@ -36,7 +36,8 @@ Cualquier combinación funciona en claro y en oscuro, en escritorio y en móvil 
 
 | Paleta | Valor | Principal en claro | Principal en oscuro | Idea |
 |---|---|---|---|---|
-| **Azul** (por defecto) | `azul` | `#1E3A5F` | `#9DB9E0` | El azul profundo de siempre. |
+| **Lima** (por defecto) | `lima` | `#151714` | `#C8F23A` | Negro con verde lima: en claro, botones negros con texto lima; en oscuro, fondo casi negro y lima como color principal. |
+| **Azul** | `azul` | `#1E3A5F` | `#9DB9E0` | El azul profundo del principio. |
 | **Salvia** | `salvia` | `#2F5D46` | `#9CCBAE` | Verde salvia profundo, neutros con un toque verde. |
 | **Terracota** | `terracota` | `#96482C` | `#EBA78A` | Arcilla cálida, neutros cálidos. |
 | **Lavanda** | `lavanda` | `#563A87` | `#C4B0EC` | Violeta y ciruela. |
@@ -46,7 +47,7 @@ Cualquier combinación funciona en claro y en oscuro, en escritorio y en móvil 
 
 - Cada paleta cambia, **para cada estilo** y en claro y oscuro: `--color-primary`, `--color-primary-hover`, `--color-primary-soft`, `--color-on-primary`, `--color-focus` y un leve tinte de fondo, superficies y líneas. En **Cristal** cambian también las manchas del fondo (`--glass-blob-1…4`). En **Minimalista** solo cambian el acento y el foco: el estilo sigue siendo monocromo.
 - Los colores de **estado** (éxito, aviso, peligro) y de los **pilares** no cambian con la paleta.
-- Todo está en `src/styles/paletas.css`: un bloque por estilo y paleta, bajo `:root[data-style='…'][data-palette='…']`, con su versión oscura para `prefers-color-scheme` y para `data-theme="dark"`. **Azul** no añade nada: es la paleta propia de cada estilo.
+- Todo está en `src/styles/paletas.css`: un bloque por estilo y paleta, bajo `:root[data-style='…'][data-palette='…']`, con su versión oscura para `prefers-color-scheme` y para `data-theme="dark"`. **Azul** no añade nada: es la paleta propia de cada estilo. La de por defecto es **Lima** (`data-palette` de `index.html` y `DEFAULT_PALETTE` en `palette.ts`).
 
 ## Cómo funciona
 

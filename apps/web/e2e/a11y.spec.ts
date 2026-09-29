@@ -255,6 +255,7 @@ test('paletas y tipografías: cada una en tres pantallas', async ({ page }) => {
     ['lavanda', /^Lavanda/],
     ['grafito', /^Grafito/],
     ['azul', /^Azul/],
+    ['lima', /^Lima/],
   ] as const) {
     await page.goto('/perfil');
     await page.getByRole('group', { name: 'Color' }).getByRole('radio', { name: option }).check();

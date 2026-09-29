@@ -14,20 +14,20 @@ describe('preferencia de paleta de color', () => {
   it('sin nada guardado (o con un valor desconocido) usa la de por defecto', () => {
     expect(storedPalette()).toBe(DEFAULT_PALETTE);
     localStorage.setItem('dyc.palette', 'fucsia');
-    expect(storedPalette()).toBe('azul');
+    expect(storedPalette()).toBe(DEFAULT_PALETTE);
   });
 
   it('elegir una paleta la guarda en este navegador y la aplica en <html>', () => {
     const { result } = renderHook(() => usePalette());
-    expect(result.current[0]).toBe('azul');
+    expect(result.current[0]).toBe(DEFAULT_PALETTE);
     act(() => result.current[1]('salvia'));
     expect(result.current[0]).toBe('salvia');
     expect(localStorage.getItem('dyc.palette')).toBe('salvia');
     expect(document.documentElement.dataset.palette).toBe('salvia');
     // Volver a la de por defecto no deja nada guardado.
-    act(() => result.current[1]('azul'));
+    act(() => result.current[1](DEFAULT_PALETTE));
     expect(localStorage.getItem('dyc.palette')).toBeNull();
-    expect(document.documentElement.dataset.palette).toBe('azul');
+    expect(document.documentElement.dataset.palette).toBe(DEFAULT_PALETTE);
   });
 
   it('lo guardado se aplica al arrancar', () => {
@@ -45,7 +45,7 @@ describe('preferencia de paleta de color', () => {
 });
 
 const css = srcFile('styles/paletas.css');
-const pairs = STYLE_OPTIONS.flatMap((s) => PALETTE_OPTIONS.filter((p) => p.value !== DEFAULT_PALETTE).map((p) => [s.value, p.value] as const));
+const pairs = STYLE_OPTIONS.flatMap((s) => PALETTE_OPTIONS.filter((p) => p.value !== 'azul').map((p) => [s.value, p.value] as const));
 
 describe.each(pairs)('paleta en el estilo %s: %s', (style, palette) => {
   const sel = `:root[data-style='${style}'][data-palette='${palette}']`;
