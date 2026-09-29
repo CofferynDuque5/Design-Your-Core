@@ -1,5 +1,5 @@
 import { addDays, localDayKey, periodReminder, shortDay, utcDayKey, type LegacyData } from '@dyc/core';
-import { act, fireEvent, renderRouter, screen, waitFor, within } from 'expo-router/testing-library';
+import { act, cleanup, fireEvent, renderRouter, screen, waitFor, within } from 'expo-router/testing-library';
 import * as SecureStore from 'expo-secure-store';
 import { auth } from '../lib/api';
 import { queryClient } from '../lib/queryClient';
@@ -58,6 +58,17 @@ async function open(path: string, marker: string | RegExp) {
 }
 
 describe('herramientas de la tanda 3 en el móvil', () => {
+  // La primera vez que se monta el router se compilan sus pantallas. En CI, con las pruebas de la
+  // API en paralelo, eso llegó a pasar de los 30 s del primer caso: se paga aquí, con más margen.
+  beforeAll(async () => {
+    reset();
+    await auth.signIn(tokens());
+    setup();
+    await open('/finanzas', 'Balance del mes');
+    cleanup();
+    queryClient.clear();
+  }, 120_000);
+
   beforeEach(async () => {
     queryClient.clear();
     reset();
