@@ -65,7 +65,7 @@ test('recorrido completo de una persona nueva', async ({ page }) => {
 
   // Volver a entrar lleva directo a Hoy (onboarding ya hecho).
   await page.getByLabel('Correo').fill(address);
-  await page.getByLabel('Contraseña').fill(PASSWORD);
+  await page.getByLabel('Contraseña', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByRole('heading', { name: 'Hábitos de hoy' })).toBeVisible();
 });
@@ -80,7 +80,7 @@ test('borrar la cuenta cierra la sesión y ya no se puede entrar', async ({ page
   await dialog.getByRole('button', { name: 'Borrar definitivamente' }).click();
   await expect(page).toHaveURL(/\/entrar$/);
   await page.getByLabel('Correo').fill(address);
-  await page.getByLabel('Contraseña').fill(PASSWORD);
+  await page.getByLabel('Contraseña', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByRole('alert')).toHaveText('Correo o contraseña incorrectos');
 });

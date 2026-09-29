@@ -79,14 +79,14 @@ test('perfil: descargar los datos y cambiar la contraseña', async ({ page }) =>
   expect(data.challenges).toHaveLength(1);
 
   await page.getByLabel('Contraseña actual').fill(PASSWORD);
-  await page.getByLabel('Nueva contraseña').fill('otra-clave-segura');
+  await page.getByLabel('Nueva contraseña').fill('Otra-Clave-Segura2');
   await page.getByRole('button', { name: 'Cambiar contraseña' }).click();
   await expect(page.getByText('Contraseña cambiada')).toBeVisible();
   await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
 
   await signIn(page, address);
   await expect(page.getByRole('alert')).toHaveText('Correo o contraseña incorrectos');
-  await signIn(page, address, 'otra-clave-segura');
+  await signIn(page, address, 'Otra-Clave-Segura2');
   await expect(page.getByRole('heading', { name: 'Hábitos de hoy' })).toBeVisible();
 });
 

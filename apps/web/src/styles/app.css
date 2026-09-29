@@ -5097,6 +5097,115 @@
     text-decoration: underline;
   }
 
+  /* ---------- Validación en vivo: icono de estado, mostrar contraseña y requisitos ---------- */
+
+  .input-wrap {
+    position: relative;
+  }
+
+  .input-wrap--valid .input,
+  .input-wrap--invalid .input {
+    padding-right: 2.75rem;
+  }
+
+  .input-wrap--action .input {
+    padding-right: 3rem;
+  }
+
+  .input-wrap--action.input-wrap--valid .input,
+  .input-wrap--action.input-wrap--invalid .input {
+    padding-right: 5.25rem;
+  }
+
+  .input-wrap--valid .input {
+    border-color: var(--color-success);
+  }
+
+  .input-status {
+    position: absolute;
+    top: 50%;
+    right: 0.875rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    animation: input-status-in var(--duration-fast) var(--ease-standard);
+  }
+
+  .input-wrap--action .input-status {
+    right: 3rem;
+  }
+
+  .input-status--valid {
+    color: var(--color-success);
+  }
+
+  .input-status--invalid {
+    color: var(--color-danger);
+  }
+
+  .input-action {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    transform: translateY(-50%);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-ink-subtle);
+    cursor: pointer;
+  }
+
+  .input-action:hover {
+    color: var(--color-ink);
+    background: var(--color-surface-sunken);
+  }
+
+  .field__hint--ok {
+    color: var(--color-success);
+  }
+
+  .password-rules {
+    display: grid;
+    gap: 6px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-sunken);
+    font-size: var(--text-small);
+    color: var(--color-ink-subtle);
+    animation: input-status-in var(--duration-base, 200ms) var(--ease-standard);
+  }
+
+  .password-rules__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .password-rules__item svg {
+    flex: none;
+  }
+
+  .password-rules__item.is-ok {
+    color: var(--color-success);
+  }
+
+  @keyframes input-status-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .input-status,
+    .password-rules {
+      animation: none;
+    }
+  }
+
   .assistant-chat {
     display: flex;
     flex-direction: column;

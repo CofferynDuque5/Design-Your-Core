@@ -1,4 +1,4 @@
-import { PILLAR_IDS, type PillarId } from '@dyc/core';
+import { PILLAR_IDS, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Download, LogOut } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -14,7 +14,7 @@ import { useTheme, type ThemePreference } from '../app/theme';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
 import { Dialog } from '../components/Dialog';
-import { Segmented, TextArea, TextField } from '../components/Form';
+import { PasswordField, Segmented, TextArea, TextField } from '../components/Form';
 import { pillarShort } from '../components/Pillar';
 import { ErrorState, errorMessage, Loading } from '../components/States';
 import { deviceTimeZone } from '../lib/format';
@@ -426,11 +426,18 @@ function SecuritySection() {
           </div>
         )}
         <div className="grid-2">
-          <TextField label="Contraseña actual" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
-          <TextField label="Nueva contraseña" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} hint="Al menos 8 caracteres." />
+          <PasswordField label="Contraseña actual" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          <PasswordField
+            label="Nueva contraseña"
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            checks={next ? passwordChecks(next) : undefined}
+            valid={isStrongPassword(next)}
+          />
         </div>
         <div className="row">
-          <button type="submit" className="btn btn--secondary" disabled={!current || next.length < 8 || change.isPending} aria-busy={change.isPending}>
+          <button type="submit" className="btn btn--secondary" disabled={!current || !isStrongPassword(next) || change.isPending} aria-busy={change.isPending}>
             Cambiar contraseña
           </button>
           <button type="button" className="btn btn--ghost" onClick={() => logoutOthers.mutate()} disabled={logoutOthers.isPending}>
