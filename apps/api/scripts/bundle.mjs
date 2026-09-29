@@ -26,6 +26,19 @@ cpSync('prisma', 'release/prisma', { recursive: true });
 cpSync('migrations', 'release/migrations', { recursive: true });
 cpSync('core-config.env.example', 'release/core-config.env.example');
 
+// En cPanel (CloudLinux) «Run NPM Install» no corre en la carpeta de la app sino en
+// ~/nodevenv/<app>/<versión>/lib, con package.json enlazado. Ahí no está prisma/, así
+// que se busca el esquema junto al package.json real o en la carpeta de la app.
+const generate = [
+  "const f=require('fs'),p=require('path'),{execSync:x}=require('child_process');",
+  "const c=[p.dirname(f.realpathSync('package.json')),process.cwd()];",
+  "const m=process.cwd().match(/^(.*)[\\/]nodevenv[\\/](.+)[\\/][^\\/]+[\\/]lib$/);",
+  'if(m)c.push(p.join(m[1],m[2]));',
+  "const s=c.map(d=>p.join(d,'prisma','schema.prisma')).find(f.existsSync);",
+  "if(!s)throw new Error('No encuentro prisma/schema.prisma en: '+c.join(', '));",
+  "x('prisma generate --schema '+JSON.stringify(s),{stdio:'inherit'});",
+].join('');
+
 writeFileSync(
   'release/package.json',
   JSON.stringify(
@@ -36,7 +49,7 @@ writeFileSync(
       type: 'module',
       main: 'dist/index.js',
       engines: { node: '>=20' },
-      scripts: { start: 'node dist/index.js', postinstall: 'prisma generate' },
+      scripts: { start: 'node dist/index.js', postinstall: `node -e "${generate}"` },
       dependencies: Object.fromEntries(external.map((d) => [d, pkg.dependencies[d]])),
     },
     null,
