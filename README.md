@@ -75,6 +75,8 @@ El teléfono necesita llegar a la API: en desarrollo la app usa la IP del ordena
 
 Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de endpoints en [docs/api.md](docs/api.md).
 
+Para enseñar la web sin servidor hay una versión de prueba en un solo HTML, con datos de ejemplo que viven en el navegador: `pnpm --filter @dyc/web build:demo` ([docs/demo.md](docs/demo.md)).
+
 ## Publicar
 
 La lista ordenada para salir a producción (decisiones pendientes, configuración, copia de seguridad, despliegue, comprobaciones y cómo volver atrás) está en [docs/lanzamiento.md](docs/lanzamiento.md).

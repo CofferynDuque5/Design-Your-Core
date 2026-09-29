@@ -23,5 +23,8 @@ apps/site/test-results/
 apps/site/playwright-report/
 apps/web/dev-dist/
 
+# Web: versión de prueba en un solo HTML (pnpm --filter @dyc/web build:demo)
+apps/web/dist-demo/
+
 # Sitio: tipos generados por Astro
 apps/site/.astro/

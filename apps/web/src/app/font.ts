@@ -24,17 +24,20 @@ export const FONT_OPTIONS: ReadonlyArray<{ value: FontPreference; label: string;
   { value: 'amable', label: 'Amable', hint: 'Nunito en todo: redondeada y cercana.' },
 ];
 
-const loaders: Record<Exclude<FontPreference, 'clasica'>, () => Promise<unknown>> = {
-  moderna: () => import('../styles/fuentes/moderna.css'),
-  geometrica: () => import('../styles/fuentes/geometrica.css'),
-  elegante: () => import('../styles/fuentes/elegante.css'),
-  amable: () => import('../styles/fuentes/amable.css'),
-};
+// En la versión de prueba (VITE_DEMO) todas llegan de Google Fonts desde el HTML: no hay trozos que cargar.
+const loaders: Record<Exclude<FontPreference, 'clasica'>, () => Promise<unknown>> | null = import.meta.env.VITE_DEMO
+  ? null
+  : {
+      moderna: () => import('../styles/fuentes/moderna.css'),
+      geometrica: () => import('../styles/fuentes/geometrica.css'),
+      elegante: () => import('../styles/fuentes/elegante.css'),
+      amable: () => import('../styles/fuentes/amable.css'),
+    };
 const loading = new Map<FontPreference, Promise<void>>();
 
 /** Carga (una sola vez) las fuentes de una tipografía. Clásica ya viene en el paquete. */
 export function loadFont(font: FontPreference): Promise<void> {
-  if (font === 'clasica') return Promise.resolve();
+  if (font === 'clasica' || !loaders) return Promise.resolve();
   let p = loading.get(font);
   if (!p) {
     p = loaders[font]().then(

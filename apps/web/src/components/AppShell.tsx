@@ -63,6 +63,12 @@ function useToolGroups(pathname: string) {
   return { isOpen, toggle };
 }
 
+/** Con rutas tras «#» (versión de prueba), el enlace a #main cambiaría de página: se enfoca a mano. */
+function skipToMain(e: React.MouseEvent) {
+  e.preventDefault();
+  document.getElementById('main')?.focus();
+}
+
 export function AppShell() {
   const online = useOnline();
   const location = useLocation();
@@ -74,7 +80,7 @@ export function AppShell() {
   if (invite && location.pathname !== '/perfil') return <Navigate to={`/perfil?invite=${encodeURIComponent(invite)}`} replace />;
   return (
     <div className="shell">
-      <a className="skip-link" href="#main">
+      <a className="skip-link" href="#main" onClick={import.meta.env.VITE_DEMO ? skipToMain : undefined}>
         Saltar al contenido
       </a>
       <aside className="sidebar">

@@ -1,7 +1,7 @@
 import { ApiError } from '@dyc/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 import { AppShell } from '../components/AppShell';
 import { UpdatePrompt } from '../components/UpdatePrompt';
 import { Forgot } from '../pages/auth/Forgot';
@@ -142,13 +142,16 @@ export function Providers({ children, client }: { children: ReactNode; client?: 
   );
 }
 
+// La versión de prueba es un solo archivo HTML servido en cualquier ruta: las rutas van tras «#».
+const Router = import.meta.env.VITE_DEMO ? HashRouter : BrowserRouter;
+
 export function App() {
   return (
     <Providers>
-      <BrowserRouter>
+      <Router>
         <AppRoutes />
-        <UpdatePrompt />
-      </BrowserRouter>
+        {!import.meta.env.VITE_DEMO && <UpdatePrompt />}
+      </Router>
     </Providers>
   );
 }

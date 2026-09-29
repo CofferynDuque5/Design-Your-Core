@@ -19,6 +19,7 @@ import {
   type LegacyData,
   type LegacyKey,
 } from '@dyc/core';
+import { demoAssistantFetch } from '../demo/assistant';
 
 /**
  * Asistente con la clave de Gemini de la persona. Las peticiones van
@@ -33,6 +34,9 @@ export type AssistantModel = (typeof ASSISTANT_MODELS)[number];
 export const DEFAULT_MODEL: AssistantModel = 'gemini-flash-latest';
 /** Si el modelo elegido está saturado (429) o falla (5xx), se reintenta una vez con este. */
 export const FALLBACK_MODEL: AssistantModel = 'gemini-flash-lite-latest';
+
+/** `fetch` por defecto. En la versión de prueba (VITE_DEMO) nada sale del navegador: responde un asistente de ejemplo. */
+const defaultFetch: typeof fetch = (...a) => (import.meta.env.VITE_DEMO ? demoAssistantFetch(...a) : fetch(...a));
 
 // ---------- Ajustes (solo en este navegador) ----------
 
@@ -499,7 +503,7 @@ export function parseReply(data: Json): Extract<ChatMessage, { role: 'assistant'
 
 /** Envía la conversación. Ante 429 o 5xx reintenta una vez con el modelo de reserva. */
 export async function chat(opts: { apiKey: string; model: string; history: ChatMessage[]; context: string | null; fetchImpl?: typeof fetch; signal?: AbortSignal }): Promise<ChatReply> {
-  const f = opts.fetchImpl ?? fetch;
+  const f = opts.fetchImpl ?? defaultFetch;
   try {
     const data = await post(opts.apiKey, buildRequest(opts.model, opts.history, opts.context), f, opts.signal);
     return { message: parseReply(data), model: opts.model, fellBack: false };
@@ -511,6 +515,6 @@ export async function chat(opts: { apiKey: string; model: string; history: ChatM
 }
 
 /** «Probar conexión»: una petición mínima, sin datos ni herramientas. */
-export async function testConnection(apiKey: string, model: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+export async function testConnection(apiKey: string, model: string, fetchImpl: typeof fetch = defaultFetch): Promise<void> {
   await post(apiKey, { model, messages: [{ role: 'user', content: 'Responde solo: ok' }], max_tokens: 16 }, fetchImpl);
 }
