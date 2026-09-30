@@ -244,7 +244,8 @@ describe('herramientas en el móvil', () => {
     const add = await waitForWrite(api, 'POST', '/api/v2/modules/classes');
     // Tercera clase: tercer color de la paleta, como la app anterior.
     expect((add.body as { item: unknown }).item).toMatchObject({ title: 'Química', day: 5, start: '12:00', end: '13:30', room: 'Lab 2', color: '#8B5CF6', subject: '' });
-    expect(await screen.findByText('Química')).toBeOnTheScreen();
+    // Por la fila de la lista: si la prueba corre cuando Química es la próxima clase, su nombre sale dos veces.
+    expect(await screen.findByRole('button', { name: 'Química, viernes de 12:00 a 13:30, aula Lab 2. Editar' })).toBeOnTheScreen();
 
     // Elegir la materia copia su nombre, color y aula.
     fireEvent.press(screen.getByRole('button', { name: 'Física, miércoles de 10:00 a 11:30. Editar' }));
