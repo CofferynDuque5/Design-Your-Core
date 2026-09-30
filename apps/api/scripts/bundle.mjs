@@ -10,17 +10,11 @@ const external = Object.keys(pkg.dependencies).filter((d) => !d.startsWith('@dyc
 rmSync('release', { recursive: true, force: true });
 mkdirSync('release', { recursive: true });
 
-await build({
-  entryPoints: ['src/index.ts'],
-  outfile: 'release/dist/index.js',
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  target: 'node20',
-  external,
-  sourcemap: true,
-  logLevel: 'warning',
-});
+// Dos archivos: index.js solo usa lo que trae Node y carga server.js; así, si faltan
+// dependencias o configuración, index.js puede responder con el motivo (lib/safeMode.ts).
+const common = { bundle: true, platform: 'node', format: 'esm', target: 'node20', sourcemap: true, logLevel: 'warning' };
+await build({ ...common, entryPoints: ['src/server.ts'], outfile: 'release/dist/server.js', external });
+await build({ ...common, entryPoints: ['src/index.ts'], outfile: 'release/dist/index.js', external: ['./server.js'] });
 
 cpSync('prisma', 'release/prisma', { recursive: true });
 cpSync('migrations', 'release/migrations', { recursive: true });
