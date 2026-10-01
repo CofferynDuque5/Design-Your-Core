@@ -12,7 +12,8 @@ import {
   type PillarScores,
   type Range,
 } from '@dyc/core';
-import type { CheckIn, Habit, HabitLog, PrismaClient } from '@prisma/client';
+import type { Db } from '../db/db.js';
+import type { CheckIn, Habit, HabitLog } from '../db/types.js';
 import { fromDb, toDb } from './util.js';
 
 /** Datos de un rango de días, listos para puntuar. */
@@ -21,15 +22,22 @@ export interface DayData {
   habits: Array<Habit & { logs: HabitLog[] }>;
 }
 
-export async function loadDays(prisma: PrismaClient, userId: string, range: Range): Promise<DayData> {
-  const [checkIns, habits] = await Promise.all([
-    prisma.checkIn.findMany({ where: { userId, date: { gte: toDb(range.from), lte: toDb(range.to) } } }),
-    prisma.habit.findMany({
-      where: { userId, OR: [{ archivedAt: null }, { archivedAt: { gte: toDb(range.from) } }] },
-      include: { logs: { where: { date: { gte: toDb(range.from), lte: toDb(range.to) } } } },
-    }),
+export async function loadDays(db: Db, userId: string, range: Range): Promise<DayData> {
+  const from = toDb(range.from);
+  const to = toDb(range.to);
+  const [checkIns, habits, logs] = await Promise.all([
+    db.rows<CheckIn>('SELECT * FROM "CheckIn" WHERE "userId" = $1 AND "date" BETWEEN $2 AND $3', [userId, from, to]),
+    db.rows<Habit>('SELECT * FROM "Habit" WHERE "userId" = $1 AND ("archivedAt" IS NULL OR "archivedAt" >= $2) ORDER BY "createdAt" ASC', [userId, from]),
+    db.rows<HabitLog>(
+      `SELECT l.* FROM "HabitLog" l JOIN "Habit" h ON h."id" = l."habitId"
+       WHERE h."userId" = $1 AND (h."archivedAt" IS NULL OR h."archivedAt" >= $2) AND l."date" BETWEEN $2 AND $3`,
+      [userId, from, to],
+    ),
   ]);
-  return { checkIns: new Map(checkIns.map((c) => [fromDb(c.date), c])), habits };
+  return {
+    checkIns: new Map(checkIns.map((c) => [fromDb(c.date), c])),
+    habits: habits.map((h) => ({ ...h, logs: logs.filter((l) => l.habitId === h.id) })),
+  };
 }
 
 /** Hábitos que tocaban ese día y si se cumplieron. */

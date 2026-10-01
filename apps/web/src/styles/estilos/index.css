@@ -1,0 +1,13 @@
+/*
+ * Estilos visuales de la app (Perfil → Estilo visual). «Editorial» es el
+ * diseño base (tokens.css + components.css + app.css) y no añade nada.
+ * Los demás se activan con <html data-style="…"> y solo cambian:
+ *   - tokens (colores, tipos, radios, sombras), sin capa, para ganar a tokens.css;
+ *   - componentes base en la capa dyc.estilo (antes de dyc.app);
+ *   - estructura y piezas compartidas en la capa dyc.estilo-app (después de dyc.app).
+ * El orden de capas se declara al principio de app.css.
+ * Cada estilo define sus tokens para claro y para oscuro (tema del sistema o elegido).
+ */
+@import './minimal.css';
+@import './glass.css';
+@import './suave.css';

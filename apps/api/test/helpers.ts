@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { loadConfig, type Config } from '../src/config.js';
+import { createDb } from '../src/db/db.js';
 import { migrate } from '../src/db/migrate.js';
 import type { Mailer } from '../src/lib/mailer.js';
 
@@ -9,7 +9,7 @@ import type { Mailer } from '../src/lib/mailer.js';
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/core_test';
 process.env.DATABASE_URL = TEST_DATABASE_URL;
 
-export const prisma = new PrismaClient();
+export const db = createDb(TEST_DATABASE_URL);
 
 export interface SentMail {
   kind: 'reset' | 'partner';
@@ -44,17 +44,17 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
 
 export function makeApp(opts: { config?: Partial<Config>; mailer?: ReturnType<typeof fakeMailer>; strict?: number } = {}) {
   const mailer = opts.mailer ?? fakeMailer();
-  const app = createApp({ prisma, config: testConfig(opts.config), mailer, limits: { general: 10_000, strict: opts.strict ?? 10_000 } });
+  const app = createApp({ db, config: testConfig(opts.config), mailer, limits: { general: 10_000, strict: opts.strict ?? 10_000 } });
   return { app, mailer, api: request(app) };
 }
 
 let migrated = false;
 export async function resetDb() {
   if (!migrated) {
-    await migrate(prisma);
+    await migrate(db);
     migrated = true;
   }
-  await prisma.$executeRawUnsafe('TRUNCATE "User" CASCADE');
+  await db.exec('TRUNCATE "User" CASCADE');
 }
 
 let counter = 0;
