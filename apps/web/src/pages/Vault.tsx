@@ -1,6 +1,6 @@
 import { legacyVault, noteTag, vaultMono, vaultSecureOf, type LegacyVaultEntry, type VaultItem, type VaultSecure } from '@dyc/core';
 import { Copy, Eye, EyeOff, KeyRound, Lock, Pencil, Plus, RefreshCw, Search, ShieldAlert, ShieldCheck, Trash2, Wand2 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { useVault } from '../app/vault';
@@ -103,7 +103,9 @@ export function Vault() {
 function useAutoLock(active: boolean, lock: () => void) {
   const lockRef = useRef(lock);
   lockRef.current = lock;
-  useEffect(() => {
+  // useLayoutEffect: las escuchas quedan puestas en el mismo momento en que se
+  // muestra la bóveda abierta, sin un hueco en el que salir de la página no la bloquee.
+  useLayoutEffect(() => {
     if (!active) return;
     let last = Date.now();
     let timer = window.setTimeout(() => lockRef.current(), VAULT_IDLE_MS);
