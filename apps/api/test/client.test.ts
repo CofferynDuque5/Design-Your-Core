@@ -3,7 +3,7 @@ import type { Server } from 'node:http';
 import { ApiError, createClient, type ApiClient } from '@dyc/api-client';
 import { todayIn } from '@dyc/core';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { makeApp, prisma, resetDb } from './helpers.js';
+import { makeApp, db, resetDb } from './helpers.js';
 
 // El cliente tipado (@dyc/api-client) contra el servidor real: comprueba que
 // las rutas y las formas de respuesta que usan la web y la app móvil existen.
@@ -19,7 +19,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await new Promise((r) => server.close(r));
-  await prisma.$disconnect();
+  await db.close();
 });
 beforeEach(resetDb);
 

@@ -92,7 +92,7 @@ La lista ordenada para salir a producción (decisiones pendientes, configuració
 
 ```
 apps/
-  api/            Express + Prisma + PostgreSQL (migrations/ se aplican al arrancar)
+  api/            Express + PostgreSQL con pg (migrations/ se aplican al arrancar)
   web/            React + Vite + PWA (TanStack Query, React Router)
   site/           Sitio de marca (Astro, estático)
   mobile/         App móvil (Expo, Expo Router, TanStack Query)

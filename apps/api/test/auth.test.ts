@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { bearer, makeApp, prisma, registerUser, resetDb } from './helpers.js';
+import { bearer, makeApp, db, registerUser, resetDb } from './helpers.js';
 
 beforeEach(resetDb);
-afterAll(() => prisma.$disconnect());
+afterAll(() => db.close());
 
 describe('salud', () => {
   it('responde ok', async () => {
@@ -24,7 +24,7 @@ describe('registro e inicio de sesión', () => {
     const { api } = makeApp();
     const { token, user, email, password } = await registerUser(api, { gender: 'mujer' });
     expect(user).toMatchObject({ email, gender: 'mujer', showCycle: true });
-    expect(await prisma.blob.findUnique({ where: { userId: user.id } })).not.toBeNull();
+    expect(await db.row('SELECT 1 FROM "Blob" WHERE "userId" = $1', [user.id])).not.toBeNull();
 
     const me = await api.get('/api/me').set(bearer(token)).expect(200);
     expect(me.body.user.id).toBe(user.id);
@@ -36,7 +36,7 @@ describe('registro e inicio de sesión', () => {
   it('no guarda la contraseña en claro', async () => {
     const { api } = makeApp();
     const { user, password } = await registerUser(api);
-    const row = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    const row = (await db.row<{ passwordHash: string }>('SELECT * FROM "User" WHERE "id" = $1', [user.id]))!;
     expect(row.passwordHash).not.toContain(password);
   });
 
@@ -122,7 +122,7 @@ describe('recuperación de contraseña', () => {
     const { email, user } = await registerUser(api);
     await api.post('/api/auth/forgot-password').send({ email });
     const resetToken = new URL(mailer.sent[0].link).searchParams.get('token') as string;
-    await prisma.user.update({ where: { id: user.id }, data: { resetExpires: new Date(Date.now() - 1000) } });
+    await db.exec('UPDATE "User" SET "resetExpires" = $2 WHERE "id" = $1', [user.id, new Date(Date.now() - 1000)]);
     const res = await api.post('/reset').type('form').send({ token: resetToken, next: 'recuperada-123' }).expect(400);
     expect(res.text).toContain('caducó');
   });

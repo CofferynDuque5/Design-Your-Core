@@ -1,6 +1,7 @@
-import type { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import express, { Router, type RequestHandler, type Response } from 'express';
+import type { Db } from '../db/db.js';
+import type { User } from '../db/types.js';
 import { ah } from '../lib/http.js';
 import { escapeHtml, sha256hex } from '../lib/security.js';
 
@@ -35,7 +36,7 @@ function resultPage(ok: boolean, msg: string): string {
   </style></head><body><div class="card"><h1>${ok ? '✅' : '⚠️'}</h1><p>${escapeHtml(msg)}</p></div></body></html>`;
 }
 
-export function resetRoutes({ prisma, strict }: { prisma: PrismaClient; strict: RequestHandler }): Router {
+export function resetRoutes({ db, strict }: { db: Db; strict: RequestHandler }): Router {
   const r = Router();
 
   r.get('/reset', (req, res) => {
@@ -56,16 +57,16 @@ export function resetRoutes({ prisma, strict }: { prisma: PrismaClient; strict: 
       res.status(400).send(resetPage(token, 'La contraseña debe tener al menos 8 caracteres.'));
       return;
     }
-    const user = token ? await prisma.user.findUnique({ where: { resetTokenHash: sha256hex(token) } }) : null;
+    const user = token ? await db.row<User>('SELECT * FROM "User" WHERE "resetTokenHash" = $1', [sha256hex(token)]) : null;
     if (!user || !user.resetExpires || user.resetExpires.getTime() < Date.now()) {
       res.status(400).send(resultPage(false, 'El enlace no es válido o ya caducó. Pide uno nuevo desde la app.'));
       return;
     }
     const passwordHash = await bcrypt.hash(next, 12);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash, tokenVersion: { increment: 1 }, resetTokenHash: null, resetExpires: null },
-    });
+    await db.exec(
+      'UPDATE "User" SET "passwordHash" = $2, "tokenVersion" = "tokenVersion" + 1, "resetTokenHash" = NULL, "resetExpires" = NULL WHERE "id" = $1',
+      [user.id, passwordHash],
+    );
     res.send(resultPage(true, 'Tu contraseña se cambió correctamente. Ya puedes volver a la app e iniciar sesión.'));
   }));
 

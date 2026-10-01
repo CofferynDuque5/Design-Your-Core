@@ -34,9 +34,9 @@ export interface Config {
 const DEV_SECRET = 'dev-secret-solo-local-0000000000000000';
 
 // Normaliza la cadena de la base de datos para que funcione sí o sí:
-//  - quita channel_binding (el motor no lo soporta y hace fallar la conexión),
-//  - si es un enlace "pooler" de Neon (PgBouncer), añade pgbouncer=true para
-//    que Prisma no use prepared statements (evita errores intermitentes).
+//  - quita channel_binding (la versión anterior con Prisma no lo soportaba),
+//  - si es un enlace "pooler" de Neon (PgBouncer), añade pgbouncer=true (la API
+//    actual lo ignora; se conserva para que la cadena siga sirviendo a la anterior).
 export function normalizeDatabaseUrl(raw: string | undefined): string {
   if (!raw) return '';
   let u = raw

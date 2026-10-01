@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { noteTag } from '@dyc/core';
-import { bearer, makeApp, prisma, registerUser, resetDb } from './helpers.js';
+import { bearer, makeApp, db, registerUser, resetDb } from './helpers.js';
 
 beforeEach(resetDb);
-afterAll(() => prisma.$disconnect());
+afterAll(() => db.close());
 
 // Documento como lo deja la app anterior: claves conocidas, otras que la API
 // v2 no toca y una desconocida que debe sobrevivir a cualquier escritura.
@@ -38,7 +38,7 @@ describe('v2 · módulos de la app anterior', () => {
 
   it('sin documento responde vacío y lo crea en la primera escritura', async () => {
     const { api, auth, sync } = await setup(null);
-    await prisma.blob.deleteMany(); // el registro crea uno vacío; aquí se prueba sin él
+    await db.exec('DELETE FROM "Blob"'); // el registro crea uno vacío; aquí se prueba sin él
     expect((await api.get('/api/v2/modules').set(auth).expect(200)).body).toEqual({ data: {}, updatedAt: null });
     const res = await api.post('/api/v2/modules/tasks').set(auth).send({ item: { id: 't1', title: 'Llamar' } }).expect(201);
     expect(res.body.item).toEqual({ id: 't1', title: 'Llamar', pri: 'media', time: null, rem: false, done: false, tags: '' });

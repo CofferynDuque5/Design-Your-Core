@@ -1,5 +1,5 @@
-import type { PrismaClient } from '@prisma/client';
 import type { Auth } from '../auth.js';
+import type { Db } from '../db/db.js';
 import { Router, type RequestHandler } from 'express';
 import { accountRoutes } from './account.js';
 import { challengeRoutes } from './challenges.js';
@@ -11,7 +11,7 @@ import { profileRoutes } from './profile.js';
 import { sessionRoutes } from './sessions.js';
 
 /** API v2: pilares, check-ins, hábitos con historial, retos, recomendaciones y módulos de la app anterior. */
-export function v2Routes(deps: { prisma: PrismaClient; auth: Auth; requireAuth: RequestHandler; strict: RequestHandler }): Router {
+export function v2Routes(deps: { db: Db; auth: Auth; requireAuth: RequestHandler; strict: RequestHandler }): Router {
   const r = Router();
   r.use(sessionRoutes(deps));
   r.use(profileRoutes(deps));

@@ -1,9 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { bearer, makeApp, prisma, registerUser, resetDb } from './helpers.js';
+import { bearer, makeApp, db, registerUser, resetDb } from './helpers.js';
 
 beforeEach(resetDb);
-afterAll(() => prisma.$disconnect());
+afterAll(() => db.close());
+
+const devices = async () => (await db.row<{ n: number }>('SELECT count(*)::int AS n FROM "PushDevice"'))?.n;
 
 const PASSWORD = 'contraseña-segura';
 
@@ -28,7 +30,7 @@ describe('v2 · sesiones renovables', () => {
     const { api } = makeApp();
     const s = await mobileSession(api);
     expect(s.refreshToken.length).toBeGreaterThan(30);
-    const row = await prisma.refreshToken.findFirstOrThrow({ where: { userId: s.user.id } });
+    const row = (await db.row<{ tokenHash: string; deviceName: string }>('SELECT * FROM "RefreshToken" WHERE "userId" = $1', [s.user.id]))!;
     expect(row.tokenHash).not.toBe(s.refreshToken);
     expect(row.deviceName).toBe('iPhone de Ana');
     const bad = await api.post('/api/v2/auth/session').send({ email: s.email, password: 'otra-cosa' }).expect(401);
@@ -65,7 +67,7 @@ describe('v2 · sesiones renovables', () => {
   it('una sesión caducada no se renueva', async () => {
     const { api } = makeApp();
     const s = await mobileSession(api);
-    await prisma.refreshToken.updateMany({ data: { expiresAt: new Date(Date.now() - 1000) } });
+    await db.exec('UPDATE "RefreshToken" SET "expiresAt" = $1', [new Date(Date.now() - 1000)]);
     await api.post('/api/v2/auth/refresh').send({ refreshToken: s.refreshToken }).expect(401);
   });
 
@@ -87,17 +89,17 @@ describe('v2 · dispositivos push', () => {
     const token = 'ExponentPushToken[abcdefghijklmnop]';
     await api.put('/api/v2/devices').set(bearer(a.token)).send({ token, platform: 'ios' }).expect(200);
     await api.put('/api/v2/devices').set(bearer(a.token)).send({ token, platform: 'ios' }).expect(200);
-    expect(await prisma.pushDevice.count()).toBe(1);
+    expect(await devices()).toBe(1);
 
     // El mismo teléfono inicia sesión con otra cuenta: el token pasa a esa cuenta.
     await api.put('/api/v2/devices').set(bearer(b.token)).send({ token, platform: 'ios' }).expect(200);
-    expect((await prisma.pushDevice.findFirstOrThrow()).userId).toBe(b.user.id);
+    expect((await db.row<{ userId: string }>('SELECT * FROM "PushDevice"'))?.userId).toBe(b.user.id);
 
     // Una cuenta no puede borrar el dispositivo de otra.
     await api.delete(`/api/v2/devices/${encodeURIComponent(token)}`).set(bearer(a.token)).expect(200);
-    expect(await prisma.pushDevice.count()).toBe(1);
+    expect(await devices()).toBe(1);
     await api.delete(`/api/v2/devices/${encodeURIComponent(token)}`).set(bearer(b.token)).expect(200);
-    expect(await prisma.pushDevice.count()).toBe(0);
+    expect(await devices()).toBe(0);
 
     await api.put('/api/v2/devices').set(bearer(a.token)).send({ token, platform: 'symbian' }).expect(400);
     await api.put('/api/v2/devices').send({ token, platform: 'ios' }).expect(401);

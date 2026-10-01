@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
-import { fakeMailer, prisma, testConfig } from './helpers.js';
+import { fakeMailer, db, testConfig } from './helpers.js';
 
 // Paquete de cPanel: la API sirve también la app web desde public/.
 function withWeb() {
@@ -13,7 +13,7 @@ function withWeb() {
   writeFileSync(join(root, 'index.html'), '<!doctype html><title>Design Your Core</title><script>/*tema*/</script>');
   writeFileSync(join(root, 'assets', 'index-abc123.js'), 'console.log(1)');
   writeFileSync(join(root, 'sw.js'), 'self.addEventListener("fetch",()=>{})');
-  return request(createApp({ prisma, config: testConfig(), mailer: fakeMailer(), webRoot: root }));
+  return request(createApp({ db, config: testConfig(), mailer: fakeMailer(), webRoot: root }));
 }
 
 describe('web en el mismo dominio', () => {
@@ -47,7 +47,7 @@ describe('web en el mismo dominio', () => {
   });
 
   it('sin carpeta web, la raíz no responde con la app', async () => {
-    const res = await request(createApp({ prisma, config: testConfig(), mailer: fakeMailer() })).get('/entrar').set('Accept', 'text/html');
+    const res = await request(createApp({ db, config: testConfig(), mailer: fakeMailer() })).get('/entrar').set('Accept', 'text/html');
     expect(res.status).toBe(404);
   });
 });

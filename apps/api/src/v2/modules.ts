@@ -24,8 +24,9 @@ import {
   type LegacyKey,
   type LegacyObjectKey,
 } from '@dyc/core';
-import type { Prisma, PrismaClient } from '@prisma/client';
 import { Router, type Request, type RequestHandler, type Response } from 'express';
+import type { Db } from '../db/db.js';
+import { findBlob } from '../routes/sync.js';
 import { ah } from '../lib/http.js';
 import { parse } from './util.js';
 
@@ -51,7 +52,7 @@ class HttpError extends Error {
  * JSON de /api/sync. Cada escritura bloquea la fila del documento, cambia solo
  * su clave y conserva todas las demás (también las que esta API no conoce).
  */
-export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; requireAuth: RequestHandler }): Router {
+export function moduleRoutes({ db, requireAuth }: { db: Db; requireAuth: RequestHandler }): Router {
   const r = Router();
 
   /**
@@ -59,23 +60,24 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
    * devuelve en `set` (y quita las de `unset`); el resto queda igual.
    */
   async function withDoc<T>(userId: string, fn: (doc: Doc) => { set: Doc; unset?: string[]; result: T }) {
-    return prisma.$transaction(
-      async (tx) => {
-        const lock = () => tx.$queryRaw<Array<{ data: unknown }>>`SELECT "data" FROM "Blob" WHERE "userId" = ${userId} FOR UPDATE`;
-        let rows = await lock();
-        if (!rows.length) {
-          await tx.$executeRaw`INSERT INTO "Blob" ("userId", "data", "updatedAt") VALUES (${userId}, '{}'::jsonb, now()) ON CONFLICT ("userId") DO NOTHING`;
-          rows = await lock();
-        }
-        const raw = rows[0]?.data;
-        const doc: Doc = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Doc) : {};
-        const { set, unset = [], result } = fn(doc);
-        const next = Object.fromEntries(Object.entries({ ...doc, ...set }).filter(([k]) => !unset.includes(k))) as Prisma.InputJsonObject;
-        const saved = await tx.blob.update({ where: { userId }, data: { data: next } });
-        return { result, updatedAt: saved.updatedAt };
-      },
-      { maxWait: 10_000, timeout: 15_000 },
-    );
+    return db.tx(async (tx) => {
+      const lock = () => tx.rows<{ data: unknown }>('SELECT "data" FROM "Blob" WHERE "userId" = $1 FOR UPDATE', [userId]);
+      let rows = await lock();
+      if (!rows.length) {
+        await tx.exec('INSERT INTO "Blob" ("userId", "data", "updatedAt") VALUES ($1, \'{}\'::jsonb, $2) ON CONFLICT ("userId") DO NOTHING', [userId, new Date()]);
+        rows = await lock();
+      }
+      const raw = rows[0]?.data;
+      const doc: Doc = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Doc) : {};
+      const { set, unset = [], result } = fn(doc);
+      const next = Object.fromEntries(Object.entries({ ...doc, ...set }).filter(([k]) => !unset.includes(k)));
+      const saved = await tx.row<{ updatedAt: Date }>('UPDATE "Blob" SET "data" = $2::jsonb, "updatedAt" = $3 WHERE "userId" = $1 RETURNING "updatedAt"', [
+        userId,
+        JSON.stringify(next),
+        new Date(),
+      ]);
+      return { result, updatedAt: saved?.updatedAt ?? null };
+    });
   }
 
   /** Edita la lista de una clave (tal cual, sin filtrar, para no perder nada de lo guardado). */
@@ -223,7 +225,7 @@ export function moduleRoutes({ prisma, requireAuth }: { prisma: PrismaClient; re
 
   // Todo el documento, igual que GET /api/sync.
   r.get('/modules', requireAuth, ah(async (req, res) => {
-    const blob = await prisma.blob.findUnique({ where: { userId: req.userId } });
+    const blob = await findBlob(db, req.userId as string);
     res.json({ data: blob?.data ?? {}, updatedAt: blob?.updatedAt ?? null });
   }));
 

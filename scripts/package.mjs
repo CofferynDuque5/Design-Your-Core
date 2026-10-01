@@ -109,8 +109,10 @@ Dominio: ${API_URL} (la app web y la API van juntas en este dominio)
    - DATABASE_URL: la misma de siempre.
    - JWT_SECRET: pon uno NUEVO (el anterior se considera expuesto). Todos tendrán que volver a entrar una vez.
    - CLIENT_ORIGIN y PUBLIC_URL: copia las líneas del ejemplo.
-5. En «Setup Node.js App»: archivo de inicio dist/index.js. Pulsa «Run NPM Install» y después «Start App».
+5. En «Setup Node.js App»: archivo de inicio dist/index.js. Pulsa «Start App» (o «Restart»).
+   No hace falta «Run NPM Install»: la API ya trae todo lo que necesita dentro de dist/.
 6. Abre ${API_URL}/api/health: debe decir {"ok":true,"service":"core-cloud"}.
+   Si dice "ok":false, el mensaje explica qué falta (JWT_SECRET, DATABASE_URL…).
 7. Abre ${API_URL}: aparece la pantalla para entrar.
 
 Al arrancar, la API añade sus tablas nuevas a la base de datos sin tocar las cuentas ni los datos.

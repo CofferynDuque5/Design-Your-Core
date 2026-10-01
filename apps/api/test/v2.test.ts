@@ -1,9 +1,9 @@
 import { addDays, todayIn } from '@dyc/core';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { bearer, makeApp, prisma, registerUser, resetDb } from './helpers.js';
+import { bearer, makeApp, db, registerUser, resetDb } from './helpers.js';
 
 beforeEach(resetDb);
-afterAll(() => prisma.$disconnect());
+afterAll(() => db.close());
 
 const today = () => todayIn('UTC');
 
@@ -125,9 +125,10 @@ describe('v2 · retos', () => {
 
   it('da por completados los retos cuyo plazo terminó', async () => {
     const { api, auth, user } = await setup();
-    await prisma.userChallenge.create({
-      data: { userId: user.id, challengeKey: 'pausa-activa', pillar: 'movimiento', startedOn: new Date(`${addDays(today(), -10)}T00:00:00Z`), durationDays: 5 },
-    });
+    await db.exec(
+      `INSERT INTO "UserChallenge" ("id", "userId", "challengeKey", "pillar", "startedOn", "durationDays", "createdAt") VALUES ('reto-viejo', $1, 'pausa-activa', 'movimiento', $2, 5, now())`,
+      [user.id, `${addDays(today(), -10)}`],
+    );
     const list = await api.get('/api/v2/challenges').set(auth).expect(200);
     expect(list.body.active).toEqual([]);
     expect(list.body.past[0]).toMatchObject({ key: 'pausa-activa', status: 'completed' });
@@ -142,7 +143,7 @@ describe('v2 · panel', () => {
     await api.put(`/api/v2/checkins/${d}`).set(auth).send({ mood: 5, stress: 1, sleepHours: 8, sleepQuality: 5, connection: 4 }).expect(200);
     await api.put(`/api/v2/checkins/${lastWeek}`).set(auth).send({ mood: 3, stress: 3, sleepHours: 5, sleepQuality: 3 }).expect(200);
     const habit = await api.post('/api/v2/habits').set(auth).send({ title: 'Estirar', pillar: 'movimiento' }).expect(201);
-    await prisma.habit.update({ where: { id: habit.body.habit.id }, data: { startsOn: new Date(`${lastWeek}T00:00:00Z`) } });
+    await db.exec('UPDATE "Habit" SET "startsOn" = $2 WHERE "id" = $1', [habit.body.habit.id, lastWeek]);
     await api.put(`/api/v2/habits/${habit.body.habit.id}/logs/${d}`).set(auth).send({ done: true }).expect(200);
 
     const res = await api.get(`/api/v2/dashboard?period=week&date=${d}`).set(auth).expect(200);
@@ -232,8 +233,8 @@ describe('v2 · cuenta', () => {
 
     await api.delete('/api/v2/account').set(auth).send({ password: 'equivocada' }).expect(401);
     await api.delete('/api/v2/account').set(auth).send({ password }).expect(200);
-    expect(await prisma.user.findUnique({ where: { id: user.id } })).toBeNull();
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: partner.user.id } })).partnerId).toBeNull();
+    expect(await db.row('SELECT 1 FROM "User" WHERE "id" = $1', [user.id])).toBeNull();
+    expect((await db.row<{ partnerId: string | null }>('SELECT * FROM "User" WHERE "id" = $1', [partner.user.id]))?.partnerId).toBeNull();
     await api.get('/api/me').set(auth).expect(401);
   });
 });
