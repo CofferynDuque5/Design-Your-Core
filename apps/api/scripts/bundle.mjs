@@ -10,11 +10,16 @@ const external = Object.keys(pkg.dependencies).filter((d) => !d.startsWith('@dyc
 rmSync('release', { recursive: true, force: true });
 mkdirSync('release', { recursive: true });
 
-// Dos archivos: index.js solo usa lo que trae Node y carga server.js; así, si faltan
-// dependencias o configuración, index.js puede responder con el motivo (lib/safeMode.ts).
-const common = { bundle: true, platform: 'node', format: 'esm', target: 'node20', sourcemap: true, logLevel: 'warning' };
-await build({ ...common, entryPoints: ['src/server.ts'], outfile: 'release/dist/server.js', external });
-await build({ ...common, entryPoints: ['src/index.ts'], outfile: 'release/dist/index.js', external: ['./server.js'] });
+// Dos archivos. dist/server.mjs es la API (ESM). dist/index.js es CommonJS y solo usa lo
+// que trae Node: el servidor de Node de cPanel (LiteSpeed/Passenger) carga el archivo de
+// inicio con require(), que no acepta ESM con «await» de nivel superior. index.js carga
+// server.mjs con import() y, si falla, responde con el motivo (lib/safeMode.ts).
+const common = { bundle: true, platform: 'node', target: 'node20', sourcemap: true, logLevel: 'warning' };
+await build({ ...common, entryPoints: ['src/server.ts'], outfile: 'release/dist/server.mjs', format: 'esm', external });
+await build({ ...common, entryPoints: ['src/index.ts'], outfile: 'release/dist/index.js', format: 'cjs', external: ['./server.js'] });
+const entry = readFileSync('release/dist/index.js', 'utf8');
+if (!entry.includes('import("./server.js")')) throw new Error('index.js debe cargar server con import()');
+writeFileSync('release/dist/index.js', entry.replace('import("./server.js")', 'import("./server.mjs")'));
 
 cpSync('prisma', 'release/prisma', { recursive: true });
 cpSync('migrations', 'release/migrations', { recursive: true });
@@ -40,7 +45,6 @@ writeFileSync(
       name: 'design-your-core-api',
       private: true,
       version: pkg.version,
-      type: 'module',
       main: 'dist/index.js',
       engines: { node: '>=20' },
       scripts: { start: 'node dist/index.js', postinstall: `node -e "${generate}"` },

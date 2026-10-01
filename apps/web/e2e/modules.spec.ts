@@ -121,8 +121,11 @@ test('pendientes: añadir, subtareas, reordenar, renombrar y borrar', async ({ p
 test('calendario: eventos de cada mes y marcas de otras secciones', async ({ page }) => {
   await register(page, 'calendario');
   await onboard(page);
-  const now = new Date();
-  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  // El mes visible es el del navegador (zona de México), no el de Node (UTC).
+  const ym = await page.evaluate(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   await seedLegacy(page, {
     ...OLD,
     reminders: [{ id: 'r1', day: 14, title: 'Dentista', when: '14:00', color: '#4F7CFF', icon: 'doc', on: true }],

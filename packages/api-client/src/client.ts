@@ -2,6 +2,10 @@ import type { CheckInInput, Day, HabitInput, HabitPatch, LegacyData, LegacyItems
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
+/** Mensaje cuando responde algo que no es la API (página del hosting, proxy…). */
+const notApi = (status: number) =>
+  `El servidor respondió sin la API (código ${status}). Inténtalo de nuevo en un momento; si sigue igual, la API no está arrancada.`;
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -72,9 +76,14 @@ export function createClient(opts: ClientOptions) {
         if (fresh) return request<T>(method, path, body, true);
       }
       if (sessionLost) opts.onUnauthorized?.();
-      const msg = (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' && data.error) || 'Algo salió mal. Inténtalo de nuevo.';
+      const msg =
+        (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' && data.error) ||
+        (data === null ? notApi(res.status) : 'Algo salió mal. Inténtalo de nuevo.');
       throw new ApiError(msg, res.status, data);
     }
+    // La API siempre responde JSON: si llega otra cosa (una página HTML del
+    // hosting), la API no está detrás de esa dirección.
+    if (data === null) throw new ApiError(notApi(res.status), res.status);
     return data as T;
   }
 
