@@ -39,7 +39,7 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--lime);outline-o
 .result.bad svg{color:var(--bad)}
 `;
 
-const LOGO = `<svg viewBox="0 0 64 64" width="28" height="28" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#C8F23A"/><circle cx="32" cy="32" r="17" fill="none" stroke="#10120C" stroke-width="5" stroke-dasharray="13.4 4.4" transform="rotate(-82.58 32 32)"/><circle cx="32" cy="32" r="6" fill="#10120C"/></svg>`;
+const LOGO = `<svg viewBox="0 0 64 64" width="28" height="28" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#C8F23A"/><g transform="translate(32 32) scale(0.8) translate(-33 -33.5)"><ellipse cx="32" cy="53" rx="10" ry="3" fill="#10120C" opacity="0.45"/><path d="M32 50 V30" fill="none" stroke="#10120C" stroke-width="4.5" stroke-linecap="round"/><path d="M31 41 C23 41 16 35.5 15 26 C24 26 30.5 31.5 31 41 Z" fill="#10120C"/><path d="M33 32 C33 21.5 40.5 13 51 11.5 C51 23 43.5 31 33 32 Z" fill="#10120C"/></g></svg>`;
 const icon = (paths: string, size = 20) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 const ALERT = icon('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>');
