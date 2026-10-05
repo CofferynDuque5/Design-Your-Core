@@ -1,6 +1,6 @@
 # Design Your Core
 
-Plataforma de bienestar personal construida alrededor de seis pilares: energía y movimiento, descanso, alimentación, enfoque mental, relaciones y propósito personal. Un solo backend da servicio a la app web, al sitio de marca y a la app móvil.
+Plataforma de bienestar personal construida alrededor de seis pilares: energía y movimiento, descanso, alimentación, enfoque mental, relación de pareja y propósito personal. Un solo backend da servicio a la app web, al sitio de marca y a la app móvil.
 
 ## Estado
 
@@ -9,7 +9,7 @@ Plataforma de bienestar personal construida alrededor de seis pilares: energía 
 | Cliente de la API | `packages/api-client` | Cliente tipado de la API, compartido por la web y la app móvil |
 | API | `apps/api` | v1 compatible con la app actual + v2 con pilares, check-ins, hábitos con historial, retos, panel y recomendaciones. Pruebas de integración |
 | Lógica compartida | `packages/core` | Pilares, fechas, validación, puntuaciones, catálogo de retos y recomendaciones. La usan la API, la web y la app móvil |
-| Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html) |
+| Sistema de diseño | `packages/tokens` | Tokens (color, tipografía, espaciado, pilares) y componentes CSS base. [Guía visual](docs/design-system/index.html). La web tiene cuatro estilos visuales (Editorial, Minimalista, Cristal y Suave), cinco tipografías y cinco paletas de color: [docs/estilos.md](docs/estilos.md) |
 | App web | `apps/web` | PWA en React: acceso, onboarding, Hoy, check-in, hábitos, retos, progreso día/semana/mes, perfil y ajustes, sección Más. Pruebas de componentes y de punta a punta |
 | Sitio de marca | `apps/site` | Astro estático: portada con los seis pilares, cómo funciona, principios, privacidad y 404. Pruebas del HTML generado y de accesibilidad con axe |
 | App móvil | `apps/mobile` | Expo (iOS y Android): acceso con sesión renovable guardada en el llavero, bienvenida, Hoy, check-in, hábitos, retos, progreso, perfil, tema claro/oscuro y recordatorio diario. Pruebas de sesión, recordatorio y recorridos con el enrutador real |
@@ -75,6 +75,8 @@ El teléfono necesita llegar a la API: en desarrollo la app usa la IP del ordena
 
 Más detalles en [docs/instalacion.md](docs/instalacion.md) y la referencia de endpoints en [docs/api.md](docs/api.md).
 
+Para enseñar la web sin servidor hay una versión de prueba en un solo HTML, con datos de ejemplo que viven en el navegador: `pnpm --filter @dyc/web build:demo` ([docs/demo.md](docs/demo.md)).
+
 ## Publicar
 
 La lista ordenada para salir a producción (decisiones pendientes, configuración, copia de seguridad, despliegue, comprobaciones y cómo volver atrás) está en [docs/lanzamiento.md](docs/lanzamiento.md).
@@ -90,7 +92,7 @@ La lista ordenada para salir a producción (decisiones pendientes, configuració
 
 ```
 apps/
-  api/            Express + Prisma + PostgreSQL (migrations/ se aplican al arrancar)
+  api/            Express + PostgreSQL con pg (migrations/ se aplican al arrancar)
   web/            React + Vite + PWA (TanStack Query, React Router)
   site/           Sitio de marca (Astro, estático)
   mobile/         App móvil (Expo, Expo Router, TanStack Query)
@@ -100,4 +102,5 @@ packages/
   tokens/         Design tokens → CSS y tema para React Native
 docs/
   design-system/  Guía visual generada desde los tokens
+  estilos.md      Estilos, tipografías y paletas de la web, y cómo cambiar los de por defecto
 ```

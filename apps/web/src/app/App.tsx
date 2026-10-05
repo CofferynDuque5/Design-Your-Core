@@ -1,24 +1,54 @@
 import { ApiError } from '@dyc/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
+import { lazy, useState, type ComponentType, type ReactNode } from 'react';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 import { AppShell } from '../components/AppShell';
 import { UpdatePrompt } from '../components/UpdatePrompt';
 import { Forgot } from '../pages/auth/Forgot';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
 import { CheckIn } from '../pages/CheckIn';
-import { Challenges } from '../pages/Challenges';
-import { Habits } from '../pages/Habits';
-import { More } from '../pages/More';
 import { NotFound } from '../pages/NotFound';
 import { Onboarding } from '../pages/Onboarding';
-import { Profile } from '../pages/Profile';
-import { Progress } from '../pages/Progress';
 import { Today } from '../pages/Today';
 import { useProfile } from './queries';
 import { SessionProvider, useSession } from './session';
 import { ToastProvider } from './toast';
+
+// Cada herramienta se descarga al abrirla por primera vez: la pantalla Hoy, el
+// check-in y la entrada van en el paquete inicial; el resto, en trozos aparte.
+const page = <K extends string>(name: K, load: () => Promise<Record<K, ComponentType>>) => lazy(() => load().then((m) => ({ default: m[name] })));
+const Agenda = page('Agenda', () => import('../pages/Agenda'));
+const Assistant = page('Assistant', () => import('../pages/Assistant'));
+const Breathe = page('Breathe', () => import('../pages/Breathe'));
+const Calendar = page('Calendar', () => import('../pages/Calendar'));
+const Challenges = page('Challenges', () => import('../pages/Challenges'));
+const Content = page('Content', () => import('../pages/Content'));
+const Cycle = page('Cycle', () => import('../pages/Cycle'));
+const Exercise = page('Exercise', () => import('../pages/Exercise'));
+const Finance = page('Finance', () => import('../pages/Finance'));
+const Goals = page('Goals', () => import('../pages/Goals'));
+const Journal = page('Journal', () => import('../pages/Journal'));
+const Pets = page('Pets', () => import('../pages/Pets'));
+const Routine = page('Routine', () => import('../pages/Routine'));
+const Sleep = page('Sleep', () => import('../pages/Sleep'));
+const Focus = page('Focus', () => import('../pages/Focus'));
+const Habits = page('Habits', () => import('../pages/Habits'));
+const Ideas = page('Ideas', () => import('../pages/Ideas'));
+const More = page('More', () => import('../pages/More'));
+const NotebookDetail = page('NotebookDetail', () => import('../pages/Notebooks'));
+const Notebooks = page('Notebooks', () => import('../pages/Notebooks'));
+const NoteEditor = page('NoteEditor', () => import('../pages/Notes'));
+const Notes = page('Notes', () => import('../pages/Notes'));
+const Profile = page('Profile', () => import('../pages/Profile'));
+const Progress = page('Progress', () => import('../pages/Progress'));
+const Projects = page('Projects', () => import('../pages/Projects'));
+const Roadmaps = page('Roadmaps', () => import('../pages/Roadmaps'));
+const Schedule = page('Schedule', () => import('../pages/Schedule'));
+const Subjects = page('Subjects', () => import('../pages/Subjects'));
+const Todos = page('Todos', () => import('../pages/Todos'));
+const Vault = page('Vault', () => import('../pages/Vault'));
+const Work = page('Work', () => import('../pages/Work'));
 
 export function makeQueryClient() {
   return new QueryClient({
@@ -75,6 +105,32 @@ export function AppRoutes() {
         <Route path="habitos" element={<Habits />} />
         <Route path="perfil" element={<Profile />} />
         <Route path="mas" element={<More />} />
+        <Route path="agenda" element={<Agenda />} />
+        <Route path="pendientes" element={<Todos />} />
+        <Route path="calendario" element={<Calendar />} />
+        <Route path="horario" element={<Schedule />} />
+        <Route path="enfoque" element={<Focus />} />
+        <Route path="materias" element={<Subjects />} />
+        <Route path="proyectos" element={<Projects />} />
+        <Route path="roadmaps" element={<Roadmaps />} />
+        <Route path="cuadernos" element={<Notebooks />} />
+        <Route path="cuadernos/:id" element={<NotebookDetail />} />
+        <Route path="contenido" element={<Content />} />
+        <Route path="ideas" element={<Ideas />} />
+        <Route path="finanzas" element={<Finance />} />
+        <Route path="metas" element={<Goals />} />
+        <Route path="mascotas" element={<Pets />} />
+        <Route path="ciclo" element={<Cycle />} />
+        <Route path="ejercicio" element={<Exercise />} />
+        <Route path="sueno" element={<Sleep />} />
+        <Route path="diario" element={<Journal />} />
+        <Route path="rutina" element={<Routine />} />
+        <Route path="notas" element={<Notes />} />
+        <Route path="notas/:id" element={<NoteEditor />} />
+        <Route path="boveda" element={<Vault />} />
+        <Route path="asistente" element={<Assistant />} />
+        <Route path="trabajo" element={<Work />} />
+        <Route path="respiracion" element={<Breathe />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
@@ -92,13 +148,16 @@ export function Providers({ children, client }: { children: ReactNode; client?: 
   );
 }
 
+// La versión de prueba es un solo archivo HTML servido en cualquier ruta: las rutas van tras «#».
+const Router = import.meta.env.VITE_DEMO ? HashRouter : BrowserRouter;
+
 export function App() {
   return (
     <Providers>
-      <BrowserRouter>
+      <Router>
         <AppRoutes />
-        <UpdatePrompt />
-      </BrowserRouter>
+        {!import.meta.env.VITE_DEMO && <UpdatePrompt />}
+      </Router>
     </Providers>
   );
 }

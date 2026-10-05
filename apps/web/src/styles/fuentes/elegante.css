@@ -1,0 +1,7 @@
+/* Elegante: Fraunces para títulos y Source Sans 3 para el texto. Se carga solo al elegirla (ver src/app/font.ts). */
+@import '@fontsource/fraunces/latin-300.css';
+@import '@fontsource/fraunces/latin-400.css';
+@import '@fontsource/fraunces/latin-400-italic.css';
+@import '@fontsource/source-sans-3/latin-400.css';
+@import '@fontsource/source-sans-3/latin-500.css';
+@import '@fontsource/source-sans-3/latin-600.css';

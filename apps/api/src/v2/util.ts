@@ -1,6 +1,6 @@
 import { dateToDay, dayToDate, isDay, todayIn, type Day } from '@dyc/core';
-import type { PrismaClient } from '@prisma/client';
 import type { Response } from 'express';
+import type { Db } from '../db/db.js';
 import type { ZodType, ZodTypeDef } from 'zod';
 
 /** Valida con Zod; si falla responde 400 con el primer problema y devuelve null. */
@@ -23,11 +23,11 @@ export function dayParam(value: unknown, res: Response): Day | null {
 export const toDb = (d: Day) => dayToDate(d);
 export const fromDb = (d: Date) => dateToDay(d);
 
-export async function userTimezone(prisma: PrismaClient, userId: string): Promise<string> {
-  const p = await prisma.profile.findUnique({ where: { userId }, select: { timezone: true } });
+export async function userTimezone(db: Db, userId: string): Promise<string> {
+  const p = await db.row<{ timezone: string }>('SELECT "timezone" FROM "Profile" WHERE "userId" = $1', [userId]);
   return p?.timezone || 'UTC';
 }
 
-export async function userToday(prisma: PrismaClient, userId: string): Promise<Day> {
-  return todayIn(await userTimezone(prisma, userId));
+export async function userToday(db: Db, userId: string): Promise<Day> {
+  return todayIn(await userTimezone(db, userId));
 }

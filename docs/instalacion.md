@@ -5,7 +5,7 @@ Para publicar esta versión paso a paso, empieza por [lanzamiento.md](lanzamient
 ## Desarrollo local
 
 1. Instala Node.js 22 y activa pnpm: `corepack enable`.
-2. `pnpm install` en la raíz. Genera también el cliente de Prisma.
+2. `pnpm install` en la raíz.
 3. Levanta PostgreSQL (ver el README) y crea una base de datos, por ejemplo `core_dev`.
 4. Copia `apps/api/core-config.env.example` a `apps/api/core-config.env` y rellena:
    - `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/core_dev`
@@ -37,9 +37,9 @@ La CI de GitHub Actions (`.github/workflows/ci.yml`) ejecuta typecheck, pruebas 
 
 Es el mismo esquema que ya usa la versión en producción.
 
-1. Genera el paquete: `pnpm build && pnpm --filter @dyc/api bundle`. Se crea `apps/api/release/` con `dist/`, `prisma/`, `migrations/` y un `package.json` sin dependencias internas.
+1. Genera el paquete: `pnpm build && pnpm --filter @dyc/api bundle`. Se crea `apps/api/release/` con `dist/` (la API con todas sus dependencias dentro), `migrations/` y un `package.json` sin dependencias.
 2. Sube el **contenido** de `release/` a la carpeta de la aplicación Node en cPanel, junto con tu `core-config.env` (parte de `core-config.env.example`).
-3. En "Setup Node.js App": versión de Node 20 o 22, archivo de inicio `dist/index.js`. Pulsa "Run NPM Install" (instala dependencias y genera Prisma).
+3. En "Setup Node.js App": versión de Node 20 o 22, archivo de inicio `dist/index.js`. No hace falta "Run NPM Install": pulsa "Start App" o "Restart".
 4. Reinicia la aplicación y comprueba `https://TU-API/api/health` → `{"ok":true,"service":"core-cloud"}`.
 
 ### Migraciones
