@@ -1,6 +1,6 @@
 # Design Your Core
 
-Plataforma de bienestar personal construida alrededor de seis pilares: energía y movimiento, descanso, alimentación, enfoque mental, relaciones y propósito personal. Un solo backend da servicio a la app web, al sitio de marca y a la app móvil.
+Plataforma de bienestar personal construida alrededor de seis pilares: energía y movimiento, descanso, alimentación, enfoque mental, relación de pareja y propósito personal. Un solo backend da servicio a la app web, al sitio de marca y a la app móvil.
 
 ## Estado
 

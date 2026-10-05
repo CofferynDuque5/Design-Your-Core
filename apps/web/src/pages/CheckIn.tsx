@@ -116,7 +116,7 @@ function CheckInForm({ date, initial, isToday }: { date: Day; initial: Values; i
       </Section>
 
       <Section pillar="relaciones">
-        <Scale legend="Conexión con otras personas" value={v.connection} onChange={set('connection')} low="Aislada/o" high="Muy conectada/o" />
+        <Scale legend="Conexión con tu pareja" value={v.connection} onChange={set('connection')} low="Distantes" high="Muy unidos" />
       </Section>
 
       <Section pillar="proposito" title="Propósito y reflexión">

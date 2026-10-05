@@ -37,10 +37,10 @@ export const CHALLENGES: readonly Challenge[] = [
   { key: 'atencion-3', pillar: 'enfoque', track: 'atencion', level: 3, durationDays: 14, title: 'Dos bloques de enfoque profundo de 50 minutos', description: 'Resérvalos en tu agenda como una reunión contigo.' },
   { key: 'descarga-mental', pillar: 'enfoque', track: 'descarga-mental', level: 1, durationDays: 7, title: 'Escribe lo que te preocupa antes de dormir', description: 'Anota cada preocupación y, si la hay, una próxima acción. La cabeza descansa mejor cuando no tiene que recordar.' },
 
-  { key: 'conexion-1', pillar: 'relaciones', track: 'conexion', level: 1, durationDays: 7, title: 'Escríbele a alguien que extrañas', description: 'Un mensaje breve y sincero. No hace falta esperar respuesta.' },
-  { key: 'conexion-2', pillar: 'relaciones', track: 'conexion', level: 2, durationDays: 7, title: 'Una conversación de 15 minutos sin teléfono', description: 'Con tu pareja, familia o amistades. Presencia completa.' },
-  { key: 'conexion-3', pillar: 'relaciones', track: 'conexion', level: 3, durationDays: 14, title: 'Un encuentro a la semana con alguien importante', description: 'Propón el plan tú. Un café o una caminata cuentan.' },
-  { key: 'agradecer', pillar: 'relaciones', track: 'agradecer', level: 1, durationDays: 7, title: 'Agradece algo concreto a una persona cada día', description: 'Di qué hizo y cómo te ayudó. Lo concreto se recuerda.' },
+  { key: 'conexion-1', pillar: 'relaciones', track: 'conexion', level: 1, durationDays: 7, title: 'Dile a tu pareja algo que valoras de su forma de ser', description: 'Una frase concreta al día, en persona o por mensaje. No hace falta esperar respuesta.' },
+  { key: 'conexion-2', pillar: 'relaciones', track: 'conexion', level: 2, durationDays: 7, title: '15 minutos al día con tu pareja, sin teléfono', description: 'Pregunta cómo le fue y escucha sin prisa. Presencia completa.' },
+  { key: 'conexion-3', pillar: 'relaciones', track: 'conexion', level: 3, durationDays: 14, title: 'Una cita a la semana con tu pareja', description: 'Propón el plan tú. Un café, una caminata o cocinar juntos cuentan.' },
+  { key: 'agradecer', pillar: 'relaciones', track: 'agradecer', level: 1, durationDays: 7, title: 'Agradece a tu pareja algo concreto cada día', description: 'Di qué hizo y cómo te ayudó. Lo concreto se recuerda.' },
 
   { key: 'sentido-1', pillar: 'proposito', track: 'sentido', level: 1, durationDays: 7, title: 'Una línea de reflexión al final del día', description: '¿Qué te dio energía hoy? ¿Qué te la quitó? Una línea es suficiente.' },
   { key: 'sentido-2', pillar: 'proposito', track: 'sentido', level: 2, durationDays: 7, title: '20 minutos para algo que te importa', description: 'Aprender, crear, ayudar: algo que no sea urgente pero sí importante para ti.' },

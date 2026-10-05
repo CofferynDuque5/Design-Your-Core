@@ -51,7 +51,7 @@ function demoHtml(): Plugin {
         manifest: {
           name: 'Design Your Core',
           short_name: 'Core',
-          description: 'Tu bienestar en seis pilares: movimiento, descanso, alimentación, enfoque, relaciones y propósito.',
+          description: 'Tu bienestar en seis pilares: movimiento, descanso, alimentación, enfoque, pareja y propósito.',
           lang: 'es',
           start_url: '/',
           scope: '/',

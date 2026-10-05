@@ -19,7 +19,7 @@ const IDEAS: Array<{ title: string; pillar: PillarId }> = [
   { title: 'Pantallas fuera 30 minutos antes de dormir', pillar: 'descanso' },
   { title: 'Un vaso de agua al despertar', pillar: 'alimentacion' },
   { title: 'Un bloque de trabajo sin notificaciones', pillar: 'enfoque' },
-  { title: 'Escribir a alguien que aprecio', pillar: 'relaciones' },
+  { title: 'Un detalle para mi pareja', pillar: 'relaciones' },
   { title: 'Una línea en el diario', pillar: 'proposito' },
 ];
 

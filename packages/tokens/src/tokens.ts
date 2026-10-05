@@ -185,9 +185,9 @@ export const pillars: readonly Pillar[] = [
   },
   {
     id: 'relaciones',
-    name: 'Relaciones',
-    short: 'Relaciones',
-    description: 'Tiempo de calidad con pareja, familia y amistades.',
+    name: 'Relación de pareja',
+    short: 'Pareja',
+    description: 'Tiempo de calidad con tu pareja: hablar, escucharse y estar presentes.',
     color: { light: '#9A5064', dark: '#DDA0AF' },
     soft: { light: '#F4E1E5', dark: '#33202A' },
     chart: { light: '#C1657C', dark: '#D1748F' },

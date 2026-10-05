@@ -199,7 +199,7 @@ describe('v2 · recomendaciones', () => {
     expect(keys).toContain('checkin-missing');
     expect(keys).toContain('focus:relaciones');
     const focus = first.body.recommendations.find((r: { key: string }) => r.key === 'focus:relaciones');
-    expect(focus.reason).toMatch(/relaciones/);
+    expect(focus.reason).toMatch(/tu relación de pareja/);
     expect(focus.action).toEqual({ type: 'start-challenge', challengeKey: 'conexion-1' });
 
     await api.post('/api/v2/recommendations/checkin-missing/dismiss').set(auth).expect(200);

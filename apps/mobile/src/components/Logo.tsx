@@ -9,7 +9,7 @@ export function Logo({ size = 28, withName = true }: { size?: number; withName?:
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} accessible accessibilityRole="image" accessibilityLabel="Design Your Core">
       <Svg width={size} height={size} viewBox="0 0 64 64">
         <Rect width={64} height={64} rx={14} fill={colors.primary} />
-        <Circle cx={32} cy={32} r={17} fill="none" stroke={colors.sandSoft} strokeWidth={4} />
+        <Circle cx={32} cy={32} r={17} fill="none" stroke={colors.sandSoft} strokeWidth={5} strokeDasharray="13.4 4.4" transform="rotate(-82.58 32 32)" />
         <Circle cx={32} cy={32} r={6} fill={colors.sand} />
       </Svg>
       {withName && (

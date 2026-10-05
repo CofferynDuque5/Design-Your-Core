@@ -11,7 +11,7 @@ const PRIMARY = '#1E3A5F';
 const mark = (size, { bg = PRIMARY, scale = 1, ring = '#F1EADC', dot = '#C9B28C' } = {}) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64">
   ${bg ? `<rect width="64" height="64" fill="${bg}"/>` : ''}
   <g transform="translate(32 32) scale(${scale}) translate(-32 -32)">
-    <circle cx="32" cy="32" r="17" fill="none" stroke="${ring}" stroke-width="4"/>
+    <circle cx="32" cy="32" r="17" fill="none" stroke="${ring}" stroke-width="5" stroke-dasharray="13.4 4.4" transform="rotate(-82.58 32 32)"/>
     <circle cx="32" cy="32" r="6" fill="${dot}"/>
   </g>
 </svg>`;

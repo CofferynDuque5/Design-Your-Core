@@ -51,7 +51,7 @@ describe('sitio compilado', () => {
 
   it('muestra los seis pilares con un reto real del catálogo', () => {
     const src = html('index.html');
-    for (const name of ['Energía y movimiento', 'Descanso', 'Alimentación', 'Enfoque mental', 'Relaciones', 'Propósito personal']) expect(src).toContain(name);
+    for (const name of ['Energía y movimiento', 'Descanso', 'Alimentación', 'Enfoque mental', 'Relación de pareja', 'Propósito personal']) expect(src).toContain(name);
     expect(src.match(/Un reto para empezar/g)).toHaveLength(6);
   });
 });

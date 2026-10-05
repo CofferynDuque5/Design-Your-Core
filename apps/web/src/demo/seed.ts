@@ -67,7 +67,7 @@ function sampleHabits(today: Day, now: string): DemoHabit[] {
     ['Pantallas fuera antes de dormir', 'descanso', '1234567', 0.55],
     ['Un vaso de agua al despertar', 'alimentacion', '1234567', 0.85],
     ['Un bloque de estudio sin móvil', 'enfoque', '12345', 0.7],
-    ['Llamar a alguien querido', 'relaciones', '67', 0.8],
+    ['Un detalle para mi pareja', 'relaciones', '67', 0.8],
   ];
   const habits: DemoHabit[] = list.map(([title, pillar, days, rate], j) => {
     const logs: Record<Day, boolean> = {};
