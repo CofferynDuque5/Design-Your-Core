@@ -7,7 +7,7 @@ afterAll(() => db.close());
 
 const devices = async () => (await db.row<{ n: number }>('SELECT count(*)::int AS n FROM "PushDevice"'))?.n;
 
-const PASSWORD = 'contraseña-segura';
+const PASSWORD = 'Contraseña-Segura1';
 
 async function mobileSession(api: ReturnType<typeof makeApp>['api']) {
   const u = await registerUser(api);

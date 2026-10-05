@@ -371,8 +371,11 @@ export const localDayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth(
 /** "HH:MM" de una fecha local. */
 export const localTime = (d = new Date()) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-/** Cantidades sin moneda, como la app anterior (`toLocaleString("es")`): 1234.5 → "1234,5"; 12345 → "12.345". */
-export const money = (n: number) => new Intl.NumberFormat('es', { maximumFractionDigits: 2 }).format(n);
+/** Cantidades sin moneda: con céntimos, siempre dos decimales (1234.5 → "1234,50"); sin ellos, ninguno (12345 → "12.345"). */
+export const money = (n: number) => {
+  const cents = Math.round(n * 100) % 100 !== 0;
+  return new Intl.NumberFormat('es', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 }).format(n);
+};
 
 /** 465 → "7 h 45 min". */
 export const minutesLabel = (m: number) => durationLabel(m / 60);

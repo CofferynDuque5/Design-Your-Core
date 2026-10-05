@@ -154,7 +154,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
     ['/cuadernos/nb1', 'Decorar'],
     ['/contenido', 'Editar «Probé 100 apps»'],
     ['/finanzas', 'Nuevo movimiento'],
-    ['/finanzas', 'Editar: Gasto de 45,5 en Comida (Mercado)'],
+    ['/finanzas', 'Editar: Gasto de 45,50 en Comida (Mercado)'],
     ['/finanzas', 'Cambiar'],
     ['/metas', 'Nueva meta'],
     ['/metas', 'Editar «Leer 12 libros»'],

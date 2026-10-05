@@ -2,6 +2,11 @@
  * Aviso de la versión de prueba (src/demo/DemoBanner.tsx). Solo usa tokens,
  * así se ve bien con cada estilo, paleta y tema, claro u oscuro.
  */
+
+/* Mismo orden de capas que app.css: este archivo se carga antes y, sin esta
+ * línea, la capa de páginas quedaría por debajo de los componentes base. */
+@layer dyc.base, dyc.components, dyc.estilo, dyc.app, dyc.estilo-app;
+
 @layer dyc.app {
   .demo-banner {
     display: flex;

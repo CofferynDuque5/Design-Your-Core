@@ -8,7 +8,7 @@ import { isUniqueViolation, newId, type Db } from '../db/db.js';
 import type { User } from '../db/types.js';
 import { ah } from '../lib/http.js';
 import type { Mailer } from '../lib/mailer.js';
-import { EMAIL_RE, sha256hex } from '../lib/security.js';
+import { EMAIL_RE, sha256hex, strongPassword, WEAK_PASSWORD } from '../lib/security.js';
 
 export const publicUser = (u: User) => ({ id: u.id, email: u.email, name: u.name, gender: u.gender ?? 'otro', showCycle: !!u.showCycle });
 
@@ -62,6 +62,7 @@ export function authRoutes({ db, auth, mailer, config, strict }: Deps): Router {
   r.post('/auth/register', strict, ah(async (req, res) => {
     const parsed = creds.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Datos inválidos (email válido y contraseña de 8+ caracteres)' });
+    if (!strongPassword(parsed.data.password)) return res.status(400).json({ error: WEAK_PASSWORD });
     const email = parsed.data.email.toLowerCase().trim();
     const name = (parsed.data.name || email.split('@')[0]).trim();
     if (await findUserByEmail(db, email)) return res.status(409).json({ error: 'Ya existe una cuenta con ese correo' });
@@ -94,7 +95,7 @@ export function authRoutes({ db, auth, mailer, config, strict }: Deps): Router {
   // sesiones (incrementa tokenVersion). Devuelve un token nuevo para esta sesión.
   r.post('/auth/change-password', requireAuth, strict, ah(async (req, res) => {
     const parsed = changePw.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'La nueva contraseña debe tener 8+ caracteres' });
+    if (!parsed.success || !strongPassword(parsed.data.next)) return res.status(400).json({ error: WEAK_PASSWORD });
     const user = await findUser(db, req.userId as string);
     if (!user) return res.status(401).json({ error: 'Sesión inválida' });
     if (!(await bcrypt.compare(parsed.data.current, user.passwordHash))) return res.status(401).json({ error: 'La contraseña actual no es correcta' });

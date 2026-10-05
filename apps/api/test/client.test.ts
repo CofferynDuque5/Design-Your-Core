@@ -31,7 +31,7 @@ function client(onUnauthorized?: () => void) {
 
 async function signedIn(): Promise<ApiClient> {
   const { api, setToken } = client();
-  const s = await api.auth.register({ email: 'cliente@example.com', password: 'contraseña-segura', name: 'Cliente' });
+  const s = await api.auth.register({ email: 'cliente@example.com', password: 'Contraseña-Segura1', name: 'Cliente' });
   setToken(s.token);
   await api.profile.update({ timezone: 'UTC' });
   return api;
@@ -40,9 +40,9 @@ async function signedIn(): Promise<ApiClient> {
 describe('@dyc/api-client', () => {
   it('registra, entra y lee la sesión', async () => {
     const { api, setToken } = client();
-    const reg = await api.auth.register({ email: 'a@example.com', password: 'contraseña-segura', name: 'Ana' });
+    const reg = await api.auth.register({ email: 'a@example.com', password: 'Contraseña-Segura1', name: 'Ana' });
     expect(reg.user).toMatchObject({ email: 'a@example.com', name: 'Ana' });
-    const login = await api.auth.login({ email: 'a@example.com', password: 'contraseña-segura' });
+    const login = await api.auth.login({ email: 'a@example.com', password: 'Contraseña-Segura1' });
     setToken(login.token);
     expect(await api.auth.me()).toMatchObject({ id: reg.user.id });
     expect(await api.health()).toMatchObject({ ok: true });
@@ -50,7 +50,7 @@ describe('@dyc/api-client', () => {
 
   it('convierte los errores en ApiError con el mensaje de la API', async () => {
     const { api } = client();
-    const err = await api.auth.login({ email: 'nadie@example.com', password: 'contraseña-segura' }).catch((e) => e);
+    const err = await api.auth.login({ email: 'nadie@example.com', password: 'Contraseña-Segura1' }).catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 401, message: 'Correo o contraseña incorrectos', isNetwork: false });
   });
@@ -84,7 +84,7 @@ describe('@dyc/api-client', () => {
         return access;
       },
     });
-    const s = await api.session.register({ email: 'movil@example.com', password: 'contraseña-segura', name: 'Ana', device: 'Pixel' });
+    const s = await api.session.register({ email: 'movil@example.com', password: 'Contraseña-Segura1', name: 'Ana', device: 'Pixel' });
     ({ accessToken: access, refreshToken: refresh } = s);
     const firstRefresh = refresh;
 
@@ -102,7 +102,7 @@ describe('@dyc/api-client', () => {
     expect(expired).toBe(1);
 
     // Los dispositivos se registran con la sesión.
-    const again = await api.session.login({ email: 'movil@example.com', password: 'contraseña-segura' });
+    const again = await api.session.login({ email: 'movil@example.com', password: 'Contraseña-Segura1' });
     access = again.accessToken;
     await expect(api.devices.register('ExponentPushToken[prueba-123456]', 'android')).resolves.toEqual({ ok: true });
   });

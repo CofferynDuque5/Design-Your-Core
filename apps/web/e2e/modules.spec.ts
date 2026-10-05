@@ -489,7 +489,7 @@ test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) =>
   await expect(budget.getByText(/La app anterior tenía 300/)).toBeVisible();
   await budget.getByLabel('Cuánto quieres gastar al mes').fill('250,5');
   await budget.getByRole('button', { name: 'Guardar' }).click();
-  await expect(page.getByText(/Quedan 210,5/)).toBeVisible();
+  await expect(page.getByText(/Quedan 210,50/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Nuevo movimiento' }).click();
   let dialog = page.getByRole('dialog', { name: 'Nuevo movimiento' });

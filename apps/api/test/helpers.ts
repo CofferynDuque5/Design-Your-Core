@@ -60,7 +60,7 @@ export async function resetDb() {
 let counter = 0;
 export async function registerUser(api: ReturnType<typeof request>, data: Record<string, unknown> = {}) {
   counter++;
-  const body = { email: `persona${counter}@example.com`, password: 'contraseña-segura', name: `Persona ${counter}`, ...data };
+  const body = { email: `persona${counter}@example.com`, password: 'Contraseña-Segura1', name: `Persona ${counter}`, ...data };
   const res = await api.post('/api/auth/register').send(body).expect(200);
   return { token: res.body.token as string, user: res.body.user, email: body.email as string, password: body.password as string };
 }

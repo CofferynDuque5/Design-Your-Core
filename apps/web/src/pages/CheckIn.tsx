@@ -125,7 +125,7 @@ function CheckInForm({ date, initial, isToday }: { date: Day; initial: Values; i
         <TextArea label="Reflexión del día" rows={4} maxLength={4000} value={v.note ?? ''} onChange={(e) => set('note')(e.target.value)} hint="Solo tú la ves." />
       </Section>
 
-      <div className="form-actions">
+      <div className="form-actions form-actions--sticky">
         <Link to="/" className="btn btn--ghost">
           Cancelar
         </Link>

@@ -161,6 +161,30 @@
     background: var(--color-bg);
   }
 
+  /* Mientras llega el código de una herramienta: una línea fina que solo aparece si tarda. */
+  .page-loading {
+    min-height: 60vh;
+    position: relative;
+  }
+  .page-loading::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: var(--color-primary);
+    transform-origin: left;
+    opacity: 0;
+    animation: page-loading 1.2s ease-in-out 250ms infinite;
+  }
+  @keyframes page-loading {
+    0% { opacity: 1; transform: scaleX(0); }
+    60% { opacity: 1; transform: scaleX(0.7); }
+    100% { opacity: 0; transform: scaleX(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-loading::before { animation: none; opacity: 0.6; transform: none; }
+  }
+
   /* ---------- Estructura: barra lateral (escritorio) y pestañas (móvil) ---------- */
 
   .shell {
@@ -181,7 +205,7 @@
     inset: auto 0 0;
     z-index: 20;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     padding-bottom: env(safe-area-inset-bottom);
     background: color-mix(in srgb, var(--color-surface) 92%, transparent);
     backdrop-filter: blur(12px);
@@ -342,6 +366,25 @@
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: var(--space-3);
+  }
+
+  /* Formularios largos (check-in): el botón de guardar queda siempre a la vista, sobre la barra de pestañas. */
+  .form-actions--sticky {
+    position: sticky;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    z-index: 10;
+    padding: var(--space-3);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-md);
+  }
+
+  @media (min-width: 1024px) {
+    .form-actions--sticky {
+      bottom: var(--space-4);
+    }
   }
 
   .is-stale {

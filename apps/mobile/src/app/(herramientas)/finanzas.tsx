@@ -27,7 +27,7 @@ import { useToast } from '../../lib/toast';
 const SHOWN_MAX = 300;
 const TYPE_OPTIONS = TX_TYPES.map((t) => ({ value: t, label: TX_TYPE_INFO[t].label }));
 const amountOf = (t: LegacyTransaction) => Math.abs(typeof t.amount === 'number' ? t.amount : 0);
-/** «Gasto de 12,3 en Transporte (Metro)»: nombre de un movimiento para lectores. */
+/** «Gasto de 12,30 en Transporte (Metro)»: nombre de un movimiento para lectores. */
 const describe = (t: LegacyTransaction) => `${TX_TYPE_INFO[txTypeOf(t)].label} de ${money(amountOf(t))} en ${t.category || 'Otro'}${t.note ? ` (${t.note})` : ''}`;
 
 export default function Finance() {

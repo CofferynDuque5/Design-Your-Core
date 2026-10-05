@@ -6,7 +6,7 @@ import type { Auth } from '../auth.js';
 import { newId, type Db } from '../db/db.js';
 import type { RefreshToken, User } from '../db/types.js';
 import { ah } from '../lib/http.js';
-import { sha256hex } from '../lib/security.js';
+import { sha256hex, strongPassword, WEAK_PASSWORD } from '../lib/security.js';
 import { createUser, findUser, findUserByEmail, publicUser } from '../routes/auth.js';
 import { parse } from './util.js';
 
@@ -68,6 +68,7 @@ export function sessionRoutes({ db, auth, requireAuth, strict }: Deps): Router {
   r.post('/auth/register', strict, ah(async (req, res) => {
     const input = parse(registerSchema, req.body, res);
     if (!input) return;
+    if (!strongPassword(input.password)) return res.status(400).json({ error: WEAK_PASSWORD });
     const email = input.email.toLowerCase().trim();
     if (await findUserByEmail(db, email)) return res.status(409).json({ error: 'Ya existe una cuenta con ese correo' });
     const user = await createUser(db, {

@@ -1,5 +1,5 @@
 import { BarChart3, CheckSquare, ChevronDown, Flag, LayoutGrid, Sun, User } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router';
 import { useUnsavedGuard } from '../app/legacy';
 import { useSession } from '../app/session';
@@ -74,6 +74,7 @@ export function AppShell() {
   const location = useLocation();
   const { user } = useSession();
   const groups = useToolGroups(location.pathname);
+  const inTool = TOOLS.some((t) => location.pathname === t.to || location.pathname.startsWith(`${t.to}/`));
   useUnsavedGuard();
   // Los enlaces de invitación de pareja llegan como /?invite=CODIGO.
   const invite = new URLSearchParams(location.search).get('invite');
@@ -144,7 +145,16 @@ export function AppShell() {
             Estás sin conexión. Verás lo último que se cargó; los cambios se podrán guardar cuando vuelvas a tener internet.
           </div>
         )}
-        <Outlet />
+        {/* Las herramientas se descargan al abrirlas: mientras llega su código, un aviso discreto. */}
+        <Suspense
+          fallback={
+            <div className="page-loading" role="status">
+              <span className="visually-hidden">Cargando…</span>
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
       <nav className="tabbar" aria-label="Principal">
         {NAV.map(({ to, label, icon: Icon, end }) => (
@@ -153,6 +163,11 @@ export function AppShell() {
             <span>{label}</span>
           </NavLink>
         ))}
+        {/* En el móvil las herramientas se abren desde Más: la pestaña sigue marcada dentro de ellas. */}
+        <NavLink to="/mas" className={({ isActive }) => `tabbar__link${isActive || inTool ? ' active' : ''}`}>
+          <LayoutGrid size={22} strokeWidth={1.75} aria-hidden="true" />
+          <span>Más</span>
+        </NavLink>
       </nav>
     </div>
   );

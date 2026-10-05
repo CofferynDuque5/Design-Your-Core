@@ -199,6 +199,12 @@
     padding-bottom: calc(88px + env(safe-area-inset-bottom));
   }
 
+  @media (max-width: 1023px) {
+    [data-style='suave'] .form-actions--sticky {
+      bottom: calc(88px + env(safe-area-inset-bottom));
+    }
+  }
+
   @media (min-width: 1024px) {
     [data-style='suave'] .main {
       padding-bottom: 0;

@@ -689,8 +689,8 @@ describe('Finanzas', () => {
     const api = withApi();
     renderAt('/finanzas');
     expect(await screen.findByText('+1200', { selector: '.stat__value *' })).toBeInTheDocument();
-    expect(screen.getByText('−45,5', { selector: '.stat__value *' })).toBeInTheDocument();
-    expect(screen.getByText('1154,5', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(screen.getByText('−45,50', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(screen.getByText('1154,50', { selector: '.stat__value *' })).toBeInTheDocument();
     // El movimiento antiguo de otro mes no cuenta.
     expect(within(screen.getByRole('region', { name: /Movimientos/ })).getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getByRole('progressbar', { name: 'Comida: 100 % de los gastos' })).toBeInTheDocument();
@@ -701,7 +701,7 @@ describe('Finanzas', () => {
     await userEvent.click(within(budget).getByRole('button', { name: 'Guardar' }));
     expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/budget', body: { monthly: 500 } });
     expect(await screen.findByRole('progressbar', { name: 'Presupuesto gastado' })).toHaveAttribute('aria-valuenow', '9');
-    expect(screen.getByText(/Quedan 454,5/)).toBeInTheDocument();
+    expect(screen.getByText(/Quedan 454,50/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Nuevo movimiento' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo movimiento' });
@@ -714,7 +714,7 @@ describe('Finanzas', () => {
       path: '/api/v2/modules/transactions',
       body: { item: { type: 'expense', amount: 12.3, category: 'Transporte', note: 'Metro', date: utcDayKey() } },
     });
-    expect(await screen.findByRole('button', { name: 'Editar: Gasto de 12,3 en Transporte (Metro)' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Editar: Gasto de 12,30 en Transporte (Metro)' })).toBeInTheDocument();
   });
 
   it('un ingreso cambia las categorías y se puede borrar con deshacer', async () => {
@@ -726,7 +726,7 @@ describe('Finanzas', () => {
     expect(within(within(dialog).getByLabelText('Categoría')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Sueldo', 'Freelance', 'Contenido', 'Regalo', 'Otro']);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Borrar: Gasto de 45,5 en Comida (Mercado)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Borrar: Gasto de 45,50 en Comida (Mercado)' }));
     expect(writes(api)[0]).toMatchObject({ method: 'DELETE', path: '/api/v2/modules/transactions/x2' });
     await userEvent.click(await screen.findByRole('button', { name: 'Deshacer' }));
     expect(writes(api)[1]).toMatchObject({ method: 'POST', body: { item: { id: 'x2', amount: 45.5 } } });

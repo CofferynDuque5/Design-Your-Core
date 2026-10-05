@@ -1,13 +1,13 @@
-// Genera los iconos PNG de la PWA a partir del logotipo (usa el Chromium de Playwright).
+// Genera los iconos PNG de la PWA a partir del logotipo, en negro sobre lima (usa el Chromium de Playwright).
 // Uso: pnpm --filter @dyc/web icons
 import { writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
 const mark = (size, pad) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="${pad ? 0 : 14}" fill="#1E3A5F"/>
+  <rect width="64" height="64" rx="${pad ? 0 : 14}" fill="#C8F23A"/>
   <g transform="translate(32 32) scale(${pad ? 0.72 : 1}) translate(-32 -32)">
-    <circle cx="32" cy="32" r="17" fill="none" stroke="#F1EADC" stroke-width="4"/>
-    <circle cx="32" cy="32" r="6" fill="#C9B28C"/>
+    <circle cx="32" cy="32" r="17" fill="none" stroke="#10120C" stroke-width="4"/>
+    <circle cx="32" cy="32" r="6" fill="#10120C"/>
   </g>
 </svg>`;
 
