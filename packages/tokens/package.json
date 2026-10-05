@@ -12,6 +12,7 @@
       "default": "./dist/index.js"
     },
     "./tokens.css": "./dist/tokens.css",
+    "./lima.css": "./dist/lima.css",
     "./components.css": "./css/components.css"
   },
   "files": [

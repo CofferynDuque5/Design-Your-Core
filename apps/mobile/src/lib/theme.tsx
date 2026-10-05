@@ -1,4 +1,4 @@
-import { color, pillarById, type ColorScheme, type PillarId, type ThemeName } from '@dyc/tokens';
+import { lima, pillarById, type ColorScheme, type PillarId, type ThemeName } from '@dyc/tokens';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
 import { readJson, writeJson } from './storage';
@@ -22,7 +22,10 @@ export function resolveTheme(pref: ThemePreference, system: string | null | unde
   return system === 'dark' ? 'dark' : 'light';
 }
 
-export function ThemeProvider({ children, initial = 'system' }: { children: ReactNode; initial?: ThemePreference }) {
+/** Como en la web: oscuro por defecto, salvo que la persona elija otro tema. */
+export const DEFAULT_THEME: ThemePreference = 'dark';
+
+export function ThemeProvider({ children, initial = DEFAULT_THEME }: { children: ReactNode; initial?: ThemePreference }) {
   const system = useColorScheme();
   const [preference, setPref] = useState<ThemePreference>(initial);
 
@@ -39,7 +42,7 @@ export function ThemeProvider({ children, initial = 'system' }: { children: Reac
   const value = useMemo<ThemeValue>(
     () => ({
       name,
-      colors: color[name],
+      colors: lima[name],
       preference,
       setPreference,
       pillar: (id) => {

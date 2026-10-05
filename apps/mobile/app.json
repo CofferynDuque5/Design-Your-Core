@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "designyourcore",
     "userInterfaceStyle": "automatic",
-    "backgroundColor": "#F4F3EF",
+    "backgroundColor": "#0A0B09",
     "ios": {
       "bundleIdentifier": "com.nvcorx.designyourcore",
       "supportsTablet": true,
@@ -16,7 +16,7 @@
     "android": {
       "package": "com.nvcorx.designyourcore",
       "adaptiveIcon": {
-        "backgroundColor": "#1E3A5F",
+        "backgroundColor": "#C8F23A",
         "foregroundImage": "./assets/adaptive-icon.png",
         "monochromeImage": "./assets/adaptive-icon-monochrome.png"
       },
@@ -26,17 +26,17 @@
       "output": "single",
       "favicon": "./assets/favicon.png",
       "name": "Design Your Core",
-      "themeColor": "#1E3A5F"
+      "themeColor": "#0A0B09"
     },
     "plugins": [
       "expo-router",
       "expo-font",
       "expo-secure-store",
-      ["expo-notifications", { "color": "#1E3A5F" }],
+      ["expo-notifications", { "color": "#C8F23A" }],
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#1E3A5F",
+          "backgroundColor": "#0A0B09",
           "image": "./assets/splash-icon.png",
           "imageWidth": 120
         }
