@@ -661,7 +661,7 @@ describe('Ideas', () => {
 const withCycle = (extra: Record<string, Handler> = {}) => withApi({ 'GET /api/me': () => ({ user: { ...USER, showCycle: true } }), ...extra });
 
 describe('Barra lateral', () => {
-  it('agrupa las herramientas en subgrupos plegables y solo muestra Ciclo si está activado', async () => {
+  it('agrupa las herramientas en subgrupos plegables, todos abiertos, y solo muestra Ciclo si está activado', async () => {
     withApi();
     renderAt('/ejercicio');
     const nav = await screen.findByRole('navigation', { name: 'Herramientas' });
@@ -669,11 +669,14 @@ describe('Barra lateral', () => {
     expect(salud).toHaveAttribute('aria-expanded', 'true');
     const list = within(nav).getByRole('list', { name: 'Salud' });
     expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Ejercicio', 'Sueño', 'Diario', 'Rutina', 'Respiración']);
-    // Los demás grupos empiezan plegados y se abren al pulsarlos.
+    // Todos los grupos empiezan abiertos: cada sección se ve en el menú. Se pueden plegar.
     const personal = within(nav).getByRole('button', { name: 'Vida personal' });
-    expect(personal).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(personal);
+    expect(personal).toHaveAttribute('aria-expanded', 'true');
     expect(within(within(nav).getByRole('list', { name: 'Vida personal' })).getByRole('link', { name: 'Finanzas' })).toBeInTheDocument();
+    expect(within(nav).getAllByRole('link')).toHaveLength(23);
+    await userEvent.click(personal);
+    expect(personal).toHaveAttribute('aria-expanded', 'false');
+    expect(within(nav).queryByRole('list', { name: 'Vida personal' })).not.toBeInTheDocument();
   });
 
   it('con Ciclo activado aparece en Salud', async () => {

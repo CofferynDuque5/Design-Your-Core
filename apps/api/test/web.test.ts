@@ -46,6 +46,13 @@ describe('web en el mismo dominio', () => {
     await withWeb().get('/logo-que-no-existe.png').set('Accept', 'image/png').expect(404);
   });
 
+  it('un trozo de código que ya no existe da 404, no la página de la app', async () => {
+    // import() pide los módulos con Accept: */*; antes recibía index.html y fallaba por el tipo MIME.
+    const res = await withWeb().get('/assets/Agenda-version-vieja.js').set('Accept', '*/*');
+    expect(res.status).toBe(404);
+    expect(res.text).not.toContain('<title>Design Your Core</title>');
+  });
+
   it('sin carpeta web, la raíz no responde con la app', async () => {
     const res = await request(createApp({ db, config: testConfig(), mailer: fakeMailer() })).get('/entrar').set('Accept', 'text/html');
     expect(res.status).toBe(404);

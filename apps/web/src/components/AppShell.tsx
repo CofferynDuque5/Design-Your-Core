@@ -5,6 +5,7 @@ import { useUnsavedGuard } from '../app/legacy';
 import { useSession } from '../app/session';
 import { TOOL_GROUPS, TOOLS, type ToolGroup } from '../app/tools';
 import { Logo } from './Logo';
+import { PageErrorBoundary } from './PageErrorBoundary';
 
 const NAV = [
   { to: '/', label: 'Hoy', icon: Sun, end: true },
@@ -32,11 +33,11 @@ function useOnline() {
 const GROUPS_KEY = 'dyc.sidebar.groups';
 
 /**
- * Subgrupos plegables de la barra lateral. Por defecto solo está abierto el de
- * la página actual; lo que la persona abre o cierra se recuerda en este
- * navegador (si el almacenamiento no está disponible, se usa el defecto).
+ * Subgrupos plegables de la barra lateral. Por defecto están todos abiertos, para
+ * que cada sección se vea en el menú; lo que la persona cierra o abre se recuerda
+ * en este navegador (si el almacenamiento no está disponible, se usa el defecto).
  */
-function useToolGroups(pathname: string) {
+function useToolGroups() {
   const [saved, setSaved] = useState<Partial<Record<ToolGroup, boolean>>>(() => {
     try {
       const v = JSON.parse(localStorage.getItem(GROUPS_KEY) ?? '{}');
@@ -45,8 +46,7 @@ function useToolGroups(pathname: string) {
       return {};
     }
   });
-  const active = TOOLS.find((t) => pathname === t.to || pathname.startsWith(`${t.to}/`))?.group;
-  const isOpen = (g: ToolGroup) => saved[g] ?? g === active;
+  const isOpen = (g: ToolGroup) => saved[g] ?? true;
   const toggle = useCallback(
     (g: ToolGroup, open: boolean) =>
       setSaved((s) => {
@@ -73,7 +73,7 @@ export function AppShell() {
   const online = useOnline();
   const location = useLocation();
   const { user } = useSession();
-  const groups = useToolGroups(location.pathname);
+  const groups = useToolGroups();
   const inTool = TOOLS.some((t) => location.pathname === t.to || location.pathname.startsWith(`${t.to}/`));
   useUnsavedGuard();
   // Los enlaces de invitación de pareja llegan como /?invite=CODIGO.
@@ -146,15 +146,18 @@ export function AppShell() {
           </div>
         )}
         {/* Las herramientas se descargan al abrirlas: mientras llega su código, un aviso discreto. */}
-        <Suspense
-          fallback={
-            <div className="page-loading" role="status">
-              <span className="visually-hidden">Cargando…</span>
-            </div>
-          }
-        >
-          <Outlet />
-        </Suspense>
+        {/* Si una sección no se puede abrir, el menú sigue a la vista (antes la app quedaba en blanco). */}
+        <PageErrorBoundary resetKey={location.pathname}>
+          <Suspense
+            fallback={
+              <div className="page-loading" role="status">
+                <span className="visually-hidden">Cargando…</span>
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
+        </PageErrorBoundary>
       </main>
       <nav className="tabbar" aria-label="Principal">
         {NAV.map(({ to, label, icon: Icon, end }) => (

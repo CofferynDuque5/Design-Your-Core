@@ -24,7 +24,9 @@ export function webRoutes(root: string): Router {
     }),
   );
   r.get('*', (req, res, next) => {
-    if (!req.accepts('html')) return next();
+    // Un archivo que no está (por ejemplo, un trozo de código de una versión anterior) da 404:
+    // devolver index.html haría fallar el import() con un error de tipo MIME.
+    if (!req.accepts('html') || /\.[a-z0-9]+$/i.test(req.path)) return next();
     res.set('Cache-Control', 'no-cache');
     res.sendFile(join(root, 'index.html'));
   });
