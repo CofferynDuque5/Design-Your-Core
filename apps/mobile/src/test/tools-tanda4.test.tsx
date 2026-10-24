@@ -13,6 +13,11 @@ import { fakeModules, tokens, type Handler } from './fakeApi';
 const reset = () => (SecureStore as unknown as { __reset: () => void }).__reset();
 const utc = utcDayKey();
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+/**
+ * Respiración avanza el reloj falso varios minutos: cerca de la medianoche UTC
+ * «hoy» cambiaría a mitad de la prueba. Se fija el reloj al mediodía de hoy.
+ */
+const atNoon = () => jest.setSystemTime(new Date(`${utc}T12:00:00.000Z`));
 
 function legacyDoc(): LegacyData {
   return {
@@ -254,6 +259,7 @@ describe('herramientas de la tanda 4 en el móvil', () => {
     // renderRouter usa relojes falsos: el tiempo avanza con `wait`.
     const wait = (ms: number) => act(async () => void jest.advanceTimersByTime(ms));
     await open('/respiracion', 'Tus minutos de calma');
+    atNoon();
     expect(await screen.findByLabelText('Esta semana: 3 min')).toBeOnTheScreen();
     expect(screen.getByLabelText('Hoy: 3 min')).toBeOnTheScreen();
     expect(screen.getByLabelText('Sesiones en total: 2')).toBeOnTheScreen();
@@ -304,6 +310,7 @@ describe('herramientas de la tanda 4 en el móvil', () => {
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
     const wait = (ms: number) => act(async () => void jest.advanceTimersByTime(ms));
     await open('/respiracion', 'Tus minutos de calma');
+    atNoon();
     expect(await screen.findByText(/Con «Reducir movimiento» activado, el círculo no se mueve\./)).toBeOnTheScreen();
     fireEvent.press(screen.getByRole('button', { name: 'Empezar' }));
     await wait(125_000);
