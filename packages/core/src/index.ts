@@ -1,3 +1,4 @@
+export * from './assistant.js';
 export * from './challenges.js';
 export * from './checkin.js';
 export * from './dates.js';
