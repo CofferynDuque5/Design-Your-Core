@@ -31,7 +31,7 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-secure-store",
+      ["expo-secure-store", { "faceIDPermission": "Design Your Core usa Face ID para abrir tu Bóveda sin escribir la contraseña maestra." }],
       ["expo-notifications", { "color": "#C8F23A" }],
       [
         "expo-splash-screen",

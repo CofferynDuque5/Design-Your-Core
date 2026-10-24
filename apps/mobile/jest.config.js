@@ -3,9 +3,9 @@ module.exports = {
   preset: 'jest-expo',
   setupFiles: ['<rootDir>/src/test/setup.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/test/setupAfterEnv.ts'],
-  // Los paquetes internos (@dyc/*) y los de Expo se publican sin compilar para RN.
+  // Los paquetes internos (@dyc/*), los de Expo y @noble (solo ESM) se publican sin compilar para RN.
   transformIgnorePatterns: [
-    'node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|react-native-svg|lucide-react-native|@dyc/.*|standard-navigation))',
+    'node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|react-native-svg|lucide-react-native|@dyc/.*|@noble/.*|standard-navigation))',
   ],
   // Lucide publica ESM en .mjs para React Native; en Jest se usa su versión CommonJS.
   moduleNameMapper: {

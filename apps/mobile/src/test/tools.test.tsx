@@ -66,12 +66,12 @@ describe('herramientas en el móvil', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it('Más agrupa las herramientas con sus cuentas y abre en la web solo la Bóveda', async () => {
+  it('Más agrupa las herramientas con sus cuentas y ya no abre ninguna en la web', async () => {
     setup();
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     await open('/mas', 'Tus herramientas');
     for (const g of ['Organización', 'Estudio y trabajo', 'Conocimiento', 'Vida personal', 'Salud']) expect(await screen.findByText(g)).toBeOnTheScreen();
-    expect(screen.getByText(/23 herramientas en el móvil\. Bóveda se abre en la web: necesita el navegador para proteger tus claves\./)).toBeOnTheScreen();
+    expect(screen.getByText('Todo lo de la app anterior, con tus datos: 24 herramientas en el móvil.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Agenda, 4 elementos' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Pendientes, 2 por hacer' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Enfoque, 1 sesión' })).toBeOnTheScreen();
@@ -79,12 +79,11 @@ describe('herramientas en el móvil', () => {
     expect(screen.getByRole('button', { name: 'Notas, Vacío' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Respiración, Vacío' })).toBeOnTheScreen();
 
-    // Solo queda en la web la Bóveda, y la fila dice por qué. El Asistente ya es nativo.
-    expect(screen.getAllByText('En la web')).toHaveLength(1);
+    // Asistente y Bóveda ya son nativos: nada se abre en la web.
+    expect(screen.queryByText('En la web')).toBeNull();
     expect(screen.getByRole('button', { name: 'Asistente, Con tu clave' })).toBeOnTheScreen();
-    fireEvent.press(screen.getByRole('link', { name: 'Bóveda, Vacío, en la web' }));
-    expect(openURL).toHaveBeenCalledWith('https://app.designyourcore.nvcorx.com/boveda');
-    expect(screen.getByText('Se abre en la web: el cifrado de tus contraseñas solo funciona en el navegador.')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Bóveda, Vacío' })).toBeOnTheScreen();
+    expect(openURL).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Finanzas, 1 movimiento' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Ejercicio, 1 entreno' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Materias, 1 materia' })).toBeOnTheScreen();

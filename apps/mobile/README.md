@@ -7,7 +7,7 @@ App de Design Your Core para iOS y Android. Usa Expo SDK 57 con Expo Router y co
 - **Acceso**: entrar, crear cuenta y recuperar contraseña. La sesión usa un token de acceso de 15 minutos y uno de renovación de 90 días que rota en cada uso. Ambos se guardan en el llavero del sistema (`expo-secure-store`). Sin conexión la sesión se conserva; solo se cierra si la API rechaza la renovación.
 - **Bienvenida** en cuatro pasos: pilares de enfoque, punto de partida, ritmo y primer reto.
 - **Pestañas**: Hoy, Progreso (día, semana y mes), Retos, Hábitos, Perfil y Más. El check-in completo se abre como hoja modal.
-- **Más**: todas las herramientas de la app anterior, agrupadas como en la barra lateral de la web (Organización, Estudio y trabajo, Conocimiento, Vida personal y Salud) y con su número de elementos. **Agenda, Pendientes, Calendario, Horario, Enfoque, Materias, Proyectos, Roadmaps, Cuadernos, Contenido, Ideas, Trabajo, Notas, Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario, Rutina y Respiración** tienen pantalla en el móvil. **Bóveda** (su cifrado necesita Web Crypto, que Hermes no trae) y **Asistente** (la clave de Gemini vive solo en el navegador) aparecen como «En la web», con el motivo, y se abren en el navegador (`EXPO_PUBLIC_WEB_URL`, por defecto `https://app.designyourcore.nvcorx.com`). Usan el mismo documento y la misma API que la web (`/api/v2/modules`, ver [docs/modulos.md](../../docs/modulos.md)): los cambios se ven al instante y, si la API falla, se deshacen con un aviso.
+- **Más**: todas las herramientas de la app anterior, agrupadas como en la barra lateral de la web (Organización, Estudio y trabajo, Conocimiento, Vida personal y Salud) y con su número de elementos. Las 24 tienen pantalla en el móvil, también **Asistente** (con tu clave de Gemini guardada en el llavero del teléfono) y **Bóveda** (la misma bóveda cifrada que la web; la primera apertura en cada teléfono tarda cerca de un minuto y después se abre con huella o Face ID). Usan el mismo documento y la misma API que la web (`/api/v2/modules`, ver [docs/modulos.md](../../docs/modulos.md)): los cambios se ven al instante y, si la API falla, se deshacen con un aviso.
 - **Tema** claro u oscuro según el sistema, o fijado desde Perfil.
 - **Recordatorio diario** del check-in (notificación local, funciona sin servidor). Al tocarlo se abre el check-in.
 - **Eliminar la cuenta** desde Perfil, como exigen las tiendas.
@@ -20,7 +20,7 @@ Con la API en marcha (`pnpm dev:api` en la raíz):
 pnpm dev:mobile        # o: pnpm --filter @dyc/mobile start
 ```
 
-Escanea el QR con Expo Go. En desarrollo la app llama a `http://<IP del ordenador>:4600`; el teléfono y el ordenador tienen que estar en la misma red. Para usar otra API, crea `.env` a partir de `.env.example` y define `EXPO_PUBLIC_API_URL` (y `EXPO_PUBLIC_WEB_URL` para la web a la que llevan Bóveda y Asistente).
+Escanea el QR con Expo Go. En desarrollo la app llama a `http://<IP del ordenador>:4600`; el teléfono y el ordenador tienen que estar en la misma red. Para usar otra API, crea `.env` a partir de `.env.example` y define `EXPO_PUBLIC_API_URL` (y `EXPO_PUBLIC_WEB_URL` para la web, a la que llevan «Cifrarlas en la web» y «¿Olvidaste la contraseña maestra?» de la Bóveda).
 
 La vista web (`pnpm --filter @dyc/mobile web`) sirve para revisar pantallas rápido; en ella no hay notificaciones.
 
