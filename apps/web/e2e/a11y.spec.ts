@@ -28,13 +28,17 @@ test('pantallas públicas', async ({ page }) => {
 test('onboarding y pantallas de la app', async ({ page }) => {
   // Recorre todas las pantallas y sus diálogos: tarda más que un recorrido normal.
   test.setTimeout(240_000);
+  // El navegador empieza a mediodía: la prueba dura minutos y no debe cruzar la medianoche
+  // (los datos de «hoy» dejarían de verse a mitad del recorrido).
+  const now = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00.000Z`);
+  await page.clock.install({ time: now });
   await register(page, 'a11y');
   await expectAccessible(page, '/bienvenida');
   await onboard(page);
 
   // Herramientas con datos de la app anterior, para revisar también sus listas.
-  const month = new Date().toISOString().slice(0, 7);
-  const today = new Date().toISOString().slice(0, 10);
+  const month = now.toISOString().slice(0, 7);
+  const today = now.toISOString().slice(0, 10);
   // Ciclo usa la fecha local del navegador, como la app anterior.
   const localToday = await page.evaluate(() => {
     const d = new Date();
@@ -54,7 +58,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
     reminders: [{ id: 'r1', day: 14, title: 'Dentista', when: '14:00', color: '#4F7CFF', icon: 'doc', on: true }],
     workouts: [{ id: 'w1', date: `${month}-10`, plan: 'Full body', minutes: 30 }],
     classes: [{ id: 'c1', day: 2, start: '08:00', end: '09:30', title: 'Cálculo', room: 'A-201', color: '#8B5CF6', subject: '' }],
-    focus: [{ id: 'f1', mode: 'focus', seconds: 1500, dateKey: new Date().toISOString().slice(0, 10) }],
+    focus: [{ id: 'f1', mode: 'focus', seconds: 1500, dateKey: today }],
     subjects: [{ id: 'mat1', name: 'Física', teacher: 'Prof. Ruiz', room: 'B-3', color: '#E8912A', nextClass: 'Lunes 8:00', topics: [{ id: 'xa1', name: 'Ondas', done: true }, { id: 'xa2', name: 'Óptica', done: false }] }],
     projects: [
       { id: 'p1', title: 'Maqueta', subject: 'Física', deadline: '20 SEP', status: 'revision', color: '#E8912A', milestones: [{ id: 'm1', name: 'Boceto', date: '', done: true }] },
