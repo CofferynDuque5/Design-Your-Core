@@ -31,7 +31,7 @@ import { UiIcon } from './UiIcon';
 // (tanda 1: Agenda, Pendientes, Calendario, Horario y Enfoque; tanda 2:
 // Materias, Proyectos, Roadmaps, Cuadernos, Contenido e Ideas; tanda 3:
 // Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario y Rutina;
-// tanda 4: Notas, Trabajo y Respiración).
+// tanda 4: Notas y Trabajo).
 
 /**
  * Pantalla de una herramienta: vuelve a «Más» (o a donde diga `back`) y

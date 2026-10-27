@@ -14,7 +14,6 @@ import {
   cyclePredictions,
   hhmmToHours,
   IDEA_CATEGORIES,
-  MEDITATION_KIND,
   NOTE_DEFAULT_SUBJECT,
   NOTE_DEFAULT_TITLE,
   noteTag,
@@ -38,7 +37,6 @@ import {
   type LegacyData,
   type LegacyIdea,
   type LegacyJournal,
-  type LegacyMeditation,
   type LegacyNote,
   type LegacyNoteBox,
   type LegacyPetCare,
@@ -98,7 +96,6 @@ export type ToolId =
   | 'sueno'
   | 'diario'
   | 'rutina'
-  | 'respiracion'
   | 'ciclo';
 
 export interface ToolInfo {
@@ -314,15 +311,6 @@ export const TOOL_CATALOG: ToolInfo[] = [
     description: 'Rutinas por hora y día, comidas y agua',
     count: (d) => legacyList(d, 'routines').length,
     unit: ['rutina', 'rutinas'],
-  },
-  {
-    id: 'respiracion',
-    path: '/respiracion',
-    label: 'Respiración',
-    group: 'salud',
-    description: 'Respiración guiada y tus minutos de calma',
-    count: (d) => legacyList(d, 'meditations').length,
-    unit: ['sesión', 'sesiones'],
   },
   {
     id: 'ciclo',
@@ -787,7 +775,7 @@ export function toggleWeekday(days: string, iso: string): string {
   return next || days;
 }
 
-// ---------- Tanda 4: Notas, Trabajo y Respiración ----------
+// ---------- Tanda 4: Notas y Trabajo ----------
 
 /** Orden alfabético español sin distinguir mayúsculas ni tildes. */
 export const byNameEs = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
@@ -836,60 +824,3 @@ export const WORK_BUCKETS: Array<{ id: 'curso' | 'todo' | 'hecho'; label: string
   { id: 'hecho', label: 'Hecho' },
 ];
 export const workBucketOf = (w: Pick<LegacyWorkItem, 'done' | 'status'>): 'curso' | 'todo' | 'hecho' => (w.done ? 'hecho' : workStatusOf(w));
-
-export type BreathPhase = 'in' | 'hold' | 'out';
-export type BreathPatternId = 'caja' | '478';
-
-/** Técnicas de respiración de la app anterior (fases con sus segundos). */
-export const BREATH_PATTERNS: Record<BreathPatternId, { label: string; hint: string; phases: Array<[BreathPhase, number]> }> = {
-  caja: { label: 'Caja 4-4-4-4', hint: 'Inhala 4, mantén 4, exhala 4 y mantén 4 segundos. Ayuda a calmarte y concentrarte.', phases: [['in', 4], ['hold', 4], ['out', 4], ['hold', 4]] },
-  '478': { label: '4-7-8', hint: 'Inhala 4, mantén 7 y exhala 8 segundos. Ayuda a relajarte antes de dormir.', phases: [['in', 4], ['hold', 7], ['out', 8]] },
-};
-/** Orden fijo: «478» parece un número y Object.keys lo pondría primero. */
-export const BREATH_PATTERN_ORDER: BreathPatternId[] = ['caja', '478'];
-export const BREATH_PHASE_LABEL: Record<BreathPhase, string> = { in: 'Inhala', hold: 'Mantén', out: 'Exhala' };
-export const BREATH_DURATIONS = [1, 3, 5] as const;
-export type BreathMinutes = (typeof BREATH_DURATIONS)[number];
-
-/** Duración de un ciclo completo de la técnica, en milisegundos. */
-export const breathCycleMs = (pattern: BreathPatternId) => BREATH_PATTERNS[pattern].phases.reduce((s, [, n]) => s + n, 0) * 1000;
-
-/** Fase de la respiración en un momento de la sesión (en milisegundos desde el inicio). */
-export function breathPhase(pattern: BreathPatternId, ms: number): { phase: BreathPhase; index: number; secondsLeft: number; seconds: number } {
-  const phases = BREATH_PATTERNS[pattern].phases;
-  let t = ms % breathCycleMs(pattern);
-  for (let i = 0; i < phases.length; i++) {
-    const len = phases[i][1] * 1000;
-    if (t < len) return { phase: phases[i][0], index: i, seconds: phases[i][1], secondsLeft: Math.ceil((len - t) / 1000) };
-    t -= len;
-  }
-  return { phase: phases[0][0], index: 0, seconds: phases[0][1], secondsLeft: phases[0][1] };
-}
-
-/** El círculo está grande al inhalar y al mantener después de inhalar; pequeño en lo demás. */
-export function breathExpanded(pattern: BreathPatternId, index: number): boolean {
-  const phases = BREATH_PATTERNS[pattern].phases;
-  const phase = phases[index][0];
-  const prev = phases[(index + phases.length - 1) % phases.length][0];
-  return phase === 'in' || (phase === 'hold' && prev === 'in');
-}
-
-/** 90500 → "1:31" (el reloj de Respiración). */
-export const breathClock = (ms: number) => {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
-
-/** Minutos de hoy, de esta semana y sesiones válidas de Respiración (día en UTC, como la app anterior). */
-export function meditationStats(sessions: LegacyMeditation[], today: Day) {
-  const valid = sessions.filter((s) => isDay(s.date) && typeof s.minutes === 'number');
-  const week = periodRange('week', today);
-  return {
-    valid,
-    todayMinutes: valid.filter((s) => s.date === today).reduce((n, s) => n + s.minutes, 0),
-    weekMinutes: valid.filter((s) => s.date >= week.from && s.date <= week.to).reduce((n, s) => n + s.minutes, 0),
-  };
-}
-
-/** Nombre del tipo de sesión («Respiración» para la de la app anterior o sin tipo). */
-export const meditationKindLabel = (kind: unknown) => (kind === MEDITATION_KIND || !kind || typeof kind !== 'string' ? 'Respiración' : kind);

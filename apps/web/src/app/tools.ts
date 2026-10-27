@@ -23,7 +23,6 @@ import {
   Target,
   Timer,
   Wallet,
-  Wind,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -59,7 +58,6 @@ const ICONS: Record<ToolId, LucideIcon> = {
   sueno: Moon,
   diario: NotebookPen,
   rutina: AlarmClock,
-  respiracion: Wind,
   ciclo: Flower2,
 };
 

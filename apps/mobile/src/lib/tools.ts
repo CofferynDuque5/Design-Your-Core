@@ -25,7 +25,6 @@ import {
   Target,
   Timer,
   Wallet,
-  Wind,
   type LucideIcon,
 } from 'lucide-react-native';
 
@@ -53,7 +52,6 @@ export const TOOL_ICONS: Record<ToolId, LucideIcon> = {
   sueno: Moon,
   diario: NotebookPen,
   rutina: AlarmClock,
-  respiracion: Wind,
   ciclo: Flower2,
 };
 
@@ -83,7 +81,6 @@ export const NATIVE_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'sueno',
   'diario',
   'rutina',
-  'respiracion',
   'asistente',
   'boveda',
 ]);

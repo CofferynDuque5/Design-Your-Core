@@ -351,8 +351,8 @@ describe('Más', () => {
     expect(within(personal).getByRole('link', { name: /Metas.*1 en curso/ })).toHaveAttribute('href', '/metas');
     expect(within(personal).getByRole('link', { name: /Mascotas.*1 mascota/ })).toHaveAttribute('href', '/mascotas');
     const health = within(tools).getByRole('list', { name: 'Salud' });
-    expect(within(health).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/ejercicio', '/sueno', '/diario', '/rutina', '/respiracion', '/ciclo']);
-    expect(within(health).getByRole('link', { name: /Respiración.*1 sesión/ })).toBeInTheDocument();
+    expect(within(health).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/ejercicio', '/sueno', '/diario', '/rutina', '/ciclo']);
+    expect(within(tools).queryByRole('link', { name: /Respiración/ })).toBeNull();
     // Ciclo siempre se abre desde Más, aunque esté oculto en el menú.
     expect(within(health).getByRole('link', { name: /Ciclo.*oculto en el menú.*Vacío/ })).toBeInTheDocument();
     expect(within(study).getByRole('link', { name: /Trabajo.*1 por hacer/ })).toHaveAttribute('href', '/trabajo');
@@ -668,12 +668,12 @@ describe('Barra lateral', () => {
     const salud = within(nav).getByRole('button', { name: 'Salud' });
     expect(salud).toHaveAttribute('aria-expanded', 'true');
     const list = within(nav).getByRole('list', { name: 'Salud' });
-    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Ejercicio', 'Sueño', 'Diario', 'Rutina', 'Respiración']);
+    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Ejercicio', 'Sueño', 'Diario', 'Rutina']);
     // Todos los grupos empiezan abiertos: cada sección se ve en el menú. Se pueden plegar.
     const personal = within(nav).getByRole('button', { name: 'Vida personal' });
     expect(personal).toHaveAttribute('aria-expanded', 'true');
     expect(within(within(nav).getByRole('list', { name: 'Vida personal' })).getByRole('link', { name: 'Finanzas' })).toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(23);
+    expect(within(nav).getAllByRole('link')).toHaveLength(22);
     await userEvent.click(personal);
     expect(personal).toHaveAttribute('aria-expanded', 'false');
     expect(within(nav).queryByRole('list', { name: 'Vida personal' })).not.toBeInTheDocument();
@@ -1082,35 +1082,10 @@ describe('Trabajo', () => {
 });
 
 describe('Respiración', () => {
-  it('guía con texto cada fase y guarda la sesión al terminar', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+  it('se quitó: el enlace viejo lleva a Más y los minutos guardados no se tocan', async () => {
     const api = withApi();
     renderAt('/respiracion');
-    expect(await screen.findByText('Sesión en total')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '1 min' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Empezar' }));
-    expect(screen.getAllByText('Inhala').length).toBeGreaterThan(0);
-    act(() => vi.advanceTimersByTime(4_500));
-    expect(screen.getAllByText('Mantén').length).toBeGreaterThan(0);
-    act(() => vi.advanceTimersByTime(4_000));
-    expect(screen.getAllByText('Exhala').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Caja 4-4-4-4' })).toBeDisabled();
-    act(() => vi.advanceTimersByTime(52_000));
-    await waitFor(() => expect(writes(api)).toHaveLength(1));
-    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/meditations', body: { item: { date: utcDayKey(), minutes: 1, kind: 'respiracion' } } });
-    expect(screen.getByRole('button', { name: 'Empezar' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Sesiones en total')).toBeInTheDocument());
-  });
-
-  it('terminar antes del primer minuto no guarda nada', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
-    const api = withApi();
-    renderAt('/respiracion');
-    await userEvent.click(await screen.findByRole('button', { name: '4-7-8' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Empezar' }));
-    act(() => vi.advanceTimersByTime(30_000));
-    await userEvent.click(screen.getByRole('button', { name: 'Terminar' }));
-    expect(screen.getByText(/Con menos de un minuto no se guarda/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /herramientas/i })).toBeInTheDocument();
     expect(writes(api)).toHaveLength(0);
   });
 });

@@ -57,8 +57,8 @@ import { utcDayKey } from '../src/legacy.js';
 // Catálogo de «Más» y utilidades de las herramientas que comparten la web y el móvil.
 describe('herramientas compartidas', () => {
   it('el catálogo tiene todas las secciones, cada una en un grupo, con rutas únicas', () => {
-    expect(TOOL_CATALOG).toHaveLength(24);
-    expect(new Set(TOOL_CATALOG.map((t) => t.path)).size).toBe(24);
+    expect(TOOL_CATALOG).toHaveLength(23);
+    expect(new Set(TOOL_CATALOG.map((t) => t.path)).size).toBe(23);
     for (const t of TOOL_CATALOG) expect(TOOL_GROUPS.map((g) => g.id)).toContain(t.group);
   });
 
