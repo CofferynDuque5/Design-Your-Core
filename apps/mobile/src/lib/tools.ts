@@ -58,8 +58,8 @@ export const TOOL_ICONS: Record<ToolId, LucideIcon> = {
 };
 
 /**
- * Herramientas con pantalla en el móvil: todas menos Bóveda y Asistente,
- * que se abren en la web a propósito (ver WEB_ONLY_REASONS).
+ * Herramientas con pantalla en el móvil: ya son todas. Si alguna tuviera que
+ * abrirse en la web, se quita de aquí y se explica en WEB_ONLY_REASONS.
  */
 export const NATIVE_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'agenda',
@@ -84,18 +84,12 @@ export const NATIVE_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'diario',
   'rutina',
   'respiracion',
+  'asistente',
+  'boveda',
 ]);
 
-/**
- * Por qué una herramienta solo está en la web. La Bóveda cifra en el
- * navegador con Web Crypto (PBKDF2 + AES-GCM), que el motor de JavaScript
- * del teléfono (Hermes) no trae; el Asistente usa una clave de Gemini que
- * solo se guarda en tu navegador.
- */
-export const WEB_ONLY_REASONS: Partial<Record<ToolId, string>> = {
-  boveda: 'Se abre en la web: el cifrado de tus contraseñas solo funciona en el navegador.',
-  asistente: 'Se abre en la web: tu clave de Gemini solo se guarda en tu navegador.',
-};
+/** Por qué una herramienta solo está en la web (ninguna, desde que la Bóveda cifra también en el teléfono). */
+export const WEB_ONLY_REASONS: Partial<Record<ToolId, string>> = {};
 
 /** La hora actual, refrescada cada minuto (línea de «ahora», próxima clase). */
 export function useNow(every = 60_000) {

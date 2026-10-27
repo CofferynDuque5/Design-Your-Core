@@ -195,7 +195,9 @@ test('enfoque: una sesión saltada se guarda y cuenta', async ({ page }) => {
   await register(page, 'enfoque');
   await onboard(page);
   await seedLegacy(page, OLD);
-  await page.clock.install();
+  // A mediodía: si la prueba cruza la medianoche, la sesión no cambia de día.
+  const noon = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00.000Z`);
+  await page.clock.install({ time: noon });
   await page.goto('/enfoque');
   await expect(page.getByRole('timer')).toHaveText('25:00');
   await page.getByRole('button', { name: 'Empezar' }).click();
@@ -210,7 +212,7 @@ test('enfoque: una sesión saltada se guarda y cuenta', async ({ page }) => {
   await reloadWhenSaved(page);
   await expect(page.locator('.stat', { hasText: 'Sesiones hoy' }).locator('.stat__value')).toHaveText('1');
   const doc = await readLegacy(page);
-  expect(doc.focus).toEqual([expect.objectContaining({ mode: 'focus', seconds: 120, dateKey: new Date().toISOString().slice(0, 10) })]);
+  expect(doc.focus).toEqual([expect.objectContaining({ mode: 'focus', seconds: 120, dateKey: noon.toISOString().slice(0, 10) })]);
   expect(doc).toMatchObject(OLD);
 });
 
