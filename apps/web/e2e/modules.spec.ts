@@ -794,11 +794,9 @@ test('notas: biblioteca por materia, formato, imagen subida y formatos de la app
   expect(await readLegacy(page)).toMatchObject(OLD);
 });
 
-test('trabajo y respiración: tareas por proyecto y una sesión guiada', async ({ page }) => {
-  await page.clock.install();
+test('trabajo: tareas por proyecto; Respiración se quitó sin tocar sus minutos', async ({ page }) => {
   await register(page, 'trabajo');
   await onboard(page);
-  const today = utcToday();
   await seedLegacy(page, { ...OLD, workItems: [{ id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: false, due: 'Hoy' }], meditations: [{ id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' }] });
 
   await page.goto('/trabajo');
@@ -816,27 +814,16 @@ test('trabajo y respiración: tareas por proyecto y una sesión guiada', async (
   await reloadWhenSaved(page);
   await expect(page.getByRole('region', { name: /Hecho/ }).getByText('Informe')).toBeVisible();
   await expect(page.getByRole('region', { name: /En curso/ }).getByText('Viernes')).toBeVisible();
-  let doc = await readLegacy(page);
+  const doc = await readLegacy(page);
   expect(doc.workItems).toEqual([
     { id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: true, due: 'Hoy' },
     { id: expect.any(String), title: 'Preparar la demo', project: 'p3', status: 'curso', done: false, due: 'Viernes' },
   ]);
 
+  // Respiración se quitó: el enlace viejo lleva a Más y los minutos guardados siguen en el documento.
   await page.goto('/respiracion');
-  await page.getByRole('button', { name: '1 min' }).click();
-  await page.getByRole('button', { name: 'Empezar' }).click();
-  await expect(page.locator('.breathe__phase')).toHaveText('Inhala');
-  await page.clock.runFor(5_000);
-  await expect(page.locator('.breathe__phase')).toHaveText('Mantén');
-  await page.clock.runFor(56_000);
-  await expect(page.getByRole('button', { name: 'Empezar' })).toBeVisible();
-  await expect(page.getByText('1 min', { exact: true }).first()).toBeVisible();
-  await reloadWhenSaved(page);
-  doc = await readLegacy(page);
-  expect(doc.meditations).toEqual([
-    { id: expect.any(String), date: today, minutes: 1, kind: 'respiracion' },
-    { id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' },
-  ]);
+  await expect(page).toHaveURL(/\/mas$/);
+  expect(doc.meditations).toEqual([{ id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' }]);
   expect(doc).toMatchObject(OLD);
 });
 

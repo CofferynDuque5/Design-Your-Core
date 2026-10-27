@@ -71,13 +71,13 @@ describe('herramientas en el móvil', () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     await open('/mas', 'Tus herramientas');
     for (const g of ['Organización', 'Estudio y trabajo', 'Conocimiento', 'Vida personal', 'Salud']) expect(await screen.findByText(g)).toBeOnTheScreen();
-    expect(screen.getByText('Todo lo de la app anterior, con tus datos: 24 herramientas en el móvil.')).toBeOnTheScreen();
+    expect(screen.getByText('Todo lo de la app anterior, con tus datos: 23 herramientas en el móvil.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Agenda, 4 elementos' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Pendientes, 2 por hacer' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Enfoque, 1 sesión' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Trabajo, Vacío' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Notas, Vacío' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Respiración, Vacío' })).toBeOnTheScreen();
+    expect(screen.queryByText('Respiración')).toBeNull();
 
     // Asistente y Bóveda ya son nativos: nada se abre en la web.
     expect(screen.queryByText('En la web')).toBeNull();

@@ -173,7 +173,7 @@ export function createClient(opts: ClientOptions) {
      * Módulos de la app anterior elemento a elemento (Agenda, Pendientes,
      * Calendario, Horario, Enfoque, Materias, Proyectos, Roadmaps, Cuadernos,
      * Contenido, Ideas, Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño,
-     * Diario, Rutina, Notas, Trabajo y Respiración) sobre el mismo documento de /api/sync. Los temas, hitos
+     * Diario, Rutina, Notas, Trabajo y las sesiones de respiración que ya existan) sobre el mismo documento de /api/sync. Los temas, hitos
      * y pasos se cambian enviando su lista completa en `update`. Las claves que
      * son un objeto (`cycle`, `dayLog`, `budget`) se guardan con `set` o `patch`.
      */

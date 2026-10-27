@@ -142,7 +142,6 @@ describe('accesibilidad de la app móvil', () => {
       ['/notas', 'Ondas'],
       ['/notas/nt1', 'Guardado'],
       ['/trabajo', 'Informe mensual'],
-      ['/respiracion', 'Tus minutos de calma'],
     ] as const) {
       await act(async () => router.push(path));
       expect(await screen.findAllByText(marker)).not.toHaveLength(0);
@@ -165,12 +164,6 @@ describe('accesibilidad de la app móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Borrar nota' }));
     expect(await screen.findByRole('button', { name: 'Borrar definitivamente' })).toBeOnTheScreen();
     expect({ path: 'nota (escribir)', problems: problems() }).toEqual({ path: 'nota (escribir)', problems: [] });
-    // Respiración en marcha.
-    await act(async () => router.push('/respiracion'));
-    fireEvent.press(await screen.findByRole('button', { name: 'Empezar' }));
-    expect(await screen.findByRole('button', { name: 'Pausar' })).toBeOnTheScreen();
-    expect({ path: 'respiración (en marcha)', problems: problems() }).toEqual({ path: 'respiración (en marcha)', problems: [] });
-    fireEvent.press(screen.getByRole('button', { name: 'Terminar' }));
     // Temas, hitos y la confirmación de borrar dentro de una hoja.
     for (const [path, button, marker] of [
       ['/materias', 'Temas de «Cálculo»: 1 de 1 vistos', 'Límites'],

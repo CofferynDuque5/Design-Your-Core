@@ -20,7 +20,6 @@ import { ToastProvider } from './toast';
 const page = <K extends string>(name: K, load: () => Promise<Record<K, ComponentType>>) => lazy(() => load().then((m) => ({ default: m[name] })));
 const Agenda = page('Agenda', () => import('../pages/Agenda'));
 const Assistant = page('Assistant', () => import('../pages/Assistant'));
-const Breathe = page('Breathe', () => import('../pages/Breathe'));
 const Calendar = page('Calendar', () => import('../pages/Calendar'));
 const Challenges = page('Challenges', () => import('../pages/Challenges'));
 const Content = page('Content', () => import('../pages/Content'));
@@ -130,7 +129,8 @@ export function AppRoutes() {
         <Route path="boveda" element={<Vault />} />
         <Route path="asistente" element={<Assistant />} />
         <Route path="trabajo" element={<Work />} />
-        <Route path="respiracion" element={<Breathe />} />
+        {/* Respiración se quitó: quien la tenga guardada llega a Más. */}
+        <Route path="respiracion" element={<Navigate to="/mas" replace />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

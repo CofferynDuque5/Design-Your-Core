@@ -107,7 +107,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   const token = await sessionToken(page);
   expect((await page.request.patch('/api/v2/me', { data: { showCycle: true }, headers: { Authorization: `Bearer ${token}` } })).ok()).toBe(true);
 
-  for (const path of ['/', '/check-in', '/progreso', '/retos', '/habitos', '/perfil', '/mas', '/agenda', '/agenda?vista=tareas', '/pendientes', '/calendario', '/horario', '/enfoque', '/materias', '/proyectos', '/roadmaps', '/cuadernos', '/cuadernos/nb1', '/contenido', '/ideas', '/finanzas', '/metas', '/mascotas', '/ciclo', '/ejercicio', '/sueno', '/diario', '/rutina', '/notas', '/notas/n1', '/trabajo', '/respiracion', '/no-existe']) {
+  for (const path of ['/', '/check-in', '/progreso', '/retos', '/habitos', '/perfil', '/mas', '/agenda', '/agenda?vista=tareas', '/pendientes', '/calendario', '/horario', '/enfoque', '/materias', '/proyectos', '/roadmaps', '/cuadernos', '/cuadernos/nb1', '/contenido', '/ideas', '/finanzas', '/metas', '/mascotas', '/ciclo', '/ejercicio', '/sueno', '/diario', '/rutina', '/notas', '/notas/n1', '/trabajo', '/no-existe']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expectAccessible(page, path);
@@ -134,7 +134,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   await page.goto('/ideas');
   await page.getByRole('button', { name: 'Borrar «App de hábitos»' }).click();
   await expectAccessible(page, 'ideas vacías con ejemplos');
-  // Editor de notas escribiendo, búsqueda sin resultados y respiración en marcha.
+  // Editor de notas escribiendo y búsqueda sin resultados.
   await page.goto('/notas/n1');
   await page.getByRole('button', { name: 'Escribir' }).click();
   await expectAccessible(page, 'editor de notas');
@@ -143,9 +143,6 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   await page.goto('/notas');
   await page.getByLabel('Buscar en tus notas').fill('nada que coincida');
   await expectAccessible(page, 'notas sin resultados');
-  await page.goto('/respiracion');
-  await page.getByRole('button', { name: 'Empezar' }).click();
-  await expectAccessible(page, 'respiración en marcha');
   for (const [path, button] of [
     ['/agenda', 'Nuevo bloque'],
     ['/calendario', 'Nuevo evento'],
