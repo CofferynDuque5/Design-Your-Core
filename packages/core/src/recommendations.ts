@@ -176,7 +176,7 @@ export function recommend(input: RecommendationInput, limit = 3): Recommendation
     if (activePillars.has(p)) continue;
     const c = firstFree(p) ?? starterChallenge(p);
     if (activeKeys.has(c.key)) continue;
-    out.push(startChallenge(c, `focus:${p}`, `Elegiste cuidar ${PILLAR_NAMES[p].toLowerCase()} y aún no tienes un reto activo ahí.`, 50));
+    out.push(startChallenge(c, `focus:${p}`, `Elegiste cuidar ${p === 'relaciones' ? 'tu relación de pareja' : PILLAR_NAMES[p].toLowerCase()} y aún no tienes un reto activo ahí.`, 50));
   }
 
   // Sin duplicar retos ni mostrar lo descartado.

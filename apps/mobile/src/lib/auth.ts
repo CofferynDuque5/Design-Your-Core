@@ -57,6 +57,16 @@ export function createAuthStore(store: KeyValueStore, renew: (refreshToken: stri
     signOut,
 
     /**
+     * Guarda los datos de la cuenta que cambiaron (mostrar Ciclo) sin tocar
+     * los tokens. No hace nada si ya no hay sesión o es de otra persona.
+     */
+    async updateUser(user: User) {
+      if (state.status !== 'signedIn' || state.user.id !== user.id) return;
+      set({ ...state, user });
+      await store.set(KEYS.user, JSON.stringify(user)).catch(() => undefined);
+    },
+
+    /**
      * Pide un token de acceso nuevo. Devuelve null (y cierra la sesión) si la
      * API la rechaza; si no hay red, lanza el error y la sesión sigue abierta.
      */

@@ -1,13 +1,15 @@
-import type { PrismaClient } from '@prisma/client';
 import { Router, type RequestHandler } from 'express';
 import type { Config } from '../config.js';
+import type { Db } from '../db/db.js';
+import type { Blob, User } from '../db/types.js';
 import { ah } from '../lib/http.js';
 import type { Mailer } from '../lib/mailer.js';
 import { isLocalOrigin, isTrustedOrigin } from '../lib/origins.js';
 import { EMAIL_RE, makeInviteCode } from '../lib/security.js';
+import { findUser } from './auth.js';
 
 interface Deps {
-  prisma: PrismaClient;
+  db: Db;
   requireAuth: RequestHandler;
   strict: RequestHandler;
   mailer: Mailer;
@@ -41,7 +43,7 @@ export function resolveInviteAppUrl(requested: string, config: Config): string {
   }
 }
 
-export function partnerRoutes({ prisma, requireAuth, strict, mailer, config }: Deps): Router {
+export function partnerRoutes({ db, requireAuth, strict, mailer, config }: Deps): Router {
   const r = Router();
 
   // Genera (o reutiliza) el código del usuario; reintenta si choca con otro.
@@ -49,8 +51,8 @@ export function partnerRoutes({ prisma, requireAuth, strict, mailer, config }: D
     if (current) return current;
     for (let attempt = 0; attempt < 6; attempt++) {
       try {
-        const updated = await prisma.user.update({ where: { id: userId }, data: { inviteCode: makeInviteCode() } });
-        if (updated.inviteCode) return updated.inviteCode;
+        const updated = await db.row<User>('UPDATE "User" SET "inviteCode" = $2 WHERE "id" = $1 RETURNING "inviteCode"', [userId, makeInviteCode()]);
+        if (updated?.inviteCode) return updated.inviteCode;
       } catch {
         /* colisión → reintenta */
       }
@@ -59,7 +61,7 @@ export function partnerRoutes({ prisma, requireAuth, strict, mailer, config }: D
   }
 
   r.post('/partner/invite', requireAuth, ah(async (req, res) => {
-    const me = await prisma.user.findUnique({ where: { id: req.userId } });
+    const me = await findUser(db, req.userId as string);
     if (!me) return res.status(401).json({ error: 'Sesión inválida' });
     if (me.partnerId) return res.status(409).json({ error: 'Ya tienes una pareja vinculada. Desvincúlala primero.' });
     const code = await ensureInviteCode(me.id, me.inviteCode);
@@ -71,7 +73,7 @@ export function partnerRoutes({ prisma, requireAuth, strict, mailer, config }: D
   r.post('/partner/invite/email', requireAuth, strict, ah(async (req, res) => {
     const email = String(req.body?.email || '').toLowerCase().trim();
     if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Correo no válido' });
-    const me = await prisma.user.findUnique({ where: { id: req.userId } });
+    const me = await findUser(db, req.userId as string);
     if (!me) return res.status(401).json({ error: 'Sesión inválida' });
     if (me.partnerId) return res.status(409).json({ error: 'Ya tienes una pareja vinculada.' });
     const code = await ensureInviteCode(me.id, me.inviteCode);
@@ -94,35 +96,35 @@ export function partnerRoutes({ prisma, requireAuth, strict, mailer, config }: D
   r.post('/partner/accept', requireAuth, strict, ah(async (req, res) => {
     const code = String(req.body?.code || '').toUpperCase().trim();
     if (!/^[A-Z0-9]{6}$/.test(code)) return res.status(400).json({ error: 'Código inválido' });
-    const me = await prisma.user.findUnique({ where: { id: req.userId } });
+    const me = await findUser(db, req.userId as string);
     if (!me) return res.status(401).json({ error: 'Sesión inválida' });
     if (me.partnerId) return res.status(409).json({ error: 'Ya tienes una pareja vinculada. Desvincúlala primero.' });
-    const inviter = await prisma.user.findUnique({ where: { inviteCode: code } });
+    const inviter = await db.row<User>('SELECT * FROM "User" WHERE "inviteCode" = $1', [code]);
     if (!inviter) return res.status(404).json({ error: 'Código no válido o vencido' });
     if (inviter.id === me.id) return res.status(400).json({ error: 'Ese es tu propio código' });
     if (inviter.partnerId) return res.status(409).json({ error: 'Esa persona ya tiene una pareja vinculada.' });
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: me.id }, data: { partnerId: inviter.id, inviteCode: null } }),
-      prisma.user.update({ where: { id: inviter.id }, data: { partnerId: me.id, inviteCode: null } }),
-    ]);
+    await db.tx(async (tx) => {
+      await tx.exec('UPDATE "User" SET "partnerId" = $2, "inviteCode" = NULL WHERE "id" = $1', [me.id, inviter.id]);
+      await tx.exec('UPDATE "User" SET "partnerId" = $2, "inviteCode" = NULL WHERE "id" = $1', [inviter.id, me.id]);
+    });
     res.json({ ok: true, partner: { name: inviter.name } });
   }));
 
   r.get('/partner', requireAuth, ah(async (req, res) => {
-    const me = await prisma.user.findUnique({ where: { id: req.userId } });
+    const me = await findUser(db, req.userId as string);
     if (!me) return res.status(401).json({ error: 'Sesión inválida' });
     if (!me.partnerId) return res.json({ partner: null });
-    const partner = await prisma.user.findUnique({ where: { id: me.partnerId }, include: { blob: true } });
+    const partner = await findUser(db, me.partnerId);
     if (!partner) return res.json({ partner: null });
-    res.json({ partner: { name: partner.name }, ...habitSummary(partner.blob?.data) });
+    const blob = await db.row<Blob>('SELECT "data" FROM "Blob" WHERE "userId" = $1', [partner.id]);
+    res.json({ partner: { name: partner.name }, ...habitSummary(blob?.data) });
   }));
 
   r.delete('/partner', requireAuth, ah(async (req, res) => {
-    const me = await prisma.user.findUnique({ where: { id: req.userId } });
+    const me = await findUser(db, req.userId as string);
     if (me?.partnerId) {
       const pid = me.partnerId;
-      await prisma.user.update({ where: { id: me.id }, data: { partnerId: null } });
-      await prisma.user.updateMany({ where: { id: pid }, data: { partnerId: null } });
+      await db.exec('UPDATE "User" SET "partnerId" = NULL WHERE "id" = ANY($1::text[])', [[me.id, pid]]);
     }
     res.json({ ok: true });
   }));

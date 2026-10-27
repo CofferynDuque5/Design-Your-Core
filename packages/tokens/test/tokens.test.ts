@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { contrast } from '../src/contrast.js';
 import { buildCss } from '../src/css.js';
-import { color, pillars, type ThemeName } from '../src/tokens.js';
+import { color, lima, pillars, type ThemeName } from '../src/tokens.js';
 
 const themes: ThemeName[] = ['light', 'dark'];
 
 // Accesibilidad: WCAG AA pide 4.5:1 para texto normal y 3:1 para elementos gráficos.
-describe.each(themes)('contraste en tema %s', (theme) => {
-  const c = color[theme];
+const cases = themes.flatMap((theme) => [
+  [`${theme}`, theme, color[theme]] as const,
+  [`${theme} (lima)`, theme, lima[theme]] as const,
+]);
+
+describe.each(cases)('contraste en tema %s', (_label, theme, c) => {
 
   it.each([
     ['ink', c.ink],
@@ -97,5 +101,17 @@ describe('CSS generado', () => {
     expect(css).toContain('--pillar-descanso: #2E4D78;');
     expect(css).toContain('--text-body: 1rem;');
     expect(css).toContain('--space-4: 16px;');
+  });
+});
+
+describe('CSS de la paleta lima', () => {
+  const css = buildCss(lima);
+
+  it('cambia la base y el acento, no el resto', () => {
+    expect(css).toContain('--color-primary: #C8F23A;');
+    expect(css).toContain('--color-bg: #0A0B09;');
+    expect(css).toContain('--color-primary: #151714;');
+    expect(css).toContain('--pillar-descanso: #2E4D78;');
+    expect(css).toContain(':root[data-theme="dark"]');
   });
 });

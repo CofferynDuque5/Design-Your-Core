@@ -166,7 +166,7 @@
   .hero em,
   .quote em {
     font-style: italic;
-    color: var(--color-terracotta);
+    color: var(--color-primary);
   }
 
   .hero__actions {
@@ -364,7 +364,7 @@
     flex-direction: column;
     gap: var(--space-2);
     padding-left: var(--space-5);
-    border-left: 2px solid var(--color-sage);
+    border-left: 2px solid var(--color-primary);
   }
 
   .principles__list h3 {
@@ -396,7 +396,7 @@
   }
 
   .btn--light:hover {
-    --btn-bg: var(--color-sand-soft);
+    --btn-bg: color-mix(in srgb, var(--color-on-primary) 85%, var(--color-primary));
   }
 
   .btn--outline-light {
@@ -480,29 +480,5 @@
 
   .not-found {
     min-height: 50vh;
-  }
-}
-
-/* En oscuro, el azul primario es claro: la franja final pasa a azul profundo suave. */
-@layer dyc.site {
-  @media (prefers-color-scheme: dark) {
-    .cta {
-      background: var(--color-primary-soft);
-      color: var(--color-ink);
-    }
-
-    .cta .btn--light {
-      --btn-bg: var(--color-primary);
-      --btn-fg: var(--color-on-primary);
-    }
-
-    .cta .btn--light:hover {
-      --btn-bg: var(--color-primary-hover);
-    }
-
-    .cta .btn--outline-light {
-      --btn-fg: var(--color-ink);
-      --btn-border: var(--color-line-strong);
-    }
   }
 }

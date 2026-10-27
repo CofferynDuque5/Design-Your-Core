@@ -26,8 +26,11 @@ test('recorrido completo de una persona nueva', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Leer 10 páginas' })).toBeVisible();
   await page.goto('/');
   const habit = page.getByRole('checkbox', { name: /Leer 10 páginas/ });
+  // La casilla se marca al instante; se espera a que la API lo guarde antes de recargar.
+  const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/api\/v2\/habits\/[^/]+\/logs\//.test(r.url()) && r.ok());
   await habit.click();
   await expect(habit).toBeChecked();
+  await saved;
   await page.reload();
   await expect(page.getByRole('checkbox', { name: /Leer 10 páginas/ })).toBeChecked();
 
@@ -62,7 +65,7 @@ test('recorrido completo de una persona nueva', async ({ page }) => {
 
   // Volver a entrar lleva directo a Hoy (onboarding ya hecho).
   await page.getByLabel('Correo').fill(address);
-  await page.getByLabel('Contraseña').fill(PASSWORD);
+  await page.getByLabel('Contraseña', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByRole('heading', { name: 'Hábitos de hoy' })).toBeVisible();
 });
@@ -77,7 +80,7 @@ test('borrar la cuenta cierra la sesión y ya no se puede entrar', async ({ page
   await dialog.getByRole('button', { name: 'Borrar definitivamente' }).click();
   await expect(page).toHaveURL(/\/entrar$/);
   await page.getByLabel('Correo').fill(address);
-  await page.getByLabel('Contraseña').fill(PASSWORD);
+  await page.getByLabel('Contraseña', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByRole('alert')).toHaveText('Correo o contraseña incorrectos');
 });

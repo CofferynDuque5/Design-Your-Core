@@ -4,9 +4,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { LogOut } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { pillarShort } from '../../components/pillar';
 import { Sheet } from '../../components/Sheet';
+import { Toggle } from '../../components/tools';
 import { Button, Card, Chip, ErrorState, errorMessage, Field, Loading, PageHeader, Screen, Segmented, SectionHeader, T } from '../../components/ui';
 import { api, useAuth } from '../../lib/api';
 import { DEFAULT_REMINDER, notificationsSupported, readReminder, REMINDER_TIMES, setReminder, type ReminderPrefs } from '../../lib/notifications';
@@ -140,7 +141,6 @@ function PreferencesSection() {
 }
 
 function ReminderSection() {
-  const { colors } = useTheme();
   const toast = useToast();
   const [prefs, setPrefs] = useState<ReminderPrefs>(DEFAULT_REMINDER);
   const [busy, setBusy] = useState(false);
@@ -176,14 +176,7 @@ function ReminderSection() {
             Un aviso para hacer tu check-in. Funciona sin conexión.
           </T>
         </View>
-        <Switch
-          accessibilityLabel="Recordatorio diario"
-          value={prefs.enabled}
-          disabled={busy}
-          onValueChange={(enabled) => apply({ ...prefs, enabled })}
-          trackColor={{ true: colors.primary, false: colors.lineStrong }}
-          thumbColor={colors.surface}
-        />
+        <Toggle label="Recordatorio diario" value={prefs.enabled} disabled={busy} onChange={(enabled) => apply({ ...prefs, enabled })} />
       </View>
       {prefs.enabled && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }} accessibilityLabel="Hora del recordatorio">

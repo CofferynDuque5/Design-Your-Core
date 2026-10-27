@@ -6,13 +6,14 @@ import { createRequire } from 'node:module';
 const require = createRequire(new URL('../../web/package.json', import.meta.url));
 const { chromium } = require('@playwright/test');
 
-const PRIMARY = '#1E3A5F';
-// ring: el círculo; bg: fondo (null = transparente); scale: tamaño de la marca dentro del lienzo.
-const mark = (size, { bg = PRIMARY, scale = 1, ring = '#F1EADC', dot = '#C9B28C' } = {}) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64">
+// Negro y lima, como la web: marca negra sobre lima; en la pantalla de carga, lima sobre negro.
+const PRIMARY = '#C8F23A';
+const INK = '#10120C';
+// ring: tallo y hojas; dot: sombra; bg: fondo (null = transparente); scale: tamaño de la marca dentro del lienzo.
+const mark = (size, { bg = PRIMARY, scale = 1, ring = INK, dot = INK } = {}) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64">
   ${bg ? `<rect width="64" height="64" fill="${bg}"/>` : ''}
   <g transform="translate(32 32) scale(${scale}) translate(-32 -32)">
-    <circle cx="32" cy="32" r="17" fill="none" stroke="${ring}" stroke-width="4"/>
-    <circle cx="32" cy="32" r="6" fill="${dot}"/>
+    <g transform="translate(32 32) scale(0.8) translate(-33 -33.5)"><ellipse cx="32" cy="53" rx="10" ry="3" fill="${dot}" opacity="0.45"/><path d="M32 50 V30" fill="none" stroke="${ring}" stroke-width="4.5" stroke-linecap="round"/><path d="M31 41 C23 41 16 35.5 15 26 C24 26 30.5 31.5 31 41 Z" fill="${ring}"/><path d="M33 32 C33 21.5 40.5 13 51 11.5 C51 23 43.5 31 33 32 Z" fill="${ring}"/></g>
   </g>
 </svg>`;
 
@@ -22,7 +23,7 @@ const out = [
   // Android: primer plano dentro de la zona segura (66 %) sobre fondo del color primario.
   ['assets/adaptive-icon.png', 1024, { bg: null, scale: 0.62 }],
   ['assets/adaptive-icon-monochrome.png', 1024, { bg: null, scale: 0.62, ring: '#000', dot: '#000' }],
-  ['assets/splash-icon.png', 512, { bg: null, scale: 0.9 }],
+  ['assets/splash-icon.png', 512, { bg: null, scale: 0.9, ring: PRIMARY, dot: PRIMARY }],
   ['assets/favicon.png', 48, {}],
 ];
 

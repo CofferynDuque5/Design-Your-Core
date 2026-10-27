@@ -1,0 +1,346 @@
+/*
+ * Minimalista: casi monocromo. Superficies neutras puras, líneas finas en vez
+ * de sombras, un solo acento (azul), radios pequeños, más aire y títulos en
+ * Figtree ligera. Los pilares se quedan en puntos y gráficos apagados.
+ */
+
+/* ---------- Tokens: claro ---------- */
+:root[data-style='minimal'] {
+  --font-display: var(--font-sans);
+  --tracking-display: -0.025em;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1);
+  --minimal-accent: #2F54C9;
+
+  --color-bg: #FAFAFA;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #F2F2F3;
+  --color-surface-raised: #FFFFFF;
+  --color-ink: #18181B;
+  --color-ink-muted: #52525B;
+  --color-ink-subtle: #5E5E66;
+  --color-line: #E6E6E9;
+  --color-line-strong: #CFCFD4;
+  --color-primary: #18181B;
+  --color-primary-hover: #3F3F46;
+  --color-on-primary: #FFFFFF;
+  --color-primary-soft: #F0F0F2;
+  --color-focus: #2F54C9;
+  --color-scrim: rgba(24, 24, 27, 0.4);
+
+  --pillar-movimiento: #52525B;
+  --pillar-movimiento-soft: #F2F2F3;
+  --pillar-movimiento-chart: #B07D66;
+  --pillar-descanso: #52525B;
+  --pillar-descanso-soft: #F2F2F3;
+  --pillar-descanso-chart: #6680A6;
+  --pillar-alimentacion: #52525B;
+  --pillar-alimentacion-soft: #F2F2F3;
+  --pillar-alimentacion-chart: #66917A;
+  --pillar-enfoque: #52525B;
+  --pillar-enfoque-soft: #F2F2F3;
+  --pillar-enfoque-chart: #A2874C;
+  --pillar-relaciones: #52525B;
+  --pillar-relaciones-soft: #F2F2F3;
+  --pillar-relaciones-chart: #A87382;
+  --pillar-proposito: #52525B;
+  --pillar-proposito-soft: #F2F2F3;
+  --pillar-proposito-chart: #7E73A1;
+}
+
+/* ---------- Tokens: oscuro ---------- */
+@media (prefers-color-scheme: dark) {
+  :root[data-style='minimal']:not([data-theme='light']) {
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+    --minimal-accent: #8EA6F5;
+
+    --color-bg: #0C0C0D;
+    --color-surface: #131315;
+    --color-surface-sunken: #0A0A0B;
+    --color-surface-raised: #1A1A1D;
+    --color-ink: #F4F4F5;
+    --color-ink-muted: #B4B4BC;
+    --color-ink-subtle: #9A9AA3;
+    --color-line: #26262A;
+    --color-line-strong: #3A3A40;
+    --color-primary: #F4F4F5;
+    --color-primary-hover: #D4D4D8;
+    --color-on-primary: #131315;
+    --color-primary-soft: #222226;
+    --color-focus: #8EA6F5;
+    --color-scrim: rgba(0, 0, 0, 0.65);
+
+    --pillar-movimiento: #B4B4BC;
+    --pillar-movimiento-soft: #1C1C1F;
+    --pillar-movimiento-chart: #C28F79;
+    --pillar-descanso: #B4B4BC;
+    --pillar-descanso-soft: #1C1C1F;
+    --pillar-descanso-chart: #8098BD;
+    --pillar-alimentacion: #B4B4BC;
+    --pillar-alimentacion-soft: #1C1C1F;
+    --pillar-alimentacion-chart: #7FAA92;
+    --pillar-enfoque: #B4B4BC;
+    --pillar-enfoque-soft: #1C1C1F;
+    --pillar-enfoque-chart: #C2A86E;
+    --pillar-relaciones: #B4B4BC;
+    --pillar-relaciones-soft: #1C1C1F;
+    --pillar-relaciones-chart: #BF8C9B;
+    --pillar-proposito: #B4B4BC;
+    --pillar-proposito-soft: #1C1C1F;
+    --pillar-proposito-chart: #9A8FC0;
+  }
+}
+
+:root[data-style='minimal'][data-theme='dark'] {
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --minimal-accent: #8EA6F5;
+
+  --color-bg: #0C0C0D;
+  --color-surface: #131315;
+  --color-surface-sunken: #0A0A0B;
+  --color-surface-raised: #1A1A1D;
+  --color-ink: #F4F4F5;
+  --color-ink-muted: #B4B4BC;
+  --color-ink-subtle: #9A9AA3;
+  --color-line: #26262A;
+  --color-line-strong: #3A3A40;
+  --color-primary: #F4F4F5;
+  --color-primary-hover: #D4D4D8;
+  --color-on-primary: #131315;
+  --color-primary-soft: #222226;
+  --color-focus: #8EA6F5;
+  --color-scrim: rgba(0, 0, 0, 0.65);
+
+  --pillar-movimiento: #B4B4BC;
+  --pillar-movimiento-soft: #1C1C1F;
+  --pillar-movimiento-chart: #C28F79;
+  --pillar-descanso: #B4B4BC;
+  --pillar-descanso-soft: #1C1C1F;
+  --pillar-descanso-chart: #8098BD;
+  --pillar-alimentacion: #B4B4BC;
+  --pillar-alimentacion-soft: #1C1C1F;
+  --pillar-alimentacion-chart: #7FAA92;
+  --pillar-enfoque: #B4B4BC;
+  --pillar-enfoque-soft: #1C1C1F;
+  --pillar-enfoque-chart: #C2A86E;
+  --pillar-relaciones: #B4B4BC;
+  --pillar-relaciones-soft: #1C1C1F;
+  --pillar-relaciones-chart: #BF8C9B;
+  --pillar-proposito: #B4B4BC;
+  --pillar-proposito-soft: #1C1C1F;
+  --pillar-proposito-chart: #9A8FC0;
+}
+
+/* ---------- Componentes base ---------- */
+@layer dyc.estilo {
+  [data-style='minimal'] h1,
+  [data-style='minimal'] h2,
+  [data-style='minimal'] h3 {
+    font-weight: 300;
+  }
+
+  [data-style='minimal'] .card {
+    border-color: var(--color-line);
+  }
+
+  [data-style='minimal'] .card--raised {
+    border-color: var(--color-line);
+  }
+
+  [data-style='minimal'] .btn {
+    font-weight: var(--weight-medium);
+  }
+
+  [data-style='minimal'] .btn--secondary {
+    --btn-border: var(--color-line-strong);
+  }
+
+  [data-style='minimal'] .btn--ghost {
+    --btn-fg: var(--color-ink);
+  }
+
+  [data-style='minimal'] .input {
+    border-color: var(--color-line-strong);
+  }
+
+  [data-style='minimal'] .chip {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+
+  /* El pilar se queda en el punto: la etiqueta es gris con su color solo en el punto. */
+  [data-style='minimal'] .pillar-tag {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--color-line);
+    font-weight: var(--weight-medium);
+  }
+
+  [data-style='minimal'] .pillar-tag::before {
+    background: var(--pillar-chart, currentColor);
+  }
+
+  [data-style='minimal'] .segmented {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+
+  [data-style='minimal'] .segmented button[aria-pressed='true'] {
+    background: var(--color-primary-soft);
+    box-shadow: none;
+  }
+
+  [data-style='minimal'] .stat__value,
+  [data-style='minimal'] .display {
+    font-weight: 300;
+  }
+
+  [data-style='minimal'] .scale__option b {
+    font-weight: 300;
+  }
+
+  [data-style='minimal'] .scale__option input:checked + span {
+    border-color: var(--color-ink);
+  }
+
+  [data-style='minimal'] .empty-state {
+    border-style: solid;
+    border-color: var(--color-line);
+  }
+
+  [data-style='minimal'] .alert {
+    box-shadow: inset 2px 0 0 currentColor;
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* ---------- Estructura ---------- */
+@layer dyc.estilo-app {
+  [data-style='minimal'] .page-title {
+    font-weight: 300;
+    letter-spacing: -0.03em;
+  }
+
+  [data-style='minimal'] .section-title,
+  [data-style='minimal'] .tool-card__title {
+    font-weight: var(--weight-regular);
+  }
+
+  [data-style='minimal'] .eyebrow {
+    letter-spacing: 0.12em;
+    font-weight: var(--weight-medium);
+  }
+
+  @media (min-width: 768px) {
+    [data-style='minimal'] .page {
+      padding-top: var(--space-12);
+    }
+
+    [data-style='minimal'] .page-header {
+      margin-bottom: var(--space-10);
+    }
+  }
+
+  [data-style='minimal'] .logo__text {
+    font-size: var(--text-lead);
+    font-weight: var(--weight-medium);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  /* Enlace activo: sin relleno, con una raya del acento. */
+  @media (min-width: 1024px) {
+    [data-style='minimal'] .sidebar__link {
+      position: relative;
+      border-radius: var(--radius-sm);
+    }
+
+    [data-style='minimal'] .sidebar__link.active {
+      background: transparent;
+      color: var(--color-ink);
+      font-weight: var(--weight-semibold);
+    }
+
+    [data-style='minimal'] .sidebar__link.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 25%;
+      bottom: 25%;
+      width: 2px;
+      border-radius: 1px;
+      background: var(--minimal-accent);
+    }
+  }
+
+  [data-style='minimal'] .tabbar {
+    background: var(--color-surface);
+    backdrop-filter: none;
+  }
+
+  [data-style='minimal'] .tabbar__link.active {
+    color: var(--color-ink);
+    font-weight: var(--weight-semibold);
+    box-shadow: inset 0 2px 0 var(--minimal-accent);
+  }
+
+  [data-style='minimal'] .dialog {
+    border: 1px solid var(--color-line);
+  }
+
+  [data-style='minimal'] .card--accent {
+    background: var(--color-surface);
+    border-color: var(--color-line-strong);
+  }
+
+  [data-style='minimal'] .chip-btn[aria-pressed='true'],
+  [data-style='minimal'] .chip-radio input:checked + span {
+    border-color: var(--color-ink);
+    background: var(--color-primary-soft);
+    color: var(--color-ink);
+  }
+
+  /* Tarjetas con color propio (materias, proyectos, metas…): sin degradado, solo la franja fina. */
+  [data-style='minimal'] .tool-card {
+    background: var(--color-surface);
+  }
+
+  [data-style='minimal'] .tool-card::before {
+    width: 3px;
+  }
+
+  /* Colores de datos (bloques de la agenda, materias de las notas): más apagados. */
+  [data-style='minimal'] .tl-block__btn {
+    border-left-width: 3px;
+    background: color-mix(in srgb, var(--c) 9%, var(--color-surface));
+  }
+
+  [data-style='minimal'] .tl-block__btn:hover {
+    background: color-mix(in srgb, var(--c) 16%, var(--color-surface));
+  }
+
+  [data-style='minimal'] .note-card {
+    border-top-width: 2px;
+  }
+
+  [data-style='minimal'] .habit-check__pillar {
+    color: var(--color-ink-subtle);
+    font-weight: var(--weight-medium);
+  }
+
+  [data-style='minimal'] .rec__icon {
+    background: var(--color-surface-sunken);
+    color: var(--color-ink);
+  }
+
+  [data-style='minimal'] .section-link {
+    color: var(--color-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--color-line-strong);
+    text-underline-offset: 0.3em;
+  }
+}

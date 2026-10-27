@@ -1,3 +1,4 @@
+import { isEmail } from '@dyc/core';
 import { useMutation } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
@@ -8,10 +9,15 @@ import { AuthLayout } from './AuthLayout';
 
 export function Forgot() {
   const [email, setEmail] = useState('');
+  const [touched, setTouched] = useState(false);
   const forgot = useMutation({ mutationFn: api.auth.forgotPassword });
+  const emailOk = isEmail(email);
+  const emailError = touched && !emailOk ? (email.trim() ? 'Ingresa un correo válido, como nombre@correo.com.' : 'Escribe tu correo.') : null;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    setTouched(true);
+    if (!emailOk) return;
     forgot.mutate(email.trim());
   };
 
@@ -32,8 +38,20 @@ export function Forgot() {
               {errorMessage(forgot.error)}
             </div>
           )}
-          <TextField label="Correo" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          <button className="btn btn--block" type="submit" disabled={forgot.isPending || !email} aria-busy={forgot.isPending}>
+          <TextField
+            label="Correo"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="nombre@correo.com"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => email && setTouched(true)}
+            error={emailError}
+            valid={emailOk}
+          />
+          <button className="btn btn--block" type="submit" disabled={forgot.isPending} aria-busy={forgot.isPending}>
             Enviar enlace
           </button>
         </form>

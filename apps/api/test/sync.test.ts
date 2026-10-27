@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { bearer, makeApp, prisma, registerUser, resetDb } from './helpers.js';
+import { bearer, makeApp, db, registerUser, resetDb } from './helpers.js';
 
 beforeEach(resetDb);
-afterAll(() => prisma.$disconnect());
+afterAll(() => db.close());
 
 describe('sincronización del documento', () => {
   it('guarda y devuelve el estado completo', async () => {
@@ -59,7 +59,7 @@ describe('imágenes', () => {
 
     const attack = await api.post('/api/images').set(bearer(b.token)).send({ images: { compartido: img('pisado por B') } }).expect(200);
     expect(attack.body.count).toBe(0);
-    const row = await prisma.image.findUniqueOrThrow({ where: { id: 'compartido' } });
+    const row = (await db.row<{ data: string }>('SELECT * FROM "Image" WHERE "id" = $1', ['compartido']))!;
     expect(row.data).toBe(img('original de A'));
 
     const peek = await api.post('/api/images/fetch').set(bearer(b.token)).send({ ids: ['compartido'] }).expect(200);

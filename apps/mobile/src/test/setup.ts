@@ -7,7 +7,17 @@ jest.mock('expo-secure-store', () => {
     getItemAsync: jest.fn(async (k: string) => data.get(k) ?? null),
     setItemAsync: jest.fn(async (k: string, v: string) => void data.set(k, v)),
     deleteItemAsync: jest.fn(async (k: string) => void data.delete(k)),
+    canUseBiometricAuthentication: jest.fn(() => true),
     __reset: () => data.clear(),
+  };
+});
+
+// Bytes aleatorios del sistema con los de Node (el módulo nativo no existe en Jest).
+jest.mock('expo-crypto', () => {
+  const { randomBytes, webcrypto } = jest.requireActual<{ randomBytes: (n: number) => Uint8Array; webcrypto: Crypto }>('node:crypto');
+  return {
+    getRandomBytes: (n: number) => new Uint8Array(randomBytes(n)),
+    getRandomValues: <T extends ArrayBufferView>(a: T) => webcrypto.getRandomValues(a as never) as T,
   };
 });
 

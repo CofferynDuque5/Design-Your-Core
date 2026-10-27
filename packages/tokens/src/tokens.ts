@@ -115,6 +115,42 @@ export const color: Record<ThemeName, ColorScheme> = {
   },
 };
 
+/**
+ * Paleta de marca «Lima»: negro con verde lima. Es la que usan por defecto la
+ * web (paletas.css, estilo editorial), el sitio y la app móvil. Cambia solo la
+ * base y el acento; el resto de colores (texto, acentos, estados) es el de `color`.
+ */
+export const lima: Record<ThemeName, ColorScheme> = {
+  light: {
+    ...color.light,
+    bg: '#F3F4EF',
+    surface: '#FFFFFF',
+    surfaceSunken: '#E9EBE3',
+    surfaceRaised: '#FFFFFF',
+    line: '#D9DCD2',
+    lineStrong: '#BFC3B6',
+    primary: '#151714',
+    primaryHover: '#2B2E29',
+    onPrimary: '#D4F53C',
+    primarySoft: '#EDF5D0',
+    focus: '#5B7A00',
+  },
+  dark: {
+    ...color.dark,
+    bg: '#0A0B09',
+    surface: '#121410',
+    surfaceSunken: '#060706',
+    surfaceRaised: '#1A1D17',
+    line: '#23261F',
+    lineStrong: '#363A30',
+    primary: '#C8F23A',
+    primaryHover: '#D8F86E',
+    onPrimary: '#10120C',
+    primarySoft: '#1F2712',
+    focus: '#C8F23A',
+  },
+};
+
 export type PillarId = 'movimiento' | 'descanso' | 'alimentacion' | 'enfoque' | 'relaciones' | 'proposito';
 
 export interface Pillar {
@@ -185,9 +221,9 @@ export const pillars: readonly Pillar[] = [
   },
   {
     id: 'relaciones',
-    name: 'Relaciones',
-    short: 'Relaciones',
-    description: 'Tiempo de calidad con pareja, familia y amistades.',
+    name: 'Relación de pareja',
+    short: 'Pareja',
+    description: 'Tiempo de calidad con tu pareja: hablar, escucharse y estar presentes.',
     color: { light: '#9A5064', dark: '#DDA0AF' },
     soft: { light: '#F4E1E5', dark: '#33202A' },
     chart: { light: '#C1657C', dark: '#D1748F' },

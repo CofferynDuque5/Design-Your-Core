@@ -8,7 +8,7 @@ export const PILLAR_NAMES: Record<PillarId, string> = {
   descanso: 'Descanso',
   alimentacion: 'Alimentación',
   enfoque: 'Enfoque mental',
-  relaciones: 'Relaciones',
+  relaciones: 'Relación de pareja',
   proposito: 'Propósito personal',
 };
 

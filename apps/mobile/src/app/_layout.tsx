@@ -4,8 +4,7 @@ import { Figtree_500Medium } from '@expo-google-fonts/figtree/500Medium';
 import { Figtree_600SemiBold } from '@expo-google-fonts/figtree/600SemiBold';
 import { Newsreader_400Regular } from '@expo-google-fonts/newsreader/400Regular';
 import { Newsreader_400Regular_Italic } from '@expo-google-fonts/newsreader/400Regular_Italic';
-import { ApiError } from '@dyc/api-client';
-import { focusManager, QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { focusManager, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
@@ -17,21 +16,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { auth, useAuth } from '../lib/api';
 import { notificationsSupported } from '../lib/notifications';
 import { useProfile } from '../lib/queries';
+import { queryClient } from '../lib/queryClient';
 import { ThemeProvider, useTheme } from '../lib/theme';
 import { ToastProvider } from '../lib/toast';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 auth.load();
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      // Solo se reintenta si no hubo conexión; un 4xx no cambia por insistir.
-      retry: (n, err) => n < 2 && err instanceof ApiError && err.isNetwork,
-    },
-  },
-});
 
 // Al volver a la app, los datos se refrescan como al enfocar una pestaña en la web.
 if (Platform.OS !== 'web') {
@@ -87,6 +78,7 @@ function Root({ fontsReady }: { fontsReady: boolean }) {
         </Stack.Protected>
         <Stack.Protected guard={signedIn && onboarded}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(herramientas)" />
           <Stack.Screen name="check-in" options={{ presentation: 'modal' }} />
         </Stack.Protected>
       </Stack>

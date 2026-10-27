@@ -54,9 +54,13 @@ export function deviceTimeZone(): string {
 const WEEKDAY_NAMES = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 export const WEEKDAYS = WEEKDAY_NAMES.map((label, i) => ({ iso: String(i + 1), label }));
 
+const WEEKDAY_PLURALS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos'];
+
 export function daysLabel(days: string): string {
   if (days === '1234567') return 'Todos los días';
   if (days === '12345') return 'Entre semana';
   if (days === '67') return 'Fines de semana';
+  // Un solo día se lee mejor con su nombre que con una letra suelta.
+  if (/^[1-7]$/.test(days)) return `Los ${WEEKDAY_PLURALS[Number(days) - 1]}`;
   return WEEKDAYS.filter((w) => days.includes(w.iso)).map((w) => w.label).join(' · ');
 }

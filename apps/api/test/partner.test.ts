@@ -1,9 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { resolveInviteAppUrl } from '../src/routes/partner.js';
-import { bearer, fakeMailer, makeApp, prisma, registerUser, resetDb, testConfig } from './helpers.js';
+import { bearer, fakeMailer, makeApp, db, registerUser, resetDb, testConfig } from './helpers.js';
 
 beforeEach(resetDb);
-afterAll(() => prisma.$disconnect());
+afterAll(() => db.close());
 
 describe('pareja', () => {
   it('invita con código, acepta y comparte el resumen de hábitos', async () => {

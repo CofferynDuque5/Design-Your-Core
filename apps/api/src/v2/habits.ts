@@ -1,6 +1,7 @@
 import { addDays, habitInputSchema, habitPatchSchema, logInputSchema } from '@dyc/core';
-import type { Habit, PrismaClient } from '@prisma/client';
 import { Router, type RequestHandler } from 'express';
+import { newId, upsert, type Db } from '../db/db.js';
+import type { Habit, HabitLog } from '../db/types.js';
 import { ah } from '../lib/http.js';
 import { dayParam, fromDb, parse, toDb, userToday } from './util.js';
 
@@ -14,22 +15,29 @@ export const publicHabit = (h: Habit) => ({
   createdAt: h.createdAt,
 });
 
-export function habitRoutes({ prisma, requireAuth }: { prisma: PrismaClient; requireAuth: RequestHandler }): Router {
+export function habitRoutes({ db, requireAuth }: { db: Db; requireAuth: RequestHandler }): Router {
   const r = Router();
-  const own = (userId: string, id: string) => prisma.habit.findFirst({ where: { id, userId } });
+  const own = (userId: string, id: string) => db.row<Habit>('SELECT * FROM "Habit" WHERE "id" = $1 AND "userId" = $2', [id, userId]);
 
   // Hábitos activos (?archived=1 incluye los archivados) con los registros de los últimos 7 días.
   r.get('/habits', requireAuth, ah(async (req, res) => {
     const userId = req.userId as string;
-    const today = await userToday(prisma, userId);
-    const habits = await prisma.habit.findMany({
-      where: { userId, ...(req.query.archived === '1' ? {} : { archivedAt: null }) },
-      include: { logs: { where: { date: { gte: toDb(addDays(today, -6)), lte: toDb(today) } } } },
-      orderBy: { createdAt: 'asc' },
-    });
+    const today = await userToday(db, userId);
+    const habits = await db.rows<Habit>(
+      `SELECT * FROM "Habit" WHERE "userId" = $1 ${req.query.archived === '1' ? '' : 'AND "archivedAt" IS NULL'} ORDER BY "createdAt" ASC`,
+      [userId],
+    );
+    const logs = await db.rows<HabitLog>('SELECT * FROM "HabitLog" WHERE "habitId" = ANY($1::text[]) AND "date" BETWEEN $2 AND $3', [
+      habits.map((h) => h.id),
+      toDb(addDays(today, -6)),
+      toDb(today),
+    ]);
     res.json({
       today,
-      habits: habits.map((h) => ({ ...publicHabit(h), recent: h.logs.map((l) => ({ date: fromDb(l.date), done: l.done })) })),
+      habits: habits.map((h) => ({
+        ...publicHabit(h),
+        recent: logs.filter((l) => l.habitId === h.id).map((l) => ({ date: fromDb(l.date), done: l.done })),
+      })),
     });
   }));
 
@@ -37,9 +45,12 @@ export function habitRoutes({ prisma, requireAuth }: { prisma: PrismaClient; req
     const input = parse(habitInputSchema, req.body, res);
     if (!input) return;
     const userId = req.userId as string;
-    const active = await prisma.habit.count({ where: { userId, archivedAt: null } });
-    if (active >= 30) return res.status(409).json({ error: 'Tienes 30 hábitos activos. Archiva alguno antes de crear otro.' });
-    const habit = await prisma.habit.create({ data: { ...input, userId, startsOn: toDb(await userToday(prisma, userId)) } });
+    const active = await db.row<{ n: number }>('SELECT count(*)::int AS n FROM "Habit" WHERE "userId" = $1 AND "archivedAt" IS NULL', [userId]);
+    if ((active?.n ?? 0) >= 30) return res.status(409).json({ error: 'Tienes 30 hábitos activos. Archiva alguno antes de crear otro.' });
+    const habit = (await db.row<Habit>(
+      'INSERT INTO "Habit" ("id", "userId", "pillar", "title", "days", "startsOn", "createdAt") VALUES ($1, $2, $3, $4, COALESCE($5, \'1234567\'), $6, $7) RETURNING *',
+      [newId(), userId, input.pillar, input.title, input.days ?? null, toDb(await userToday(db, userId)), new Date()],
+    )) as Habit;
     res.status(201).json({ habit: publicHabit(habit) });
   }));
 
@@ -49,10 +60,11 @@ export function habitRoutes({ prisma, requireAuth }: { prisma: PrismaClient; req
     const habit = await own(req.userId as string, req.params.id);
     if (!habit) return res.status(404).json({ error: 'Hábito no encontrado' });
     const { archived, ...fields } = input;
-    const updated = await prisma.habit.update({
-      where: { id: habit.id },
-      data: { ...fields, ...(archived === undefined ? {} : { archivedAt: archived ? habit.archivedAt ?? new Date() : null }) },
-    });
+    const next = { ...habit, ...fields, ...(archived === undefined ? {} : { archivedAt: archived ? habit.archivedAt ?? new Date() : null }) };
+    const updated = (await db.row<Habit>(
+      'UPDATE "Habit" SET "pillar" = $2, "title" = $3, "days" = $4, "archivedAt" = $5 WHERE "id" = $1 RETURNING *',
+      [habit.id, next.pillar, next.title, next.days, next.archivedAt],
+    )) as Habit;
     res.json({ habit: publicHabit(updated) });
   }));
 
@@ -60,7 +72,7 @@ export function habitRoutes({ prisma, requireAuth }: { prisma: PrismaClient; req
   r.delete('/habits/:id', requireAuth, ah(async (req, res) => {
     const habit = await own(req.userId as string, req.params.id);
     if (!habit) return res.status(404).json({ error: 'Hábito no encontrado' });
-    await prisma.habit.delete({ where: { id: habit.id } });
+    await db.exec('DELETE FROM "Habit" WHERE "id" = $1', [habit.id]);
     res.json({ ok: true });
   }));
 
@@ -72,12 +84,8 @@ export function habitRoutes({ prisma, requireAuth }: { prisma: PrismaClient; req
     const userId = req.userId as string;
     const habit = await own(userId, req.params.id);
     if (!habit) return res.status(404).json({ error: 'Hábito no encontrado' });
-    if (date > addDays(await userToday(prisma, userId), 1)) return res.status(400).json({ error: 'No se puede registrar un día futuro' });
-    const log = await prisma.habitLog.upsert({
-      where: { habitId_date: { habitId: habit.id, date: toDb(date) } },
-      update: { done: input.done },
-      create: { habitId: habit.id, date: toDb(date), done: input.done },
-    });
+    if (date > addDays(await userToday(db, userId), 1)) return res.status(400).json({ error: 'No se puede registrar un día futuro' });
+    const log = await upsert<HabitLog>(db, 'HabitLog', ['habitId', 'date'], { habitId: habit.id, date: toDb(date) }, { done: input.done });
     res.json({ log: { habitId: habit.id, date, done: log.done } });
   }));
 

@@ -27,7 +27,8 @@
   h2,
   h3 {
     font-family: var(--font-display);
-    font-weight: var(--weight-regular);
+    /* La web cambia --weight-display con la tipografía elegida (Perfil → Tipografía). */
+    font-weight: var(--weight-display, var(--weight-regular));
     line-height: var(--leading-snug);
     letter-spacing: var(--tracking-display);
     text-wrap: balance;
@@ -90,6 +91,7 @@
 
   .display {
     font-family: var(--font-display);
+    font-weight: var(--weight-display, var(--weight-regular));
     font-size: clamp(var(--text-h1), 7vw, var(--text-display));
     line-height: var(--leading-tight);
     letter-spacing: var(--tracking-display);
@@ -339,7 +341,7 @@
   .scale__option b {
     font-family: var(--font-display);
     font-size: var(--text-h3);
-    font-weight: var(--weight-regular);
+    font-weight: var(--weight-display, var(--weight-regular));
     color: var(--color-ink);
     line-height: 1;
   }
@@ -512,6 +514,7 @@
 
   .stat__value {
     font-family: var(--font-display);
+    font-weight: var(--weight-display, var(--weight-regular));
     font-size: var(--text-h2);
     line-height: 1;
     font-variant-numeric: tabular-nums;

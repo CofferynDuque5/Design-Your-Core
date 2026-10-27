@@ -17,6 +17,7 @@ Esta versión es compatible con la app publicada actualmente. El plan añade `/a
 | POST | `/api/auth/register` (estricta) | `{ email, password (8+), name?, gender? ('mujer'\|'hombre'\|'otro') }` | `{ token, user }` · 409 si el correo existe |
 | POST | `/api/auth/login` (estricta) | `{ email, password }` | `{ token, user }` · 401 si no coincide |
 | GET | `/api/me` 🔒 | | `{ user }` |
+| PATCH | `/api/v2/me` 🔒 | `{ showCycle }` (booleano) | `{ user }`. Es el mismo ajuste `showCycle` de la app anterior: muestra Ciclo en el menú y en el Calendario |
 | POST | `/api/auth/change-password` 🔒 (estricta) | `{ current, next (8+) }` | `{ ok, token }`. Cierra las demás sesiones |
 | POST | `/api/auth/logout-others` 🔒 | | `{ ok, token }`. Cierra las demás sesiones |
 | POST | `/api/auth/forgot-password` (estricta) | `{ email }` | Siempre `{ ok, message }`. Envía un enlace válido 30 min |
@@ -135,3 +136,20 @@ La app móvil no guarda un token de 60 días: recibe un **token de acceso de 15 
 ## Cambio en v1: sincronización sin sobrescrituras
 
 `PUT /api/sync` acepta ahora `baseUpdatedAt` (el `updatedAt` que el cliente leyó). Si el documento cambió desde entonces en otro dispositivo, responde 409 con `{ error, data, updatedAt }` en lugar de pisarlo. Sin ese campo se comporta como antes, así que la app publicada sigue funcionando.
+
+## Módulos de la app anterior
+
+Edición elemento a elemento de las listas `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas`, `transactions`, `goals`, `pets`, `petCares`, `period`, `workouts`, `sleep`, `journal`, `routines`, `meals`, `notes`, `workItems` y `meditations` del documento de `/api/sync`, en `/api/v2/modules`. Las claves que son un objeto (`cycle`, `dayLog` y `budget`) se guardan enteras con `PUT /modules/:key` o en parte con `PATCH /modules/:key`, y responden `{ value, updatedAt }`. En `notes`, `excerpt` y `tag` los calcula el servidor.
+
+La **bóveda cifrada** (`vaultSecure`, clave nueva) tiene rutas propias; el servidor solo valida la forma, nunca ve el contenido:
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| PUT | `/api/v2/modules/vaultSecure` 🔒 | `{ v: 1, kdf, check, items: [] }` | 201 `{ value, updatedAt }` · 409 si ya existe |
+| DELETE | `/api/v2/modules/vaultSecure` 🔒 | | `{ ok, updatedAt }` (la lista antigua `vault` no se toca) |
+| POST | `/api/v2/modules/vaultSecure/items` 🔒 | `{ item: { id, iv, ct } }` | 201 `{ item, updatedAt }` · 404 sin bóveda · 409 id repetido |
+| PUT | `/api/v2/modules/vaultSecure/items/:id` 🔒 | `{ iv, ct }` | `{ item, updatedAt }` · 404 |
+| DELETE | `/api/v2/modules/vaultSecure/items/:id` 🔒 | | `{ ok, updatedAt }` · 404 |
+| POST | `/api/v2/modules/vaultSecure/migrate` 🔒 | `{ items, legacyIds }` | `{ migrated, remaining, updatedAt }`: añade las entradas cifradas y quita de `vault` las de `legacyIds` en la misma escritura |
+
+Formatos, validación y reglas: ver [modulos.md](modulos.md).

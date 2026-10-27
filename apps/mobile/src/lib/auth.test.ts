@@ -74,4 +74,20 @@ describe('sesión del móvil', () => {
     await auth.signIn(pair(2));
     expect(listener).toHaveBeenCalledTimes(2);
   });
+
+  it('guarda los ajustes de la cuenta sin tocar los tokens, solo de la misma persona', async () => {
+    const store = memory();
+    const auth = createAuthStore(store, jest.fn());
+    await auth.signIn(pair(1));
+    await auth.updateUser({ ...user, showCycle: true });
+    expect(auth.get()).toMatchObject({ status: 'signedIn', accessToken: 'a1', user: { showCycle: true } });
+    expect(JSON.parse(store.data.get('dyc.user') ?? '{}')).toMatchObject({ showCycle: true });
+
+    await auth.updateUser({ ...user, id: 'otra', showCycle: false });
+    expect(auth.get()).toMatchObject({ user: { id: 'u1', showCycle: true } });
+    await auth.signOut();
+    await auth.updateUser(user);
+    expect(auth.get().status).toBe('signedOut');
+  });
 });
+

@@ -18,6 +18,7 @@ describe('formato de fechas', () => {
     expect(daysLabel('12345')).toBe('Entre semana');
     expect(daysLabel('67')).toBe('Fines de semana');
     expect(daysLabel('135')).toBe('L · X · V');
+    expect(daysLabel('6')).toBe('Los sábados');
   });
 
   it('saluda según la hora', () => {

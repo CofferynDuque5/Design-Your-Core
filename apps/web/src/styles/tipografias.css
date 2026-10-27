@@ -1,0 +1,77 @@
+/*
+ * Tipografías (Perfil → Tipografía). Cada una es una pareja de letras para
+ * títulos (--font-display) y texto (--font-sans), independiente del estilo,
+ * la paleta y el tema, y se activa con <html data-font="…">.
+ *
+ * Aquí solo están las familias (pocos bytes, en el paquete inicial, para que
+ * no haya destello). Las @font-face de las que no son la clásica están en
+ * styles/fuentes/ y se cargan aparte al elegirlas (src/app/font.ts); mientras
+ * llegan se ve la letra de repuesto de cada pila.
+ *
+ * Va después de los estilos: la tipografía elegida gana a la de un estilo
+ * (Minimalista usa la letra del texto en los títulos solo con la clásica).
+ * --weight-display es el grosor de los títulos con la letra de títulos; el
+ * estilo Minimalista pone los suyos más finos por encima.
+ */
+
+:root {
+  --font-stack-clasica-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-stack-clasica-sans: 'Figtree', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-stack-moderna: 'Manrope', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-stack-geometrica-display: 'Outfit', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-stack-geometrica-sans: 'DM Sans', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-stack-elegante-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-stack-elegante-sans: 'Source Sans 3', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-stack-amable: 'Nunito', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --weight-display: var(--weight-regular);
+}
+
+:root[data-font='moderna'] {
+  --font-display: var(--font-stack-moderna);
+  --font-sans: var(--font-stack-moderna);
+  --weight-display: var(--weight-semibold);
+  --tracking-display: -0.025em;
+}
+
+:root[data-font='geometrica'] {
+  --font-display: var(--font-stack-geometrica-display);
+  --font-sans: var(--font-stack-geometrica-sans);
+  --weight-display: var(--weight-medium);
+  --tracking-display: -0.015em;
+}
+
+:root[data-font='elegante'] {
+  --font-display: var(--font-stack-elegante-display);
+  --font-sans: var(--font-stack-elegante-sans);
+  --weight-display: var(--weight-regular);
+  --tracking-display: -0.015em;
+}
+
+:root[data-font='amable'] {
+  --font-display: var(--font-stack-amable);
+  --font-sans: var(--font-stack-amable);
+  --weight-display: var(--weight-bold);
+  --tracking-display: -0.01em;
+}
+
+/* Las letras de títulos sin serif son más anchas: el nombre de la app cabe en una línea en la barra lateral. */
+@layer dyc.app {
+  :root:not([data-font='clasica']) .logo__text {
+    font-size: var(--text-lead);
+    white-space: nowrap;
+  }
+}
+
+/* ---------- Perfil: cada opción se muestra con su propia letra (el resto, en app.css) ---------- */
+@layer dyc.app {
+  [data-font-option='clasica'] b { font-family: var(--font-stack-clasica-display); font-weight: var(--weight-regular); }
+  [data-font-option='clasica'] span { font-family: var(--font-stack-clasica-sans); }
+  [data-font-option='moderna'] b { font-family: var(--font-stack-moderna); font-weight: var(--weight-semibold); }
+  [data-font-option='moderna'] span { font-family: var(--font-stack-moderna); }
+  [data-font-option='geometrica'] b { font-family: var(--font-stack-geometrica-display); font-weight: var(--weight-medium); }
+  [data-font-option='geometrica'] span { font-family: var(--font-stack-geometrica-sans); }
+  [data-font-option='elegante'] b { font-family: var(--font-stack-elegante-display); font-weight: var(--weight-regular); }
+  [data-font-option='elegante'] span { font-family: var(--font-stack-elegante-sans); }
+  [data-font-option='amable'] b { font-family: var(--font-stack-amable); font-weight: var(--weight-bold); }
+  [data-font-option='amable'] span { font-family: var(--font-stack-amable); }
+}

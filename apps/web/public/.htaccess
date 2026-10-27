@@ -3,6 +3,8 @@
   RewriteEngine On
   RewriteBase /
   RewriteRule ^index\.html$ - [L]
+  # Un archivo que no está (un trozo de una versión anterior) da 404, no la página de la app.
+  RewriteRule \.[a-zA-Z0-9]+$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]

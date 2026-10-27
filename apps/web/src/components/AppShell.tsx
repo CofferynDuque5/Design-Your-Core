@@ -1,7 +1,11 @@
-import { BarChart3, CheckSquare, Flag, LayoutGrid, Sun, User } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { BarChart3, CheckSquare, ChevronDown, Flag, LayoutGrid, Sun, User } from 'lucide-react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router';
+import { useUnsavedGuard } from '../app/legacy';
+import { useSession } from '../app/session';
+import { TOOL_GROUPS, TOOLS, type ToolGroup } from '../app/tools';
 import { Logo } from './Logo';
+import { PageErrorBoundary } from './PageErrorBoundary';
 
 const NAV = [
   { to: '/', label: 'Hoy', icon: Sun, end: true },
@@ -26,15 +30,58 @@ function useOnline() {
   return online;
 }
 
+const GROUPS_KEY = 'dyc.sidebar.groups';
+
+/**
+ * Subgrupos plegables de la barra lateral. Por defecto están todos abiertos, para
+ * que cada sección se vea en el menú; lo que la persona cierra o abre se recuerda
+ * en este navegador (si el almacenamiento no está disponible, se usa el defecto).
+ */
+function useToolGroups() {
+  const [saved, setSaved] = useState<Partial<Record<ToolGroup, boolean>>>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(GROUPS_KEY) ?? '{}');
+      return v && typeof v === 'object' ? v : {};
+    } catch {
+      return {};
+    }
+  });
+  const isOpen = (g: ToolGroup) => saved[g] ?? true;
+  const toggle = useCallback(
+    (g: ToolGroup, open: boolean) =>
+      setSaved((s) => {
+        const next = { ...s, [g]: !open };
+        try {
+          localStorage.setItem(GROUPS_KEY, JSON.stringify(next));
+        } catch {
+          /* sin almacenamiento: solo en esta visita */
+        }
+        return next;
+      }),
+    [],
+  );
+  return { isOpen, toggle };
+}
+
+/** Con rutas tras «#» (versión de prueba), el enlace a #main cambiaría de página: se enfoca a mano. */
+function skipToMain(e: React.MouseEvent) {
+  e.preventDefault();
+  document.getElementById('main')?.focus();
+}
+
 export function AppShell() {
   const online = useOnline();
   const location = useLocation();
+  const { user } = useSession();
+  const groups = useToolGroups();
+  const inTool = TOOLS.some((t) => location.pathname === t.to || location.pathname.startsWith(`${t.to}/`));
+  useUnsavedGuard();
   // Los enlaces de invitación de pareja llegan como /?invite=CODIGO.
   const invite = new URLSearchParams(location.search).get('invite');
   if (invite && location.pathname !== '/perfil') return <Navigate to={`/perfil?invite=${encodeURIComponent(invite)}`} replace />;
   return (
     <div className="shell">
-      <a className="skip-link" href="#main">
+      <a className="skip-link" href="#main" onClick={import.meta.env.VITE_DEMO ? skipToMain : undefined}>
         Saltar al contenido
       </a>
       <aside className="sidebar">
@@ -57,6 +104,40 @@ export function AppShell() {
             </li>
           </ul>
         </nav>
+        <nav aria-label="Herramientas" className="sidebar__tools">
+          {TOOL_GROUPS.map((g) => {
+            const open = groups.isOpen(g.id);
+            // Ciclo solo aparece si la persona lo activó (siempre se llega desde Más).
+            const tools = TOOLS.filter((t) => t.group === g.id && (!t.optIn || user?.showCycle));
+            return (
+              <div key={g.id}>
+                <button
+                  type="button"
+                  id={`nav-tools-${g.id}`}
+                  className="sidebar__group"
+                  aria-expanded={open}
+                  aria-controls={open ? `nav-tools-${g.id}-list` : undefined}
+                  onClick={() => groups.toggle(g.id, open)}
+                >
+                  {g.label}
+                  <ChevronDown size={16} aria-hidden="true" />
+                </button>
+                {open && (
+                  <ul id={`nav-tools-${g.id}-list`} className="sidebar__nav sidebar__nav--compact" aria-labelledby={`nav-tools-${g.id}`}>
+                    {tools.map(({ to, label, icon: Icon }) => (
+                      <li key={to}>
+                        <NavLink to={to} className="sidebar__link">
+                          <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+                          {label}
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </nav>
       </aside>
       <main id="main" className="main" tabIndex={-1}>
         {!online && (
@@ -64,7 +145,19 @@ export function AppShell() {
             Estás sin conexión. Verás lo último que se cargó; los cambios se podrán guardar cuando vuelvas a tener internet.
           </div>
         )}
-        <Outlet />
+        {/* Las herramientas se descargan al abrirlas: mientras llega su código, un aviso discreto. */}
+        {/* Si una sección no se puede abrir, el menú sigue a la vista (antes la app quedaba en blanco). */}
+        <PageErrorBoundary resetKey={location.pathname}>
+          <Suspense
+            fallback={
+              <div className="page-loading" role="status">
+                <span className="visually-hidden">Cargando…</span>
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
+        </PageErrorBoundary>
       </main>
       <nav className="tabbar" aria-label="Principal">
         {NAV.map(({ to, label, icon: Icon, end }) => (
@@ -73,6 +166,11 @@ export function AppShell() {
             <span>{label}</span>
           </NavLink>
         ))}
+        {/* En el móvil las herramientas se abren desde Más: la pestaña sigue marcada dentro de ellas. */}
+        <NavLink to="/mas" className={({ isActive }) => `tabbar__link${isActive || inTool ? ' active' : ''}`}>
+          <LayoutGrid size={22} strokeWidth={1.75} aria-hidden="true" />
+          <span>Más</span>
+        </NavLink>
       </nav>
     </div>
   );

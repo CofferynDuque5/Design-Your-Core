@@ -1,42 +1,47 @@
 import { accountDeleteSchema } from '@dyc/core';
-import type { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { Router, type RequestHandler } from 'express';
+import type { Db } from '../db/db.js';
+import type { ChallengeLog, CheckIn, Habit, HabitLog, UserChallenge } from '../db/types.js';
 import { ah } from '../lib/http.js';
-import { publicUser } from '../routes/auth.js';
+import { findUser, publicUser } from '../routes/auth.js';
+import { findBlob } from '../routes/sync.js';
 import { challengeProgress } from './challenges.js';
 import { publicCheckIn } from './checkins.js';
 import { publicHabit } from './habits.js';
-import { publicProfile } from './profile.js';
+import { findProfile, publicProfile } from './profile.js';
 import { fromDb, parse, userToday } from './util.js';
 
-export function accountRoutes({ prisma, requireAuth, strict }: { prisma: PrismaClient; requireAuth: RequestHandler; strict: RequestHandler }): Router {
+export function accountRoutes({ db, requireAuth, strict }: { db: Db; requireAuth: RequestHandler; strict: RequestHandler }): Router {
   const r = Router();
 
   // Descarga de todos los datos de la persona (portabilidad).
   r.get('/account/export', requireAuth, ah(async (req, res) => {
     const userId = req.userId as string;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        profile: true,
-        blob: true,
-        checkIns: { orderBy: { date: 'asc' } },
-        habits: { include: { logs: { orderBy: { date: 'asc' } } } },
-        challenges: { include: { logs: true } },
-      },
-    });
+    const user = await findUser(db, userId);
     if (!user) return res.status(401).json({ error: 'Sesión inválida' });
-    const today = await userToday(prisma, userId);
+    const [profile, blob, checkIns, habits, habitLogs, challenges, challengeLogs] = await Promise.all([
+      findProfile(db, userId),
+      findBlob(db, userId),
+      db.rows<CheckIn>('SELECT * FROM "CheckIn" WHERE "userId" = $1 ORDER BY "date" ASC', [userId]),
+      db.rows<Habit>('SELECT * FROM "Habit" WHERE "userId" = $1 ORDER BY "createdAt" ASC', [userId]),
+      db.rows<HabitLog>('SELECT l.* FROM "HabitLog" l JOIN "Habit" h ON h."id" = l."habitId" WHERE h."userId" = $1 ORDER BY l."date" ASC', [userId]),
+      db.rows<UserChallenge>('SELECT * FROM "UserChallenge" WHERE "userId" = $1 ORDER BY "createdAt" ASC', [userId]),
+      db.rows<ChallengeLog>('SELECT l.* FROM "ChallengeLog" l JOIN "UserChallenge" c ON c."id" = l."userChallengeId" WHERE c."userId" = $1', [userId]),
+    ]);
+    const today = await userToday(db, userId);
     res.setHeader('Content-Disposition', 'attachment; filename="design-your-core.json"');
     res.json({
       exportedAt: new Date(),
       user: publicUser(user),
-      profile: publicProfile(user.profile),
-      checkIns: user.checkIns.map(publicCheckIn),
-      habits: user.habits.map((h) => ({ ...publicHabit(h), logs: h.logs.map((l) => ({ date: fromDb(l.date), done: l.done })) })),
-      challenges: user.challenges.map((c) => challengeProgress(c, today)),
-      legacy: user.blob?.data ?? {},
+      profile: publicProfile(profile),
+      checkIns: checkIns.map(publicCheckIn),
+      habits: habits.map((h) => ({
+        ...publicHabit(h),
+        logs: habitLogs.filter((l) => l.habitId === h.id).map((l) => ({ date: fromDb(l.date), done: l.done })),
+      })),
+      challenges: challenges.map((c) => challengeProgress({ ...c, logs: challengeLogs.filter((l) => l.userChallengeId === c.id) }, today)),
+      legacy: blob?.data ?? {},
     });
   }));
 
@@ -44,13 +49,13 @@ export function accountRoutes({ prisma, requireAuth, strict }: { prisma: PrismaC
   r.delete('/account', requireAuth, strict, ah(async (req, res) => {
     const input = parse(accountDeleteSchema, req.body, res);
     if (!input) return;
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    const user = await findUser(db, req.userId as string);
     if (!user) return res.status(401).json({ error: 'Sesión inválida' });
     if (!(await bcrypt.compare(input.password, user.passwordHash))) return res.status(401).json({ error: 'La contraseña no es correcta' });
-    await prisma.$transaction([
-      prisma.user.updateMany({ where: { partnerId: user.id }, data: { partnerId: null } }),
-      prisma.user.delete({ where: { id: user.id } }),
-    ]);
+    await db.tx(async (tx) => {
+      await tx.exec('UPDATE "User" SET "partnerId" = NULL WHERE "partnerId" = $1', [user.id]);
+      await tx.exec('DELETE FROM "User" WHERE "id" = $1', [user.id]);
+    });
     res.json({ ok: true });
   }));
 

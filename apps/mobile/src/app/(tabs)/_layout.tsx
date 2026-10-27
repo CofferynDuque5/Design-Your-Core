@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { ChartNoAxesColumn, Flag, House, ListChecks, UserRound } from 'lucide-react-native';
+import { ChartNoAxesColumn, Flag, House, LayoutGrid, ListChecks, UserRound } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts } from '../../components/ui';
 import { useTheme } from '../../lib/theme';
@@ -24,6 +24,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="retos" options={{ title: 'Retos', tabBarIcon: ({ color }) => <Flag color={color} size={22} strokeWidth={1.75} /> }} />
       <Tabs.Screen name="habitos" options={{ title: 'Hábitos', tabBarIcon: ({ color }) => <ListChecks color={color} size={22} strokeWidth={1.75} /> }} />
       <Tabs.Screen name="perfil" options={{ title: 'Perfil', tabBarIcon: ({ color }) => <UserRound color={color} size={22} strokeWidth={1.75} /> }} />
+      <Tabs.Screen name="mas" options={{ title: 'Más', tabBarIcon: ({ color }) => <LayoutGrid color={color} size={22} strokeWidth={1.75} /> }} />
     </Tabs>
   );
 }

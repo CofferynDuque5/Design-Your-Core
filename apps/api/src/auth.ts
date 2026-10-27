@@ -1,6 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
 import type { RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
+import type { Db } from './db/db.js';
 
 const JWT_ISS = 'core-cloud';
 const JWT_AUD = 'core-app';
@@ -13,7 +13,7 @@ interface TokenPayload {
 // El token lleva `ver` = tokenVersion del usuario en el momento de emitirlo.
 // Si luego se incrementa tokenVersion (cambio de contraseña o "cerrar sesión en
 // otros dispositivos"), los tokens antiguos dejan de validar.
-export function createAuth(prisma: PrismaClient, secret: string) {
+export function createAuth(db: Db, secret: string) {
   // v1 usa tokens de 60 días; las sesiones renovables (v2) usan tokens de acceso cortos.
   const signToken = (userId: string, ver: number, expiresIn: jwt.SignOptions['expiresIn'] = '60d') =>
     jwt.sign({ sub: userId, ver }, secret, { algorithm: 'HS256', issuer: JWT_ISS, audience: JWT_AUD, expiresIn });
@@ -33,8 +33,7 @@ export function createAuth(prisma: PrismaClient, secret: string) {
       return;
     }
     // Comprueba que la versión del token siga vigente (sesión no revocada).
-    prisma.user
-      .findUnique({ where: { id: payload.sub }, select: { tokenVersion: true } })
+    db.row<{ tokenVersion: number }>('SELECT "tokenVersion" FROM "User" WHERE "id" = $1', [payload.sub])
       .then((u) => {
         if (!u || u.tokenVersion !== (payload.ver ?? 0)) {
           res.status(401).json({ error: 'Sesión cerrada. Inicia sesión de nuevo.' });

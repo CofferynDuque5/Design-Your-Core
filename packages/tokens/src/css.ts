@@ -1,10 +1,10 @@
-import { breakpoint, color, font, fontSize, fontWeight, letterSpacing, lineHeight, motion, pillars, radius, shadow, space, type ThemeName } from './tokens.js';
+import { breakpoint, color, type ColorScheme, font, fontSize, fontWeight, letterSpacing, lineHeight, motion, pillars, radius, shadow, space, type ThemeName } from './tokens.js';
 
 const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
 const px = (n: number) => (n === 0 ? '0' : `${n}px`);
 
-function themeVars(theme: ThemeName): string[] {
-  const lines = Object.entries(color[theme]).map(([k, v]) => `--color-${kebab(k)}: ${v};`);
+function themeVars(theme: ThemeName, scheme: Record<ThemeName, ColorScheme>): string[] {
+  const lines = Object.entries(scheme[theme]).map(([k, v]) => `--color-${kebab(k)}: ${v};`);
   for (const p of pillars) {
     lines.push(`--pillar-${p.id}: ${p.color[theme]};`);
     lines.push(`--pillar-${p.id}-soft: ${p.soft[theme]};`);
@@ -34,12 +34,13 @@ const block = (selector: string, lines: string[]) => `${selector} {\n${lines.map
  * Genera las variables CSS. Tema claro en :root; el oscuro se aplica con la
  * preferencia del sistema (salvo que la persona elija claro) o con
  * data-theme="dark" en <html>, que tiene prioridad en ambos sentidos.
+ * `scheme` elige la paleta: la base (`color`) o la de marca (`lima`).
  */
-export function buildCss(): string {
-  const dark = themeVars('dark');
+export function buildCss(scheme: Record<ThemeName, ColorScheme> = color): string {
+  const dark = themeVars('dark', scheme);
   return [
     '/* Generado por @dyc/tokens a partir de src/tokens.ts. No editar a mano. */',
-    block(':root', ['color-scheme: light;', ...staticVars(), ...themeVars('light')]),
+    block(':root', ['color-scheme: light;', ...staticVars(), ...themeVars('light', scheme)]),
     `@media (prefers-color-scheme: dark) {\n${block(':root:not([data-theme="light"])', ['color-scheme: dark;', ...dark])
       .split('\n')
       .map((l) => `  ${l}`)

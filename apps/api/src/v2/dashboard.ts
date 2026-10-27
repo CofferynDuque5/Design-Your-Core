@@ -1,22 +1,24 @@
 import { addDays, daysIn, isDay, isPillarId, overallScore, periodRange, periodSchema, previousRange, recommend, todayIn, type PillarId } from '@dyc/core';
-import type { PrismaClient } from '@prisma/client';
 import { Router, type RequestHandler } from 'express';
+import { upsert, type Db } from '../db/db.js';
+import type { Dismissal } from '../db/types.js';
 import { ah } from '../lib/http.js';
 import { activeChallenges } from './challenges.js';
 import { publicCheckIn } from './checkins.js';
+import { findProfile } from './profile.js';
 import { checkInStreak, habitsOn, loadDays, pillarList, scoreDays, summarize } from './insights.js';
 import { fromDb, toDb } from './util.js';
 
 const DISMISS_DAYS = 7;
 
-async function recommendationsFor(prisma: PrismaClient, userId: string, today: string) {
+async function recommendationsFor(db: Db, userId: string, today: string) {
   const [profile, dismissals, active] = await Promise.all([
-    prisma.profile.findUnique({ where: { userId } }),
-    prisma.dismissal.findMany({ where: { userId, until: { gt: new Date() } } }),
-    activeChallenges(prisma, userId, today),
+    findProfile(db, userId),
+    db.rows<Dismissal>('SELECT * FROM "Dismissal" WHERE "userId" = $1 AND "until" > $2', [userId, new Date()]),
+    activeChallenges(db, userId, today),
   ]);
   const range = { from: addDays(today, -13), to: today };
-  const data = await loadDays(prisma, userId, range);
+  const data = await loadDays(db, userId, range);
   const week = { from: addDays(today, -6), to: today };
   const weekScores = summarize(scoreDays(data, daysIn(week), today), week).scores;
   return recommend({
@@ -29,7 +31,7 @@ async function recommendationsFor(prisma: PrismaClient, userId: string, today: s
   });
 }
 
-export function dashboardRoutes({ prisma, requireAuth }: { prisma: PrismaClient; requireAuth: RequestHandler }): Router {
+export function dashboardRoutes({ db, requireAuth }: { db: Db; requireAuth: RequestHandler }): Router {
   const r = Router();
 
   /**
@@ -42,23 +44,24 @@ export function dashboardRoutes({ prisma, requireAuth }: { prisma: PrismaClient;
     const userId = req.userId as string;
     const period = periodSchema.safeParse(req.query.period ?? 'week');
     if (!period.success) return res.status(400).json({ error: 'period debe ser day, week o month' });
-    const profile = await prisma.profile.findUnique({ where: { userId } });
+    const profile = await findProfile(db, userId);
     const today = todayIn(profile?.timezone || 'UTC');
     const date = isDay(req.query.date) ? req.query.date : today;
 
     const range = periodRange(period.data, date);
     const prev = previousRange(period.data, range);
-    const data = await loadDays(prisma, userId, { from: prev.from, to: range.to > today ? range.to : today });
+    const data = await loadDays(db, userId, { from: prev.from, to: range.to > today ? range.to : today });
     const scores = scoreDays(data, [...daysIn(prev), ...daysIn(range)], today);
     const current = summarize(scores, range);
     const previous = summarize(scores, prev);
 
     const pastDays = daysIn(range).filter((d) => d <= today);
     const scheduled = pastDays.flatMap((d) => habitsOn(data, d));
-    const allCheckInDates = await prisma.checkIn.findMany({
-      where: { userId, date: { gte: toDb(addDays(today, -365)), lte: toDb(today) } },
-      select: { date: true },
-    });
+    const allCheckInDates = await db.rows<{ date: Date }>('SELECT "date" FROM "CheckIn" WHERE "userId" = $1 AND "date" BETWEEN $2 AND $3', [
+      userId,
+      toDb(addDays(today, -365)),
+      toDb(today),
+    ]);
 
     const todayCheckIn = data.checkIns.get(today);
     res.json({
@@ -82,16 +85,16 @@ export function dashboardRoutes({ prisma, requireAuth }: { prisma: PrismaClient;
         checkIn: todayCheckIn ? publicCheckIn(todayCheckIn) : null,
         habits: habitsOn(data, today),
       },
-      challenges: await activeChallenges(prisma, userId, today),
-      recommendations: await recommendationsFor(prisma, userId, today),
+      challenges: await activeChallenges(db, userId, today),
+      recommendations: await recommendationsFor(db, userId, today),
       onboarded: !!profile?.onboardedAt,
     });
   }));
 
   r.get('/recommendations', requireAuth, ah(async (req, res) => {
     const userId = req.userId as string;
-    const profile = await prisma.profile.findUnique({ where: { userId }, select: { timezone: true } });
-    res.json({ recommendations: await recommendationsFor(prisma, userId, todayIn(profile?.timezone || 'UTC')) });
+    const profile = await findProfile(db, userId);
+    res.json({ recommendations: await recommendationsFor(db, userId, todayIn(profile?.timezone || 'UTC')) });
   }));
 
   // Oculta una recomendación durante una semana.
@@ -100,7 +103,7 @@ export function dashboardRoutes({ prisma, requireAuth }: { prisma: PrismaClient;
     if (!/^[\w:-]{1,80}$/.test(key)) return res.status(400).json({ error: 'Clave no válida' });
     const userId = req.userId as string;
     const until = new Date(Date.now() + DISMISS_DAYS * 86_400_000);
-    await prisma.dismissal.upsert({ where: { userId_key: { userId, key } }, update: { until }, create: { userId, key, until } });
+    await upsert(db, 'Dismissal', ['userId', 'key'], { userId, key }, { until });
     res.json({ ok: true, until });
   }));
 
