@@ -5,10 +5,13 @@ import {
   classDescription,
   classWhenLabel,
   HHMM_RE,
+  hhmmToHours,
   isoDay,
+  layoutLanes,
   nextClass,
   normalizeHHMM,
-  validClass,
+  scheduleHours,
+  showableClasses,
   type LegacyClass,
   type LegacyData,
 } from '@dyc/core';
@@ -41,7 +44,8 @@ export default function Schedule() {
   const { colors } = useTheme();
   const legacy = useLegacyData();
   const all = useLegacyList(legacy.data?.data, 'classes');
-  const classes = all.filter(validClass);
+  // Datos antiguos con «8:00» o el día como texto también se dibujan.
+  const classes = showableClasses(all);
   const [editing, setEditing] = useState<LegacyClass | 'new' | null>(null);
   const now = useNow();
   const today = isoDay(now);
@@ -58,10 +62,9 @@ export default function Schedule() {
         <Loading label="Cargando tu horario" />
       ) : legacy.isError ? (
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
-      ) : classes.length === 0 ? (
-        <EmptyState title="Tu horario está vacío">Añade tus clases: se repiten cada semana en el mismo día y hora.</EmptyState>
       ) : (
         <>
+          {classes.length === 0 && <EmptyState title="Tu horario está vacío">Añade tus clases con «Nueva clase»: se repiten cada semana en el mismo día y hora.</EmptyState>}
           {next && (
             <Card tone="accent" style={{ borderLeftWidth: 4, borderLeftColor: next.c.color }}>
               <T v="eyebrow" tint="muted">
@@ -88,6 +91,8 @@ export default function Schedule() {
               </View>
             </Card>
           )}
+
+          <WeekGrid classes={classes} today={today} now={now} onOpen={setEditing} />
 
           {CLASS_DAY_NAMES.map((name, i) => {
             const list = classes.filter((c) => c.day === i + 1).sort(byStart);
@@ -141,6 +146,81 @@ export default function Schedule() {
         {editing !== null && <ClassForm cls={editing === 'new' ? null : editing} count={all.length} subjects={subjectsOf(legacy.data?.data)} onDone={() => setEditing(null)} />}
       </Sheet>
     </ToolScreen>
+  );
+}
+
+const HOUR = 44; // alto de cada cuadro (una hora)
+
+/** Cuadrícula semanal: una columna por día y un cuadro por hora. Se ve también vacía. */
+function WeekGrid({ classes, today, now, onOpen }: { classes: LegacyClass[]; today: number; now: Date; onOpen: (c: LegacyClass) => void }) {
+  const { colors } = useTheme();
+  const { from, to } = scheduleHours(classes);
+  const hours = Array.from({ length: to - from }, (_, i) => from + i);
+  const nowH = now.getHours() + now.getMinutes() / 60;
+  const line = colors.lineStrong;
+  return (
+    <Card style={{ padding: space[2], gap: 0 }}>
+      <View style={{ flexDirection: 'row' }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        <View style={s.hourCol} />
+        {CLASS_DAYS.map((d, i) => (
+          <T key={d} v="small" tint={i + 1 === today ? 'primary' : 'muted'} style={[s.gridHead, { fontFamily: fonts.semibold }]}>
+            {d}
+          </T>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row' }}>
+        <View style={s.hourCol} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          {hours.map((h) => (
+            <T key={h} v="small" tint="subtle" style={[s.hourLabel, { top: (h - from) * HOUR }]}>
+              {h}
+            </T>
+          ))}
+        </View>
+        {CLASS_DAY_NAMES.map((name, i) => {
+          const day = i + 1;
+          const placed = layoutLanes(classes.filter((c) => c.day === day).map((c) => ({ item: c, start: hhmmToHours(c.start), end: hhmmToHours(c.end) })));
+          return (
+            <View
+              key={name}
+              style={[
+                s.gridCol,
+                { height: (to - from) * HOUR, borderColor: line, borderRightWidth: day === 7 ? StyleSheet.hairlineWidth : 0 },
+                day === today && { backgroundColor: colors.primarySoft },
+              ]}
+            >
+              {hours.map((h) => (
+                <View key={h} style={[s.gridCell, { top: (h - from) * HOUR, borderColor: line }]} />
+              ))}
+              {placed.map(({ item: c, start, end, lane, lanes }) => (
+                <Pressable
+                  key={c.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${name}: ${classDescription(c)}. Editar`}
+                  onPress={() => onOpen(c)}
+                  style={[
+                    s.gridBlock,
+                    {
+                      top: (start - from) * HOUR + 1,
+                      height: Math.max(18, (end - start) * HOUR - 2),
+                      left: `${(lane / lanes) * 100}%`,
+                      width: `${100 / lanes}%`,
+                      // Como en la web: fondo suave del color de la clase y borde izquierdo lleno.
+                      backgroundColor: `${c.color}33`,
+                      borderLeftColor: c.color,
+                    },
+                  ]}
+                >
+                  <T v="small" numberOfLines={end - start >= 1 ? 3 : 1} android_hyphenationFrequency="full" style={{ fontFamily: fonts.semibold, fontSize: 10, lineHeight: 12 }}>
+                    {c.title}
+                  </T>
+                </Pressable>
+              ))}
+              {day === today && nowH >= from && nowH <= to && <View style={[s.nowLine, { top: (nowH - from) * HOUR, backgroundColor: colors.primary }]} />}
+            </View>
+          );
+        })}
+      </View>
+    </Card>
   );
 }
 
@@ -264,5 +344,12 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: touchTarget + 12, paddingVertical: space[2] },
   time: { width: 48, alignItems: 'flex-end' },
   bar: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
+  hourCol: { width: 26 },
+  hourLabel: { position: 'absolute', right: 4, marginTop: -7, fontSize: 10, lineHeight: 14, fontVariant: ['tabular-nums'] },
+  gridHead: { flex: 1, textAlign: 'center', paddingBottom: space[1] },
+  gridCol: { flex: 1, position: 'relative', borderLeftWidth: StyleSheet.hairlineWidth, borderTopWidth: StyleSheet.hairlineWidth },
+  gridCell: { position: 'absolute', left: 0, right: 0, height: HOUR, borderBottomWidth: StyleSheet.hairlineWidth },
+  gridBlock: { position: 'absolute', borderRadius: 4, paddingLeft: 3, paddingRight: 1, paddingVertical: 2, overflow: 'hidden', borderLeftWidth: 3 },
+  nowLine: { position: 'absolute', left: 0, right: 0, height: 2 },
   dayOpt: { flex: 1, minHeight: touchTarget, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

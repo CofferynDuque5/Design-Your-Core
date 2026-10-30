@@ -1,4 +1,4 @@
-import { CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, validClass, type LegacyClass } from '@dyc/core';
+import { CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, scheduleHours, showableClasses, type LegacyClass } from '@dyc/core';
 import { Clock, MapPin, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
@@ -25,13 +25,13 @@ const whenLabel = classWhenLabel;
 export function Schedule() {
   const legacy = useLegacyData();
   const all = useLegacyList(legacy.data?.data, 'classes');
-  const classes = all.filter(validClass);
+  // Datos antiguos con «8:00» o el día como texto también se dibujan.
+  const classes = showableClasses(all);
   const [editing, setEditing] = useState<LegacyClass | 'new' | null>(null);
   const now = useNow();
   const today = isoDay(now);
 
-  const from = Math.min(7, ...classes.map((c) => Math.floor(hhmmToHours(c.start))));
-  const to = Math.max(from + 1, ...classes.map((c) => Math.ceil(hhmmToHours(c.end))));
+  const { from, to } = scheduleHours(classes);
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i);
   const nowH = nowHours(now);
   const next = nextClass(classes, now);
@@ -48,10 +48,11 @@ export function Schedule() {
         <Loading label="Cargando tu horario" />
       ) : legacy.isError ? (
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
-      ) : classes.length === 0 ? (
-        <EmptyState title="Tu horario está vacío">Añade tus clases: se repiten cada semana en el mismo día y hora.</EmptyState>
       ) : (
         <div className="stack-lg">
+          {classes.length === 0 && (
+            <EmptyState title="Tu horario está vacío">Añade tus clases con «Nueva clase»: se repiten cada semana en el mismo día y hora.</EmptyState>
+          )}
           {next && (
             <section className="card card--accent next-class" aria-labelledby="next-class-title" style={{ ['--c' as string]: next.c.color }}>
               <p id="next-class-title" className="eyebrow">
@@ -76,7 +77,7 @@ export function Schedule() {
             </section>
           )}
 
-          {/* Cuadrícula semanal (pantallas anchas) */}
+          {/* Cuadrícula semanal: siempre visible, también vacía y en el teléfono */}
           <section className="card week-grid-card" aria-labelledby="week-title">
             <h2 id="week-title" className="visually-hidden">
               Semana
@@ -132,7 +133,7 @@ export function Schedule() {
             </div>
           </section>
 
-          {/* Lista por días (móvil) */}
+          {/* Lista por días (teléfono, debajo de la cuadrícula) */}
           <div className="day-list stack">
             {DAY_NAMES.map((name, i) => {
               const list = classes.filter((c) => c.day === i + 1).sort(byStart);

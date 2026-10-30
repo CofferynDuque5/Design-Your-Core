@@ -2053,9 +2053,11 @@
     line-height: var(--leading-snug);
   }
 
+  /* Cuadrícula del Horario: siempre visible. En el teléfono se desliza de lado si no cabe. */
   .week-grid-card {
-    display: none;
-    padding: var(--space-4);
+    display: flex;
+    padding: var(--space-3);
+    overflow-x: auto;
   }
 
   .day-list {
@@ -2064,7 +2066,7 @@
 
   @media (min-width: 768px) {
     .week-grid-card {
-      display: flex;
+      padding: var(--space-4);
     }
 
     .day-list {
@@ -2073,13 +2075,15 @@
   }
 
   .week-grid {
+    --grid-line: color-mix(in srgb, var(--color-ink) 16%, transparent);
     display: grid;
-    grid-template-columns: 44px repeat(7, minmax(0, 1fr));
-    column-gap: 2px;
+    flex: 1;
+    grid-template-columns: 40px repeat(7, minmax(44px, 1fr));
+    min-width: 348px;
   }
 
   .week-grid__head {
-    padding-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
     color: var(--color-ink-muted);
     font-size: var(--text-small);
     font-weight: var(--weight-semibold);
@@ -2092,17 +2096,56 @@
 
   .week-grid__hours {
     position: relative;
+    border-top: 1px solid var(--grid-line);
   }
 
+  /* Cada hora de cada día es un cuadro: líneas horizontales por hora y una vertical por día. */
   .week-grid__col {
     position: relative;
-    background-image: linear-gradient(var(--color-line) 1px, transparent 1px);
+    border-top: 1px solid var(--grid-line);
+    border-left: 1px solid var(--grid-line);
+    background-image: linear-gradient(to bottom, transparent 51px, var(--grid-line) 51px);
     background-size: 100% 52px;
-    border-radius: var(--radius-sm);
+  }
+
+  .week-grid__col:last-child {
+    border-right: 1px solid var(--grid-line);
+  }
+
+  /* Columnas estrechas: el nombre se parte en líneas en vez de cortarse. */
+  .week-grid .tl-block__btn {
+    padding: 2px var(--space-1);
+    border-left-width: 3px;
+  }
+
+  .week-grid .tl-block__label {
+    font-size: var(--text-caption);
+    white-space: normal;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  /* En el teléfono, el cuadro solo lleva el nombre; la hora y el aula están en la lista de abajo. */
+  .week-grid .tl-block__meta {
+    display: none;
+  }
+
+  @media (min-width: 768px) {
+    .week-grid .tl-block__btn {
+      padding: var(--space-1) var(--space-2);
+    }
+
+    .week-grid .tl-block__label {
+      font-size: var(--text-small);
+    }
+
+    .week-grid .tl-block__meta {
+      display: block;
+    }
   }
 
   .week-grid__col--today {
-    background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
+    background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
   }
 
   .week-grid__col .now-line {
@@ -5365,5 +5408,115 @@
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+}
+
+/* Cursos: temas por estudiar con sus enlaces */
+@layer dyc.app {
+  .course-bar {
+    justify-content: space-between;
+  }
+
+  .course-card {
+    --c: var(--color-primary);
+    align-content: start;
+  }
+
+  .course-card > .btn {
+    align-self: flex-start;
+    margin-left: calc(var(--space-3) * -1);
+  }
+
+  .course-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .course-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 52px;
+    padding-block: var(--space-2);
+    border-top: 1px solid var(--color-line);
+  }
+
+  .course-row:first-child {
+    border-top: 0;
+  }
+
+  .course-row__icon {
+    flex: none;
+    color: var(--color-ink-muted);
+  }
+
+  .course-row__main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .course-row__name {
+    overflow-wrap: anywhere;
+    font-weight: var(--weight-semibold);
+  }
+
+  a.course-row__name {
+    color: var(--color-ink);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--color-ink) 30%, transparent);
+    text-underline-offset: 3px;
+  }
+
+  a.course-row__name:hover {
+    color: var(--color-primary);
+    text-decoration-color: currentColor;
+  }
+
+  a.course-row__name svg {
+    display: inline;
+    margin-left: var(--space-1);
+    color: var(--color-ink-muted);
+    vertical-align: -2px;
+  }
+
+  .course-row__meta {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .course-row--hecho .course-row__name {
+    color: var(--color-ink-muted);
+    text-decoration-line: line-through;
+  }
+
+  .course-status {
+    flex: none;
+    min-width: 72px;
+    min-height: 32px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-ink-muted);
+    font: inherit;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+  }
+
+  .course-status--curso {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+  }
+
+  .course-status--hecho {
+    border-color: transparent;
+    background: var(--color-surface-sunken);
+    color: var(--color-ink);
   }
 }

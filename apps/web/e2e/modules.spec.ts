@@ -168,6 +168,11 @@ test('horario: clase desde una materia, próxima clase y edición', async ({ pag
   await seedLegacy(page, { ...OLD, subjects: [{ id: 'mat1', name: 'Física', teacher: '', room: 'B-3', color: '#22B8CF', nextClass: '', topics: [] }] });
   await page.goto('/horario');
   await expect(page.getByRole('heading', { name: 'Tu horario está vacío' })).toBeVisible();
+  // Vacío también se ve la cuadrícula de la semana, en escritorio y en el teléfono.
+  const week = page.getByRole('region', { name: 'Semana' });
+  await expect(week).toBeVisible();
+  await expect(week.getByText('Dom', { exact: true })).toBeVisible();
+  await expect(week.getByText('20:00')).toBeVisible();
 
   await page.getByRole('button', { name: 'Nueva clase' }).click();
   const dialog = page.getByRole('dialog', { name: 'Nueva clase' });
@@ -179,15 +184,51 @@ test('horario: clase desde una materia, próxima clase y edición', async ({ pag
   await dialog.getByRole('button', { name: 'Añadir clase' }).click();
 
   await expect(page.getByText(/Próxima clase|Clase en curso/)).toBeVisible();
-  await page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula B-3/ }).click();
+  await page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula B-3/ }).first().click();
   const edit = page.getByRole('dialog', { name: 'Editar clase' });
   await edit.getByLabel('Aula (opcional)').fill('Lab 2');
   await edit.getByRole('button', { name: 'Guardar' }).click();
   await reloadWhenSaved(page);
-  await expect(page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula Lab 2/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula Lab 2/ }).first()).toBeVisible();
 
   const doc = await readLegacy(page);
   expect(doc.classes).toEqual([expect.objectContaining({ day: 2, start: '10:00', end: '11:30', title: 'Física', room: 'Lab 2', color: '#22B8CF', subject: 'mat1' })]);
+  expect(doc).toMatchObject(OLD);
+});
+
+test('cursos: tema con enlaces, estado y datos guardados', async ({ page }) => {
+  await register(page, 'cursos');
+  await onboard(page);
+  await seedLegacy(page, OLD);
+  await page.goto('/mas');
+  await page.getByRole('link', { name: /Cursos/ }).first().click();
+  await expect(page.getByRole('heading', { name: 'Anota lo que quieres aprender' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Añadir el primero' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Nuevo curso' });
+  await dialog.getByLabel('Tema').fill('Inglés');
+  await dialog.getByLabel('Enlace (opcional)').fill('youtube.com/watch?v=abc');
+  await expect(dialog.getByText('Se abrirá en YouTube.')).toBeVisible();
+  await dialog.getByLabel('Nombre (opcional)').fill('Inglés básico');
+  await dialog.getByRole('button', { name: 'Añadir curso' }).click();
+
+  const card = page.getByRole('list', { name: 'Cursos de Inglés' });
+  await expect(card.getByRole('link', { name: /Inglés básico/ })).toHaveAttribute('href', 'https://youtube.com/watch?v=abc');
+  await page.getByRole('button', { name: 'Añadir a Inglés' }).click();
+  dialog = page.getByRole('dialog', { name: 'Nuevo curso' });
+  await expect(dialog.getByLabel('Tema')).toHaveValue('Inglés');
+  await dialog.getByLabel('Enlace (opcional)').fill('https://www.udemy.com/course/ingles/');
+  await dialog.getByRole('button', { name: 'Añadir curso' }).click();
+  await card.getByRole('button', { name: /Estado de «Inglés básico»: Por ver/ }).click();
+  await expect(card.getByRole('button', { name: /Estado de «Inglés básico»: Viendo/ })).toBeVisible();
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('link', { name: /Curso en Udemy/ })).toBeVisible();
+
+  const doc = await readLegacy(page);
+  expect(doc.courses).toEqual([
+    { id: expect.any(String), topic: 'Inglés', title: 'Inglés básico', url: 'https://youtube.com/watch?v=abc', status: 'curso', notes: '' },
+    { id: expect.any(String), topic: 'Inglés', title: '', url: 'https://www.udemy.com/course/ingles/', status: 'pendiente', notes: '' },
+  ]);
   expect(doc).toMatchObject(OLD);
 });
 

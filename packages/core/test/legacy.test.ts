@@ -246,6 +246,11 @@ describe('tanda 4: notas, trabajo, respiración y bóveda cifrada', () => {
   it('trabajo y respiración: formatos de la app anterior', () => {
     expect(legacyItemSchemas.workItems.parse({ id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: 'p1', status: 'todo', done: false, due: '' });
     expect(legacyItemSchemas.workItems.safeParse({ id: 'w1', title: 'x', project: 'p4' }).success).toBe(false);
+    expect(legacyItemSchemas.courses.parse({ id: 'c1', topic: ' Inglés ' })).toEqual({ id: 'c1', topic: 'Inglés', title: '', url: '', status: 'pendiente', notes: '' });
+    expect(legacyItemSchemas.courses.parse({ id: 'c1', topic: 'x', url: 'https://youtu.be/a' }).url).toBe('https://youtu.be/a');
+    for (const url of ['javascript:alert(1)', 'ftp://a.com/x', 'no es enlace']) expect(legacyItemSchemas.courses.safeParse({ id: 'c1', topic: 'x', url }).success).toBe(false);
+    expect(legacyItemSchemas.courses.safeParse({ id: 'c1', topic: ' ' }).success).toBe(false);
+    expect(legacyPatchSchemas.courses.parse({ status: 'hecho' })).toEqual({ status: 'hecho' });
     expect(legacyItemSchemas.meditations.parse({ id: 'm1', date: '2026-09-25', minutes: 3 })).toEqual({ id: 'm1', date: '2026-09-25', minutes: 3, kind: 'respiracion' });
     expect(legacyItemSchemas.meditations.safeParse({ id: 'm1', date: '2026-09-25', minutes: 2.5 }).success).toBe(false);
   });

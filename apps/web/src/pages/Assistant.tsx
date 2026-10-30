@@ -9,6 +9,7 @@ import { PageHeader } from '../components/AppShell';
 import { SelectField, TextField } from '../components/Form';
 import { errorMessage } from '../components/States';
 import {
+  ASSISTANT_MODEL_NOTE,
   ASSISTANT_MODELS,
   AssistantError,
   buildContext,
@@ -144,8 +145,7 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
       <SelectField label="Modelo" value={settings.model} onChange={(e) => onChange({ ...settings, model: e.target.value as AssistantModel })}>
         {ASSISTANT_MODELS.map((m) => (
           <option key={m} value={m}>
-            {m}
-            {m === 'gemini-flash-latest' ? ' (recomendado)' : ''}
+            {m} ({ASSISTANT_MODEL_NOTE[m]})
           </option>
         ))}
       </SelectField>

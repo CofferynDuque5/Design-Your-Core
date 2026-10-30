@@ -139,7 +139,7 @@ La app móvil no guarda un token de 60 días: recibe un **token de acceso de 15 
 
 ## Módulos de la app anterior
 
-Edición elemento a elemento de las listas `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas`, `transactions`, `goals`, `pets`, `petCares`, `period`, `workouts`, `sleep`, `journal`, `routines`, `meals`, `notes`, `workItems` y `meditations` del documento de `/api/sync`, en `/api/v2/modules`. Las claves que son un objeto (`cycle`, `dayLog` y `budget`) se guardan enteras con `PUT /modules/:key` o en parte con `PATCH /modules/:key`, y responden `{ value, updatedAt }`. En `notes`, `excerpt` y `tag` los calcula el servidor.
+Edición elemento a elemento de las listas `blocks`, `tasks`, `todos`, `subtasks`, `reminders`, `classes`, `focus`, `subjects`, `projects`, `roadmaps`, `notebooks`, `noteBoxes`, `content`, `ideas`, `transactions`, `goals`, `pets`, `petCares`, `period`, `workouts`, `sleep`, `journal`, `routines`, `meals`, `notes`, `workItems`, `meditations` y `courses` (nueva) del documento de `/api/sync`, en `/api/v2/modules`. Las claves que son un objeto (`cycle`, `dayLog` y `budget`) se guardan enteras con `PUT /modules/:key` o en parte con `PATCH /modules/:key`, y responden `{ value, updatedAt }`. En `notes`, `excerpt` y `tag` los calcula el servidor.
 
 La **bóveda cifrada** (`vaultSecure`, clave nueva) tiene rutas propias; el servidor solo valida la forma, nunca ve el contenido:
 

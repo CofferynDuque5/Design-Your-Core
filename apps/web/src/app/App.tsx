@@ -23,6 +23,7 @@ const Assistant = page('Assistant', () => import('../pages/Assistant'));
 const Calendar = page('Calendar', () => import('../pages/Calendar'));
 const Challenges = page('Challenges', () => import('../pages/Challenges'));
 const Content = page('Content', () => import('../pages/Content'));
+const Courses = page('Courses', () => import('../pages/Courses'));
 const Cycle = page('Cycle', () => import('../pages/Cycle'));
 const Exercise = page('Exercise', () => import('../pages/Exercise'));
 const Finance = page('Finance', () => import('../pages/Finance'));
@@ -110,6 +111,7 @@ export function AppRoutes() {
         <Route path="horario" element={<Schedule />} />
         <Route path="enfoque" element={<Focus />} />
         <Route path="materias" element={<Subjects />} />
+        <Route path="cursos" element={<Courses />} />
         <Route path="proyectos" element={<Projects />} />
         <Route path="roadmaps" element={<Roadmaps />} />
         <Route path="cuadernos" element={<Notebooks />} />

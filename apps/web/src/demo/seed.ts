@@ -361,6 +361,13 @@ export function sampleLegacy(today: Day): Record<string, unknown> {
       { id: 'md3', date: day(-3), minutes: 1, kind: 'respiracion' },
       { id: 'md4', date: day(-5), minutes: 3, kind: 'respiracion' },
     ],
+    courses: [
+      { id: 'cr1', topic: 'Inglés', title: 'Inglés básico desde cero', url: 'https://www.youtube.com/playlist?list=PLinglesbasico', status: 'curso', notes: 'Voy en la lección 6' },
+      { id: 'cr2', topic: 'Inglés', title: 'Pronunciación en 30 días', url: 'https://www.udemy.com/course/pronunciacion-ingles/', status: 'pendiente', notes: '' },
+      { id: 'cr3', topic: 'Programación web', title: 'React desde cero', url: 'https://platzi.com/cursos/react/', status: 'pendiente', notes: '' },
+      { id: 'cr4', topic: 'Programación web', title: 'CSS Grid en una hora', url: 'https://youtu.be/cssgrid', status: 'hecho', notes: '' },
+      { id: 'cr5', topic: 'Finanzas personales', title: '', url: 'https://www.coursera.org/learn/finanzas-personales', status: 'pendiente', notes: '' },
+    ],
   };
   // Cada elemento pasa por la misma validación que la API: la muestra es siempre válida.
   const doc: Record<string, unknown> = Object.fromEntries(

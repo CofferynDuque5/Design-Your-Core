@@ -277,6 +277,73 @@ describe('Horario', () => {
     expect(within(dialog).getByText('Debe ser después de la hora de inicio.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Añadir clase' })).toBeDisabled();
   });
+
+  it('vacío, sigue mostrando la cuadrícula de la semana; y dibuja horas antiguas como «8:00»', async () => {
+    withApi({}, (doc) => {
+      doc.classes = [];
+    });
+    const { unmount } = renderAt('/horario');
+    expect(await screen.findByText('Tu horario está vacío')).toBeInTheDocument();
+    for (const day of ['Lunes', 'Domingo']) expect(screen.getByRole('list', { name: day })).toBeInTheDocument();
+    unmount();
+
+    withApi({}, (doc) => {
+      doc.classes = [{ id: 'old', title: 'Química', day: '2', start: '8:00', end: '9:30', room: '', color: '#4F7CFF', subject: '' }];
+    });
+    renderAt('/horario');
+    expect((await screen.findAllByRole('button', { name: /Química, martes de 08:00 a 09:30/ })).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Tu horario está vacío')).not.toBeInTheDocument();
+  });
+});
+
+describe('Cursos', () => {
+  it('agrupa por tema, abre los enlaces aparte y cambia el estado', async () => {
+    const api = withApi();
+    renderAt('/cursos');
+    const ingles = await screen.findByRole('list', { name: 'Cursos de Inglés' });
+    const link = within(ingles).getByRole('link', { name: /Inglés básico/ });
+    expect(link).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abc');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    // Sin nombre, se muestra la plataforma.
+    expect(within(ingles).getByRole('link', { name: /Curso en Udemy/ })).toBeInTheDocument();
+    expect(within(ingles).getByText('YouTube · Lección 6')).toBeInTheDocument();
+
+    await userEvent.click(within(ingles).getByRole('button', { name: /Estado de «Inglés básico»: Viendo\. Cambiar a Terminado/ }));
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/cr1', body: { status: 'hecho' } });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Terminado' }));
+    expect(screen.getByRole('link', { name: /Inglés básico/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Curso en Udemy/ })).not.toBeInTheDocument();
+  });
+
+  it('añade un curso con un enlace sin https y con un tema nuevo', async () => {
+    const api = withApi();
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo curso' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Tema'), 'Guitarra');
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'youtu.be/xyz');
+    expect(within(dialog).getByText('Se abrirá en YouTube.')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
+    expect(writes(api)[0]).toMatchObject({
+      method: 'POST',
+      path: '/api/v2/modules/courses',
+      body: { item: { topic: 'Guitarra', url: 'https://youtu.be/xyz', title: '', status: 'pendiente', notes: '' } },
+    });
+    expect(await screen.findByRole('list', { name: 'Cursos de Guitarra' })).toBeInTheDocument();
+  });
+
+  it('no deja guardar un enlace que no es web', async () => {
+    withApi();
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo curso' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Tema'), 'X');
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'javascript:alert(1)');
+    expect(within(dialog).getByRole('button', { name: 'Añadir curso' })).toBeDisabled();
+    expect(within(dialog).getByText(/Pega un enlace completo/)).toBeInTheDocument();
+  });
 });
 
 describe('Enfoque', () => {
@@ -673,7 +740,7 @@ describe('Barra lateral', () => {
     const personal = within(nav).getByRole('button', { name: 'Vida personal' });
     expect(personal).toHaveAttribute('aria-expanded', 'true');
     expect(within(within(nav).getByRole('list', { name: 'Vida personal' })).getByRole('link', { name: 'Finanzas' })).toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(22);
+    expect(within(nav).getAllByRole('link')).toHaveLength(23);
     await userEvent.click(personal);
     expect(personal).toHaveAttribute('aria-expanded', 'false');
     expect(within(nav).queryByRole('list', { name: 'Vida personal' })).not.toBeInTheDocument();

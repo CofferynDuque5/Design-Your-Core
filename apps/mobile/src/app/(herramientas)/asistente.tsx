@@ -1,4 +1,5 @@
 import {
+  ASSISTANT_MODEL_NOTE,
   ASSISTANT_MODELS,
   AssistantError,
   buildContext,
@@ -177,7 +178,7 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
         <T v="label">Modelo</T>
         <View accessibilityRole="radiogroup" accessibilityLabel="Modelo" style={st.chips}>
           {ASSISTANT_MODELS.map((m) => (
-            <Chip key={m} label={m === DEFAULT_MODEL ? `${m} (recomendado)` : m} selected={settings.model === m} onPress={() => onChange({ ...settings, model: m as AssistantModel })} />
+            <Chip key={m} label={`${m} (${ASSISTANT_MODEL_NOTE[m]})`} selected={settings.model === m} onPress={() => onChange({ ...settings, model: m as AssistantModel })} />
           ))}
         </View>
       </View>

@@ -80,6 +80,7 @@ export type ToolId =
   | 'horario'
   | 'enfoque'
   | 'materias'
+  | 'cursos'
   | 'proyectos'
   | 'roadmaps'
   | 'cuadernos'
@@ -168,6 +169,15 @@ export const TOOL_CATALOG: ToolInfo[] = [
     description: 'Asignaturas, temas y avance del curso',
     count: (d) => legacyList(d, 'subjects').length,
     unit: ['materia', 'materias'],
+  },
+  {
+    id: 'cursos',
+    path: '/cursos',
+    label: 'Cursos',
+    group: 'estudio',
+    description: 'Temas por estudiar con sus enlaces de YouTube u otras plataformas',
+    count: (d) => legacyList(d, 'courses').filter((c) => c.status !== 'hecho').length,
+    unit: ['por ver', 'por ver'],
   },
   {
     id: 'proyectos',
@@ -460,6 +470,28 @@ export function normalizeHHMM(v: string): string {
   const m = /^(\d{1,2})[:.h]?(\d{2})$/.exec(t);
   if (!m) return t;
   return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
+
+/**
+ * Clases que se pueden dibujar. Acepta datos antiguos un poco distintos («8:00»,
+ * el día como texto «1») y los muestra con la forma correcta, sin cambiar el dato.
+ */
+export function showableClasses(list: LegacyClass[]): LegacyClass[] {
+  return list
+    .map((c) => ({
+      ...c,
+      day: typeof (c.day as unknown) === 'string' && /^[1-7]$/.test(String(c.day)) ? Number(c.day) : c.day,
+      start: typeof (c.start as unknown) === 'string' ? normalizeHHMM(c.start) : c.start,
+      end: typeof (c.end as unknown) === 'string' ? normalizeHHMM(c.end) : c.end,
+    }))
+    .filter(validClass);
+}
+
+/** Horas que muestra la cuadrícula del Horario: de 7:00 a 21:00, ampliadas para que quepan todas las clases. */
+export function scheduleHours(classes: LegacyClass[]): { from: number; to: number } {
+  const from = Math.min(7, ...classes.map((c) => Math.floor(hhmmToHours(c.start))));
+  const to = Math.max(21, ...classes.map((c) => Math.ceil(hhmmToHours(c.end))));
+  return { from, to };
 }
 
 /** La clase en curso o la siguiente de la semana (las clases se repiten cada semana). */
@@ -824,3 +856,65 @@ export const WORK_BUCKETS: Array<{ id: 'curso' | 'todo' | 'hecho'; label: string
   { id: 'hecho', label: 'Hecho' },
 ];
 export const workBucketOf = (w: Pick<LegacyWorkItem, 'done' | 'status'>): 'curso' | 'todo' | 'hecho' => (w.done ? 'hecho' : workStatusOf(w));
+
+// ---------- Cursos ----------
+
+/** «youtube.com/watch?v=…» → «https://youtube.com/watch?v=…». Vacío se queda vacío. */
+export function normalizeCourseUrl(v: string): string {
+  const t = v.trim();
+  if (!t) return '';
+  return /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
+}
+
+/** Un enlace que se puede guardar y abrir (solo http y https). */
+export function validCourseUrl(v: string): boolean {
+  if (!v) return true;
+  try {
+    const u = new URL(v);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && u.hostname.includes('.') && v.length <= 2000;
+  } catch {
+    return false;
+  }
+}
+
+const COURSE_SITES: Array<{ match: RegExp; label: string; video: boolean }> = [
+  { match: /(^|\.)(youtube\.com|youtu\.be)$/, label: 'YouTube', video: true },
+  { match: /(^|\.)udemy\.com$/, label: 'Udemy', video: false },
+  { match: /(^|\.)coursera\.org$/, label: 'Coursera', video: false },
+  { match: /(^|\.)platzi\.com$/, label: 'Platzi', video: false },
+  { match: /(^|\.)domestika\.org$/, label: 'Domestika', video: false },
+  { match: /(^|\.)edx\.org$/, label: 'edX', video: false },
+  { match: /(^|\.)khanacademy\.org$/, label: 'Khan Academy', video: false },
+  { match: /(^|\.)crehana\.com$/, label: 'Crehana', video: false },
+  { match: /(^|\.)skillshare\.com$/, label: 'Skillshare', video: false },
+  { match: /(^|\.)linkedin\.com$/, label: 'LinkedIn Learning', video: false },
+  { match: /(^|\.)vimeo\.com$/, label: 'Vimeo', video: true },
+  { match: /(^|\.)twitch\.tv$/, label: 'Twitch', video: true },
+];
+
+/** De dónde es un enlace: «YouTube», «Udemy»… o el dominio («miweb.com»). */
+export function courseSource(url: string): { label: string; video: boolean } | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    const site = COURSE_SITES.find((s) => s.match.test(host));
+    return site ? { label: site.label, video: site.video } : { label: host, video: false };
+  } catch {
+    return null;
+  }
+}
+
+/** Nombre que se muestra: el título, o la plataforma si solo hay enlace. */
+export const courseName = (c: { title?: string; url?: string; topic?: string }) => c.title?.trim() || (c.url ? `Curso en ${courseSource(c.url)?.label ?? 'internet'}` : (c.topic ?? 'Curso'));
+
+/** Cursos agrupados por tema, en el orden en que aparece cada tema por primera vez. */
+export function coursesByTopic<T extends { topic: string }>(list: T[]): Array<{ topic: string; items: T[] }> {
+  const groups = new Map<string, { topic: string; items: T[] }>();
+  for (const c of list) {
+    const topic = (c.topic ?? '').trim() || 'Sin tema';
+    const key = topic.toLocaleLowerCase('es');
+    const g = groups.get(key) ?? groups.set(key, { topic, items: [] }).get(key)!;
+    g.items.push(c);
+  }
+  return [...groups.values()];
+}

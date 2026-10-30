@@ -38,6 +38,7 @@ export const LEGACY_KEYS = [
   'notes',
   'workItems',
   'meditations',
+  'courses',
 ] as const;
 export type LegacyKey = (typeof LEGACY_KEYS)[number];
 export const isLegacyKey = (k: unknown): k is LegacyKey => typeof k === 'string' && (LEGACY_KEYS as readonly string[]).includes(k);
@@ -300,6 +301,15 @@ export type WorkStatus = (typeof WORK_STATUSES)[number];
 export const WORK_STATUS_INFO: Record<WorkStatus, { label: string }> = {
   todo: { label: 'Por hacer' },
   curso: { label: 'En curso' },
+};
+
+/** Cursos (nuevo, no existe en la app anterior): temas por estudiar con su enlace. */
+export const COURSE_STATUSES = ['pendiente', 'curso', 'hecho'] as const;
+export type CourseStatus = (typeof COURSE_STATUSES)[number];
+export const COURSE_STATUS_INFO: Record<CourseStatus, { label: string; short: string }> = {
+  pendiente: { label: 'Por ver', short: 'Por ver' },
+  curso: { label: 'Viendo', short: 'Viendo' },
+  hecho: { label: 'Terminado', short: 'Hecho' },
 };
 
 /** Tipo de sesión de Respiración (`meditations.kind`) que escribe la app anterior. */
@@ -614,6 +624,18 @@ export interface LegacyWorkItem {
   due: string;
 }
 
+export interface LegacyCourse {
+  id: string;
+  /** Tema que se quiere estudiar («Inglés», «React»…). Agrupa los cursos. */
+  topic: string;
+  /** Nombre del curso o video; "" si solo hay enlace. */
+  title: string;
+  /** Enlace http(s) o "". */
+  url: string;
+  status: CourseStatus;
+  notes: string;
+}
+
 export interface LegacyMeditation {
   id: string;
   /** Día en UTC. */
@@ -661,6 +683,7 @@ export interface LegacyItems {
   notes: LegacyNote;
   workItems: LegacyWorkItem;
   meditations: LegacyMeditation;
+  courses: LegacyCourse;
 }
 
 /** Documento completo de la app anterior: claves conocidas y cualquier otra que traiga. */
@@ -900,6 +923,14 @@ const shapes = {
     done: z.boolean().default(false),
     due: line(60),
   }),
+  courses: z.object({
+    id: legacyIdSchema,
+    topic: z.string().trim().min(1, 'Escribe el tema').max(120),
+    title: line(200),
+    url: z.union([z.literal(''), z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).default(''),
+    status: z.enum(COURSE_STATUSES).default('pendiente'),
+    notes: text(5000),
+  }),
   meditations: z.object({
     id: legacyIdSchema,
     date: dayKey,
@@ -998,6 +1029,7 @@ export const legacyItemSchemas = {
   })),
   workItems: shapes.workItems.strict(),
   meditations: shapes.meditations.strict(),
+  courses: shapes.courses.strict(),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 const patchOf = (o: z.AnyZodObject): z.AnyZodObject => {
@@ -1036,6 +1068,7 @@ export const legacyPatchSchemas = {
   notes: patchOf(shapes.notes.omit({ shareId: true, commit: true, tag: true, excerpt: true })),
   workItems: patchOf(shapes.workItems),
   meditations: patchOf(shapes.meditations),
+  courses: patchOf(shapes.courses),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 /**

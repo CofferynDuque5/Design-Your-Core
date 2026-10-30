@@ -34,6 +34,10 @@ export type AssistantModel = (typeof ASSISTANT_MODELS)[number];
 export const DEFAULT_MODEL: AssistantModel = 'gemini-flash-latest';
 /** Si el modelo elegido está saturado (429) o falla (5xx), se reintenta una vez con este. */
 export const FALLBACK_MODEL: AssistantModel = 'gemini-flash-lite-latest';
+/** Razonamiento mínimo: para un asistente de agenda importa más la rapidez. */
+export const REASONING_EFFORT = 'low';
+/** Si Gemini no responde en este tiempo se corta y se prueba con el modelo de reserva (en vez de esperar sin fin). */
+export const REQUEST_TIMEOUT_MS = 30_000;
 
 
 export interface AssistantSettings {
@@ -42,6 +46,14 @@ export interface AssistantSettings {
   /** Ya leyó qué datos se envían. */
   seenPrivacy: boolean;
 }
+
+/** Nota que acompaña a cada modelo en el selector. */
+export const ASSISTANT_MODEL_NOTE: Record<AssistantModel, string> = {
+  'gemini-flash-latest': 'recomendado',
+  'gemini-3.6-flash': 'rápido',
+  'gemini-flash-lite-latest': 'el más rápido',
+  'gemini-pro-latest': 'más lento, piensa más',
+};
 
 export const isAssistantModel = (m: unknown): m is AssistantModel => typeof m === 'string' && (ASSISTANT_MODELS as readonly string[]).includes(m);
 
@@ -397,6 +409,9 @@ export function buildRequest(model: string, history: ChatMessage[], context: str
     ],
     tools: TOOLS,
     tool_choice: 'auto',
+    // Sin esto Gemini «piensa» a fondo antes de cada respuesta y tarda muchos segundos.
+    // `low` es el nivel más bajo que aceptan todos los modelos de la lista.
+    reasoning_effort: REASONING_EFFORT,
   };
 }
 
@@ -436,29 +451,49 @@ async function detailOf(res: Response): Promise<string> {
   }
 }
 
-async function post(apiKey: string, body: unknown, fetchImpl: typeof fetch, signal?: AbortSignal): Promise<Json> {
-  let res: Response;
+async function post(apiKey: string, body: unknown, fetchImpl: typeof fetch, signal?: AbortSignal, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Json> {
+  // Un controlador propio para cortar por tiempo; también sigue a la señal de quien llama («Detener»).
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, timeoutMs);
+  const follow = () => ctrl.abort();
+  if (signal?.aborted) ctrl.abort();
+  signal?.addEventListener('abort', follow);
   try {
-    res = await fetchImpl(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(body),
-      signal,
-      // En el navegador, sin cookies ni página de origen (React Native los ignora).
-      credentials: 'omit',
-      referrerPolicy: 'no-referrer',
-    });
-  } catch (e) {
-    if ((e as Error)?.name === 'AbortError') throw e;
-    throw errorFor(0);
-  }
-  if (!res.ok) throw errorFor(res.status, await detailOf(res));
-  try {
-    return (await res.json()) as Json;
-  } catch {
-    throw new AssistantError('Gemini respondió algo que no se pudo leer.', 502);
+    let res: Response;
+    try {
+      res = await fetchImpl(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+        // En el navegador, sin cookies ni página de origen (React Native los ignora).
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+      });
+    } catch (e) {
+      if (timedOut) throw tooSlow();
+      if ((e as Error)?.name === 'AbortError') throw e;
+      throw errorFor(0);
+    }
+    if (!res.ok) throw errorFor(res.status, await detailOf(res));
+    try {
+      return (await res.json()) as Json;
+    } catch (e) {
+      if (timedOut) throw tooSlow();
+      if ((e as Error)?.name === 'AbortError') throw e;
+      throw new AssistantError('Gemini respondió algo que no se pudo leer.', 502);
+    }
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', follow);
   }
 }
+
+const tooSlow = () => new AssistantError('Gemini tardó demasiado en responder. Inténtalo de nuevo o elige un modelo más rápido.', 504);
 
 export interface ChatReply {
   message: Extract<ChatMessage, { role: 'assistant' }>;
@@ -498,5 +533,5 @@ export async function chat(opts: { apiKey: string; model: string; history: ChatM
 
 /** «Probar conexión»: una petición mínima, sin datos ni herramientas. */
 export async function testConnection(apiKey: string, model: string, fetchImpl: typeof fetch = fetch): Promise<void> {
-  await post(apiKey, { model, messages: [{ role: 'user', content: 'Responde solo: ok' }], max_tokens: 16 }, fetchImpl);
+  await post(apiKey, { model, messages: [{ role: 'user', content: 'Responde solo: ok' }], max_tokens: 16, reasoning_effort: REASONING_EFFORT }, fetchImpl);
 }

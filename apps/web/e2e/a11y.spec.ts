@@ -97,6 +97,10 @@ test('onboarding y pantallas de la app', async ({ page }) => {
       { id: 'n1', title: 'Ondas', subject: 'Física', date: '3 sept', tag: '#4F7CFF', excerpt: '# Ondas', body: '# Ondas\n\n- [x] Repasar la **frecuencia**\n- [ ] Ejercicios\n\n> La luz también es una onda.\n\n```\nf = 1 / T\n```\n\nFórmula: $v = \\lambda f$ y [un enlace](https://example.com).\n\n![imagen](coreimg:no-esta)', commit: false, tags: 'examen, física', shareId: null },
       { id: 'n2', title: 'Libros', subject: 'General', date: '10 sept', tag: '#E8912A', excerpt: 'Leer', body: 'Leer *Rayuela*', commit: false, tags: 'lectura', shareId: null },
     ],
+    courses: [
+      { id: 'cr1', topic: 'Inglés', title: 'Inglés básico', url: 'https://youtu.be/abc', status: 'curso', notes: 'Lección 6' },
+      { id: 'cr2', topic: 'Inglés', title: '', url: 'https://www.udemy.com/course/ingles/', status: 'hecho', notes: '' },
+    ],
     workItems: [
       { id: 'wk1', title: 'Informe mensual', project: 'p2', status: 'curso', done: false, due: 'Hoy' },
       { id: 'wk2', title: 'Revisar cambios', project: 'p1', status: 'todo', done: true, due: '' },
@@ -107,7 +111,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   const token = await sessionToken(page);
   expect((await page.request.patch('/api/v2/me', { data: { showCycle: true }, headers: { Authorization: `Bearer ${token}` } })).ok()).toBe(true);
 
-  for (const path of ['/', '/check-in', '/progreso', '/retos', '/habitos', '/perfil', '/mas', '/agenda', '/agenda?vista=tareas', '/pendientes', '/calendario', '/horario', '/enfoque', '/materias', '/proyectos', '/roadmaps', '/cuadernos', '/cuadernos/nb1', '/contenido', '/ideas', '/finanzas', '/metas', '/mascotas', '/ciclo', '/ejercicio', '/sueno', '/diario', '/rutina', '/notas', '/notas/n1', '/trabajo', '/no-existe']) {
+  for (const path of ['/', '/check-in', '/progreso', '/retos', '/habitos', '/perfil', '/mas', '/agenda', '/agenda?vista=tareas', '/pendientes', '/calendario', '/horario', '/enfoque', '/materias', '/cursos', '/proyectos', '/roadmaps', '/cuadernos', '/cuadernos/nb1', '/contenido', '/ideas', '/finanzas', '/metas', '/mascotas', '/ciclo', '/ejercicio', '/sueno', '/diario', '/rutina', '/notas', '/notas/n1', '/trabajo', '/no-existe']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expectAccessible(page, path);
@@ -148,6 +152,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
     ['/calendario', 'Nuevo evento'],
     ['/horario', 'Nueva clase'],
     ['/materias', 'Nueva materia'],
+    ['/cursos', 'Nuevo curso'],
     ['/materias', 'Editar «Física»'],
     ['/proyectos', 'Nuevo proyecto'],
     ['/roadmaps', 'Nuevo roadmap'],
