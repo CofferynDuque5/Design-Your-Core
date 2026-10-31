@@ -529,10 +529,10 @@ test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) =>
   await page.getByRole('button', { name: 'Definir' }).click();
   const budget = page.getByRole('dialog', { name: 'Presupuesto mensual' });
   await expect(budget.getByLabel('Cuánto quieres gastar al mes')).toHaveValue('300');
-  await expect(budget.getByText(/La app anterior tenía 300/)).toBeVisible();
+  await expect(budget.getByText(/La app anterior tenía \$300/)).toBeVisible();
   await budget.getByLabel('Cuánto quieres gastar al mes').fill('250,5');
   await budget.getByRole('button', { name: 'Guardar' }).click();
-  await expect(page.getByText(/Quedan 210,50/)).toBeVisible();
+  await expect(page.getByText(/Quedan \$210,50/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Nuevo movimiento' }).click();
   let dialog = page.getByRole('dialog', { name: 'Nuevo movimiento' });
@@ -540,13 +540,13 @@ test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) =>
   await dialog.getByLabel('Monto').fill('1200');
   await dialog.getByLabel('Categoría').selectOption('Sueldo');
   await dialog.getByRole('button', { name: 'Añadir movimiento' }).click();
-  await page.getByRole('button', { name: 'Editar: Gasto de 40 en Comida (Mercado)' }).click();
+  await page.getByRole('button', { name: 'Editar: Gasto de $40 en Comida (Mercado)' }).click();
   dialog = page.getByRole('dialog', { name: 'Editar movimiento' });
   await dialog.getByLabel('Monto').fill('45,75');
   await dialog.getByRole('button', { name: 'Guardar' }).click();
   await reloadWhenSaved(page);
-  await expect(page.getByRole('button', { name: 'Editar: Ingreso de 1200 en Sueldo' })).toBeVisible();
-  await expect(page.getByText(/Quedan 204,75/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editar: Ingreso de $1200 en Sueldo' })).toBeVisible();
+  await expect(page.getByText(/Quedan \$204,75/)).toBeVisible();
 
   let doc = await readLegacy(page);
   expect(doc.budget).toEqual({ monthly: 250.5 });

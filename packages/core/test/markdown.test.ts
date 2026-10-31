@@ -122,6 +122,15 @@ describe('mathRuns (fórmulas)', () => {
     expect(mathSpoken('\\frac{a+b}{2}')).toBe('(a+b)/2');
     expect(mathSpoken('a \\cdot b \\neq c')).toBe('a · b ≠ c');
   });
+  it('dibuja exponentes dentro de raíces y fracciones, y acentos', () => {
+    expect(mathRuns('\\sqrt{x_1^2}')).toEqual([
+      { text: '√(x', pos: 'base' },
+      { text: '1', pos: 'sub' },
+      { text: '2', pos: 'sup' },
+      { text: ')', pos: 'base' },
+    ]);
+    expect(mathSpoken('\\bar v')).toBe('v\u0304');
+  });
   it('deja tal cual lo que no conoce y no se rompe con llaves sin cerrar', () => {
     expect(mathSpoken('\\raro x')).toBe('\\raro x');
     expect(mathSpoken('\\frac{a')).toBe('a/');

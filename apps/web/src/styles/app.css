@@ -495,17 +495,6 @@
   }
 
   .chip-btn[aria-pressed='true'],
-  /* Color del pilar en un punto (el chip elegido va en el color de la marca). */
-  .chip-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    margin-right: 6px;
-    border-radius: 50%;
-    background: var(--pillar);
-    vertical-align: middle;
-  }
-
   .chip-radio input:checked + span {
     border-color: var(--pillar, var(--color-primary));
     background: var(--pillar-soft, var(--color-primary-soft));
@@ -514,6 +503,20 @@
 
   .chip-radio {
     position: relative;
+  }
+
+  /* Color del pilar en un punto (el chip elegido va en el color de la marca). */
+  .chip-radio .chip-dot {
+    display: inline-block;
+    flex: none;
+    width: 8px;
+    min-height: 0;
+    height: 8px;
+    margin-right: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--pillar);
   }
 
   .chip-radio input {
@@ -1721,7 +1724,11 @@
     min-width: 0;
     min-height: 44px;
     cursor: pointer;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .check-row__label > * {
+    min-width: 0;
   }
 
   .check-row__label input {
@@ -1967,7 +1974,7 @@
     flex-direction: column;
     min-width: 0;
     padding-block: var(--space-2);
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
   }
 
   .day-item--off .day-item__text strong {
@@ -2114,7 +2121,9 @@
   }
 
   .week-grid .timeline__hour {
-    width: 30px;
+    width: 32px;
+    font-size: 0.6875rem;
+    white-space: nowrap;
   }
 
   .week-grid__head--today {

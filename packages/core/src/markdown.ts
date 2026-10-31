@@ -170,6 +170,8 @@ export function markdownToText(src: string): string {
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_m, alt: string) => (alt.trim() ? `[${alt.trim()}]` : '[imagen]'))
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/^\s{0,3}(#{1,6}|>|[-*+]\s+\[[ xX]\]|[-*+]|\d+[.)])\s+/gm, '')
+    // Las fórmulas, legibles: «$\frac{a}{b}$» → «a/b».
+    .replace(/\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g, (_m, block: string | undefined, inline: string | undefined) => mathSpoken(block ?? inline ?? ''))
     .replace(/(\*\*|__|~~|`+|\$\$?)/g, '')
     .replace(/(^|\W)[*_](\S[^*_]*?)[*_](?=\W|$)/g, '$1$2')
     .replace(/\s+/g, ' ')
@@ -296,10 +298,13 @@ function mathPlain(src: string): string {
     .join('');
 }
 
+const MATH_ACCENTS: Record<string, string> = { bar: '\u0304', overline: '\u0305', hat: '\u0302', widehat: '\u0302', vec: '\u20D7', dot: '\u0307', ddot: '\u0308', tilde: '\u0303' };
+
 /**
  * Fórmula LaTeX sencilla → trozos para dibujarla: letras griegas y símbolos,
- * `\frac{a}{b}` → a/b, `\sqrt{x}` → √(x), `x^2`, `x_{i}`. No es un motor
- * completo de LaTeX: lo que no entiende se deja tal cual, nunca como HTML.
+ * `\frac{a}{b}` → a/b, `\sqrt{x}` → √(x), `\bar{v}` → v̄, `x^2`, `x_{i}`
+ * (también dentro de raíces y fracciones). No es un motor completo de LaTeX:
+ * lo que no entiende se deja tal cual, nunca como HTML.
  */
 export function mathRuns(src: string): MathRun[] {
   const out: MathRun[] = [];
@@ -308,6 +313,15 @@ export function mathRuns(src: string): MathRun[] {
     const last = out[out.length - 1];
     if (last && last.pos === pos) last.text += text;
     else out.push({ text, pos });
+  };
+  const pushRuns = (runs: MathRun[]) => runs.forEach((r) => push(r.text, r.pos));
+  // Una parte de una fracción: sin paréntesis si es simple (una letra, un número).
+  const part = (body: string) => {
+    const runs = mathRuns(body);
+    const simple = runs.length <= 1 && /^[\w.]*$/.test(runs[0]?.text ?? '');
+    if (!simple) push('(');
+    pushRuns(runs);
+    if (!simple) push(')');
   };
   let i = 0;
   while (i < src.length) {
@@ -323,12 +337,21 @@ export function mathRuns(src: string): MathRun[] {
       if (name === 'frac' || name === 'dfrac' || name === 'tfrac') {
         const a = mathGroup(src, i);
         const b = mathGroup(src, a.end);
-        const wrap = (t: string) => (!t || /^[\w.]+$/.test(t) ? t : `(${t})`);
-        push(`${wrap(mathPlain(a.body))}/${wrap(mathPlain(b.body))}`);
+        part(a.body);
+        push('/');
+        part(b.body);
         i = b.end;
       } else if (name === 'sqrt') {
         const a = mathGroup(src, i);
-        push(`√(${mathPlain(a.body)})`);
+        push('√(');
+        pushRuns(mathRuns(a.body));
+        push(')');
+        i = a.end;
+      } else if (name in MATH_ACCENTS) {
+        const a = mathGroup(src, i);
+        const runs = mathRuns(a.body);
+        if (runs.length) runs[runs.length - 1].text += MATH_ACCENTS[name];
+        pushRuns(runs);
         i = a.end;
       } else if (name in MATH_SYMBOLS) push(MATH_SYMBOLS[name]);
       else if (name === '{' || name === '}' || name === '%' || name === '$' || name === '#' || name === '&' || name === '_') push(name);
