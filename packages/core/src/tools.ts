@@ -33,6 +33,7 @@ import {
   type GoalCategory,
   type IdeaCategory,
   type LegacyClass,
+  type LegacyCourse,
   type LegacyContent,
   type LegacyData,
   type LegacyIdea,
@@ -930,6 +931,83 @@ export function coursesByTopic<T extends { topic: string }>(list: T[]): Array<{ 
   }
   return [...groups.values()];
 }
+
+/**
+ * Video (y lista) de un enlace de YouTube, para verlo dentro de la app y
+ * guardar dónde se pausó. `null` si no es de YouTube o no tiene video ni lista.
+ */
+export function youtubeRef(url: string): { video: string; list: string; start: number } | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase().replace(/^(www|m|music)\./, '');
+  const id = (v: string | null | undefined) => (v && /^[\w-]{6,20}$/.test(v) ? v : '');
+  let video = '';
+  if (host === 'youtu.be') video = id(u.pathname.split('/')[1]);
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    const parts = u.pathname.split('/').filter(Boolean);
+    video = parts[0] === 'watch' ? id(u.searchParams.get('v')) : ['embed', 'shorts', 'live', 'v'].includes(parts[0]) ? id(parts[1]) : '';
+  } else return null;
+  const list = u.searchParams.get('list') ?? '';
+  const t = u.searchParams.get('t') ?? u.searchParams.get('start') ?? '';
+  const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(t);
+  const start = m ? Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0) : 0;
+  if (!video && !/^[\w-]{10,64}$/.test(list)) return null;
+  return { video, list: /^[\w-]{10,64}$/.test(list) ? list : '', start };
+}
+
+/** Porcentaje visto (0-100): con YouTube, la posición guardada; si no, lo que anotó la persona. */
+export function courseProgress(c: Pick<LegacyCourse, 'progress' | 'position' | 'duration' | 'status'>): number {
+  if (c.status === 'hecho') return 100;
+  const p = typeof c.progress === 'number' ? c.progress : c.duration && c.position ? (c.position / c.duration) * 100 : 0;
+  return Math.max(0, Math.min(100, Math.round(p)));
+}
+
+/** 75 → «1:15», 3725 → «1:02:05». */
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/** Texto corto de dónde se quedó: «Lección 12 · 40 %» o «Vas en 12:05 de 45:10». */
+export function courseResume(c: LegacyCourse): string {
+  const pct = courseProgress(c);
+  if (c.status === 'hecho') return 'Terminado';
+  const parts: string[] = [];
+  if (c.spot?.trim()) parts.push(c.spot.trim());
+  else if (c.position && c.duration) parts.push(`Vas en ${formatClock(c.position)} de ${formatClock(c.duration)}`);
+  else if (c.position) parts.push(`Vas en ${formatClock(c.position)}`);
+  if (pct > 0 && !(c.position && c.duration && !c.spot)) parts.push(`${pct} %`);
+  return parts.join(' · ');
+}
+
+/** Lo que se guarda al pausar o cerrar el video. */
+export function coursePlaybackPatch(c: LegacyCourse, at: { position: number; duration: number; video?: string; index?: number; count?: number }, now = new Date()): Partial<LegacyCourse> {
+  const position = Math.max(0, Math.round(at.position));
+  const duration = Math.max(0, Math.round(at.duration));
+  const one = duration ? position / duration : 0;
+  const count = at.count && at.count > 1 ? at.count : 1;
+  const index = count > 1 ? Math.max(0, Math.min(count - 1, at.index ?? 0)) : 0;
+  const progress = Math.round(Math.min(1, (index + one) / count) * 100);
+  const finished = count === 1 ? one >= 0.97 : index === count - 1 && one >= 0.97;
+  return {
+    position,
+    duration,
+    progress: finished ? 100 : progress,
+    ...(at.video !== undefined ? { video: /^[\w-]{6,20}$/.test(at.video) ? at.video : '' } : {}),
+    lastAt: now.toISOString(),
+    status: finished ? 'hecho' : c.status === 'hecho' ? 'hecho' : 'curso',
+  };
+}
+
+/** Clases del Horario que vienen de un curso. */
+export const courseClasses = (data: LegacyData | null | undefined, courseId: string): LegacyClass[] => legacyList(data, 'classes').filter((k) => k.course === courseId);
 
 // ---------- Emprendimientos ----------
 

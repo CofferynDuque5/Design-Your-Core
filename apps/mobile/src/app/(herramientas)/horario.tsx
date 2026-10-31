@@ -17,6 +17,7 @@ import {
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { Clock, MapPin, Plus } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
@@ -227,6 +228,7 @@ function WeekGrid({ classes, today, now, onOpen }: { classes: LegacyClass[]; tod
 function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; count: number; subjects: Subject[]; onDone: () => void }) {
   const { colors } = useTheme();
   const actions = useModule('classes');
+  const router = useRouter();
   const [subject, setSubject] = useState(cls?.subject && subjects.some((x) => x.id === cls.subject) ? cls.subject : '');
   const [title, setTitle] = useState(cls?.title ?? '');
   const [day, setDay] = useState(cls?.day ?? 1);
@@ -251,7 +253,7 @@ function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; 
   };
 
   const submit = () => {
-    const fields = { title: title.trim(), day, start, end, room: room.trim(), color, subject };
+    const fields = { title: title.trim(), day, start, end, room: room.trim(), color, subject, ...(cls?.course ? { course: cls.course } : {}) };
     if (cls) actions.update(cls.id, fields);
     else actions.add({ id: newId(), ...fields });
     onDone();
@@ -305,6 +307,16 @@ function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; 
       <Field label="Aula (opcional)" value={room} onChangeText={setRoom} maxLength={60} placeholder="A-201" />
       <ColorSwatches legend="Color" colors={palette} value={color} onChange={setColor} />
       <View style={{ gap: space[2] }}>
+        {cls?.course && (
+          <Button
+            variant="secondary"
+            label="Abrir el curso"
+            onPress={() => {
+              onDone();
+              router.push(`/cursos?abrir=${cls.course}`);
+            }}
+          />
+        )}
         <Button label={cls ? 'Guardar' : 'Añadir clase'} onPress={submit} disabled={!title.trim() || badTime} />
         {cls && (
           <Button

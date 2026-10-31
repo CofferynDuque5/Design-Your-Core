@@ -1,5 +1,5 @@
 import { addDays, noteDateLabel, noteTag, reorderById, utcDayKey } from '@dyc/core';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -343,6 +343,81 @@ describe('Cursos', () => {
     await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'javascript:alert(1)');
     expect(within(dialog).getByRole('button', { name: 'Añadir curso' })).toBeDisabled();
     expect(within(dialog).getByText(/Pega un enlace completo/)).toBeInTheDocument();
+  });
+});
+
+describe('Cursos: progreso y horario', () => {
+  afterEach(() => {
+    delete (window as { YT?: unknown }).YT;
+  });
+
+  it('un video de YouTube se ve dentro, empieza donde se pausó y guarda el avance al pausar', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [{ id: 'yt1', topic: 'Inglés', title: 'Inglés básico', url: 'https://www.youtube.com/watch?v=abcdefghijk', status: 'curso', notes: '', position: 600, duration: 2400, progress: 25 }];
+    });
+    let opts: { videoId?: string; playerVars: { start: number }; events: { onStateChange: (e: { data: number }) => void } } | undefined;
+    const player = { getCurrentTime: () => 1200.4, getDuration: () => 2400, getVideoData: () => ({ video_id: 'abcdefghijk' }), getPlaylist: () => null, getPlaylistIndex: () => -1, destroy: vi.fn() };
+    (window as { YT?: unknown }).YT = {
+      Player: function (_el: HTMLElement, o: typeof opts) {
+        opts = o;
+        return player;
+      },
+    };
+    renderAt('/cursos');
+    expect(await screen.findByText('Vas en 10:00 de 40:00')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar «Inglés básico» aquí' }));
+    const dialog = screen.getByRole('dialog', { name: 'Inglés básico' });
+    await waitFor(() => expect(opts?.videoId).toBe('abcdefghijk'));
+    expect(opts!.playerVars.start).toBe(597);
+    act(() => opts!.events.onStateChange({ data: 2 }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/yt1', body: { position: 1200, duration: 2400, progress: 50, status: 'curso' } }));
+    expect(within(dialog).getByText('Guardado: Vas en 20:00 de 40:00.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: /Abrir en YouTube/ })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abcdefghijk');
+  });
+
+  it('en otras plataformas abre el enlace y al volver pregunta hasta dónde llegaste', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [{ id: 'ud1', topic: 'Inglés', title: 'Gramática', url: 'https://www.udemy.com/course/gramatica/', status: 'pendiente', notes: '' }];
+    });
+    renderAt('/cursos');
+    const link = await screen.findByRole('link', { name: /Gramática/ });
+    link.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(link);
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/courses/ud1', body: { status: 'curso' } }));
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    const dialog = await screen.findByRole('dialog', { name: '¿Hasta dónde llegaste?' });
+    await userEvent.type(within(dialog).getByLabelText('Dónde lo dejaste (opcional)'), 'Lección 12');
+    fireEvent.change(within(dialog).getByLabelText(/Avance/), { target: { value: '40' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar avance' }));
+    expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', body: { spot: 'Lección 12', progress: 40, status: 'curso' } });
+    expect(await screen.findByText('Lección 12 · 40 %')).toBeInTheDocument();
+  });
+
+  it('agrega el curso al horario los días elegidos y desde el Horario se abre', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [{ id: 'ud1', topic: 'Inglés', title: 'Gramática', url: 'https://www.udemy.com/course/gramatica/', status: 'curso', notes: '' }];
+      doc.classes = [];
+    });
+    const { unmount } = renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Agregar «Gramática» al horario' }));
+    const dialog = screen.getByRole('dialog', { name: 'Agregar al horario' });
+    expect(within(dialog).getByRole('button', { name: 'Agregar al horario' })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'lunes' }));
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'miércoles' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Agregar al horario' }));
+    const added = writes(api).filter((c) => c.path === '/api/v2/modules/classes');
+    expect(added.map((c) => (c.body as { item: unknown }).item)).toEqual([
+      { id: expect.any(String), day: 1, start: '18:00', end: '19:00', title: 'Gramática', room: 'Udemy', color: expect.any(String), subject: '', course: 'ud1' },
+      { id: expect.any(String), day: 3, start: '18:00', end: '19:00', title: 'Gramática', room: 'Udemy', color: expect.any(String), subject: '', course: 'ud1' },
+    ]);
+    expect(await screen.findByRole('link', { name: 'En tu horario: Lun y Mié 18:00' })).toBeInTheDocument();
+    unmount();
+
+    renderAt('/horario');
+    await userEvent.click((await screen.findAllByRole('button', { name: /Gramática, lunes/ }))[0]);
+    expect(screen.getByRole('link', { name: 'Abrir el curso' })).toHaveAttribute('href', '/cursos?abrir=ud1');
   });
 });
 

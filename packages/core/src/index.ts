@@ -8,6 +8,7 @@ export * from './icons.js';
 export * from './covers.js';
 export * from './legacy.js';
 export * from './markdown.js';
+export * from './notify.js';
 export * from './password.js';
 export * from './pillars.js';
 export * from './recommendations.js';

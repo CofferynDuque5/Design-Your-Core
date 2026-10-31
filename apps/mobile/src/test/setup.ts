@@ -29,9 +29,10 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn(async () => undefined),
   setNotificationChannelAsync: jest.fn(async () => null),
   scheduleNotificationAsync: jest.fn(async () => 'id'),
+  getAllScheduledNotificationsAsync: jest.fn(async () => []),
   getExpoPushTokenAsync: jest.fn(),
-  AndroidImportance: { DEFAULT: 3 },
-  SchedulableTriggerInputTypes: { DAILY: 'daily' },
+  AndroidImportance: { DEFAULT: 3, HIGH: 4 },
+  SchedulableTriggerInputTypes: { DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly', DATE: 'date' },
 }));
 
 // Galería, archivos y compartir: en Jest no hay módulos nativos; cada prueba decide qué se elige.
@@ -64,3 +65,15 @@ jest.mock('expo-file-system', () => {
   return { File, Paths: { cache: { uri: 'file:///cache' } } };
 });
 jest.mock('expo-sharing', () => ({ shareAsync: jest.fn(async () => undefined) }));
+// Sin motor web en Jest: el WebView es una vista; las pruebas mandan mensajes con `__send`.
+jest.mock('react-native-webview', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  const state: { props: { onMessage?: (e: { nativeEvent: { data: string } }) => void } | null; injected: string[] } = { props: null, injected: [] };
+  const WebView = React.forwardRef((props: Record<string, unknown>, ref) => {
+    state.props = props;
+    React.useImperativeHandle(ref, () => ({ injectJavaScript: (js: string) => state.injected.push(js) }));
+    return React.createElement(View, { testID: 'webview' });
+  });
+  return { WebView, __state: state, __send: (o: unknown) => state.props?.onMessage?.({ nativeEvent: { data: JSON.stringify(o) } }) };
+});

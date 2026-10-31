@@ -10,7 +10,8 @@ import { Sheet } from '../../components/Sheet';
 import { Toggle } from '../../components/tools';
 import { Button, Card, Chip, ErrorState, errorMessage, Field, Loading, PageHeader, Screen, Segmented, SectionHeader, T } from '../../components/ui';
 import { api, useAuth } from '../../lib/api';
-import { DEFAULT_REMINDER, notificationsSupported, readReminder, REMINDER_TIMES, setReminder, type ReminderPrefs } from '../../lib/notifications';
+import { CLASS_LEADS, DEFAULT_NOTIFY, type NotifyPrefs } from '@dyc/core';
+import { DEFAULT_REMINDER, notificationsSupported, onNotifyChange, readNotify, readReminder, REMINDER_TIMES, setReminder, setToolNotifications, type ReminderPrefs } from '../../lib/notifications';
 import { keys, useProfile } from '../../lib/queries';
 import { useTheme, type ThemePreference } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
@@ -34,6 +35,7 @@ export default function ProfileScreen() {
       <FocusSection />
       <PreferencesSection />
       {notificationsSupported && <ReminderSection />}
+      {notificationsSupported && <ToolNotifySection />}
       <AccountSection />
       <Button
         variant="secondary"
@@ -186,6 +188,72 @@ function ReminderSection() {
         </View>
       )}
     </Card>
+  );
+}
+
+function ToolNotifySection() {
+  const toast = useToast();
+  const [prefs, setPrefs] = useState<NotifyPrefs>(DEFAULT_NOTIFY);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    readNotify().then(setPrefs);
+    return onNotifyChange(setPrefs);
+  }, []);
+  const apply = async (next: NotifyPrefs) => {
+    setBusy(true);
+    setPrefs(next);
+    try {
+      const result = await setToolNotifications(next);
+      if (result === 'denied') toast('Activa las notificaciones de Design Your Core en los ajustes del teléfono.', { tone: 'error' });
+      else if (result === 'on' && !prefs.enabled) toast('Listo: te avisaremos aunque la app esté cerrada.');
+    } catch {
+      toast('No se pudieron programar los avisos.', { tone: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: touchTarget }}>
+        <View style={{ flex: 1 }}>
+          <T v="heading">Avisos de tus herramientas</T>
+          <T v="small" tint="muted">
+            Notificaciones de tus clases, cursos, recordatorios y tareas. Llegan aunque la app esté cerrada y sin conexión.
+          </T>
+        </View>
+        <Toggle label="Avisos de tus herramientas" value={prefs.enabled} disabled={busy} onChange={(enabled) => apply({ ...prefs, enabled })} />
+      </View>
+      {prefs.enabled && (
+        <View style={{ gap: space[2] }}>
+          <ToggleRow label="Clases y cursos del Horario" value={prefs.classes} disabled={busy} onChange={(classes) => apply({ ...prefs, classes })} />
+          {prefs.classes && (
+            <View style={{ gap: space[2] }}>
+              <T v="small" tint="muted">
+                Avisarme antes de empezar
+              </T>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }} accessibilityLabel="Minutos de antelación">
+                {CLASS_LEADS.map((m) => (
+                  <Chip key={m} label={m === 0 ? 'A la hora' : `${m} min`} selected={prefs.classLead === m} onPress={() => apply({ ...prefs, classLead: m })} />
+                ))}
+              </View>
+            </View>
+          )}
+          <ToggleRow label="Recordatorios del Calendario" value={prefs.reminders} disabled={busy} onChange={(reminders) => apply({ ...prefs, reminders })} />
+          <ToggleRow label="Tareas de la Agenda con aviso" value={prefs.tasks} disabled={busy} onChange={(tasks) => apply({ ...prefs, tasks })} />
+        </View>
+      )}
+    </Card>
+  );
+}
+
+function ToggleRow({ label, value, disabled, onChange }: { label: string; value: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: touchTarget }}>
+      <T v="body" style={{ flex: 1 }}>
+        {label}
+      </T>
+      <Toggle label={label} value={value} disabled={disabled} onChange={onChange} />
+    </View>
   );
 }
 

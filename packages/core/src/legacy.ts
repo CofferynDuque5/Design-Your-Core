@@ -412,6 +412,8 @@ export interface LegacyClass {
   color: string;
   /** Id de la materia (`subjects`) o "". */
   subject: string;
+  /** Id del curso (`courses`) que se estudia en este hueco, si se añadió desde Cursos. */
+  course?: string;
 }
 
 export interface LegacyFocus {
@@ -664,6 +666,17 @@ export interface LegacyCourse {
   url: string;
   status: CourseStatus;
   notes: string;
+  /** 0-100. En YouTube se calcula con `position`/`duration`. */
+  progress?: number;
+  /** Segundos vistos del video actual (YouTube). */
+  position?: number;
+  duration?: number;
+  /** Video actual de una lista de YouTube. */
+  video?: string;
+  /** Dónde se quedó, con sus palabras («Lección 12»). */
+  spot?: string;
+  /** Última vez que se abrió (ISO). */
+  lastAt?: string;
 }
 
 export interface LegacyVenture {
@@ -895,6 +908,8 @@ const shapes = {
     // La paleta del Horario, o el color copiado de una materia.
     color: hex.default(CLASS_COLORS[0]),
     subject: z.union([legacyIdSchema, z.literal('')]).default(''),
+    // Curso de Cursos que se estudia en este hueco (nuevo, opcional).
+    course: z.union([legacyIdSchema, z.literal('')]).optional(),
   }),
   focus: z.object({
     id: legacyIdSchema,
@@ -1070,6 +1085,14 @@ const shapes = {
     url: z.union([z.literal(''), z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).default(''),
     status: z.enum(COURSE_STATUSES).default('pendiente'),
     notes: text(5000),
+    // Progreso (nuevo, opcional): YouTube lo guarda solo al pausar; en otras
+    // plataformas lo anota la persona al volver.
+    progress: z.number().int().min(0).max(100).optional(),
+    position: z.number().min(0).max(1e6).optional(),
+    duration: z.number().min(0).max(1e6).optional(),
+    video: z.union([z.literal(''), z.string().regex(/^[\w-]{6,20}$/)]).optional(),
+    spot: z.string().trim().max(200).optional(),
+    lastAt: z.union([z.literal(''), z.string().datetime()]).optional(),
   }),
   ventures: z.object({
     id: legacyIdSchema,

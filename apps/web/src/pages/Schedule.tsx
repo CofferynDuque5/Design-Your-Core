@@ -1,5 +1,6 @@
 import { CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, scheduleHours, showableClasses, type LegacyClass } from '@dyc/core';
-import { Clock, MapPin, Plus, Trash2 } from 'lucide-react';
+import { Clock, MapPin, Play, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
@@ -72,6 +73,11 @@ export function Schedule() {
                       </span>
                     )}
                   </span>
+                  {next.c.course && (
+                    <Link to={`/cursos?abrir=${encodeURIComponent(next.c.course)}`} className="small">
+                      Continuar el curso
+                    </Link>
+                  )}
                 </div>
               </div>
             </section>
@@ -212,6 +218,11 @@ function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; 
 
   return (
     <form className="stack" onSubmit={submit}>
+      {cls?.course && (
+        <Link to={`/cursos?abrir=${encodeURIComponent(cls.course)}`} className="btn btn--secondary" style={{ alignSelf: 'flex-start' }}>
+          <Play size={16} aria-hidden="true" /> Abrir el curso
+        </Link>
+      )}
       {subjects.length > 0 && (
         <SelectField label="Materia" value={subject} onChange={(e) => pickSubject(e.target.value)}>
           <option value="">Clase suelta</option>
