@@ -444,7 +444,7 @@ function Watch({ course: c }: { course: LegacyCourse }) {
         {saved
           ? `Guardado: ${saved}.`
           : c.position
-            ? `Sigue desde ${courseResume(c)}. Se guarda cada vez que pausas.`
+            ? `${courseResume(c)}: sigue desde ahí. Se guarda cada vez que pausas.`
             : "Se guarda dónde lo pausas, para seguir después desde aquí o desde el teléfono."}
       </p>
       <a

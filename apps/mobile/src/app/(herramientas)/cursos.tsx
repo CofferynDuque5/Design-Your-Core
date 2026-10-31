@@ -316,7 +316,7 @@ function Watch({ course: c, onClose }: { course: LegacyCourse; onClose: () => vo
             : saved
               ? `Guardado: ${saved}.`
               : c.position
-                ? `Sigue desde ${courseResume(c)}. Se guarda cada vez que pausas.`
+                ? `${courseResume(c)}: sigue desde ahí. Se guarda cada vez que pausas.`
                 : 'Se guarda dónde lo pausas, para seguir después desde aquí o desde la web.'}
         </T>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>

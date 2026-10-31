@@ -26,7 +26,8 @@
 
   /* Casillas y radios nativos con el color de la marca (en oscuro se veían grises o blancos). */
   input[type='checkbox'],
-  input[type='radio'] {
+  input[type='radio'],
+  input[type='range'] {
     accent-color: var(--color-primary);
   }
 
