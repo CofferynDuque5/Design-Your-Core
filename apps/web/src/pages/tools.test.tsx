@@ -307,7 +307,7 @@ describe('Cursos', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     // Sin nombre, se muestra la plataforma.
     expect(within(ingles).getByRole('link', { name: /Curso en Udemy/ })).toBeInTheDocument();
-    expect(within(ingles).getByText('YouTube · Lección 6')).toBeInTheDocument();
+    expect(within(ingles).getByText(/YouTube · Lección 6/)).toBeInTheDocument();
 
     await userEvent.click(within(ingles).getByRole('button', { name: /Estado de «Inglés básico»: Viendo\. Cambiar a Terminado/ }));
     expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/cr1', body: { status: 'hecho' } });
@@ -457,6 +457,24 @@ describe('Cursos: progreso y horario', () => {
     expect(asked).toHaveLength(2);
   });
 
+  it('cada tema va en orden de lo básico a lo avanzado y al terminar uno sus clases pasan al siguiente', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [
+        { id: 'r1', topic: 'React', title: 'Redux avanzado', url: '', status: 'pendiente', notes: '' },
+        { id: 'r2', topic: 'React', title: 'Hooks en React', url: '', status: 'pendiente', notes: '' },
+        { id: 'r3', topic: 'React', title: 'React desde cero', url: 'https://www.udemy.com/course/react/', status: 'curso', notes: '' },
+      ];
+      doc.classes = [{ id: 'k1', day: 1, start: '18:00', end: '19:00', title: 'React desde cero', room: 'Udemy', color: '#4F7CFF', subject: '', course: 'r3' }];
+    });
+    renderAt('/cursos');
+    const card = await screen.findByRole('list', { name: 'Cursos de React' });
+    expect(within(card).getAllByRole('listitem').map((li) => li.querySelector('.course-row__name')?.textContent?.replace(' (se abre en otra pestaña)', ''))).toEqual(['React desde cero', 'Hooks en React', 'Redux avanzado']);
+    expect(within(card).getAllByRole('listitem')[0]).toHaveTextContent('Sigue');
+    await userEvent.click(within(card).getByRole('button', { name: /Estado de «React desde cero»: Viendo/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/classes/k1', body: { course: 'r2', title: 'Hooks en React' } }));
+    expect(await screen.findByText('Terminaste «React desde cero». Tus clases siguen con «Hooks en React».')).toBeInTheDocument();
+  });
+
   it('«Armar mi horario» reparte los cursos en los huecos libres y dice cuándo terminas', async () => {
     const api = withApi({}, (doc) => {
       doc.courses = [
@@ -473,8 +491,8 @@ describe('Cursos: progreso y horario', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Armar mi horario' }));
     const dialog = screen.getByRole('dialog', { name: 'Armar mi horario' });
     // Por defecto, los que estás viendo.
-    expect(within(dialog).getByRole('checkbox', { name: /Inglés.*faltan 5 h/ })).toBeChecked();
-    expect(within(dialog).getByRole('checkbox', { name: /Guitarra.*sin duración/ })).not.toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Inglés.*1 curso.*faltan 5 h/ })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Otro.*empieza por «Guitarra»/ })).not.toBeChecked();
     // Solo lunes y miércoles, de 18 a 20.
     for (const d of ['martes', 'jueves', 'viernes']) await userEvent.click(within(dialog).getByRole('checkbox', { name: d }));
     fireEvent.change(within(dialog).getByLabelText('Hasta'), { target: { value: '20:00' } });
@@ -483,7 +501,7 @@ describe('Cursos: progreso y horario', () => {
     expect(within(dialog).getByText('En esos días y horas caben 3 h a la semana, así que usamos esas.')).toBeInTheDocument();
     const sessions = within(dialog).getAllByRole('listitem').map((li) => li.textContent);
     expect(sessions.slice(0, 3)).toEqual(['Lun 19:00–20:00 Inglés', 'Mié 18:00–19:00 React', 'Mié 19:00–20:00 React']);
-    expect(sessions.slice(3)).toEqual([expect.stringMatching(/^Inglés: 1 sesión a la semana · terminas hacia el .+ \(5 semanas\)$/), expect.stringMatching(/^React: 2 sesiones a la semana · terminas hacia el .+ \(3 semanas\)$/)]);
+    expect(sessions.slice(3)).toEqual([expect.stringMatching(/^Inglés: 1 sesión a la semana · lo terminas hacia el .+ \(5 semanas\)$/), expect.stringMatching(/^React: 2 sesiones a la semana · lo terminas hacia el .+ \(3 semanas\)$/)]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Poner en mi horario' }));
     await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(3));
     expect(writes(api).find((c) => c.method === 'DELETE')).toMatchObject({ path: '/api/v2/modules/classes/old' });

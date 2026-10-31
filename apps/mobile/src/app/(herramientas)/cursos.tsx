@@ -8,7 +8,11 @@ import {
   courseProgress,
   courseRemaining,
   formatLength,
-  planStudy,
+  courseLevel,
+  courseRoute,
+  COURSE_LEVEL_LABEL,
+  handoffClasses,
+  planTopics,
   STUDY_SESSIONS,
   STUDY_WEEKLY,
   courseResume,
@@ -50,6 +54,7 @@ export default function Cursos() {
   const legacy = useLegacyData();
   const courses = useLegacyList(legacy.data?.data, 'courses');
   const actions = useModule('courses');
+  const update = useCourseUpdate();
   const [filter, setFilter] = useState<Filter>('todos');
   // `topic` sin curso: añadir uno nuevo a ese tema.
   const [editing, setEditing] = useState<LegacyCourse | { topic: string } | null>(null);
@@ -87,7 +92,7 @@ export default function Cursos() {
     if (canWatch(c)) return setWatching(c.id);
     if (!validCourseUrl(c.url) || !c.url) return;
     away.current = c.id;
-    actions.update(c.id, { lastAt: new Date().toISOString(), ...(statusOf(c) === 'pendiente' ? { status: 'curso' as const } : {}) });
+    update(c, { lastAt: new Date().toISOString(), ...(statusOf(c) === 'pendiente' ? { status: 'curso' as const } : {}) });
     Linking.openURL(c.url).catch(() => undefined);
   };
   const byId = (id: string | null) => (id ? courses.find((c) => c.id === id) : undefined);
@@ -125,9 +130,10 @@ export default function Cursos() {
                 key={g.topic}
                 topic={g.topic}
                 items={g.items}
+                all={coursesByTopic(courses).find((x) => x.topic.toLocaleLowerCase('es') === g.topic.toLocaleLowerCase('es'))?.items ?? g.items}
                 onEdit={setEditing}
                 onAdd={() => setEditing({ topic: g.topic })}
-                onStatus={(c) => actions.update(c.id, { status: NEXT_STATUS[statusOf(c)] })}
+                onStatus={(c) => update(c, { status: NEXT_STATUS[statusOf(c)] })}
                 onOpen={open}
                 onLog={(c) => setLogging(c.id)}
                 onSchedule={(c) => setScheduling(c.id)}
@@ -166,9 +172,13 @@ interface RowActions {
   classes: (c: LegacyCourse) => Array<{ day: number; start: string }>;
 }
 
-function TopicCard({ topic, items, onAdd, ...row }: { topic: string; items: LegacyCourse[]; onAdd: () => void } & RowActions) {
+function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items: LegacyCourse[]; all: LegacyCourse[]; onAdd: () => void } & RowActions) {
   const { colors } = useTheme();
-  const done = items.filter((c) => statusOf(c) === 'hecho').length;
+  // Ruta del tema con todos sus cursos (aunque el filtro oculte algunos).
+  const route = courseRoute(all);
+  const next = route.find((c) => statusOf(c) !== 'hecho');
+  const shown = route.filter((c) => items.includes(c));
+  const done = all.filter((c) => statusOf(c) === 'hecho').length;
   return (
     <Card style={[st.card, { borderLeftColor: colors.primary }]}>
       <View style={st.head}>
@@ -176,14 +186,19 @@ function TopicCard({ topic, items, onAdd, ...row }: { topic: string; items: Lega
           {topic}
         </T>
         <T v="small" tint="muted" style={{ fontVariant: ['tabular-nums'] }}>
-          {done} de {items.length}
+          {done} de {all.length}
         </T>
       </View>
+      {all.length > 2 && (
+        <T v="small" tint="muted">
+          En orden: lo que empezaste y de lo básico a lo avanzado.
+        </T>
+      )}
       <View>
-        {items.map((c, k) => (
+        {shown.map((c, k) => (
           <Fragment key={c.id}>
             {k > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.line }} />}
-            <CourseRow course={c} {...row} />
+            <CourseRow course={c} next={all.length > 1 && c === next} {...row} />
           </Fragment>
         ))}
       </View>
@@ -196,6 +211,26 @@ function TopicCard({ topic, items, onAdd, ...row }: { topic: string; items: Lega
 
 /** «4 h 30 min» o, si la página solo da una cifra aproximada, «unas 20 h». */
 const lengthLabel = (c: LegacyCourse): string => (c.length ? `${c.lengthFrom === 'aprox' ? 'unas ' : ''}${formatLength(c.length)}` : '');
+const levelLabel = (c: LegacyCourse) => COURSE_LEVEL_LABEL[courseLevel(c).level];
+
+/**
+ * Guarda cambios de un curso. Si acaba de quedar «hecho», sus clases del
+ * Horario pasan al siguiente curso del tema.
+ */
+function useCourseUpdate() {
+  const legacy = useLegacyData();
+  const courses = useModule('courses');
+  const classes = useModule('classes');
+  const toast = useToast();
+  return (c: LegacyCourse, patch: Partial<LegacyCourse>) => {
+    courses.update(c.id, patch);
+    if (patch.status !== 'hecho' || c.status === 'hecho') return;
+    const { next, patches } = handoffClasses(legacy.data?.data, c.id);
+    if (!next || !patches.length) return;
+    for (const k of patches) classes.update(k.id, k.patch);
+    toast(`Terminaste «${courseName(c)}». Tus clases siguen con «${courseName(next)}».`);
+  };
+}
 
 const DAY_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 /** «Lun y Mié 18:00» */
@@ -208,7 +243,7 @@ export function scheduleText(list: Array<{ day: number; start: string }>): strin
   return times.length === 1 ? `${d} ${times[0]}` : d;
 }
 
-function CourseRow({ course: c, onEdit, onStatus, onOpen, onLog, onSchedule, classes }: { course: LegacyCourse } & RowActions) {
+function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedule, classes }: { course: LegacyCourse; next?: boolean } & RowActions) {
   const { colors } = useTheme();
   const router = useRouter();
   const source = courseSource(c.url);
@@ -216,7 +251,7 @@ function CourseRow({ course: c, onEdit, onStatus, onOpen, onLog, onSchedule, cla
   const status = statusOf(c);
   const watch = canWatch(c);
   const Icon = !source ? GraduationCap : source.video ? MonitorPlay : Link2;
-  const meta = [source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ');
+  const meta = [levelLabel(c), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ');
   const pct = courseProgress(c);
   const resume = courseResume(c);
   const inSchedule = scheduleText(classes(c));
@@ -230,11 +265,18 @@ function CourseRow({ course: c, onEdit, onStatus, onOpen, onLog, onSchedule, cla
           </T>
           {c.url ? watch ? <Play size={14} color={colors.primary} /> : <ExternalLink size={14} color={colors.inkMuted} /> : null}
         </View>
-        {meta ? (
-          <T v="small" tint="muted" numberOfLines={1}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+          {next && (
+            <View style={[st.next, { backgroundColor: colors.primary }]}>
+              <T v="small" style={{ color: colors.onPrimary, fontFamily: fonts.semibold, fontSize: 11, lineHeight: 14 }}>
+                Sigue
+              </T>
+            </View>
+          )}
+          <T v="small" tint="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
             {meta}
           </T>
-        ) : null}
+        </View>
         {(pct > 0 || !!resume) && status !== 'hecho' && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: pct }} accessibilityLabel={`Avance de «${name}»`} style={[st.bar, { backgroundColor: colors.surfaceSunken }]}>
@@ -300,7 +342,7 @@ function CourseRow({ course: c, onEdit, onStatus, onOpen, onLog, onSchedule, cla
 /** El video de YouTube dentro de la app: empieza donde lo dejaste y guarda al pausar o cerrar. */
 function Watch({ course: c, onClose }: { course: LegacyCourse; onClose: () => void }) {
   const { colors } = useTheme();
-  const actions = useModule('courses');
+  const update = useCourseUpdate();
   const ref = youtubeRef(c.url)!;
   const video = c.video || ref.video;
   const start = c.position && (!c.video || c.video === video) && courseProgress(c) < 100 ? Math.max(0, c.position - 3) : ref.start;
@@ -312,7 +354,7 @@ function Watch({ course: c, onClose }: { course: LegacyCourse; onClose: () => vo
   const [failed, setFailed] = useState(false);
   const save = (s: { position: number; duration: number; video?: string; index?: number; count?: number }) => {
     const patch = coursePlaybackPatch(latest.current, s);
-    actions.update(c.id, patch);
+    update(latest.current, patch);
     setSaved(courseResume({ ...latest.current, ...patch } as LegacyCourse));
     if (closing.current) onClose();
   };
@@ -348,12 +390,12 @@ function Watch({ course: c, onClose }: { course: LegacyCourse; onClose: () => vo
 /** Udemy, Coursera…: no dicen cuánto viste, así que lo anotas tú al volver. */
 const STEPS = [0, 10, 25, 40, 50, 60, 75, 90, 100];
 function ProgressForm({ course: c, onDone }: { course: LegacyCourse; onDone: () => void }) {
-  const actions = useModule('courses');
+  const update = useCourseUpdate();
   const [spot, setSpot] = useState(c.spot ?? '');
   const now = courseProgress(c);
   const [pct, setPct] = useState(STEPS.reduce((a, b) => (Math.abs(b - now) < Math.abs(a - now) ? b : a), 0));
   const submit = () => {
-    actions.update(c.id, { spot: spot.trim(), progress: pct, lastAt: new Date().toISOString(), status: pct >= 100 ? 'hecho' : 'curso' });
+    update(c, { spot: spot.trim(), progress: pct, lastAt: new Date().toISOString(), status: pct >= 100 ? 'hecho' : 'curso' });
     onDone();
   };
   return (
@@ -536,7 +578,10 @@ function useCourseLength(course: LegacyCourse | null) {
   };
 }
 
-const fmtDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('es', { day: 'numeric', month: 'long' });
+const fmtDate = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00`);
+  return d.toLocaleDateString('es', { day: 'numeric', month: 'long', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' as const } : {}) });
+};
 
 /** Reparte los cursos en las horas libres de la semana y los pone en el Horario. */
 function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: () => void }) {
@@ -545,10 +590,13 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
   const classes = useModule('classes');
   const toast = useToast();
   const router = useRouter();
-  const open = courses.filter((c) => statusOf(c) !== 'hecho');
+  // Por temas: cada tema estudia un curso a la vez, en el orden de su ruta.
+  const topics = coursesByTopic(courses)
+    .map((g) => ({ topic: g.topic, route: courseRoute(g.items).filter((c) => statusOf(c) !== 'hecho') }))
+    .filter((g) => g.route.length);
   const [chosen, setChosen] = useState<string[]>(() => {
-    const watching = open.filter((c) => statusOf(c) === 'curso').map((c) => c.id);
-    return watching.length ? watching : open.map((c) => c.id);
+    const started = topics.filter((g) => g.route.some((c) => statusOf(c) === 'curso')).map((g) => g.topic);
+    return started.length ? started : topics.map((g) => g.topic);
   });
   const [days, setDays] = useState('12345');
   const [from, setFrom] = useState('18:00');
@@ -558,17 +606,19 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
   const f = normalizeHHMM(from);
   const t = normalizeHHMM(to);
   const badTime = !HHMM_RE.test(f) || !HHMM_RE.test(t) || t <= f;
-  const plan = badTime ? null : planStudy(legacy.data?.data, chosen, { days, from: f, to: t, session: Number(session), weekly: Number(weekly) });
+  const plan = badTime ? null : planTopics(legacy.data?.data, chosen, { days, from: f, to: t, session: Number(session), weekly: Number(weekly) });
   const name = (id: string) => courseName(courses.find((c) => c.id === id) ?? ({ title: '', url: '' } as LegacyCourse));
   const short = plan && plan.fits < Number(weekly) && plan.sessions.length > 0;
 
   const submit = () => {
     if (!plan?.sessions.length) return;
+    const inTopics = new Set(topics.filter((g) => chosen.includes(g.topic)).flatMap((g) => g.route.map((c) => c.id)));
     const old = legacy.data?.data.classes as Array<{ id: string; course?: string }> | undefined;
-    for (const k of old ?? []) if (k.course && chosen.includes(k.course)) classes.remove(k.id);
+    for (const k of old ?? []) if (k.course && inTopics.has(k.course)) classes.remove(k.id);
     plan.sessions.forEach((s) => {
       const c = courses.find((x) => x.id === s.courseId)!;
-      classes.add({ id: newId(), day: s.day, start: s.start, end: s.end, title: courseName(c).slice(0, 120), room: (courseSource(c.url)?.label ?? '').slice(0, 60), color: CLASS_COLORS[chosen.indexOf(c.id) % CLASS_COLORS.length], subject: '', course: c.id });
+      const color = CLASS_COLORS[Math.max(0, chosen.findIndex((t) => t.toLocaleLowerCase('es') === c.topic.trim().toLocaleLowerCase('es'))) % CLASS_COLORS.length];
+      classes.add({ id: newId(), day: s.day, start: s.start, end: s.end, title: courseName(c).slice(0, 120), room: (courseSource(c.url)?.label ?? '').slice(0, 60), color, subject: '', course: c.id });
     });
     toast(`Listo: ${plural(plan.sessions.length, 'sesión', 'sesiones')} de estudio en tu horario.`, { action: { label: 'Ver horario', run: () => router.push('/horario') } });
     onDone();
@@ -577,20 +627,21 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
   return (
     <ScrollView style={{ maxHeight: 620 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
       <T v="small" tint="muted">
-        Elige qué quieres estudiar y cuándo tienes tiempo. Lo repartimos en tus huecos libres sin pisar tus otras clases y te decimos cuándo terminarías cada curso.
+        Elige qué temas quieres estudiar y cuándo tienes tiempo. Cada tema va un curso a la vez, de lo básico a lo avanzado, y cuando terminas uno sus clases pasan solas al siguiente.
       </T>
       <View style={{ gap: space[1] }}>
-        <T v="label">Cursos</T>
-        {open.map((c) => {
-          const rem = courseRemaining(c);
-          const label = `${courseName(c)} · ${rem === null ? 'sin duración' : `faltan ${formatLength(rem)}`}`;
-          const on = chosen.includes(c.id);
+        <T v="label">Temas</T>
+        {topics.map((g) => {
+          const known = g.route.map(courseRemaining).filter((r): r is number => r !== null);
+          const left = known.reduce((a, b) => a + b, 0);
+          const label = `${g.topic} · ${plural(g.route.length, 'curso', 'cursos')} · empieza por «${courseName(g.route[0])}»${known.length ? ` · faltan ${formatLength(left)}` : ''}`;
+          const on = chosen.includes(g.topic);
           return (
-            <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: touchTarget }}>
+            <View key={g.topic} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: touchTarget }}>
               <T v="body" style={{ flex: 1 }}>
                 {label}
               </T>
-              <Toggle label={label} value={on} onChange={() => setChosen((l) => (on ? l.filter((x) => x !== c.id) : [...l, c.id]))} />
+              <Toggle label={label} value={on} onChange={() => setChosen((l) => (on ? l.filter((x) => x !== g.topic) : [...l, g.topic]))} />
             </View>
           );
         })}
@@ -606,7 +657,7 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
         </T>
         {!chosen.length ? (
           <T v="small" tint="muted">
-            Elige al menos un curso.
+            Elige al menos un tema.
           </T>
         ) : !plan?.sessions.length ? (
           <T v="small" tint="muted">
@@ -623,17 +674,22 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
                 {name(s.courseId)}
               </T>
             ))}
-            {plan.courses.map((p) => (
-              <T key={p.courseId} v="small" tint="muted">
-                {name(p.courseId)}: {plural(p.perWeek, 'sesión', 'sesiones')} a la semana
-                {p.finish ? ` · terminas hacia el ${fmtDate(p.finish)} (${plural(p.weeks ?? 0, 'semana', 'semanas')})` : p.perWeek ? ' · agrega su duración para saber cuándo terminas' : ' · no cupo esta semana'}
+            {plan.topics.map((p) => (
+              <T key={p.topic} v="small" tint="muted">
+                {p.topic}: {plural(p.perWeek, 'sesión', 'sesiones')} a la semana
+                {!p.perWeek
+                  ? ' · no cupo esta semana'
+                  : p.finish
+                    ? ` · ${p.count > 1 ? `los ${p.count} cursos` : 'lo terminas'} hacia el ${fmtDate(p.finish)} (${plural(p.weeks ?? 0, 'semana', 'semanas')})`
+                    : ' · agrega la duración de sus cursos para saber cuándo terminas'}
+                {p.unknown > 0 && p.finish ? ` · ${plural(p.unknown, 'curso sin duración no cuenta', 'cursos sin duración no cuentan')}` : ''}
               </T>
             ))}
           </>
         )}
       </View>
       <T v="small" tint="muted">
-        Si ya tenían clases en tu horario, se cambian por estas.
+        Las clases que ya tenían estos temas en tu horario se cambian por estas.
       </T>
       <Button label="Poner en mi horario" onPress={submit} disabled={!plan?.sessions.length} />
     </ScrollView>
@@ -646,5 +702,6 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: touchTarget + 8 },
   main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[2] },
   bar: { width: 64, height: 6, borderRadius: 3, overflow: 'hidden' },
+  next: { paddingHorizontal: 8, paddingVertical: 1, borderRadius: radius.pill },
   status: { minWidth: 64, minHeight: 32, paddingHorizontal: space[3], borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

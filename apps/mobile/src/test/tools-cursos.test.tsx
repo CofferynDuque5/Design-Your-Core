@@ -130,10 +130,31 @@ describe('Cursos y Horario en el móvil', () => {
     for (const d of ['martes', 'jueves', 'viernes']) fireEvent.press(await screen.findByRole('checkbox', { name: d }));
     fireEvent.changeText(screen.getByLabelText('Hasta'), '20:00');
     expect(await screen.findByText('En esos días y horas caben 3 h a la semana, así que usamos esas.')).toBeOnTheScreen();
-    expect(screen.getByText(/React: 2 sesiones a la semana · terminas hacia el .+ \(3 semanas\)/)).toBeOnTheScreen();
+    expect(screen.getByText(/React: 2 sesiones a la semana · lo terminas hacia el .+ \(3 semanas\)/)).toBeOnTheScreen();
     fireEvent.press(screen.getByRole('button', { name: 'Poner en mi horario' }));
     await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(3));
     expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0]).toMatchObject({ body: { item: { day: 1, start: '19:00', end: '20:00', course: 'a' } } });
+  });
+
+  it('Cursos: cada tema va de lo básico a lo avanzado y al terminar uno sus clases pasan al siguiente', async () => {
+    const api = fakeModules(
+      legacyDoc({
+        courses: [
+          { id: 'r1', topic: 'React', title: 'Redux avanzado', url: '', status: 'pendiente', notes: '' },
+          { id: 'r2', topic: 'React', title: 'Hooks en React', url: '', status: 'pendiente', notes: '' },
+          { id: 'r3', topic: 'React', title: 'React desde cero', url: '', status: 'curso', notes: '' },
+        ] as unknown as LegacyData['courses'],
+        classes: [{ id: 'k1', day: 1, start: '18:00', end: '19:00', title: 'React desde cero', room: '', color: '#4F7CFF', subject: '', course: 'r3' }] as unknown as LegacyData['classes'],
+      }),
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByText('En orden: lo que empezaste y de lo básico a lo avanzado.')).toBeOnTheScreen();
+    const names = screen.getAllByRole('button', { name: /^Estado de «/ }).map((b) => /«(.+)»/.exec(b.props.accessibilityLabel)?.[1]);
+    expect(names).toEqual(['React desde cero', 'Hooks en React', 'Redux avanzado']);
+    expect(screen.getByText('Sigue')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: /^Estado de «React desde cero»/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/classes/k1', body: { course: 'r2', title: 'Hooks en React' } }));
+    expect(await screen.findByText('Terminaste «React desde cero». Tus clases siguen con «Hooks en React».')).toBeOnTheScreen();
   });
 
   it('Cursos vacío invita a añadir el primero', async () => {

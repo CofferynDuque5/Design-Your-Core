@@ -5548,6 +5548,22 @@
     background: var(--color-primary);
   }
 
+  .course-row__next {
+    display: inline-block;
+    margin-right: var(--space-2);
+    padding: 0 var(--space-2);
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-weight: var(--weight-semibold);
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  .course-card__route {
+    margin: calc(var(--space-2) * -1) 0 0;
+  }
+
   .course-row__when {
     color: var(--color-primary);
   }

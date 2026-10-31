@@ -9,11 +9,15 @@ import {
   courseResume,
   coursePlaybackPatch,
   coursesByTopic,
+  courseLevel,
   courseRemaining,
+  courseRoute,
+  COURSE_LEVEL_LABEL,
+  handoffClasses,
   courseSource,
   formatLength,
   HHMM_RE,
-  planStudy,
+  planTopics,
   STUDY_SESSIONS,
   STUDY_WEEKLY,
   normalizeCourseUrl,
@@ -61,6 +65,7 @@ export function Courses() {
   const [logging, setLogging] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
   const [planning, setPlanning] = useState(false);
+  const update = useCourseUpdate();
   const [params, setParams] = useSearchParams();
   // Volver de otra pestaña después de abrir un curso de Udemy, Coursera…: pregunta hasta dónde llegaste.
   const away = useRef<string | null>(null);
@@ -152,10 +157,11 @@ export function Courses() {
                   key={g.topic}
                   topic={g.topic}
                   items={g.items}
+                  all={coursesByTopic(courses).find((x) => x.topic.toLocaleLowerCase('es') === g.topic.toLocaleLowerCase('es'))?.items ?? g.items}
                   classes={(c) => courseClasses(legacy.data?.data, c.id)}
                   onEdit={setEditing}
                   onAdd={() => setEditing({ topic: g.topic })}
-                  onStatus={(c) => actions.update(c.id, { status: NEXT_STATUS[statusOf(c)] })}
+                  onStatus={(c) => update(c, { status: NEXT_STATUS[statusOf(c)] })}
                   onOpen={open}
                   onLog={(c) => setLogging(c.id)}
                   onSchedule={(c) => setScheduling(c.id)}
@@ -193,9 +199,13 @@ interface RowActions {
   classes: (c: LegacyCourse) => Array<{ day: number; start: string }>;
 }
 
-function TopicCard({ topic, items, onAdd, ...row }: { topic: string; items: LegacyCourse[]; onAdd: () => void } & RowActions) {
+function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items: LegacyCourse[]; all: LegacyCourse[]; onAdd: () => void } & RowActions) {
   const id = useId();
-  const done = items.filter((c) => statusOf(c) === 'hecho').length;
+  // Ruta del tema con todos sus cursos (aunque el filtro oculte algunos).
+  const route = courseRoute(all);
+  const next = route.find((c) => statusOf(c) !== 'hecho');
+  const shown = route.filter((c) => items.includes(c));
+  const done = all.filter((c) => statusOf(c) === 'hecho').length;
   return (
     <section className="card tool-card course-card" aria-labelledby={`${id}-t`}>
       <div className="tool-card__head">
@@ -203,12 +213,13 @@ function TopicCard({ topic, items, onAdd, ...row }: { topic: string; items: Lega
           {topic}
         </h2>
         <span className="small muted numeric">
-          {done} de {items.length}
+          {done} de {all.length}
         </span>
       </div>
+      {all.length > 2 && <p className="small muted course-card__route">En orden: lo que empezaste y de lo básico a lo avanzado.</p>}
       <ul className="course-list" aria-label={`Cursos de ${topic}`}>
-        {items.map((c) => (
-          <CourseRow key={c.id} course={c} {...row} />
+        {shown.map((c) => (
+          <CourseRow key={c.id} course={c} next={all.length > 1 && c === next} {...row} />
         ))}
       </ul>
       <button type="button" className="btn btn--ghost btn--sm" onClick={onAdd}>
@@ -221,6 +232,28 @@ function TopicCard({ topic, items, onAdd, ...row }: { topic: string; items: Lega
 /** «4 h 30 min» o, si la página solo da una cifra aproximada, «unas 20 h». */
 export const lengthLabel = (c: LegacyCourse): string => (c.length ? `${c.lengthFrom === 'aprox' ? 'unas ' : ''}${formatLength(c.length)}` : '');
 
+/**
+ * Guarda cambios de un curso. Si con eso se termina, sus clases del Horario
+ * pasan solas al siguiente curso del mismo tema.
+ */
+function useCourseUpdate() {
+  const legacy = useLegacyData();
+  const courses = useModule('courses');
+  const classes = useModule('classes');
+  const toast = useToast();
+  return (c: LegacyCourse, patch: Partial<LegacyCourse>) => {
+    courses.update(c.id, patch);
+    if (patch.status !== 'hecho' || c.status === 'hecho') return;
+    const { next, patches } = handoffClasses(legacy.data?.data, c.id);
+    if (!next || !patches.length) return;
+    for (const k of patches) classes.update(k.id, k.patch);
+    toast(`Terminaste «${courseName(c)}». Tus clases siguen con «${courseName(next)}».`);
+  };
+}
+
+/** «Básico», «Intermedio»… para mostrar junto a cada curso. */
+const levelLabel = (c: LegacyCourse) => COURSE_LEVEL_LABEL[courseLevel(c).level];
+
 const DAY_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 /** «Lun y Mié 18:00» */
 export function scheduleText(list: Array<{ day: number; start: string }>): string {
@@ -232,7 +265,7 @@ export function scheduleText(list: Array<{ day: number; start: string }>): strin
   return times.length === 1 ? `${d} ${times[0]}` : d;
 }
 
-function CourseRow({ course: c, onEdit, onStatus, onOpen, onLog, onSchedule, classes }: { course: LegacyCourse } & RowActions) {
+function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedule, classes }: { course: LegacyCourse; next?: boolean } & RowActions) {
   const source = courseSource(c.url);
   const name = courseName(c);
   const status = statusOf(c);
@@ -259,7 +292,10 @@ function CourseRow({ course: c, onEdit, onStatus, onOpen, onLog, onSchedule, cla
         ) : (
           <span className="course-row__name">{name}</span>
         )}
-        {(source || c.notes || !!c.length) && <span className="small muted course-row__meta">{[source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ')}</span>}
+        <span className="small muted course-row__meta">
+          {next && <span className="course-row__next">Sigue</span>}
+          {[levelLabel(c), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ')}
+        </span>
         {(pct > 0 || resume) && status !== 'hecho' && (
           <span className="course-progress">
             <span className="course-progress__bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`Avance de «${name}»`}>
@@ -301,7 +337,7 @@ function CourseRow({ course: c, onEdit, onStatus, onOpen, onLog, onSchedule, cla
 
 /** El video de YouTube dentro de la app: empieza donde lo dejaste y guarda al pausar. */
 function Watch({ course: c }: { course: LegacyCourse }) {
-  const actions = useModule('courses');
+  const update = useCourseUpdate();
   const ref = youtubeRef(c.url)!;
   // Si se guardó un video de la lista, se sigue en ese; si no, en el del enlace.
   const video = c.video || ref.video;
@@ -318,7 +354,7 @@ function Watch({ course: c }: { course: LegacyCourse }) {
         title={courseName(c)}
         onProgress={(s) => {
           const patch = coursePlaybackPatch(latest.current, s);
-          actions.update(c.id, patch);
+          update(latest.current, patch);
           setSaved(courseResume({ ...latest.current, ...patch } as LegacyCourse));
         }}
       />
@@ -338,12 +374,12 @@ function Watch({ course: c }: { course: LegacyCourse }) {
 
 /** Udemy, Coursera…: no dicen cuánto viste, así que lo anotas tú al volver. */
 function ProgressForm({ course: c, onDone }: { course: LegacyCourse; onDone: () => void }) {
-  const actions = useModule('courses');
+  const update = useCourseUpdate();
   const [spot, setSpot] = useState(c.spot ?? '');
   const [pct, setPct] = useState(courseProgress(c));
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    actions.update(c.id, {
+    update(c, {
       spot: spot.trim(),
       progress: pct,
       lastAt: new Date().toISOString(),
@@ -611,28 +647,39 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
   const classes = useModule('classes');
   const toast = useToast();
   const navigate = useNavigate();
-  const open = courses.filter((c) => statusOf(c) !== 'hecho');
-  const [chosen, setChosen] = useState<string[]>(() => open.filter((c) => statusOf(c) === 'curso').map((c) => c.id).concat(open.every((c) => statusOf(c) !== 'curso') ? open.map((c) => c.id) : []));
+  // Por temas: cada tema estudia un curso a la vez, en el orden de su ruta.
+  const topics = coursesByTopic(courses)
+    .map((g) => ({ topic: g.topic, route: courseRoute(g.items).filter((c) => statusOf(c) !== 'hecho') }))
+    .filter((g) => g.route.length);
+  const [chosen, setChosen] = useState<string[]>(() => {
+    const started = topics.filter((g) => g.route.some((c) => statusOf(c) === 'curso')).map((g) => g.topic);
+    return started.length ? started : topics.map((g) => g.topic);
+  });
   const [days, setDays] = useState('12345');
   const [from, setFrom] = useState('18:00');
   const [to, setTo] = useState('21:00');
   const [session, setSession] = useState(60);
   const [weekly, setWeekly] = useState(5);
   const badTime = !HHMM_RE.test(from) || !HHMM_RE.test(to) || to <= from;
-  const plan = badTime ? null : planStudy(legacy.data?.data, chosen, { days, from, to, session, weekly });
+  const plan = badTime ? null : planTopics(legacy.data?.data, chosen, { days, from, to, session, weekly });
   const name = (id: string) => courseName(courses.find((c) => c.id === id) ?? ({ title: '', url: '' } as LegacyCourse));
-  const toggle = (id: string) => setChosen((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
+  const toggle = (topic: string) => setChosen((list) => (list.includes(topic) ? list.filter((x) => x !== topic) : [...list, topic]));
   const short = plan && plan.fits < weekly && plan.sessions.length > 0;
-  const fmtDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('es', { day: 'numeric', month: 'long' });
+  const fmtDate = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('es', { day: 'numeric', month: 'long', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!plan?.sessions.length) return;
+    const inTopics = new Set(topics.filter((g) => chosen.includes(g.topic)).flatMap((g) => g.route.map((c) => c.id)));
     const old = legacy.data?.data.classes as Array<{ id: string; course?: string }> | undefined;
-    for (const k of old ?? []) if (k.course && chosen.includes(k.course)) classes.remove(k.id);
+    for (const k of old ?? []) if (k.course && inTopics.has(k.course)) classes.remove(k.id);
     plan.sessions.forEach((s) => {
       const c = courses.find((x) => x.id === s.courseId)!;
-      classes.add({ id: newId(), day: s.day, start: s.start, end: s.end, title: courseName(c).slice(0, 120), room: (courseSource(c.url)?.label ?? '').slice(0, 60), color: CLASS_COLORS[chosen.indexOf(c.id) % CLASS_COLORS.length], subject: '', course: c.id });
+      const color = CLASS_COLORS[Math.max(0, chosen.findIndex((t) => t.toLocaleLowerCase('es') === c.topic.trim().toLocaleLowerCase('es'))) % CLASS_COLORS.length];
+      classes.add({ id: newId(), day: s.day, start: s.start, end: s.end, title: courseName(c).slice(0, 120), room: (courseSource(c.url)?.label ?? '').slice(0, 60), color, subject: '', course: c.id });
     });
     toast(`Listo: ${plural(plan.sessions.length, 'sesión', 'sesiones')} de estudio en tu horario.`, { action: { label: 'Ver horario', run: () => navigate('/horario') } });
     onDone();
@@ -640,18 +687,24 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
 
   return (
     <form className="stack planner" onSubmit={submit}>
-      <p className="muted small">Elige qué quieres estudiar y cuándo tienes tiempo. Lo repartimos en tus huecos libres sin pisar tus otras clases y te decimos cuándo terminarías cada curso.</p>
+      <p className="muted small">
+        Elige qué temas quieres estudiar y cuándo tienes tiempo. Cada tema va un curso a la vez, de lo básico a lo avanzado, y cuando terminas uno sus clases pasan solas al siguiente.
+      </p>
       <fieldset className="field">
-        <legend className="field__label">Cursos</legend>
+        <legend className="field__label">Temas</legend>
         <div className="planner__courses">
-          {open.map((c) => {
-            const rem = courseRemaining(c);
+          {topics.map((g) => {
+            const known = g.route.map(courseRemaining).filter((r): r is number => r !== null);
+            const left = known.reduce((a, b) => a + b, 0);
             return (
-              <label key={c.id} className="check-row">
-                <input type="checkbox" checked={chosen.includes(c.id)} onChange={() => toggle(c.id)} />
+              <label key={g.topic} className="check-row">
+                <input type="checkbox" checked={chosen.includes(g.topic)} onChange={() => toggle(g.topic)} />
                 <span>
-                  {courseName(c)}
-                  <span className="small muted"> · {rem === null ? 'sin duración' : `faltan ${formatLength(rem)}`}</span>
+                  {g.topic}
+                  <span className="small muted">
+                    {' '}
+                    · {plural(g.route.length, 'curso', 'cursos')} · empieza por «{courseName(g.route[0])}»{known.length ? ` · faltan ${formatLength(left)}` : ''}
+                  </span>
                 </span>
               </label>
             );
@@ -682,7 +735,7 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
           Así quedaría
         </h3>
         {!chosen.length ? (
-          <p className="muted small">Elige al menos un curso.</p>
+          <p className="muted small">Elige al menos un tema.</p>
         ) : !plan?.sessions.length ? (
           <p className="muted small">No hay huecos libres con esos días y horas. Prueba otros días o amplía el horario.</p>
         ) : (
@@ -699,17 +752,22 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
               ))}
             </ul>
             <ul className="planner__finish">
-              {plan.courses.map((p) => (
-                <li key={p.courseId} className="small">
-                  <strong>{name(p.courseId)}:</strong> {plural(p.perWeek, 'sesión', 'sesiones')} a la semana
-                  {p.finish ? ` · terminas hacia el ${fmtDate(p.finish)} (${plural(p.weeks ?? 0, 'semana', 'semanas')})` : p.perWeek ? ' · agrega su duración para saber cuándo terminas' : ' · no cupo esta semana'}
+              {plan.topics.map((t) => (
+                <li key={t.topic} className="small">
+                  <strong>{t.topic}:</strong> {plural(t.perWeek, 'sesión', 'sesiones')} a la semana
+                  {!t.perWeek
+                    ? ' · no cupo esta semana'
+                    : t.finish
+                      ? ` · ${t.count > 1 ? `los ${t.count} cursos` : 'lo terminas'} hacia el ${fmtDate(t.finish)} (${plural(t.weeks ?? 0, 'semana', 'semanas')})`
+                      : ' · agrega la duración de sus cursos para saber cuándo terminas'}
+                  {t.unknown > 0 && t.finish ? ` · ${plural(t.unknown, 'curso sin duración no cuenta', 'cursos sin duración no cuentan')}` : ''}
                 </li>
               ))}
             </ul>
           </>
         )}
       </section>
-      <p className="muted small">Si ya tenían clases en tu horario, se cambian por estas.</p>
+      <p className="muted small">Las clases que ya tenían estos temas en tu horario se cambian por estas.</p>
       <button type="submit" className="btn" disabled={!plan?.sessions.length}>
         Poner en mi horario
       </button>
