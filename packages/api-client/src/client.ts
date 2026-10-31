@@ -1,4 +1,4 @@
-import type { CheckInInput, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
+import type { CheckInInput, CourseLength, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
@@ -158,6 +158,11 @@ export function createClient(opts: ClientOptions) {
     account: {
       export: () => request<AccountExport>('GET', '/api/v2/account/export'),
       remove: (password: string) => request<{ ok: true }>('DELETE', '/api/v2/account', { password }),
+    },
+
+    courses: {
+      /** Cuánto dura un curso con solo su enlace (lo lee el servidor). 404 si la página no lo dice. */
+      length: (url: string) => request<CourseLength>('POST', '/api/v2/courses/length', { url }),
     },
 
     /** Datos de la app anterior (v1): un documento JSON por persona. Para editar, usa `modules`. */

@@ -825,6 +825,9 @@ export function createDemoServer(opts: DemoServerOptions = {}) {
     return { images: Object.fromEntries(wanted.filter((id) => a.images[id]).map((id) => [id, a.images[id]])) };
   });
 
+  // La demostración no sale a internet: la duración se escribe a mano.
+  on('POST', '/api/v2/courses/length', () => fail(404, 'En la demostración no se leen otras páginas. Escribe la duración a mano.'));
+
   on('POST', '/api/images/delete', ({ token, body }) => {
     const a = account(token);
     const ids: string[] = Array.isArray(body.ids) ? body.ids.filter((x: unknown): x is string => typeof x === 'string').slice(0, 100) : [];

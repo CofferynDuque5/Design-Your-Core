@@ -103,6 +103,39 @@ describe('Cursos y Horario en el móvil', () => {
     expect(await screen.findByLabelText('Dónde lo dejaste (opcional)')).toBeOnTheScreen();
   });
 
+  it('Cursos: con solo pegar el enlace lee cuánto dura', async () => {
+    const api = fakeModules(legacyDoc({ courses: [] }), { 'POST /api/v2/courses/length': () => ({ seconds: 45000, exact: true, videos: 12 }) });
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    fireEvent.press(await screen.findByRole('button', { name: 'Añadir el primero' }));
+    fireEvent.changeText(await screen.findByLabelText('Tema'), 'Inglés');
+    fireEvent.changeText(screen.getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
+    fireEvent(screen.getByLabelText('Enlace (opcional)'), 'blur');
+    expect(await screen.findByText('Dura 12 h 30 min (12 videos), según la página.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir curso' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'POST', path: '/api/v2/modules/courses', body: { item: { length: 45000, lengthFrom: 'enlace' } } }));
+  });
+
+  it('Cursos: «Armar mi horario» reparte los cursos en los huecos libres', async () => {
+    const api = fakeModules(
+      legacyDoc({
+        courses: [
+          { id: 'a', topic: 'Inglés', title: 'Inglés', url: '', status: 'curso', notes: '', length: 36000, progress: 50 },
+          { id: 'b', topic: 'React', title: 'React', url: '', status: 'curso', notes: '', length: 21600 },
+        ] as unknown as LegacyData['courses'],
+        classes: [{ id: 'k1', day: 1, start: '18:00', end: '19:00', title: 'Gimnasio', room: '', color: '#4F7CFF', subject: '' }] as unknown as LegacyData['classes'],
+      }),
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    fireEvent.press(await screen.findByRole('button', { name: 'Armar mi horario' }));
+    for (const d of ['martes', 'jueves', 'viernes']) fireEvent.press(await screen.findByRole('checkbox', { name: d }));
+    fireEvent.changeText(screen.getByLabelText('Hasta'), '20:00');
+    expect(await screen.findByText('En esos días y horas caben 3 h a la semana, así que usamos esas.')).toBeOnTheScreen();
+    expect(screen.getByText(/React: 2 sesiones a la semana · terminas hacia el .+ \(3 semanas\)/)).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Poner en mi horario' }));
+    await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(3));
+    expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0]).toMatchObject({ body: { item: { day: 1, start: '19:00', end: '20:00', course: 'a' } } });
+  });
+
   it('Cursos vacío invita a añadir el primero', async () => {
     fakeModules(legacyDoc({ courses: [] }));
     renderRouter('./src/app', { initialUrl: '/cursos' });

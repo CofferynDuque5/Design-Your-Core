@@ -5552,6 +5552,59 @@
     color: var(--color-primary);
   }
 
+  /* Duración: el campo y «Leer del enlace» en una fila; el botón baja si no cabe. */
+  .course-length {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .course-length > .field {
+    flex: 1 1 14rem;
+  }
+
+  .course-length > .btn {
+    margin-top: 1.9rem;
+  }
+
+  .planner__courses {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .planner__preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-sunken);
+  }
+
+  .planner__title {
+    margin: 0;
+    font-size: var(--text-base, 1rem);
+    font-weight: var(--weight-semibold);
+  }
+
+  .planner__sessions,
+  .planner__finish {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .planner__sessions .numeric {
+    display: inline-block;
+    min-width: 8.5rem;
+    color: var(--color-primary);
+  }
+
   .dialog--wide {
     width: min(100% - 2 * var(--space-4), 880px);
   }

@@ -6,6 +6,11 @@ import {
   courseClasses,
   courseName,
   courseProgress,
+  courseRemaining,
+  formatLength,
+  planStudy,
+  STUDY_SESSIONS,
+  STUDY_WEEKLY,
   courseResume,
   coursePlaybackPatch,
   coursesByTopic,
@@ -16,19 +21,23 @@ import {
   plural,
   validCourseUrl,
   youtubeRef,
+  type CourseLength,
+  type CourseLengthFrom,
   type CourseStatus,
   type LegacyCourse,
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarPlus, ExternalLink, Gauge, GraduationCap, Link2, MonitorPlay, Pencil, Play, Plus } from 'lucide-react-native';
+import { CalendarClock, CalendarPlus, ExternalLink, Gauge, GraduationCap, Link2, MonitorPlay, Pencil, Play, Plus } from 'lucide-react-native';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { DotChoices, FormActions, IconButton, Pill, Suggestions, TimeField, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { DotChoices, FormActions, IconButton, Pill, Suggestions, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { YouTubeView, type YouTubeViewHandle } from '../../components/YouTubeView';
+import { api } from '../../lib/api';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
+import { useToast } from '../../lib/toast';
 import { useTheme } from '../../lib/theme';
 
 type Filter = 'todos' | CourseStatus;
@@ -50,6 +59,7 @@ export default function Cursos() {
   const [watching, setWatching] = useState<string | null>(null);
   const [logging, setLogging] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
+  const [planning, setPlanning] = useState(false);
   const router = useRouter();
   const { abrir } = useLocalSearchParams<{ abrir?: string }>();
   // Al volver a la app después de abrir un curso de Udemy, Coursera…: pregunta hasta dónde llegaste.
@@ -104,6 +114,7 @@ export default function Cursos() {
         <>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] }}>
             <Pill a11yLabel={plural(pending, 'curso por ver', 'cursos por ver')}>{plural(pending, 'por ver', 'por ver')}</Pill>
+            {pending > 0 && <Button small variant="secondary" label="Armar mi horario" icon={<CalendarClock size={16} color={colors.primary} />} onPress={() => setPlanning(true)} />}
           </View>
           <DotChoices legend="Estado" hideLegend value={filter} onChange={setFilter} options={FILTER_OPTIONS} />
           {groups.length === 0 ? (
@@ -132,6 +143,9 @@ export default function Cursos() {
       {watched && <Watch course={watched} onClose={() => setWatching(null)} />}
       <Sheet open={!!logged} onClose={() => setLogging(null)} title="¿Hasta dónde llegaste?">
         {logged && <ProgressForm course={logged} onDone={() => setLogging(null)} />}
+      </Sheet>
+      <Sheet open={planning} onClose={() => setPlanning(false)} title="Armar mi horario">
+        {planning && <StudyPlanner courses={courses} onDone={() => setPlanning(false)} />}
       </Sheet>
       <Sheet open={!!scheduled} onClose={() => setScheduling(null)} title="Agregar al horario">
         {scheduled && <ScheduleForm course={scheduled} count={(legacy.data?.data.classes as unknown[] | undefined)?.length ?? 0} onDone={() => setScheduling(null)} />}
@@ -180,6 +194,9 @@ function TopicCard({ topic, items, onAdd, ...row }: { topic: string; items: Lega
   );
 }
 
+/** «4 h 30 min» o, si la página solo da una cifra aproximada, «unas 20 h». */
+const lengthLabel = (c: LegacyCourse): string => (c.length ? `${c.lengthFrom === 'aprox' ? 'unas ' : ''}${formatLength(c.length)}` : '');
+
 const DAY_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 /** «Lun y Mié 18:00» */
 export function scheduleText(list: Array<{ day: number; start: string }>): string {
@@ -199,7 +216,7 @@ function CourseRow({ course: c, onEdit, onStatus, onOpen, onLog, onSchedule, cla
   const status = statusOf(c);
   const watch = canWatch(c);
   const Icon = !source ? GraduationCap : source.video ? MonitorPlay : Link2;
-  const meta = [source?.label, c.notes.split('\n')[0]].filter(Boolean).join(' · ');
+  const meta = [source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ');
   const pct = courseProgress(c);
   const resume = courseResume(c);
   const inSchedule = scheduleText(classes(c));
@@ -393,11 +410,14 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
   const link = normalizeCourseUrl(url);
   const badUrl = !validCourseUrl(link);
   const source = !badUrl ? courseSource(link) : null;
+  const length = useCourseLength(course);
 
   const submit = () => {
-    const fields = { topic: topic.trim(), url: link, title: title.trim(), status, notes };
-    if (course) actions.update(course.id, fields);
-    else actions.add({ id: newId(), ...fields });
+    const fields = { topic: topic.trim(), url: link, title: title.trim(), status, notes, ...length.fields() };
+    const id = course?.id ?? newId();
+    if (course) actions.update(id, fields);
+    else actions.add({ id, ...fields });
+    if (link && !badUrl) length.later(id, link, actions.update);
     onDone();
   };
 
@@ -409,7 +429,11 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
         label="Enlace (opcional)"
         value={url}
         onChangeText={setUrl}
-        onBlur={() => setUrl(link)}
+        onBlur={() => {
+          setUrl(link);
+          // Con solo pegar el enlace se busca cuánto dura.
+          if (link && !badUrl) length.lookup(link, false);
+        }}
         maxLength={2000}
         placeholder="https://youtube.com/…"
         keyboardType="url"
@@ -418,13 +442,24 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
         hint={source ? `Se abrirá en ${source.label}.` : 'De YouTube, Udemy, Coursera, Platzi o cualquier página.'}
         error={url.trim() && badUrl ? 'Pega un enlace completo, por ejemplo https://youtube.com/watch?v=…' : null}
       />
+      <Field
+        label="Duración total en horas (opcional)"
+        value={length.hours}
+        onChangeText={length.type}
+        keyboardType="decimal-pad"
+        maxLength={7}
+        placeholder="12.5"
+        hint={length.message}
+        error={length.bad ? 'Escribe un número de horas, por ejemplo 12.5.' : null}
+      />
+      <Button small variant="secondary" label={length.busy ? 'Buscando…' : 'Leer del enlace'} onPress={() => length.lookup(link, true)} disabled={!link || badUrl || length.busy} />
       <Field label="Nombre (opcional)" value={title} onChangeText={setTitle} maxLength={200} placeholder="Curso completo de inglés básico" />
       <DotChoices legend="Estado" value={status} onChange={setStatus} options={COURSE_STATUSES.map((s) => ({ value: s, label: COURSE_STATUS_INFO[s].label }))} />
       <Field label="Notas (opcional)" value={notes} onChangeText={setNotes} maxLength={5000} multiline placeholder="Voy en la lección 4…" />
       <FormActions
         submitLabel={course ? 'Guardar' : 'Añadir curso'}
         onSubmit={submit}
-        disabled={!topic.trim() || (!!url.trim() && badUrl)}
+        disabled={!topic.trim() || (!!url.trim() && badUrl) || length.bad}
         onDelete={
           course
             ? () => {
@@ -435,6 +470,172 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
         }
         confirm={course ? `Se borrará «${courseName(course)}».` : undefined}
       />
+    </ScrollView>
+  );
+}
+
+/**
+ * Duración del curso en el formulario: se escribe a mano o se lee del enlace
+ * (lo hace el servidor). Si ya se escribió, el enlace no la pisa salvo con
+ * «Leer del enlace».
+ */
+function useCourseLength(course: LegacyCourse | null) {
+  const initial = course?.length ? String(Math.round((course.length / 3600) * 100) / 100) : '';
+  const [hours, setHours] = useState(initial);
+  const [from, setFrom] = useState<CourseLengthFrom | undefined>(course?.lengthFrom);
+  const [message, setMessage] = useState<string | undefined>(course?.length ? undefined : 'Se busca sola al pegar el enlace, si la página la dice.');
+  const [busy, setBusy] = useState(false);
+  // Una consulta por enlace: si se guarda antes de que responda, se aprovecha la misma.
+  const asked = useRef(new Map<string, Promise<CourseLength | null>>());
+  const ask = (url: string) => {
+    let p = asked.current.get(url);
+    if (!p) {
+      p = api.courses.length(url).catch((e: unknown) => {
+        setMessage(e instanceof Error && e.message ? e.message : 'No pude leerla. Escríbela a mano.');
+        return null;
+      });
+      asked.current.set(url, p);
+    }
+    return p;
+  };
+  const value = hours.trim() === '' ? 0 : Number(hours.replace(',', '.'));
+  const bad = hours.trim() !== '' && !(Number.isFinite(value) && value >= 0 && value <= 2000);
+  const lookup = async (url: string, force: boolean) => {
+    if (busy || (!force && (hours.trim() || asked.current.has(url)))) return;
+    if (force) asked.current.delete(url);
+    setBusy(true);
+    setMessage('Buscando cuánto dura…');
+    const r = await ask(url);
+    setBusy(false);
+    if (!r) return;
+    setHours(String(Math.round((r.seconds / 3600) * 100) / 100));
+    setFrom(r.exact ? 'enlace' : 'aprox');
+    setMessage(`${r.exact ? 'Dura' : 'Dura unas'} ${formatLength(r.seconds)}${r.videos ? ` (${r.videos} videos)` : ''}, según la página.`);
+  };
+  return {
+    hours,
+    busy,
+    bad,
+    message,
+    lookup,
+    type: (v: string) => {
+      setHours(v);
+      setFrom('manual');
+      setMessage(undefined);
+    },
+    fields: (): Partial<LegacyCourse> => {
+      if (bad) return {};
+      if (!value) return course?.length ? { length: 0 } : {};
+      return { length: Math.round(value * 3600), lengthFrom: from ?? 'manual' };
+    },
+    /** Guardado sin duración pero con enlace: se busca después y se completa sola. */
+    later: (id: string, url: string, save: (id: string, patch: Partial<LegacyCourse>) => void) => {
+      if (value || bad || !url || (course?.length && course.url === url)) return;
+      void ask(url).then((r) => r && save(id, { length: r.seconds, lengthFrom: r.exact ? 'enlace' : 'aprox' }));
+    },
+  };
+}
+
+const fmtDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('es', { day: 'numeric', month: 'long' });
+
+/** Reparte los cursos en las horas libres de la semana y los pone en el Horario. */
+function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: () => void }) {
+  const { colors } = useTheme();
+  const legacy = useLegacyData();
+  const classes = useModule('classes');
+  const toast = useToast();
+  const router = useRouter();
+  const open = courses.filter((c) => statusOf(c) !== 'hecho');
+  const [chosen, setChosen] = useState<string[]>(() => {
+    const watching = open.filter((c) => statusOf(c) === 'curso').map((c) => c.id);
+    return watching.length ? watching : open.map((c) => c.id);
+  });
+  const [days, setDays] = useState('12345');
+  const [from, setFrom] = useState('18:00');
+  const [to, setTo] = useState('21:00');
+  const [session, setSession] = useState('60');
+  const [weekly, setWeekly] = useState('5');
+  const f = normalizeHHMM(from);
+  const t = normalizeHHMM(to);
+  const badTime = !HHMM_RE.test(f) || !HHMM_RE.test(t) || t <= f;
+  const plan = badTime ? null : planStudy(legacy.data?.data, chosen, { days, from: f, to: t, session: Number(session), weekly: Number(weekly) });
+  const name = (id: string) => courseName(courses.find((c) => c.id === id) ?? ({ title: '', url: '' } as LegacyCourse));
+  const short = plan && plan.fits < Number(weekly) && plan.sessions.length > 0;
+
+  const submit = () => {
+    if (!plan?.sessions.length) return;
+    const old = legacy.data?.data.classes as Array<{ id: string; course?: string }> | undefined;
+    for (const k of old ?? []) if (k.course && chosen.includes(k.course)) classes.remove(k.id);
+    plan.sessions.forEach((s) => {
+      const c = courses.find((x) => x.id === s.courseId)!;
+      classes.add({ id: newId(), day: s.day, start: s.start, end: s.end, title: courseName(c).slice(0, 120), room: (courseSource(c.url)?.label ?? '').slice(0, 60), color: CLASS_COLORS[chosen.indexOf(c.id) % CLASS_COLORS.length], subject: '', course: c.id });
+    });
+    toast(`Listo: ${plural(plan.sessions.length, 'sesión', 'sesiones')} de estudio en tu horario.`, { action: { label: 'Ver horario', run: () => router.push('/horario') } });
+    onDone();
+  };
+
+  return (
+    <ScrollView style={{ maxHeight: 620 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
+      <T v="small" tint="muted">
+        Elige qué quieres estudiar y cuándo tienes tiempo. Lo repartimos en tus huecos libres sin pisar tus otras clases y te decimos cuándo terminarías cada curso.
+      </T>
+      <View style={{ gap: space[1] }}>
+        <T v="label">Cursos</T>
+        {open.map((c) => {
+          const rem = courseRemaining(c);
+          const label = `${courseName(c)} · ${rem === null ? 'sin duración' : `faltan ${formatLength(rem)}`}`;
+          const on = chosen.includes(c.id);
+          return (
+            <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: touchTarget }}>
+              <T v="body" style={{ flex: 1 }}>
+                {label}
+              </T>
+              <Toggle label={label} value={on} onChange={() => setChosen((l) => (on ? l.filter((x) => x !== c.id) : [...l, c.id]))} />
+            </View>
+          );
+        })}
+      </View>
+      <WeekdayPicker legend="Días que puedes estudiar" value={days} onChange={setDays} />
+      <TimeField label="Desde" value={from} onChange={setFrom} />
+      <TimeField label="Hasta" value={to} onChange={setTo} hint={HHMM_RE.test(f) && HHMM_RE.test(t) && t <= f ? 'Debe ser después de «Desde».' : undefined} />
+      <DotChoices legend="Horas a la semana" value={weekly} onChange={setWeekly} options={STUDY_WEEKLY.map((h) => ({ value: String(h), label: `${h} h` }))} />
+      <DotChoices legend="Cada sesión" value={session} onChange={setSession} options={STUDY_SESSIONS.map((m) => ({ value: String(m), label: m < 60 ? `${m} min` : formatLength(m * 60) }))} />
+      <View accessibilityLiveRegion="polite" style={{ gap: space[2], padding: space[4], borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surfaceSunken }}>
+        <T v="label" accessibilityRole="header">
+          Así quedaría
+        </T>
+        {!chosen.length ? (
+          <T v="small" tint="muted">
+            Elige al menos un curso.
+          </T>
+        ) : !plan?.sessions.length ? (
+          <T v="small" tint="muted">
+            No hay huecos libres con esos días y horas. Prueba otros días o amplía el horario.
+          </T>
+        ) : (
+          <>
+            {short && <T v="small">En esos días y horas caben {String(plan.fits).replace('.', ',')} h a la semana, así que usamos esas.</T>}
+            {plan.sessions.map((s) => (
+              <T key={`${s.day}-${s.start}`} v="small">
+                <T v="small" tint="primary">
+                  {DAY_SHORT[s.day - 1]} {s.start}–{s.end}
+                </T>{' '}
+                {name(s.courseId)}
+              </T>
+            ))}
+            {plan.courses.map((p) => (
+              <T key={p.courseId} v="small" tint="muted">
+                {name(p.courseId)}: {plural(p.perWeek, 'sesión', 'sesiones')} a la semana
+                {p.finish ? ` · terminas hacia el ${fmtDate(p.finish)} (${plural(p.weeks ?? 0, 'semana', 'semanas')})` : p.perWeek ? ' · agrega su duración para saber cuándo terminas' : ' · no cupo esta semana'}
+              </T>
+            ))}
+          </>
+        )}
+      </View>
+      <T v="small" tint="muted">
+        Si ya tenían clases en tu horario, se cambian por estas.
+      </T>
+      <Button label="Poner en mi horario" onPress={submit} disabled={!plan?.sessions.length} />
     </ScrollView>
   );
 }

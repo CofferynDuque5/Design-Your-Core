@@ -677,7 +677,14 @@ export interface LegacyCourse {
   spot?: string;
   /** Última vez que se abrió (ISO). */
   lastAt?: string;
+  /** Duración total en segundos (leída del enlace o escrita a mano). */
+  length?: number;
+  /** De dónde salió `length`: exacta del enlace, aproximada o escrita a mano. */
+  lengthFrom?: CourseLengthFrom;
 }
+
+export const COURSE_LENGTH_FROM = ['enlace', 'aprox', 'manual'] as const;
+export type CourseLengthFrom = (typeof COURSE_LENGTH_FROM)[number];
 
 export interface LegacyVenture {
   id: string;
@@ -1093,6 +1100,8 @@ const shapes = {
     video: z.union([z.literal(''), z.string().regex(/^[\w-]{6,20}$/)]).optional(),
     spot: z.string().trim().max(200).optional(),
     lastAt: z.union([z.literal(''), z.string().datetime()]).optional(),
+    length: z.number().int().min(0).max(1e7).optional(),
+    lengthFrom: z.enum(COURSE_LENGTH_FROM).optional(),
   }),
   ventures: z.object({
     id: legacyIdSchema,

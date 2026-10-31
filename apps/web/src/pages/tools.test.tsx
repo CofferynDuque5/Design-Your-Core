@@ -326,7 +326,7 @@ describe('Cursos', () => {
     await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'youtu.be/xyz');
     expect(within(dialog).getByText('Se abrirá en YouTube.')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
-    expect(writes(api)[0]).toMatchObject({
+    expect(writes(api).filter((c) => c.path.startsWith('/api/v2/modules'))[0]).toMatchObject({
       method: 'POST',
       path: '/api/v2/modules/courses',
       body: { item: { topic: 'Guitarra', url: 'https://youtu.be/xyz', title: '', status: 'pendiente', notes: '' } },
@@ -418,6 +418,76 @@ describe('Cursos: progreso y horario', () => {
     renderAt('/horario');
     await userEvent.click((await screen.findAllByRole('button', { name: /Gramática, lunes/ }))[0]);
     expect(screen.getByRole('link', { name: 'Abrir el curso' })).toHaveAttribute('href', '/cursos?abrir=ud1');
+  });
+
+  it('con solo pegar el enlace lee cuánto dura, y si no puede deja escribirla', async () => {
+    const asked: string[] = [];
+    const api = withApi(
+      {
+        'POST /api/v2/courses/length': (b) => {
+          const url = (b as { url: string }).url;
+          asked.push(url);
+          return url.includes('youtube') ? { seconds: 45000, exact: true, videos: 12 } : [404, { error: 'Esa página no dice cuánto dura. Escribe la duración a mano.' }];
+        },
+      },
+      (doc) => {
+        doc.courses = [];
+      },
+    );
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir el primero' }));
+    let dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Tema'), 'Inglés');
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
+    await userEvent.tab();
+    expect(await within(dialog).findByText('Dura 12 h 30 min (12 videos), según la página.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Duración total en horas (opcional)')).toHaveValue(12.5);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
+    expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/courses', body: { item: { length: 45000, lengthFrom: 'enlace' } } });
+    expect(await screen.findByText(/YouTube · 12 h 30 min/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir a Inglés' }));
+    dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://ejemplo.com/curso');
+    await userEvent.tab();
+    expect(await within(dialog).findByText('Esa página no dice cuánto dura. Escribe la duración a mano.')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Duración total en horas (opcional)'), '6');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
+    expect(writes(api).at(-1)).toMatchObject({ body: { item: { url: 'https://ejemplo.com/curso', length: 21600, lengthFrom: 'manual' } } });
+    expect(asked).toHaveLength(2);
+  });
+
+  it('«Armar mi horario» reparte los cursos en los huecos libres y dice cuándo terminas', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [
+        { id: 'a', topic: 'Inglés', title: 'Inglés', url: '', status: 'curso', notes: '', length: 36000, progress: 50 },
+        { id: 'b', topic: 'React', title: 'React', url: '', status: 'curso', notes: '', length: 21600 },
+        { id: 'z', topic: 'Otro', title: 'Guitarra', url: '', status: 'pendiente', notes: '' },
+      ];
+      doc.classes = [
+        { id: 'k1', day: 1, start: '18:00', end: '19:00', title: 'Gimnasio', room: '', color: '#4F7CFF', subject: '' },
+        { id: 'old', day: 2, start: '07:00', end: '08:00', title: 'Inglés', room: '', color: '#4F7CFF', subject: '', course: 'a' },
+      ];
+    });
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Armar mi horario' }));
+    const dialog = screen.getByRole('dialog', { name: 'Armar mi horario' });
+    // Por defecto, los que estás viendo.
+    expect(within(dialog).getByRole('checkbox', { name: /Inglés.*faltan 5 h/ })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Guitarra.*sin duración/ })).not.toBeChecked();
+    // Solo lunes y miércoles, de 18 a 20.
+    for (const d of ['martes', 'jueves', 'viernes']) await userEvent.click(within(dialog).getByRole('checkbox', { name: d }));
+    fireEvent.change(within(dialog).getByLabelText('Hasta'), { target: { value: '20:00' } });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Horas a la semana'), '5');
+    // Lunes 18-19 ya está ocupado: caben 3 h.
+    expect(within(dialog).getByText('En esos días y horas caben 3 h a la semana, así que usamos esas.')).toBeInTheDocument();
+    const sessions = within(dialog).getAllByRole('listitem').map((li) => li.textContent);
+    expect(sessions.slice(0, 3)).toEqual(['Lun 19:00–20:00 Inglés', 'Mié 18:00–19:00 React', 'Mié 19:00–20:00 React']);
+    expect(sessions.slice(3)).toEqual([expect.stringMatching(/^Inglés: 1 sesión a la semana · terminas hacia el .+ \(5 semanas\)$/), expect.stringMatching(/^React: 2 sesiones a la semana · terminas hacia el .+ \(3 semanas\)$/)]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Poner en mi horario' }));
+    await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(3));
+    expect(writes(api).find((c) => c.method === 'DELETE')).toMatchObject({ path: '/api/v2/modules/classes/old' });
+    expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0].body).toMatchObject({ item: { day: 1, start: '19:00', end: '20:00', title: 'Inglés', course: 'a' } });
   });
 });
 
