@@ -104,6 +104,16 @@ describe('herramientas de la tanda 4 en el móvil', () => {
     expect(await screen.findByText('Ninguna nota coincide')).toBeOnTheScreen();
   });
 
+  it('Notas: una nota nueva que no se escribe se borra al salir', async () => {
+    const api = setup();
+    await open('/notas', 'Ondas');
+    fireEvent.press(screen.getByRole('button', { name: 'Nueva nota' }));
+    const created = itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/notes'));
+    await screen.findByLabelText('Título');
+    screen.unmount();
+    await waitForWrite(api, 'DELETE', `/api/v2/modules/notes/${created.id as string}`);
+  });
+
   it('Notas: una nota nueva se abre para escribir y se guarda sola, con barra de formato', async () => {
     const api = setup();
     await open('/notas', 'Ondas');

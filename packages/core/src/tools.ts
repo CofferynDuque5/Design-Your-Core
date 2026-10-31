@@ -382,10 +382,14 @@ export const localDayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth(
 /** "HH:MM" de una fecha local. */
 export const localTime = (d = new Date()) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-/** Cantidades sin moneda: con céntimos, siempre dos decimales (1234.5 → "1234,50"); sin ellos, ninguno (12345 → "12.345"). */
+/** Símbolo de moneda de Finanzas (el mismo en web, móvil y Asistente). */
+export const CURRENCY_SYMBOL = '$';
+
+/** Cantidad con moneda: con céntimos, siempre dos decimales (1234.5 → "$1234,50"); sin ellos, ninguno (12345 → "$12.345"; -8 → "-$8"). */
 export const money = (n: number) => {
   const cents = Math.round(n * 100) % 100 !== 0;
-  return new Intl.NumberFormat('es', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 }).format(n);
+  const text = new Intl.NumberFormat('es', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 }).format(Math.abs(n));
+  return `${n < 0 ? '-' : ''}${CURRENCY_SYMBOL}${text}`;
 };
 
 /** 465 → "7 h 45 min". */
@@ -694,7 +698,7 @@ export const inlineImages = (text: string): string[] => Array.from(new Set(text.
 
 /** "12,30" o "12.30" → 12.3 (hasta dos decimales). null si no es una cantidad. */
 export function parseAmount(text: string): number | null {
-  const t = text.trim().replace(/\s/g, '');
+  const t = text.trim().replace(/\s/g, '').replace(/^\$/, ''); // «$12,50» también vale
   if (!/^\d+([.,]\d{1,2})?$/.test(t)) return null;
   return Number(t.replace(',', '.'));
 }
@@ -829,6 +833,12 @@ export const byNameEs = (a: string, b: string) => a.localeCompare(b, 'es', { sen
 export const searchFold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 // Una nota con datos raros se muestra con los valores por defecto, sin cambiar el dato.
+/** Nota recién creada que nunca se escribió: sin título propio ni texto. Se borra al salir del editor. */
+export const noteIsBlank = (n: { title?: string | null; body?: string | null }): boolean => {
+  const t = (n.title ?? '').trim();
+  return (!t || t === NOTE_DEFAULT_TITLE) && !(n.body ?? '').trim();
+};
+
 export const noteSubjectOf = (n: Pick<LegacyNote, 'subject'>): string => (typeof n.subject === 'string' && n.subject.trim() ? n.subject.trim() : NOTE_DEFAULT_SUBJECT);
 export const noteTitleOf = (n: Pick<LegacyNote, 'title'>): string => (typeof n.title === 'string' && n.title.trim() ? n.title : NOTE_DEFAULT_TITLE);
 export const noteBodyOf = (n: Pick<LegacyNote, 'body'>): string => (typeof n.body === 'string' ? n.body : '');

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tokenStore } from '../app/api';
+import { resetFocusTimer } from '../app/focusTimer';
 import { AppRoutes, makeQueryClient, Providers } from '../app/App';
 import { fakeFetch, legacyDoc, profile, USER, type Handler } from '../test/fakeApi';
 import { localDayKey } from '../lib/tools';
@@ -510,6 +511,36 @@ describe('Cursos: progreso y horario', () => {
 });
 
 describe('Enfoque', () => {
+  beforeEach(() => resetFocusTimer());
+
+  it('sigue contando al ir a otra sección y vuelve donde iba', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    withApi();
+    renderAt('/enfoque');
+    await userEvent.click(await screen.findByRole('button', { name: 'Empezar' }));
+    act(() => vi.advanceTimersByTime(3_000));
+    await userEvent.click(screen.getAllByRole('link', { name: /^Hoy$/ })[0]);
+    act(() => vi.advanceTimersByTime(60_000));
+    const chip = await screen.findByRole('link', { name: /Enfoque en marcha: quedan 23:57/ });
+    expect(document.title).toBe('23:57 · Enfoque');
+    await userEvent.click(chip);
+    expect(await screen.findByRole('timer')).toHaveTextContent('23:57');
+    expect(screen.getByRole('button', { name: 'Pausar' })).toBeInTheDocument();
+  });
+
+  it('termina la sesión aunque estés en otra sección', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    const api = withApi();
+    renderAt('/enfoque');
+    await userEvent.click(await screen.findByRole('button', { name: 'Empezar' }));
+    await userEvent.click(screen.getAllByRole('link', { name: /^Hoy$/ })[0]);
+    act(() => vi.advanceTimersByTime(25 * 60_000 + 500));
+    vi.useRealTimers();
+    await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/focus')).toHaveLength(1));
+    expect(await screen.findByText(/Enfoque: ¡sesión terminada! Ahora toca descanso corto/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /en marcha/ })).not.toBeInTheDocument();
+  });
+
   it('guarda la sesión al saltar y alterna con el descanso', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     const api = withApi();
@@ -921,9 +952,9 @@ describe('Finanzas', () => {
   it('resume el mes, define el presupuesto y añade un gasto', async () => {
     const api = withApi();
     renderAt('/finanzas');
-    expect(await screen.findByText('+1200', { selector: '.stat__value *' })).toBeInTheDocument();
-    expect(screen.getByText('−45,50', { selector: '.stat__value *' })).toBeInTheDocument();
-    expect(screen.getByText('1154,50', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(await screen.findByText('+$1200', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(screen.getByText('−$45,50', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(screen.getByText('$1154,50', { selector: '.stat__value *' })).toBeInTheDocument();
     // El movimiento antiguo de otro mes no cuenta.
     expect(within(screen.getByRole('region', { name: /Movimientos/ })).getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getByRole('progressbar', { name: 'Comida: 100 % de los gastos' })).toBeInTheDocument();
@@ -934,7 +965,7 @@ describe('Finanzas', () => {
     await userEvent.click(within(budget).getByRole('button', { name: 'Guardar' }));
     expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/budget', body: { monthly: 500 } });
     expect(await screen.findByRole('progressbar', { name: 'Presupuesto gastado' })).toHaveAttribute('aria-valuenow', '9');
-    expect(screen.getByText(/Quedan 454,50/)).toBeInTheDocument();
+    expect(screen.getByText(/Quedan \$454,50/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Nuevo movimiento' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo movimiento' });
@@ -947,7 +978,7 @@ describe('Finanzas', () => {
       path: '/api/v2/modules/transactions',
       body: { item: { type: 'expense', amount: 12.3, category: 'Transporte', note: 'Metro', date: utcDayKey() } },
     });
-    expect(await screen.findByRole('button', { name: 'Editar: Gasto de 12,30 en Transporte (Metro)' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Editar: Gasto de $12,30 en Transporte (Metro)' })).toBeInTheDocument();
   });
 
   it('un ingreso cambia las categorías y se puede borrar con deshacer', async () => {
@@ -959,7 +990,7 @@ describe('Finanzas', () => {
     expect(within(within(dialog).getByLabelText('Categoría')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Sueldo', 'Freelance', 'Contenido', 'Regalo', 'Otro']);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Borrar: Gasto de 45,50 en Comida (Mercado)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Borrar: Gasto de $45,50 en Comida (Mercado)' }));
     expect(writes(api)[0]).toMatchObject({ method: 'DELETE', path: '/api/v2/modules/transactions/x2' });
     await userEvent.click(await screen.findByRole('button', { name: 'Deshacer' }));
     expect(writes(api)[1]).toMatchObject({ method: 'POST', body: { item: { id: 'x2', amount: 45.5 } } });
@@ -1264,6 +1295,18 @@ describe('Notas', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Borrar definitivamente' }));
     expect(writes(api).at(-1)).toMatchObject({ method: 'DELETE', path: patches[0].path });
     expect(await screen.findByRole('heading', { level: 1, name: 'Notas' })).toBeInTheDocument();
+  });
+
+  it('una nota nueva que no se escribe no se queda guardada', async () => {
+    const api = withApi();
+    renderAt('/notas');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva nota' }));
+    await screen.findByLabelText('Título');
+    await userEvent.click(screen.getAllByRole('link', { name: 'Notas' }).find((a) => a.classList.contains('back-link'))!);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Notas' })).toBeInTheDocument();
+    const id = (writes(api)[0].body as { item: { id: string } }).item.id;
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'DELETE', path: `/api/v2/modules/notes/${id}` }));
+    expect(screen.queryByText('Nota sin título')).not.toBeInTheDocument();
   });
 
   it('inserta una imagen reducida y subida a la nube como coreimg:', async () => {

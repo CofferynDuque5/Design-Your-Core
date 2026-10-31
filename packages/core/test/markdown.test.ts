@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFormat, insertBlock, markdownToText, mdImageLabel, parseBlocks, parseInline } from '../src/markdown.js';
+import { applyFormat, insertBlock, markdownToText, mathRuns, mathSpoken, mdImageLabel, parseBlocks, parseInline } from '../src/markdown.js';
 import {
   filterNotes,
   groupNotesBySubject,
@@ -102,5 +102,29 @@ describe('tanda 4: Notas, Trabajo y Respiración', () => {
     expect(workStatusOf(w({ status: 'raro' as never }))).toBe('todo');
     expect(workBucketOf(w({}))).toBe('curso');
     expect(workBucketOf(w({ done: true }))).toBe('hecho');
+  });
+});
+
+describe('mathRuns (fórmulas)', () => {
+  it('separa exponentes y subíndices', () => {
+    expect(mathRuns('x^2')).toEqual([
+      { text: 'x', pos: 'base' },
+      { text: '2', pos: 'sup' },
+    ]);
+    expect(mathRuns('x_{i}^{2}')).toEqual([
+      { text: 'x', pos: 'base' },
+      { text: 'i', pos: 'sub' },
+      { text: '2', pos: 'sup' },
+    ]);
+  });
+  it('cambia comandos por símbolos, fracciones y raíces', () => {
+    expect(mathSpoken('\\alpha \\le \\sqrt{y}')).toBe('α ≤ √(y)');
+    expect(mathSpoken('\\frac{a+b}{2}')).toBe('(a+b)/2');
+    expect(mathSpoken('a \\cdot b \\neq c')).toBe('a · b ≠ c');
+  });
+  it('deja tal cual lo que no conoce y no se rompe con llaves sin cerrar', () => {
+    expect(mathSpoken('\\raro x')).toBe('\\raro x');
+    expect(mathSpoken('\\frac{a')).toBe('a/');
+    expect(mathRuns('')).toEqual([]);
   });
 });

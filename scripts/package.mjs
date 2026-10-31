@@ -38,6 +38,18 @@ const LEGACY_APP_URL = url(process.env.DYC_LEGACY_APP_URL || 'https://designyour
 const LEGACY_ORIGINS = [...new Set([LEGACY_APP_URL, 'https://desingyourcore.nvcorx.com'])];
 
 const host = (u) => new URL(u).host;
+// El index.html que LiteSpeed entrega sin pasar por Node también lleva la protección
+// contra clickjacking (cuando responde Node, la pone Express).
+const FRAME_HEADERS = `
+<IfModule mod_headers.c>
+  <FilesMatch "\\.html$">
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Content-Security-Policy "frame-ancestors 'self'"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  </FilesMatch>
+</IfModule>
+`;
 const API_DOCROOT = process.env.DYC_API_DOCROOT || `public_html/${host(API_URL)}`;
 const version = `${JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version}-${execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim()}`;
 
@@ -72,7 +84,7 @@ PassengerNodejs "${SERVER_HOME}/nodevenv/${API_FOLDER}/${NODE_MAJOR}/bin/node"
 PassengerAppType node
 PassengerStartupFile dist/index.js
 # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
-`,
+${FRAME_HEADERS}`,
 );
 cpSync(join(ROOT, 'apps/api/release'), apiDir, { recursive: true });
 // Web para el mismo dominio: sin VITE_API_URL llama a /api del dominio donde se abre.

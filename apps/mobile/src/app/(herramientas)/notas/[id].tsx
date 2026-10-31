@@ -1,4 +1,4 @@
-import { applyFormat, NOTE_DEFAULT_SUBJECT, NOTE_DEFAULT_TITLE, noteBodyOf, noteColorOf, noteSubjectOf, noteTag, uniqueTexts, type FormatKind, type LegacyNote } from '@dyc/core';
+import { applyFormat, NOTE_DEFAULT_SUBJECT, NOTE_DEFAULT_TITLE, noteBodyOf, noteColorOf, noteIsBlank, noteSubjectOf, noteTag, uniqueTexts, type FormatKind, type LegacyNote } from '@dyc/core';
 import { radius, space } from '@dyc/tokens';
 import { useIsMutating } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -51,6 +51,8 @@ export default function NoteScreen() {
   return <Editor key={note.id} note={note} fresh={nueva === '1'} subjects={uniqueTexts(notes.map(noteSubjectOf))} />;
 }
 
+const blankRemovals = new Map<string, ReturnType<typeof setTimeout>>();
+
 function Editor({ note, fresh, subjects }: { note: LegacyNote; fresh: boolean; subjects: string[] }) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -79,6 +81,25 @@ function Editor({ note, fresh, subjects }: { note: LegacyNote; fresh: boolean; s
   };
   const resolve = useCoreImages(body.draft);
 
+  // Una nota que se abrió y nunca se escribió no se queda guardada vacía.
+  const latest = useRef({ title: title.draft, body: body.draft, removed: false });
+  latest.current.title = title.draft;
+  latest.current.body = body.draft;
+  useEffect(() => {
+    // Si se vuelve a montar enseguida (modo desarrollo), no se borra.
+    clearTimeout(blankRemovals.get(note.id));
+    return () => {
+      if (latest.current.removed || !noteIsBlank(latest.current)) return;
+      blankRemovals.set(
+        note.id,
+        setTimeout(() => {
+          blankRemovals.delete(note.id);
+          actions.remove(note.id);
+        }, 0),
+      );
+    };
+  }, [actions, note.id]);
+
   const format = (kind: FormatKind) => {
     const end = body.draft.length;
     const sel = caret.current ?? { start: end, end };
@@ -90,6 +111,7 @@ function Editor({ note, fresh, subjects }: { note: LegacyNote; fresh: boolean; s
   };
 
   const remove = () => {
+    latest.current.removed = true;
     actions.remove(note.id);
     toast('Nota eliminada.');
     if (router.canGoBack()) router.back();
@@ -199,7 +221,7 @@ function Editor({ note, fresh, subjects }: { note: LegacyNote; fresh: boolean; s
         )}
       </Card>
       <T v="small" tint="muted" style={{ marginTop: -space[3] }}>
-        Se guarda sola mientras escribes. Las fórmulas entre $ se muestran como texto, sin dibujarlas. Las imágenes se añaden desde la web; aquí se ven en la vista previa.
+        Se guarda sola mientras escribes. Las fórmulas entre $, como $x^2$, se dibujan en la vista previa. Las imágenes se añaden desde la web; aquí se ven en la vista previa.
       </T>
 
       {asking ? (

@@ -230,6 +230,12 @@ export function MonthNav({ month, onChange, current, titleId }: { month: string;
   };
   return (
     <div className="month-nav">
+      {/* «Hoy» va a la izquierda de las flechas: al aparecer no las mueve bajo el cursor. */}
+      {month.slice(0, 7) !== current.slice(0, 7) && (
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange(`${current.slice(0, 7)}-01`)}>
+          Hoy
+        </button>
+      )}
       <button type="button" className="icon-btn" onClick={() => shift(-1)} aria-label="Mes anterior">
         <ChevronLeft size={20} aria-hidden="true" />
       </button>
@@ -239,11 +245,6 @@ export function MonthNav({ month, onChange, current, titleId }: { month: string;
       <button type="button" className="icon-btn" onClick={() => shift(1)} aria-label="Mes siguiente">
         <ChevronRight size={20} aria-hidden="true" />
       </button>
-      {month.slice(0, 7) !== current.slice(0, 7) && (
-        <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange(`${current.slice(0, 7)}-01`)}>
-          Hoy
-        </button>
-      )}
     </div>
   );
 }

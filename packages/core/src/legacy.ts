@@ -1429,6 +1429,18 @@ export function applyLegacyOp<K extends LegacyKey>(data: LegacyData, key: K, op:
   }
 }
 
+/**
+ * Tras guardar: la copia del servidor reemplaza a la optimista (puede traer
+ * textos recortados o campos normalizados). Así no hace falta volver a pedir
+ * todo el documento después de cada cambio.
+ */
+export function legacyWithSaved<K extends LegacyKey>(data: LegacyData, key: K, item: LegacyItems[K] | null | undefined): LegacyData {
+  if (!item || typeof item !== 'object' || typeof item.id !== 'string') return data;
+  const list = legacyList(data, key) as Array<LegacyItems[K]>;
+  if (!list.some((x) => x.id === item.id)) return data;
+  return { ...data, [key]: list.map((x) => (x.id === item.id ? item : x)) };
+}
+
 /** Id nuevo como en la app anterior: randomUUID si existe (navegador) o uno aleatorio con la fecha (React Native). */
 export function newLegacyId(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;

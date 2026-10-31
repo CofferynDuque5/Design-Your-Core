@@ -11,9 +11,10 @@ const HASHED = /[\\/]assets[\\/]/;
 export function webRoutes(root: string): Router {
   const r = express.Router();
   // La web tiene un script en línea (tema antes de pintar) que la CSP por defecto de
-  // helmet bloquearía; en el hosting estático tampoco se enviaba CSP.
+  // helmet bloquearía. Se deja solo frame-ancestors: nadie puede cargar la app dentro
+  // de otra página (clickjacking). X-Frame-Options: SAMEORIGIN ya lo pone helmet.
   r.use((_req, res, next) => {
-    res.removeHeader('Content-Security-Policy');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
     next();
   });
   r.use(

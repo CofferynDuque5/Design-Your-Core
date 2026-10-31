@@ -149,6 +149,7 @@ function CheckInCard({ today, checkIn }: { today: string; checkIn: CheckIn | nul
     const parts = [
       checkIn.mood && `ánimo ${checkIn.mood}/5`,
       checkIn.energy && `energía ${checkIn.energy}/5`,
+      checkIn.stress && `estrés ${checkIn.stress}/5`,
       checkIn.sleepHours !== null && `${String(checkIn.sleepHours).replace('.', ',')} h de sueño`,
       checkIn.activeMinutes !== null && `${checkIn.activeMinutes} min activos`,
     ].filter(Boolean);

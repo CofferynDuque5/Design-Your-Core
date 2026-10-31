@@ -1,5 +1,5 @@
 import type { Habit } from '@dyc/api-client';
-import { addDays, isScheduled, PILLAR_IDS, type Day, type PillarId } from '@dyc/core';
+import { addDays, isScheduled, PILLAR_IDS, WEEKDAY_LONG_NAMES, type Day, type PillarId } from '@dyc/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, Check, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
@@ -220,9 +220,13 @@ function HabitForm({ habit, onDone }: { habit: Habit | null; onDone: () => void 
         <legend className="field__label">Pilar</legend>
         <div className="chips">
           {PILLAR_IDS.map((p) => (
-            <label key={p} className="chip-radio" data-pillar={p}>
+            <label key={p} className="chip-radio">
               <input type="radio" name="pillar" checked={pillar === p} onChange={() => setPillar(p)} />
-              <span title={pillarName(p)}>{pillarShort(p)}</span>
+              {/* Elegido en el color de la marca, como los días; el punto conserva el color del pilar. */}
+              <span title={pillarName(p)}>
+                <span className="chip-dot" data-pillar={p} aria-hidden="true" />
+                {pillarShort(p)}
+              </span>
             </label>
           ))}
         </div>
@@ -230,10 +234,13 @@ function HabitForm({ habit, onDone }: { habit: Habit | null; onDone: () => void 
       <fieldset className="field">
         <legend className="field__label">Días</legend>
         <div className="weekday-picker">
-          {WEEKDAYS.map((w) => (
+          {WEEKDAYS.map((w, i) => (
             <label key={w.iso} className="chip-radio">
               <input type="checkbox" checked={days.includes(w.iso)} onChange={() => toggleDay(w.iso)} />
-              <span>{w.label}</span>
+              <span>
+                <span aria-hidden="true">{w.label}</span>
+                <span className="visually-hidden">{WEEKDAY_LONG_NAMES[i]}</span>
+              </span>
             </label>
           ))}
         </div>

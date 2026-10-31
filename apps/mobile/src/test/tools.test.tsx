@@ -3,6 +3,7 @@ import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testi
 import * as SecureStore from 'expo-secure-store';
 import { Linking } from 'react-native';
 import { auth } from '../lib/api';
+import { resetFocusTimer } from '../lib/focusTimer';
 import { fakeModules, tokens, type Handler } from './fakeApi';
 
 // Herramientas de la app anterior en el móvil: «Más», Agenda, Pendientes,
@@ -62,6 +63,7 @@ async function open(path: string, marker: string | RegExp) {
 describe('herramientas en el móvil', () => {
   beforeEach(async () => {
     reset();
+    resetFocusTimer();
     await auth.signIn(tokens());
   });
   afterEach(() => jest.restoreAllMocks());
@@ -252,6 +254,18 @@ describe('herramientas en el móvil', () => {
     fireEvent.press(await screen.findByRole('button', { name: 'Cálculo, lunes de 08:00 a 09:30, aula A-201. Editar' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Borrar clase' }));
     await waitForWrite(api, 'DELETE', '/api/v2/modules/classes/c1');
+  });
+
+  it('Enfoque: sigue contando al salir de la pantalla', async () => {
+    setup();
+    await open('/enfoque', 'Últimas sesiones');
+    fireEvent.press(screen.getByRole('button', { name: 'Empezar' }));
+    screen.unmount();
+    await open('/mas', 'Tus herramientas');
+    screen.unmount();
+    await open('/enfoque', 'Últimas sesiones');
+    expect(screen.getByRole('button', { name: 'Pausar' })).toBeOnTheScreen();
+    await waitFor(() => expect(screen.getByRole('timer')).toHaveTextContent('24:59'), { timeout: 4000 });
   });
 
   it('Enfoque: cuenta, pausa y guarda la sesión al saltar (lo más reciente primero)', async () => {

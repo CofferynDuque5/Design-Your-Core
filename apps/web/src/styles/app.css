@@ -199,6 +199,9 @@
   .main {
     outline: none;
     padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    /* Una palabra o un enlace muy largo se corta antes que salirse de su tarjeta. */
+    overflow-wrap: anywhere;
+    min-width: 0;
   }
 
   .tabbar {
@@ -492,6 +495,17 @@
   }
 
   .chip-btn[aria-pressed='true'],
+  /* Color del pilar en un punto (el chip elegido va en el color de la marca). */
+  .chip-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--pillar);
+    vertical-align: middle;
+  }
+
   .chip-radio input:checked + span {
     border-color: var(--pillar, var(--color-primary));
     background: var(--pillar-soft, var(--color-primary-soft));
@@ -2055,10 +2069,18 @@
   }
 
   /* Cuadrícula del Horario: siempre visible. En el teléfono se desliza de lado si no cabe. */
+  /* En un teléfono normal caben los 7 días; si la pantalla es aún más estrecha,
+     la cuadrícula se desliza y una sombra en el borde avisa de que hay más. */
   .week-grid-card {
     display: flex;
-    padding: var(--space-3);
+    padding: var(--space-3) var(--space-2);
     overflow-x: auto;
+    background:
+      linear-gradient(to right, var(--color-surface) 30%, transparent) left / 24px 100% no-repeat local,
+      linear-gradient(to left, var(--color-surface) 30%, transparent) right / 24px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--color-ink) 28%, transparent), transparent) left / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--color-ink) 28%, transparent), transparent) right / 12px 100% no-repeat scroll,
+      var(--color-surface);
   }
 
   .day-list {
@@ -2079,8 +2101,8 @@
     --grid-line: color-mix(in srgb, var(--color-ink) 16%, transparent);
     display: grid;
     flex: 1;
-    grid-template-columns: 40px repeat(7, minmax(44px, 1fr));
-    min-width: 348px;
+    grid-template-columns: 34px repeat(7, minmax(36px, 1fr));
+    min-width: 286px;
   }
 
   .week-grid__head {
@@ -2089,6 +2111,10 @@
     font-size: var(--text-small);
     font-weight: var(--weight-semibold);
     text-align: center;
+  }
+
+  .week-grid .timeline__hour {
+    width: 30px;
   }
 
   .week-grid__head--today {
@@ -2386,6 +2412,7 @@
   /* ---------- Diálogo y avisos ---------- */
 
   .dialog {
+    overflow-wrap: anywhere;
     width: min(100% - 2 * var(--space-4), 520px);
     max-height: calc(100dvh - 2 * var(--space-4));
     padding: 0;
@@ -2444,6 +2471,38 @@
   .toast--error {
     background: var(--color-danger);
     color: var(--color-surface);
+  }
+
+  /* Enfoque en marcha mientras estás en otra sección. */
+  .focus-chip {
+    position: fixed;
+    right: var(--space-4);
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-primary);
+    border-radius: 999px;
+    background: var(--color-surface-raised, var(--color-surface));
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: var(--shadow-md);
+  }
+
+  .focus-chip:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (min-width: 1024px) {
+    .focus-chip {
+      right: var(--space-6);
+      bottom: var(--space-6);
+    }
   }
 
   @media (min-width: 1024px) {
@@ -4537,8 +4596,14 @@
     border-top-color: var(--c);
   }
 
+  /* Un título muy largo se corta a tres líneas (el completo, en la nota). */
   .note-card__title {
+    display: -webkit-box;
+    overflow: hidden;
     overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 
   .note-card__text {
@@ -4775,8 +4840,29 @@
     background: none;
   }
 
+  /* Fórmulas: letra de libro en cursiva, no la de código. */
   .markdown .md-math {
+    font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', Georgia, 'Times New Roman', serif;
+    font-style: italic;
+    font-size: 1.08em;
     color: var(--color-primary);
+    white-space: nowrap;
+  }
+
+  .markdown .md-math sup,
+  .markdown .md-math sub {
+    font-size: 0.7em;
+    line-height: 0;
+  }
+
+  .markdown .md-formula {
+    overflow-x: auto;
+    padding: var(--space-3, 12px) 0;
+    text-align: center;
+  }
+
+  .markdown .md-math--block {
+    font-size: 1.3em;
   }
 
   .markdown hr {
