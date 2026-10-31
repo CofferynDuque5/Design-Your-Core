@@ -19,6 +19,7 @@ import {
   Moon,
   NotebookPen,
   PawPrint,
+  Rocket,
   Route,
   School,
   Sparkles,
@@ -32,6 +33,7 @@ import {
 /** Los mismos iconos que la web para cada herramienta. */
 export const TOOL_ICONS: Record<ToolId, LucideIcon> = {
   agenda: CalendarClock,
+  emprendimientos: Rocket,
   pendientes: ListTodo,
   calendario: CalendarDays,
   horario: School,
@@ -69,6 +71,7 @@ export const NATIVE_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'enfoque',
   'materias',
   'cursos',
+  'emprendimientos',
   'proyectos',
   'roadmaps',
   'cuadernos',

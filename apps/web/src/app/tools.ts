@@ -17,6 +17,7 @@ import {
   Moon,
   NotebookPen,
   PawPrint,
+  Rocket,
   Route,
   School,
   Sparkles,
@@ -38,6 +39,7 @@ export interface Tool extends ToolInfo {
 /** Iconos de Lucide de cada sección (los mismos que usa la app móvil). */
 const ICONS: Record<ToolId, LucideIcon> = {
   agenda: CalendarClock,
+  emprendimientos: Rocket,
   pendientes: ListTodo,
   calendario: CalendarDays,
   horario: School,

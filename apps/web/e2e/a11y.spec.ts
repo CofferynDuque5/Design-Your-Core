@@ -45,6 +45,11 @@ test('onboarding y pantallas de la app', async ({ page }) => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   await seedLegacy(page, {
+    ventures: [{ id: 've1', name: 'Tienda de velas', description: 'Velas de soya', stage: 'validando', color: '#4F7CFF' }],
+    ventureItems: [
+      { id: 'vi1', ventureId: 've1', kind: 'note', title: 'Proveedores', text: 'Cera de **soya**', url: '', ref: '', mime: '', size: 0, date: '2026-10-30' },
+      { id: 'vi2', ventureId: 've1', kind: 'link', title: '', text: '', url: 'https://instagram.com/velas', ref: '', mime: '', size: 0, date: '2026-10-30' },
+    ],
     blocks: [
       { id: 'b1', label: 'Estudiar', sub: 'Cálculo', start: 9, dur: 1.5, kind: 'study' },
       { id: 'b2', label: 'Pausa', sub: '', start: 10.5, dur: 0.5, kind: 'break' },
@@ -111,7 +116,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   const token = await sessionToken(page);
   expect((await page.request.patch('/api/v2/me', { data: { showCycle: true }, headers: { Authorization: `Bearer ${token}` } })).ok()).toBe(true);
 
-  for (const path of ['/', '/check-in', '/progreso', '/retos', '/habitos', '/perfil', '/mas', '/agenda', '/agenda?vista=tareas', '/pendientes', '/calendario', '/horario', '/enfoque', '/materias', '/cursos', '/proyectos', '/roadmaps', '/cuadernos', '/cuadernos/nb1', '/contenido', '/ideas', '/finanzas', '/metas', '/mascotas', '/ciclo', '/ejercicio', '/sueno', '/diario', '/rutina', '/notas', '/notas/n1', '/trabajo', '/no-existe']) {
+  for (const path of ['/', '/check-in', '/progreso', '/retos', '/habitos', '/perfil', '/mas', '/agenda', '/agenda?vista=tareas', '/pendientes', '/calendario', '/horario', '/enfoque', '/materias', '/cursos', '/proyectos', '/roadmaps', '/cuadernos', '/cuadernos/nb1', '/contenido', '/ideas', '/finanzas', '/metas', '/mascotas', '/ciclo', '/ejercicio', '/sueno', '/diario', '/rutina', '/notas', '/notas/n1', '/trabajo', '/emprendimientos', '/emprendimientos/ve1', '/no-existe']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expectAccessible(page, path);
@@ -177,6 +182,9 @@ test('onboarding y pantallas de la app', async ({ page }) => {
     ['/rutina', 'Añadir comida'],
     ['/rutina', 'Editar Desayuno'],
     ['/trabajo', 'Editar «Informe mensual»'],
+    ['/emprendimientos', 'Nuevo emprendimiento'],
+    ['/emprendimientos/ve1', 'Editar «Proveedores»'],
+    ['/pendientes', 'Sugerencias'],
   ] as const) {
     await page.goto(path);
     await page.getByRole('button', { name: button }).click();

@@ -33,3 +33,34 @@ jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3 },
   SchedulableTriggerInputTypes: { DAILY: 'daily' },
 }));
+
+// Galería, archivos y compartir: en Jest no hay módulos nativos; cada prueba decide qué se elige.
+jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })) }));
+jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })) }));
+jest.mock('expo-image-manipulator', () => ({
+  SaveFormat: { JPEG: 'jpeg' },
+  ImageManipulator: {
+    manipulate: () => ({ resize: jest.fn(), renderAsync: async () => ({ saveAsync: async () => ({ base64: '/9j/AAAA', uri: 'file://x.jpg', width: 10, height: 10 }) }) }),
+  },
+}));
+jest.mock('expo-file-system', () => {
+  class File {
+    static contents = new Map<string, string>();
+    uri: string;
+    constructor(...parts: Array<string | { uri: string }>) {
+      this.uri = parts.map((p) => (typeof p === 'string' ? p : p.uri)).join('/');
+    }
+    async text() {
+      return File.contents.get(this.uri) ?? '';
+    }
+    async base64() {
+      const { Buffer: B } = jest.requireActual<{ Buffer: { from: (s: string) => { toString: (e: string) => string } } }>('node:buffer');
+      return B.from(File.contents.get(this.uri) ?? '').toString('base64');
+    }
+    write(content: string) {
+      File.contents.set(this.uri, content);
+    }
+  }
+  return { File, Paths: { cache: { uri: 'file:///cache' } } };
+});
+jest.mock('expo-sharing', () => ({ shareAsync: jest.fn(async () => undefined) }));

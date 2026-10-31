@@ -6,6 +6,7 @@ import { useSession } from '../app/session';
 import { TOOL_GROUPS, TOOLS, type ToolGroup } from '../app/tools';
 import { Logo } from './Logo';
 import { PageErrorBoundary } from './PageErrorBoundary';
+import { SuggestButton } from './Suggestions';
 
 const NAV = [
   { to: '/', label: 'Hoy', icon: Sun, end: true },
@@ -186,7 +187,10 @@ export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; tit
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1 className="page-title">{title}</h1>
       </div>
-      {children && <div className="page-header__actions">{children}</div>}
+      <div className="page-header__actions">
+        {children}
+        <SuggestButton />
+      </div>
     </header>
   );
 }

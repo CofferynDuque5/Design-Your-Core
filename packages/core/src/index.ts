@@ -1,4 +1,5 @@
 export * from './assistant.js';
+export * from './attachments.js';
 export * from './challenges.js';
 export * from './checkin.js';
 export * from './dates.js';
@@ -12,5 +13,6 @@ export * from './pillars.js';
 export * from './recommendations.js';
 export * from './schemas.js';
 export * from './scoring.js';
+export * from './suggest.js';
 export * from './tools.js';
 export * from './vault.js';

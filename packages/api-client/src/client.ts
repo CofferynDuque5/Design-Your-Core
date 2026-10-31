@@ -167,6 +167,8 @@ export function createClient(opts: ClientOptions) {
       images: (ids: string[]) => request<{ images: Record<string, string> }>('POST', '/api/images/fetch', { ids }),
       /** Sube imágenes `{ id: dataURL }` (máx. 50, 4 MB cada una); `count` = las que se guardaron. La app anterior las descarga igual. */
       uploadImages: (images: Record<string, string>) => request<{ ok: true; count: number }>('POST', '/api/images', { images }),
+      /** Borra imágenes o archivos propios por id (los ajenos se ignoran). */
+      deleteImages: (ids: string[]) => request<{ ok: true; count: number }>('POST', '/api/images/delete', { ids }),
     },
 
     /**

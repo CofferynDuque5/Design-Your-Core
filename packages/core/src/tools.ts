@@ -50,6 +50,8 @@ import {
   type WorkProject,
   type WorkStatus,
   type LegacyWorkItem,
+  type LegacyVentureItem,
+  type VentureItemKind,
 } from './legacy.js';
 import { markdownToText } from './markdown.js';
 import { legacyVault, vaultSecureOf } from './vault.js';
@@ -87,6 +89,7 @@ export type ToolId =
   | 'contenido'
   | 'ideas'
   | 'trabajo'
+  | 'emprendimientos'
   | 'notas'
   | 'boveda'
   | 'asistente'
@@ -232,6 +235,15 @@ export const TOOL_CATALOG: ToolInfo[] = [
     description: 'Tareas de trabajo por proyecto, de la app anterior',
     count: (d) => legacyList(d, 'workItems').filter((w) => !w.done).length,
     unit: ['por hacer', 'por hacer'],
+  },
+  {
+    id: 'emprendimientos',
+    path: '/emprendimientos',
+    label: 'Emprendimientos',
+    group: 'estudio',
+    description: 'Tus negocios y proyectos con notas, imágenes, archivos y enlaces',
+    count: (d) => legacyList(d, 'ventures').length,
+    unit: ['proyecto', 'proyectos'],
   },
   {
     id: 'notas',
@@ -918,3 +930,29 @@ export function coursesByTopic<T extends { topic: string }>(list: T[]): Array<{ 
   }
   return [...groups.values()];
 }
+
+// ---------- Emprendimientos ----------
+
+/** Lo guardado en un emprendimiento, lo más nuevo primero (como se añadió). */
+export function ventureItemsOf(data: LegacyData | undefined, ventureId: string, kind?: VentureItemKind): LegacyVentureItem[] {
+  return legacyList(data, 'ventureItems')
+    .filter((i) => i.ventureId === ventureId && (!kind || i.kind === kind))
+    .reverse();
+}
+
+/** «3 notas · 2 imágenes · 1 archivo». */
+export function ventureSummary(items: LegacyVentureItem[]): string {
+  const n = (k: VentureItemKind) => items.filter((i) => i.kind === k).length;
+  const parts = [
+    [n('note'), 'nota', 'notas'],
+    [n('image'), 'imagen', 'imágenes'],
+    [n('file'), 'archivo', 'archivos'],
+    [n('link'), 'enlace', 'enlaces'],
+  ] as const;
+  const out = parts.filter(([c]) => c > 0).map(([c, one, many]) => plural(c, one, many));
+  return out.length ? out.join(' · ') : 'Vacío';
+}
+
+/** Nombre para mostrar de lo guardado: su título, el nombre del archivo o el enlace. */
+export const ventureItemName = (i: Pick<LegacyVentureItem, 'title' | 'kind' | 'url'>) =>
+  i.title || (i.kind === 'link' ? i.url.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 80) : i.kind === 'note' ? 'Nota sin título' : i.kind === 'image' ? 'Imagen' : 'Archivo');

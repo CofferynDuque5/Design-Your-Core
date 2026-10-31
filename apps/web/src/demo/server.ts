@@ -825,6 +825,18 @@ export function createDemoServer(opts: DemoServerOptions = {}) {
     return { images: Object.fromEntries(wanted.filter((id) => a.images[id]).map((id) => [id, a.images[id]])) };
   });
 
+  on('POST', '/api/images/delete', ({ token, body }) => {
+    const a = account(token);
+    const ids: string[] = Array.isArray(body.ids) ? body.ids.filter((x: unknown): x is string => typeof x === 'string').slice(0, 100) : [];
+    let count = 0;
+    for (const id of ids)
+      if (a.images[id]) {
+        delete a.images[id];
+        count++;
+      }
+    return { ok: true, count };
+  });
+
   // Pareja: en la prueba, cualquier código válido vincula con una pareja de ejemplo.
   const partnerView = (a: DemoAccount): PartnerView => {
     if (!a.partner) return { partner: null };

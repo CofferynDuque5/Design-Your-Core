@@ -124,7 +124,7 @@ test('la sección Más reúne todas las herramientas', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Llegan pronto' })).toHaveCount(0);
   const tools = page.getByRole('region', { name: 'Herramientas' });
   await expect(tools.getByRole('list', { name: 'Organización' }).getByRole('link')).toHaveCount(5);
-  await expect(tools.getByRole('list', { name: 'Estudio y trabajo' }).getByRole('link')).toHaveCount(8);
+  await expect(tools.getByRole('list', { name: 'Estudio y trabajo' }).getByRole('link')).toHaveCount(9);
   await expect(tools.getByRole('list', { name: 'Conocimiento' }).getByRole('link')).toHaveCount(TOOLS_KNOWLEDGE);
   await expect(tools.getByRole('list', { name: 'Vida personal' }).getByRole('link')).toHaveCount(3);
   // Ciclo está en Salud aunque no se muestre en el menú.

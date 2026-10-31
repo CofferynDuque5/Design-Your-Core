@@ -39,6 +39,9 @@ export const LEGACY_KEYS = [
   'workItems',
   'meditations',
   'courses',
+  'ventures',
+  'ventureItems',
+  'chats',
 ] as const;
 export type LegacyKey = (typeof LEGACY_KEYS)[number];
 export const isLegacyKey = (k: unknown): k is LegacyKey => typeof k === 'string' && (LEGACY_KEYS as readonly string[]).includes(k);
@@ -108,6 +111,11 @@ export const COLOR_NAMES: Record<string, string> = {
   '#EDE4FF': 'Lila',
   '#FFE8D6': 'Melocotón',
   '#F1F3F5': 'Gris',
+  '#C8F23A': 'Lima',
+  '#F2A33A': 'Ámbar',
+  '#E05A6A': 'Coral',
+  '#3AC2B0': 'Aguamarina',
+  '#B57CF2': 'Lavanda',
 };
 
 export const PROJECT_STATUSES = ['curso', 'revision', 'entregado'] as const;
@@ -312,11 +320,33 @@ export const COURSE_STATUS_INFO: Record<CourseStatus, { label: string; short: st
   hecho: { label: 'Terminado', short: 'Hecho' },
 };
 
+/** Emprendimientos (nuevo): proyectos de negocio con sus notas, imágenes, archivos y enlaces. */
+export const VENTURE_STAGES = ['idea', 'validando', 'lanzado', 'pausa'] as const;
+export type VentureStage = (typeof VENTURE_STAGES)[number];
+export const VENTURE_STAGE_INFO: Record<VentureStage, { label: string }> = {
+  idea: { label: 'Idea' },
+  validando: { label: 'Validando' },
+  lanzado: { label: 'En marcha' },
+  pausa: { label: 'En pausa' },
+};
+export const VENTURE_COLORS = ['#C8F23A', '#4F7CFF', '#F2A33A', '#E05A6A', '#3AC2B0', '#B57CF2'] as const;
+export const VENTURE_ITEM_KINDS = ['note', 'image', 'file', 'link'] as const;
+export type VentureItemKind = (typeof VENTURE_ITEM_KINDS)[number];
+/** Archivos e imágenes se guardan en /api/images como data: URL (máximo ~4 MB de texto). */
+export const VENTURE_FILE_MAX_BYTES = 3 * 1024 * 1024;
+
+/** Asistente (nuevo): conversaciones guardadas en tu cuenta, la más reciente primero. */
+export const CHATS_MAX = 50;
+export const ATTACHMENT_KINDS = ['image', 'pdf', 'text'] as const;
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+export const CARD_STATUSES = ['pending', 'running', 'done', 'discarded', 'invalid'] as const;
+export type CardStatus = (typeof CARD_STATUSES)[number];
+
 /** Tipo de sesión de Respiración (`meditations.kind`) que escribe la app anterior. */
 export const MEDITATION_KIND = 'respiracion';
 
 /** Máximo de registros que guarda la app anterior (el más reciente primero). */
-export const LEGACY_NEWEST_FIRST: Partial<Record<LegacyKey, number>> = { focus: FOCUS_MAX, transactions: 2000, workouts: 400, sleep: 400, meditations: 400 };
+export const LEGACY_NEWEST_FIRST: Partial<Record<LegacyKey, number>> = { focus: FOCUS_MAX, transactions: 2000, workouts: 400, sleep: 400, meditations: 400, chats: CHATS_MAX };
 
 /** Claves con un solo registro por fecha (la app anterior no permite duplicados). */
 export const LEGACY_UNIQUE: Partial<Record<LegacyKey, { field: string; message: string }>> = {
@@ -636,6 +666,80 @@ export interface LegacyCourse {
   notes: string;
 }
 
+export interface LegacyVenture {
+  id: string;
+  name: string;
+  description: string;
+  stage: VentureStage;
+  color: string;
+}
+
+export interface LegacyVentureItem {
+  id: string;
+  ventureId: string;
+  kind: VentureItemKind;
+  title: string;
+  /** Texto de una nota (o descripción de una imagen, archivo o enlace). */
+  text: string;
+  /** Enlace http(s) de `link`; "" en el resto. */
+  url: string;
+  /** Id del archivo en /api/images (`image` y `file`); "" en el resto. */
+  ref: string;
+  mime: string;
+  /** Tamaño en bytes del archivo original. */
+  size: number;
+  /** Día en que se añadió (AAAA-MM-DD). */
+  date: string;
+}
+
+/** Archivo adjunto a un mensaje del Asistente. */
+export interface ChatAttachment {
+  name: string;
+  mime: string;
+  kind: AttachmentKind;
+  size: number;
+  /** Id en /api/images (imágenes y PDF); "" si no se pudo guardar. */
+  ref: string;
+  /** Contenido de un archivo de texto. */
+  text?: string;
+  /** data: URL de la imagen o el PDF. Solo en memoria: nunca se guarda en el documento. */
+  data?: string;
+}
+
+export interface StoredToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+export type StoredChatMessage =
+  | { role: 'user'; content: string; attachments?: ChatAttachment[] }
+  | { role: 'assistant'; content: string; tool_calls?: StoredToolCall[] }
+  | { role: 'tool'; tool_call_id: string; content: string };
+
+/** Acción propuesta por el Asistente, tal como se mostró. */
+export interface StoredCard {
+  callId: string;
+  tool: string;
+  title: string;
+  where: string;
+  fields: Array<{ label: string; value: string }>;
+  plan: Record<string, unknown> | null;
+  error?: string;
+  done: string;
+  status: CardStatus;
+}
+
+export interface LegacyChat {
+  id: string;
+  title: string;
+  model: string;
+  /** Fecha y hora ISO del último mensaje. */
+  updatedAt: string;
+  messages: StoredChatMessage[];
+  cards: Record<string, StoredCard>;
+}
+
 export interface LegacyMeditation {
   id: string;
   /** Día en UTC. */
@@ -684,6 +788,9 @@ export interface LegacyItems {
   workItems: LegacyWorkItem;
   meditations: LegacyMeditation;
   courses: LegacyCourse;
+  ventures: LegacyVenture;
+  ventureItems: LegacyVentureItem;
+  chats: LegacyChat;
 }
 
 /** Documento completo de la app anterior: claves conocidas y cualquier otra que traiga. */
@@ -715,6 +822,39 @@ const weekdays = z
  */
 const checkItem = z.object({ id: legacyIdSchema, name: z.string().max(300), done: z.boolean().default(false) }).strict();
 const checkList = (item: z.AnyZodObject = checkItem) => z.array(item).max(1000).default([]);
+
+const httpUrl = z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://');
+/** Id de un archivo en /api/images (igual que el servidor). */
+const fileRef = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/, 'Archivo no válido');
+const chatAttachment = z
+  .object({
+    name: z.string().max(200),
+    mime: z.string().max(120),
+    kind: z.enum(ATTACHMENT_KINDS),
+    size: z.number().int().min(0).max(100_000_000).default(0),
+    ref: z.union([z.literal(''), fileRef]).default(''),
+    text: z.string().max(200_000).optional(),
+  })
+  .strict();
+const toolCall = z.object({ id: z.string().max(200), type: z.literal('function'), function: z.object({ name: z.string().max(100), arguments: z.string().max(50_000) }).strict() }).strict();
+const chatMessage = z.discriminatedUnion('role', [
+  z.object({ role: z.literal('user'), content: z.string().max(20_000), attachments: z.array(chatAttachment).max(10).optional() }).strict(),
+  z.object({ role: z.literal('assistant'), content: z.string().max(100_000), tool_calls: z.array(toolCall).max(20).optional() }).strict(),
+  z.object({ role: z.literal('tool'), tool_call_id: z.string().max(200), content: z.string().max(10_000) }).strict(),
+]);
+const storedCard = z
+  .object({
+    callId: z.string().max(200),
+    tool: z.string().max(100),
+    title: z.string().max(300),
+    where: z.string().max(120),
+    fields: z.array(z.object({ label: z.string().max(120), value: z.string().max(10_000) }).strict()).max(40),
+    plan: z.record(z.unknown()).nullable(),
+    error: z.string().max(1000).optional(),
+    done: z.string().max(1000),
+    status: z.enum(CARD_STATUSES),
+  })
+  .strict();
 
 const shapes = {
   blocks: z.object({
@@ -931,6 +1071,33 @@ const shapes = {
     status: z.enum(COURSE_STATUSES).default('pendiente'),
     notes: text(5000),
   }),
+  ventures: z.object({
+    id: legacyIdSchema,
+    name: named(120),
+    description: text(5000),
+    stage: z.enum(VENTURE_STAGES).default('idea'),
+    color: hex.default(VENTURE_COLORS[0]),
+  }),
+  ventureItems: z.object({
+    id: legacyIdSchema,
+    ventureId: legacyIdSchema,
+    kind: z.enum(VENTURE_ITEM_KINDS).default('note'),
+    title: line(200),
+    text: text(100_000),
+    url: z.union([z.literal(''), httpUrl]).default(''),
+    ref: z.union([z.literal(''), fileRef]).default(''),
+    mime: line(120),
+    size: z.number().int().min(0).max(100_000_000).default(0),
+    date: optionalDay.default(''),
+  }),
+  chats: z.object({
+    id: legacyIdSchema,
+    title: z.string().trim().max(120).default('Conversación').transform((t) => t || 'Conversación'),
+    model: line(80),
+    updatedAt: line(40),
+    messages: z.array(chatMessage).max(400).default([]),
+    cards: z.record(z.string().max(200), storedCard).default({}),
+  }),
   meditations: z.object({
     id: legacyIdSchema,
     date: dayKey,
@@ -1030,6 +1197,9 @@ export const legacyItemSchemas = {
   workItems: shapes.workItems.strict(),
   meditations: shapes.meditations.strict(),
   courses: shapes.courses.strict(),
+  ventures: shapes.ventures.strict(),
+  ventureItems: shapes.ventureItems.strict(),
+  chats: shapes.chats.strict(),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 const patchOf = (o: z.AnyZodObject): z.AnyZodObject => {
@@ -1069,6 +1239,9 @@ export const legacyPatchSchemas = {
   workItems: patchOf(shapes.workItems),
   meditations: patchOf(shapes.meditations),
   courses: patchOf(shapes.courses),
+  ventures: patchOf(shapes.ventures),
+  ventureItems: patchOf(shapes.ventureItems),
+  chats: patchOf(shapes.chats),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 /**
@@ -1128,6 +1301,7 @@ export const LEGACY_CHILDREN: Partial<Record<LegacyKey, { key: LegacyKey; field:
   todos: { key: 'subtasks', field: 'todoId' },
   notebooks: { key: 'noteBoxes', field: 'notebookId' },
   pets: { key: 'petCares', field: 'petId' },
+  ventures: { key: 'ventureItems', field: 'ventureId' },
 };
 
 /** Padre de cada clave hija (el inverso de LEGACY_CHILDREN) y el error si no existe. */
@@ -1135,6 +1309,7 @@ export const LEGACY_PARENT: Partial<Record<LegacyKey, { key: LegacyKey; field: s
   subtasks: { key: 'todos', field: 'todoId', missing: 'La tarea principal no existe' },
   noteBoxes: { key: 'notebooks', field: 'notebookId', missing: 'El cuaderno no existe' },
   petCares: { key: 'pets', field: 'petId', missing: 'La mascota no existe' },
+  ventureItems: { key: 'ventures', field: 'ventureId', missing: 'El emprendimiento no existe' },
 };
 
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);

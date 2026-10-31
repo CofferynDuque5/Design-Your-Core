@@ -66,6 +66,12 @@ const LEGACY = {
     { id: 'nt1', title: 'Ondas', subject: 'Física', date: '20 sept', tag: '#4F7CFF', excerpt: '', body: '# Ondas\n**Periodo** y [fuente](https://example.com)\n\n- [x] Repasar\n\n```\nT = 1/f\n```\n\n> Cita\n\n![](data:image/png;base64,iVBORw0KGgo=)', commit: false, tags: 'examen', shareId: null },
   ],
   workItems: [{ id: 'wk1', title: 'Informe mensual', project: 'p1', status: 'curso', done: false, due: 'Viernes' }],
+  ventures: [{ id: 've1', name: 'Tienda de velas', description: '', stage: 'idea', color: '#C8F23A' }],
+  ventureItems: [
+    { id: 'vi1', ventureId: 've1', kind: 'note', title: 'Proveedores', text: 'Cera', url: '', ref: '', mime: '', size: 0, date: '2026-09-23' },
+    { id: 'vi2', ventureId: 've1', kind: 'link', title: '', text: '', url: 'https://instagram.com/velas', ref: '', mime: '', size: 0, date: '2026-09-23' },
+    { id: 'vi3', ventureId: 've1', kind: 'file', title: 'costos.csv', text: '', url: '', ref: 'vf_1', mime: 'text/csv', size: 10, date: '2026-09-23' },
+  ],
   courses: [{ id: 'cr1', topic: 'Inglés', title: 'Inglés básico', url: 'https://youtu.be/abc', status: 'curso', notes: '' }],
   meditations: [{ id: 'md1', date: TODAY, minutes: 3, kind: 'respiracion' }],
 };
@@ -127,6 +133,8 @@ describe('accesibilidad de la app móvil', () => {
       ['/enfoque', 'Últimas sesiones'],
       ['/materias', 'Dra. Morales'],
       ['/cursos', 'Inglés básico'],
+      ['/emprendimientos', 'Tienda de velas'],
+      ['/emprendimientos/ve1', 'Proveedores'],
       ['/proyectos', 'Ensayo de Historia'],
       ['/roadmaps', 'Ingeniería'],
       ['/cuadernos', 'Apuntes de cálculo'],

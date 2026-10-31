@@ -1,5 +1,6 @@
 import {
   chat as coreChat,
+  suggest as coreSuggest,
   DEFAULT_MODEL,
   parseAssistantSettings,
   testConnection as coreTestConnection,
@@ -49,4 +50,5 @@ export function clearSettings(): void {
 }
 
 export const chat = (opts: Parameters<typeof coreChat>[0]) => coreChat({ fetchImpl: defaultFetch, ...opts });
+export const suggest = (opts: Parameters<typeof coreSuggest>[0]) => coreSuggest({ fetchImpl: defaultFetch, ...opts });
 export const testConnection = (apiKey: string, model: string, fetchImpl: typeof fetch = defaultFetch) => coreTestConnection(apiKey, model, fetchImpl);

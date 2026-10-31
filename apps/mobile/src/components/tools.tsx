@@ -25,6 +25,7 @@ import { useState, type ReactNode, type Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '../lib/theme';
 import { Button, Card, Field, PageHeader, Screen, T, fonts } from './ui';
+import { SuggestButton } from './SectionSuggestions';
 import { UiIcon } from './UiIcon';
 
 // Piezas comunes de las herramientas de la app anterior en el móvil
@@ -77,6 +78,7 @@ export function ToolScreen({
           </T>
         </Pressable>
         {header ?? <PageHeader eyebrow={eyebrow} title={title} right={right} />}
+        <SuggestButton />
       </View>
       {children}
     </Screen>

@@ -123,6 +123,11 @@ const note = (id: string, title: string, subject: string, date: string, tags: st
 });
 
 /** Documento de la app anterior con algo en cada herramienta. */
+/** Imágenes y archivo de ejemplo de Emprendimientos (SVG y CSV para no pesar). */
+const DEMO_LOGO = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MDAiIGhlaWdodD0iNjAwIiB2aWV3Qm94PSIwIDAgNjAwIDYwMCI+PHJlY3Qgd2lkdGg9IjYwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiMwQTBCMDkiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIyNjAiIHI9IjE1MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQzhGMjNBIiBzdHJva2Utd2lkdGg9IjE4Ii8+PHBhdGggZD0iTTMwMCAzMzBjMC02MCAyMC0xMDAgNzAtMTMwTTMwMCAzMzBjMC00MC0yMC03MC02MC05MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQzhGMjNBIiBzdHJva2Utd2lkdGg9IjE2IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48dGV4dCB4PSIzMDAiIHk9IjUwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsIHNlcmlmIiBmb250LXNpemU9IjU2IiBmaWxsPSIjRjRGNUVFIj5DYWbDqSBCcm90ZTwvdGV4dD48L3N2Zz4=';
+const DEMO_LOCAL = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiB2aWV3Qm94PSIwIDAgODAwIDYwMCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjM0IyQTFFIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjOEE1QTNCIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9InVybCgjZykiLz48cmVjdCB4PSI4MCIgeT0iMzQwIiB3aWR0aD0iNjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMkExRDE0Ii8+PHJlY3QgeD0iMTIwIiB5PSIzODAiIHdpZHRoPSIzMCIgaGVpZ2h0PSIxNjAiIGZpbGw9IiMyQTFEMTQiLz48cmVjdCB4PSI2NTAiIHk9IjM4MCIgd2lkdGg9IjMwIiBoZWlnaHQ9IjE2MCIgZmlsbD0iIzJBMUQxNCIvPjxjaXJjbGUgY3g9IjI2MCIgY3k9IjMyMCIgcj0iMzQiIGZpbGw9IiNGNEY1RUUiLz48Y2lyY2xlIGN4PSI0MDAiIGN5PSIzMjAiIHI9IjM0IiBmaWxsPSIjRjRGNUVFIi8+PGNpcmNsZSBjeD0iNTQwIiBjeT0iMzIwIiByPSIzNCIgZmlsbD0iI0Y0RjVFRSIvPjxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI4MDAiIGhlaWdodD0iMTIwIiBmaWxsPSIjQzhGMjNBIiBvcGFjaXR5PSIuODUiLz48dGV4dCB4PSI0MDAiIHk9IjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNDQiIGZpbGw9IiMwQTBCMDkiPklkZWEgZGVsIGxvY2FsPC90ZXh0Pjwvc3ZnPg==';
+const DEMO_BUDGET = 'data:text/csv;base64,Q29uY2VwdG8sTW9udG8KQ2FmZXRlcmEsODUwMApNb2xpbm8sMjQwMApUYXphcyB5IHZhc29zLDEyMDAKUHJpbWVyIG1lcyBkZSByZW50YSw2MDAwCg==';
+
 export function sampleLegacy(today: Day): Record<string, unknown> {
   const day = (n: number) => addDays(today, n);
   const dom = Number(today.slice(8, 10));
@@ -368,6 +373,33 @@ export function sampleLegacy(today: Day): Record<string, unknown> {
       { id: 'cr4', topic: 'Programación web', title: 'CSS Grid en una hora', url: 'https://youtu.be/cssgrid', status: 'hecho', notes: '' },
       { id: 'cr5', topic: 'Finanzas personales', title: '', url: 'https://www.coursera.org/learn/finanzas-personales', status: 'pendiente', notes: '' },
     ],
+    ventures: [
+      { id: 've1', name: 'Café Brote', description: 'Cafetería pequeña cerca de la universidad: café de especialidad y pan dulce. Abrir en primavera.', stage: 'validando', color: '#C8F23A' },
+      { id: 've2', name: 'Tienda de stickers', description: 'Stickers ilustrados para laptops y cuadernos. Venta por Instagram.', stage: 'lanzado', color: '#4F7CFF' },
+      { id: 've3', name: 'App de recetas', description: '', stage: 'idea', color: '#F2A33A' },
+    ],
+    ventureItems: [
+      { id: 'vi1', ventureId: 've1', kind: 'note', title: 'Plan de lanzamiento', text: '- Probar 3 cafés con amigos\n- Pedir presupuesto de la cafetera\n- **Buscar local** a menos de 5 min del campus', date: day(-6) },
+      { id: 'vi2', ventureId: 've1', kind: 'image', title: 'Logo', ref: 'vf_demo_logo', mime: 'image/svg+xml', size: 1200, date: day(-5) },
+      { id: 'vi3', ventureId: 've1', kind: 'image', title: 'Idea del local', ref: 'vf_demo_local', mime: 'image/svg+xml', size: 1500, date: day(-4) },
+      { id: 'vi4', ventureId: 've1', kind: 'file', title: 'presupuesto.csv', text: 'Primera estimación del equipo', ref: 'vf_demo_presupuesto', mime: 'text/csv', size: 92, date: day(-3) },
+      { id: 'vi5', ventureId: 've1', kind: 'link', title: 'Proveedor de café', url: 'https://www.ejemplo.com/cafe-de-especialidad', date: day(-2) },
+      { id: 'vi6', ventureId: 've2', kind: 'note', title: 'Precios', text: 'Sticker suelto: 25\nPaquete de 5: 100', date: day(-8) },
+      { id: 'vi7', ventureId: 've2', kind: 'link', title: 'Instagram', url: 'https://www.instagram.com/', date: day(-8) },
+    ],
+    chats: [
+      {
+        id: 'chat1',
+        title: 'Ayúdame a planear mi tarde de estudio',
+        model: 'gemini-flash-latest',
+        updatedAt: `${day(-1)}T16:05:00.000Z`,
+        messages: [
+          { role: 'user', content: 'Ayúdame a planear mi tarde de estudio' },
+          { role: 'assistant', content: 'Te propongo bloques cortos: **16:00–16:25** integrales, pausa de 5 minutos y **16:30–16:55** ejercicios de ondas.' },
+        ],
+        cards: {},
+      },
+    ],
   };
   // Cada elemento pasa por la misma validación que la API: la muestra es siempre válida.
   const doc: Record<string, unknown> = Object.fromEntries(
@@ -407,7 +439,7 @@ export function sampleAccount({ today, utcToday, timezone, now = new Date() }: S
     challenges: sampleChallenges(today),
     dismissals: {},
     blob: { data: sampleLegacy(utcToday ?? utcDayKey(now)), updatedAt: stamp },
-    images: { img_onda01: ONDA_PNG },
+    images: { img_onda01: ONDA_PNG, vf_demo_logo: DEMO_LOGO, vf_demo_local: DEMO_LOCAL, vf_demo_presupuesto: DEMO_BUDGET },
     inviteCode: null,
     partner: null,
   };

@@ -46,5 +46,13 @@ export function imageRoutes({ db, requireAuth }: { db: Db; requireAuth: RequestH
     res.json({ images: out });
   }));
 
+  // Borra imágenes y archivos (de un emprendimiento o del Asistente): { ids: [...] }.
+  // Solo las de quien lo pide; las demás se ignoran.
+  r.post('/images/delete', requireAuth, ah(async (req, res) => {
+    const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids.filter((x: unknown) => typeof x === 'string' && IMAGE_ID_RE.test(x)).slice(0, 100) : [];
+    const count = ids.length ? await db.exec('DELETE FROM "Image" WHERE "userId" = $1 AND "id" = ANY($2::text[])', [req.userId, ids]) : 0;
+    res.json({ ok: true, count });
+  }));
+
   return r;
 }

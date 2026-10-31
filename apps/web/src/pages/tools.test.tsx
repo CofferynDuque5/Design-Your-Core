@@ -740,7 +740,7 @@ describe('Barra lateral', () => {
     const personal = within(nav).getByRole('button', { name: 'Vida personal' });
     expect(personal).toHaveAttribute('aria-expanded', 'true');
     expect(within(within(nav).getByRole('list', { name: 'Vida personal' })).getByRole('link', { name: 'Finanzas' })).toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(23);
+    expect(within(nav).getAllByRole('link')).toHaveLength(24);
     await userEvent.click(personal);
     expect(personal).toHaveAttribute('aria-expanded', 'false');
     expect(within(nav).queryByRole('list', { name: 'Vida personal' })).not.toBeInTheDocument();
@@ -1304,8 +1304,10 @@ describe('Asistente', () => {
     expect(within(todo).getByText('Comprar pan')).toBeInTheDocument();
     const water = screen.getByRole('group', { name: 'Acción propuesta: Registrar agua' });
     // Nada se ha escrito todavía y no se puede seguir sin decidir.
-    expect(api.calls.filter((c) => c.path.startsWith('/api/v2/modules') && c.method !== 'GET')).toHaveLength(0);
+    expect(api.calls.filter((c) => c.path.startsWith('/api/v2/modules') && !c.path.includes('/chats') && c.method !== 'GET')).toHaveLength(0);
     expect(screen.getByText('Elige «Hacer» o «Descartar» en la acción propuesta para seguir.')).toBeInTheDocument();
+    // La conversación sí se guarda en la cuenta, con sus acciones pendientes.
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'POST' && c.path === '/api/v2/modules/chats')?.body).toMatchObject({ item: { title: 'Añade comprar pan y 2 vasos de agua', cards: { call_1: { status: 'pending' } } } }));
     const google = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions');
     expect(google?.auth).toBe('Bearer clave-de-prueba');
     const first = google?.body as { model: string; messages: Array<{ role: string; content: string }> };
@@ -1348,5 +1350,230 @@ describe('Asistente', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Google no aceptó tu clave');
     // El mensaje vuelve al cuadro para reintentarlo.
     expect(screen.getByLabelText('Mensaje para el asistente')).toHaveValue('Otra');
+  });
+});
+
+describe('Asistente: archivos e historial', () => {
+  const GOOGLE = 'POST /v1beta/openai/chat/completions';
+  const answer = (message: object) => ({ choices: [{ message }] });
+  const ready = () => localStorage.setItem('dyc.assistant', JSON.stringify({ apiKey: 'clave-de-prueba', model: 'gemini-flash-latest', seenPrivacy: true }));
+  afterEach(() => localStorage.clear());
+
+  it('adjunta un archivo de texto, lo envía a Gemini y guarda la conversación en el historial', async () => {
+    ready();
+    const api = withApi({ [GOOGLE]: () => answer({ content: 'Dice «hola mundo».' }) });
+    const { container } = renderAt('/asistente');
+    await screen.findByLabelText('Mensaje para el asistente');
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await userEvent.upload(input, new File(['x'], 'informe.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), { applyAccept: false });
+    expect(await screen.findByRole('alert')).toHaveTextContent('«informe.docx» no se puede leer');
+
+    await userEvent.upload(input, new File(['hola mundo'], 'notas.txt', { type: 'text/plain' }), { applyAccept: false });
+    const pending = await screen.findByRole('list', { name: 'Archivos para enviar' });
+    expect(within(pending).getByText('notas.txt')).toBeInTheDocument();
+    // Con un archivo se puede enviar sin escribir nada.
+    expect(screen.getByRole('button', { name: 'Enviar' })).toBeEnabled();
+    await userEvent.type(screen.getByLabelText('Mensaje para el asistente'), 'Resume esto{Enter}');
+
+    expect(await screen.findByText('Dice «hola mundo».')).toBeInTheDocument();
+    const sent = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions')?.body as { messages: Array<{ role: string; content: unknown }> };
+    expect(sent.messages[1].content).toEqual([
+      { type: 'text', text: 'Archivo adjunto «notas.txt»:\n\nhola mundo' },
+      { type: 'text', text: 'Resume esto' },
+    ]);
+    const log = screen.getByRole('log', { name: 'Mensajes' });
+    expect(within(log).getByRole('list', { name: 'Archivos adjuntos' })).toHaveTextContent('notas.txt');
+
+    await waitFor(() => expect(api.calls.some((c) => c.method === 'POST' && c.path === '/api/v2/modules/chats')).toBe(true));
+    const saved = api.calls.find((c) => c.path === '/api/v2/modules/chats')?.body as { item: { title: string; messages: Array<{ attachments?: Array<{ text?: string }> }> } };
+    expect(saved.item.title).toBe('Resume esto');
+    expect(saved.item.messages[0].attachments?.[0].text).toBe('hola mundo');
+    const history = await screen.findByRole('list', { name: 'Conversaciones guardadas' });
+    expect(within(history).getByRole('button', { name: /^Resume esto/ })).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('abre una conversación guardada con sus imágenes, sigue en ella y la borra', async () => {
+    ready();
+    const api = withApi(
+      {
+        [GOOGLE]: () => answer({ content: 'Sigo aquí.' }),
+        'POST /api/images/fetch': () => ({ images: { ai_foto: 'data:image/jpeg;base64,AAAA' } }),
+        'POST /api/images/delete': () => ({ ok: true, count: 1 }),
+      },
+      (doc) => {
+        doc.chats = [
+          {
+            id: 'ch1',
+            title: 'Mi horario',
+            model: 'gemini-flash-latest',
+            updatedAt: '2026-09-20T10:00:00.000Z',
+            messages: [
+              { role: 'user', content: 'Mi horario', attachments: [{ name: 'horario.jpg', mime: 'image/jpeg', kind: 'image', size: 10, ref: 'ai_foto' }] },
+              { role: 'assistant', content: 'Veo tres clases.' },
+            ],
+            cards: {},
+          },
+        ];
+      },
+    );
+    renderAt('/asistente');
+    const history = await screen.findByRole('list', { name: 'Conversaciones guardadas' });
+    await userEvent.click(within(history).getByRole('button', { name: /^Mi horario/ }));
+    expect(await screen.findByText('Veo tres clases.')).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'horario.jpg' })).toHaveAttribute('src', 'data:image/jpeg;base64,AAAA');
+
+    await userEvent.type(screen.getByLabelText('Mensaje para el asistente'), '¿Y el viernes?{Enter}');
+    expect(await screen.findByText('Sigo aquí.')).toBeInTheDocument();
+    const sent = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions')?.body as { messages: Array<{ role: string; content: unknown }> };
+    // La imagen de antes vuelve a ir a Gemini para que la conversación tenga sentido.
+    expect(sent.messages[1].content).toEqual([
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAAA' } },
+      { type: 'text', text: 'Mi horario' },
+    ]);
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'PATCH' && c.path === '/api/v2/modules/chats/ch1')).toBeTruthy());
+    const patch = api.calls.find((c) => c.method === 'PATCH' && c.path === '/api/v2/modules/chats/ch1')?.body as { messages: unknown[] };
+    expect(patch.messages).toHaveLength(4);
+    expect(JSON.stringify(patch)).not.toContain('base64');
+
+    await userEvent.click(within(history).getByRole('button', { name: 'Borrar «Mi horario»' }));
+    await userEvent.click(within(history).getByRole('button', { name: 'Borrar definitivamente' }));
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'DELETE' && c.path === '/api/v2/modules/chats/ch1')).toBeTruthy());
+    expect(api.calls.find((c) => c.path === '/api/images/delete')?.body).toEqual({ ids: ['ai_foto'] });
+    expect(await screen.findByText(/Tus conversaciones aparecerán aquí/)).toBeInTheDocument();
+  });
+});
+
+describe('Emprendimientos', () => {
+  it('crea un emprendimiento y guarda una nota, un enlace y un archivo', async () => {
+    const api = withApi({ 'POST /api/images': (b) => ({ ok: true, count: Object.keys((b as { images: object }).images).length }) }, (doc) => {
+      doc.ventures = [];
+      doc.ventureItems = [];
+    });
+    const { container } = renderAt('/emprendimientos');
+    expect(await screen.findByText('Guarda aquí cada negocio o proyecto')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Crear el primero' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo emprendimiento' });
+    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Café Brote');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Etapa'), 'Validando');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear emprendimiento' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/ventures', body: { item: { name: 'Café Brote', stage: 'validando' } } });
+    // Se abre su página.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Café Brote' })).toBeInTheDocument();
+    const ventureId = (writes(api)[0].body as { item: { id: string } }).item.id;
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nota' }));
+    const note = screen.getByRole('dialog', { name: 'Nueva nota' });
+    await userEvent.type(within(note).getByLabelText('Título'), 'Plan');
+    await userEvent.type(within(note).getByLabelText('Texto'), '- Buscar local');
+    await userEvent.click(within(note).getByRole('button', { name: 'Guardar nota' }));
+    expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/ventureItems', body: { item: { ventureId, kind: 'note', title: 'Plan', text: '- Buscar local' } } });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Enlace' }));
+    const link = screen.getByRole('dialog', { name: 'Nuevo enlace' });
+    await userEvent.type(within(link).getByLabelText('Enlace'), 'instagram.com/cafebrote');
+    await userEvent.click(within(link).getByRole('button', { name: 'Guardar enlace' }));
+    expect(writes(api).at(-1)).toMatchObject({ body: { item: { kind: 'link', url: 'https://instagram.com/cafebrote' } } });
+    expect(await screen.findByRole('link', { name: /instagram\.com\/cafebrote/ })).toHaveAttribute('target', '_blank');
+
+    const files = container.querySelector('input[aria-label="Elegir archivos"]') as HTMLInputElement;
+    await userEvent.upload(files, new File(['%PDF-1.4'], 'menu.pdf', { type: 'application/pdf' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/ventureItems', body: { item: { kind: 'file', title: 'menu.pdf', mime: 'application/pdf', size: 8 } } }));
+    const upload = api.calls.find((c) => c.path === '/api/images')?.body as { images: Record<string, string> };
+    const [ref] = Object.keys(upload.images);
+    expect(ref).toMatch(/^vf_/);
+    expect(upload.images[ref]).toMatch(/^data:application\/pdf;base64,/);
+    expect((writes(api).at(-1)?.body as { item: { ref: string } }).item.ref).toBe(ref);
+    expect(await screen.findByRole('button', { name: 'Descargar «menu.pdf»' })).toBeInTheDocument();
+    expect(screen.getByText('1 nota · 1 archivo · 1 enlace')).toBeInTheDocument();
+  });
+
+  it('al borrar un emprendimiento se borran también sus archivos', async () => {
+    const api = withApi({ 'POST /api/images/fetch': () => ({ images: { vf_1: 'data:image/jpeg;base64,AAAA' } }), 'POST /api/images/delete': () => ({ ok: true, count: 1 }) }, (doc) => {
+      doc.ventures = [{ id: 'v1', name: 'Tienda', description: 'Stickers', stage: 'lanzado', color: '#4F7CFF' }];
+      doc.ventureItems = [{ id: 'i1', ventureId: 'v1', kind: 'image', title: 'Logo', text: '', url: '', ref: 'vf_1', mime: 'image/jpeg', size: 9, date: '' }];
+    });
+    renderAt('/emprendimientos');
+    await userEvent.click(await screen.findByRole('link', { name: /Tienda/ }));
+    expect(await screen.findByRole('button', { name: 'Ver «Logo»' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    const dialog = screen.getByRole('dialog', { name: 'Editar emprendimiento' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Borrar' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Borrar definitivamente' }));
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'DELETE' && c.path === '/api/v2/modules/ventures/v1')).toBeTruthy());
+    expect(api.calls.find((c) => c.path === '/api/images/delete')?.body).toEqual({ ids: ['vf_1'] });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Emprendimientos' })).toBeInTheDocument();
+  });
+});
+
+describe('Sugerencias de cada sección', () => {
+  const GOOGLE = 'POST /v1beta/openai/chat/completions';
+  afterEach(() => localStorage.clear());
+
+  it('sin clave de Gemini lleva al Asistente', async () => {
+    withApi();
+    renderAt('/pendientes');
+    await userEvent.click(await screen.findByRole('button', { name: 'Sugerencias' }));
+    const dialog = screen.getByRole('dialog', { name: 'Sugerencias para Pendientes' });
+    expect(within(dialog).getByRole('link', { name: 'Ir al Asistente' })).toHaveAttribute('href', '/asistente');
+  });
+
+  it('pide sugerencias con los datos de la sección y «Hacer» aplica la elegida', async () => {
+    localStorage.setItem('dyc.assistant', JSON.stringify({ apiKey: 'clave-de-prueba', model: 'gemini-flash-latest', seenPrivacy: true }));
+    const call = (id: string, args: object) => ({ id, type: 'function', function: { name: 'suggest_change', arguments: JSON.stringify(args) } });
+    const api = withApi({
+      [GOOGLE]: () => ({
+        choices: [
+          {
+            message: {
+              content: 'Dos ideas para tus pendientes.',
+              tool_calls: [
+                call('a', { title: 'Divide «Mudanza» en pasos', reason: 'Así sabes por dónde empezar.', action: 'add', key: 'subtasks', fields: JSON.stringify([{ todoId: 'td2', title: 'Etiquetar cajas' }, { todoId: 'td2', title: 'Contratar camión' }]) }),
+                call('b', { title: 'Añade «Pagar internet»', reason: 'Vence pronto.', action: 'add', key: 'todos', fields: '{"title":"Pagar internet"}' }),
+              ],
+            },
+          },
+        ],
+      }),
+    });
+    renderAt('/pendientes');
+    await userEvent.click(await screen.findByRole('button', { name: 'Sugerencias' }));
+    const dialog = screen.getByRole('dialog', { name: 'Sugerencias para Pendientes' });
+    await userEvent.click(within(dialog).getByText('Ver lo que se enviará'));
+    expect(within(dialog).getByLabelText('Datos de esta sección que se enviarán')).toHaveTextContent('Pedir cajas');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pedir sugerencias' }));
+
+    const split = await within(dialog).findByRole('group', { name: 'Sugerencia: Divide «Mudanza» en pasos' });
+    expect(within(split).getByText('Así sabes por dónde empezar.')).toBeInTheDocument();
+    expect(within(split).getByText('Etiquetar cajas')).toBeInTheDocument();
+    const sent = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions')?.body as { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> };
+    expect(sent.tools[0].function.name).toBe('suggest_change');
+    expect(sent.messages[1].content).toContain('Pedir cajas');
+    // Nada se escribe hasta pulsar «Hacer».
+    expect(writes(api).map((c) => c.path)).toEqual(['/v1beta/openai/chat/completions']);
+
+    await userEvent.click(within(split).getByRole('button', { name: 'Hacer' }));
+    expect(await within(dialog).findByRole('group', { name: 'Hecho: Divide «Mudanza» en pasos' })).toBeInTheDocument();
+    const posts = writes(api).filter((c) => c.path === '/api/v2/modules/subtasks');
+    expect(posts.map((p) => (p.body as { item: { title: string; todoId: string } }).item)).toMatchObject([
+      { title: 'Etiquetar cajas', todoId: 'td2' },
+      { title: 'Contratar camión', todoId: 'td2' },
+    ]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Descartar' }));
+    expect(within(dialog).getByRole('group', { name: 'Descartado: Añade «Pagar internet»' })).toBeInTheDocument();
+    expect(writes(api).filter((c) => c.path === '/api/v2/modules/todos')).toHaveLength(0);
+
+    // «Pedir otras» avisa al modelo de lo que ya propuso.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pedir otras' }));
+    await waitFor(() => expect(api.calls.filter((c) => c.path === '/v1beta/openai/chat/completions')).toHaveLength(2));
+    const again = api.calls.filter((c) => c.path === '/v1beta/openai/chat/completions')[1].body as { messages: Array<{ content: string }> };
+    expect(again.messages[1].content).toContain('«Divide «Mudanza» en pasos»');
+  });
+
+  it('no aparece en secciones sin sugerencias', async () => {
+    withApi();
+    renderAt('/asistente');
+    await screen.findByLabelText('Mensaje para el asistente');
+    expect(screen.queryByRole('button', { name: 'Sugerencias' })).not.toBeInTheDocument();
   });
 });
