@@ -28,7 +28,7 @@ const url = (v) => v.replace(/\/+$/, '');
 const API_URL = url(process.env.DYC_API_URL || 'https://designyourcorepanel.nvcorx.com');
 const APP_URL = url(process.env.DYC_APP_URL || API_URL);
 const SITE_URL = url(process.env.DYC_SITE_URL || 'https://designyourcore.nvcorx.com');
-const CONTACT = process.env.DYC_CONTACT_EMAIL || '';
+const CONTACT = process.env.DYC_CONTACT_EMAIL || 'designyourcore@nvcorx.com';
 const API_FOLDER = process.env.DYC_API_FOLDER || 'core-api';
 const SERVER_HOME = url(process.env.DYC_SERVER_HOME || '/home/nvcorxco');
 const NODE_MAJOR = process.env.DYC_NODE_MAJOR || '20';

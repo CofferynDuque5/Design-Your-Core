@@ -1,3 +1,4 @@
+import { CONTACT_EMAIL as CORE_CONTACT_EMAIL } from '@dyc/core';
 /** URL de la app web, sin barra final. En desarrollo, la app de `pnpm dev:web`. */
 export const APP_URL = (import.meta.env.PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
 
@@ -23,3 +24,6 @@ export const DOWNLOADS = {
   macIntel: { href: '/descargas/DesignYourCore-Mac-Intel.zip', label: 'Mac con Intel', size: '95 MB', file: '.zip' },
   linux: { href: '/descargas/DesignYourCore-Linux.AppImage', label: 'Linux (64 bits)', size: '103 MB', file: '.AppImage' },
 } as const;
+
+/** Correo de contacto: PUBLIC_CONTACT_EMAIL o el oficial. */
+export const CONTACT_EMAIL = import.meta.env.PUBLIC_CONTACT_EMAIL || CORE_CONTACT_EMAIL;

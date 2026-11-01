@@ -1,6 +1,7 @@
 export * from './assistant.js';
 export * from './attachments.js';
 export * from './challenges.js';
+export * from './contact.js';
 export * from './checkin.js';
 export * from './dates.js';
 export * from './format.js';

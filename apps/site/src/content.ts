@@ -1,5 +1,6 @@
 import { starterChallenge, TOOL_CATALOG, TOOL_GROUPS, type PillarId } from '@dyc/core';
 import { pillars } from '@dyc/tokens';
+import { CONTACT_EMAIL } from './config';
 
 /** Los seis pilares, con un ejemplo real de reto de nivel 1 del catálogo de la app. */
 export const PILLARS = pillars.map((p) => ({
@@ -131,5 +132,9 @@ export const FAQ = [
   {
     q: '¿Estará en App Store y Google Play?',
     a: 'Sí, está en camino. Mientras tanto, la app instalada desde el navegador tiene las mismas funciones.',
+  },
+  {
+    q: '¿Cómo los contacto?',
+    a: `Escríbenos a ${CONTACT_EMAIL}. Te respondemos por ese mismo correo.`,
   },
 ] as const;

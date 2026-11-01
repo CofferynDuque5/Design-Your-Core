@@ -1,5 +1,5 @@
 ---
-import { appLink } from '../config';
+import { appLink, CONTACT_EMAIL } from '../config';
 import Logo from './Logo.astro';
 
 const year = new Date().getFullYear();
@@ -25,9 +25,10 @@ const year = new Date().getFullYear();
       <a href="/#preguntas">Preguntas</a>
     </nav>
     <nav aria-label="Legal" class="site-footer__nav">
-      <span class="site-footer__title">Legal</span>
+      <span class="site-footer__title">Legal y contacto</span>
       <a href="/privacidad">Privacidad</a>
       <a href="/condiciones">Condiciones</a>
+      <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
     </nav>
   </div>
   <div class="container">

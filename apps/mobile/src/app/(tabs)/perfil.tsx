@@ -1,10 +1,10 @@
-import { deviceTimeZone, PILLAR_IDS, type PillarId } from '@dyc/core';
+import { CONTACT_EMAIL, deviceTimeZone, PILLAR_IDS, type PillarId } from '@dyc/core';
 import { space, touchTarget } from '@dyc/tokens';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
-import { LogOut } from 'lucide-react-native';
+import { LogOut, Mail } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Linking, View } from 'react-native';
 import { pillarShort } from '../../components/pillar';
 import { Sheet } from '../../components/Sheet';
 import { Toggle } from '../../components/tools';
@@ -37,6 +37,12 @@ export default function ProfileScreen() {
       {notificationsSupported && <ReminderSection />}
       {notificationsSupported && <ToolNotifySection />}
       <AccountSection />
+      <Button
+        variant="ghost"
+        label={`Escríbenos: ${CONTACT_EMAIL}`}
+        icon={<Mail size={18} color={colors.primary} />}
+        onPress={() => void Linking.openURL(`mailto:${CONTACT_EMAIL}`)}
+      />
       <Button
         variant="secondary"
         label="Cerrar sesión"

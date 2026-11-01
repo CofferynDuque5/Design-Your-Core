@@ -1,6 +1,6 @@
-import { PILLAR_IDS, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
+import { CONTACT_EMAIL, PILLAR_IDS, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Download, LogOut } from 'lucide-react';
+import { ArrowRight, Download, LogOut, Mail } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { api } from '../app/api';
@@ -481,6 +481,9 @@ function DataSection() {
         Tus datos
       </h2>
       <p className="muted">Tus datos son tuyos. Puedes descargarlos todos en un archivo o borrar tu cuenta.</p>
+      <p className="muted">
+        <Mail size={16} aria-hidden="true" style={{ verticalAlign: '-3px' }} /> ¿Dudas o sugerencias? Escríbenos a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+      </p>
       <div className="row">
         <button type="button" className="btn btn--secondary" onClick={() => exportData.mutate()} disabled={exportData.isPending} aria-busy={exportData.isPending}>
           <Download size={18} aria-hidden="true" /> Descargar mis datos
