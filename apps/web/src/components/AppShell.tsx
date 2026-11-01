@@ -1,11 +1,13 @@
 import { BarChart3, CheckSquare, ChevronDown, Flag, LayoutGrid, Sun, User } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { Navigate, NavLink, Outlet, useLocation } from 'react-router';
+import { Navigate, NavLink, Outlet, useLocation, useNavigationType } from 'react-router';
 import { useUnsavedGuard } from '../app/legacy';
 import { useSession } from '../app/session';
 import { TOOL_GROUPS, TOOLS, type ToolGroup } from '../app/tools';
 import { Logo } from './Logo';
 import { PageErrorBoundary } from './PageErrorBoundary';
+import { FocusWatcher } from './FocusWatcher';
+import { SuggestButton } from './Suggestions';
 
 const NAV = [
   { to: '/', label: 'Hoy', icon: Sun, end: true },
@@ -76,6 +78,11 @@ export function AppShell() {
   const groups = useToolGroups();
   const inTool = TOOLS.some((t) => location.pathname === t.to || location.pathname.startsWith(`${t.to}/`));
   useUnsavedGuard();
+  // Cada sección nueva empieza arriba (al volver atrás, el navegador recupera dónde estabas).
+  const navType = useNavigationType();
+  useEffect(() => {
+    if (navType !== 'POP') window.scrollTo({ top: 0, left: 0 });
+  }, [location.pathname, navType]);
   // Los enlaces de invitación de pareja llegan como /?invite=CODIGO.
   const invite = new URLSearchParams(location.search).get('invite');
   if (invite && location.pathname !== '/perfil') return <Navigate to={`/perfil?invite=${encodeURIComponent(invite)}`} replace />;
@@ -159,6 +166,7 @@ export function AppShell() {
           </Suspense>
         </PageErrorBoundary>
       </main>
+      <FocusWatcher />
       <nav className="tabbar" aria-label="Principal">
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className="tabbar__link">
@@ -186,7 +194,10 @@ export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; tit
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1 className="page-title">{title}</h1>
       </div>
-      {children && <div className="page-header__actions">{children}</div>}
+      <div className="page-header__actions">
+        {children}
+        <SuggestButton />
+      </div>
     </header>
   );
 }

@@ -92,15 +92,6 @@ export function Calendar() {
         <div className="calendar-layout">
           <section className="card stack" aria-labelledby="month-title">
             <div className="month-nav">
-              <button type="button" className="icon-btn" onClick={() => go(-1)} aria-label="Mes anterior">
-                <ChevronLeft size={20} aria-hidden="true" />
-              </button>
-              <h2 id="month-title" className="section-title" aria-live="polite">
-                {monthLabel(month)}
-              </h2>
-              <button type="button" className="icon-btn" onClick={() => go(1)} aria-label="Mes siguiente">
-                <ChevronRight size={20} aria-hidden="true" />
-              </button>
               {month.slice(0, 7) !== today.slice(0, 7) && (
                 <button
                   type="button"
@@ -113,6 +104,15 @@ export function Calendar() {
                   Hoy
                 </button>
               )}
+              <button type="button" className="icon-btn" onClick={() => go(-1)} aria-label="Mes anterior">
+                <ChevronLeft size={20} aria-hidden="true" />
+              </button>
+              <h2 id="month-title" className="section-title" aria-live="polite">
+                {monthLabel(month)}
+              </h2>
+              <button type="button" className="icon-btn" onClick={() => go(1)} aria-label="Mes siguiente">
+                <ChevronRight size={20} aria-hidden="true" />
+              </button>
             </div>
             <table className="month">
               <caption className="visually-hidden">{monthLabel(month)}. Elige un día para ver lo que tiene.</caption>

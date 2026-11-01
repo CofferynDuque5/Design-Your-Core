@@ -27,6 +27,13 @@ import {
   layoutLanes,
   nextClass,
   normalizeHHMM,
+  normalizeCourseUrl,
+  validCourseUrl,
+  courseSource,
+  courseName,
+  coursesByTopic,
+  showableClasses,
+  scheduleHours,
   shiftMonth,
   TOOL_CATALOG,
   TOOL_GROUPS,
@@ -57,8 +64,8 @@ import { utcDayKey } from '../src/legacy.js';
 // Catálogo de «Más» y utilidades de las herramientas que comparten la web y el móvil.
 describe('herramientas compartidas', () => {
   it('el catálogo tiene todas las secciones, cada una en un grupo, con rutas únicas', () => {
-    expect(TOOL_CATALOG).toHaveLength(24);
-    expect(new Set(TOOL_CATALOG.map((t) => t.path)).size).toBe(24);
+    expect(TOOL_CATALOG).toHaveLength(25);
+    expect(new Set(TOOL_CATALOG.map((t) => t.path)).size).toBe(25);
     for (const t of TOOL_CATALOG) expect(TOOL_GROUPS.map((g) => g.id)).toContain(t.group);
   });
 
@@ -124,6 +131,34 @@ describe('herramientas compartidas', () => {
     expect(normalizeHHMM('8:30')).toBe('08:30');
     expect(normalizeHHMM('0830')).toBe('08:30');
     expect(normalizeHHMM('hola')).toBe('hola');
+    // Datos antiguos raros se dibujan sin cambiar el dato; lo que no se entiende se ignora.
+    const odd = [{ ...classes[0], id: 'a', day: '2' as unknown as number, start: '8:00', end: '9:30' }, { ...classes[0], id: 'b', day: 9 }];
+    expect(showableClasses(odd)).toEqual([{ ...odd[0], day: 2, start: '08:00', end: '09:30' }]);
+    expect(odd[0].start).toBe('8:00');
+    expect(scheduleHours([])).toEqual({ from: 7, to: 21 });
+    expect(scheduleHours([{ ...classes[0], start: '06:30', end: '22:15' }])).toEqual({ from: 6, to: 23 });
+  });
+
+  it('cursos: enlaces, plataforma y temas', () => {
+    expect(normalizeCourseUrl(' youtu.be/xyz ')).toBe('https://youtu.be/xyz');
+    expect(normalizeCourseUrl('http://a.com')).toBe('http://a.com');
+    expect(normalizeCourseUrl('')).toBe('');
+    expect(validCourseUrl('')).toBe(true);
+    expect(validCourseUrl('https://www.udemy.com/course/x/')).toBe(true);
+    expect(validCourseUrl('javascript:alert(1)')).toBe(false);
+    expect(validCourseUrl('https://localhost')).toBe(false);
+    expect(courseSource('https://www.youtube.com/watch?v=1')).toEqual({ label: 'YouTube', video: true });
+    expect(courseSource('https://m.youtube.com/watch?v=1')?.label).toBe('YouTube');
+    expect(courseSource('https://platzi.com/cursos/react/')).toEqual({ label: 'Platzi', video: false });
+    expect(courseSource('https://www.miacademia.mx/clase')).toEqual({ label: 'miacademia.mx', video: false });
+    expect(courseSource('notyoutube.com')).toBeNull();
+    expect(courseName({ title: '', url: 'https://coursera.org/learn/x', topic: 'Finanzas' })).toBe('Curso en Coursera');
+    expect(courseName({ title: ' React ', url: '' })).toBe('React');
+    expect(coursesByTopic([{ topic: 'Inglés' }, { topic: 'React' }, { topic: 'inglés ' }, { topic: '' }]).map((g) => [g.topic, g.items.length])).toEqual([
+      ['Inglés', 2],
+      ['React', 1],
+      ['Sin tema', 1],
+    ]);
   });
 
   it('enfoque: reloj y texto para lectores', () => {

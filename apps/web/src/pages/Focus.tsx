@@ -1,12 +1,13 @@
-import { FOCUS_MODE_INFO, FOCUS_MODES, focusClock, focusSpoken, focusStats, hoursShort, nextFocusMode, shortDay, utcDayKey, type FocusMode } from '@dyc/core';
+import { FOCUS_MODE_INFO, FOCUS_MODES, focusClock, focusSpoken, focusStats, hoursShort, shortDay, utcDayKey, type FocusMode } from '@dyc/core';
 import { Pause, Play, RotateCcw, SkipForward } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
+import { useEffect, useState } from 'react';
+import { focusLeft, getFocusTimer, setFocusTimer, useFocusTimer } from '../app/focusTimer';
+import { useLegacyData, useLegacyList } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { Segmented } from '../components/Form';
+import { useFocusFinish } from '../components/FocusWatcher';
 import { ErrorState, Loading } from '../components/States';
 
-type Status = 'idle' | 'running' | 'paused';
 const MODE_OPTIONS = FOCUS_MODES.map((m) => ({ value: m, label: FOCUS_MODE_INFO[m].label }));
 const totalMs = (m: FocusMode) => FOCUS_MODE_INFO[m].minutes * 60_000;
 
@@ -16,76 +17,44 @@ const spoken = focusSpoken;
 export function Focus() {
   const legacy = useLegacyData();
   const records = useLegacyList(legacy.data?.data, 'focus');
-  const actions = useModule('focus');
-  const [mode, setMode] = useState<FocusMode>('focus');
-  const [status, setStatus] = useState<Status>('idle');
-  const [remaining, setRemaining] = useState(totalMs('focus'));
-  const [completed, setCompleted] = useState(0);
+  // El temporizador vive fuera de la página: sigue al cambiar de sección o recargar.
+  const timer = useFocusTimer();
+  const finishSession = useFocusFinish();
+  const { mode, status, completed } = timer;
   const [message, setMessage] = useState('');
-  const endsAt = useRef(0);
   const [, setTick] = useState(0);
 
-  const left = status === 'running' ? Math.max(0, endsAt.current - Date.now()) : remaining;
+  const left = focusLeft(timer);
   const total = totalMs(mode);
   const label = FOCUS_MODE_INFO[mode].label;
 
-  const switchTo = (next: FocusMode) => {
-    setMode(next);
-    setRemaining(totalMs(next));
-    setStatus('idle');
+  const switchTo = (next: FocusMode) => setFocusTimer((t) => ({ ...t, mode: next, status: 'idle', endsAt: 0, remaining: totalMs(next) }));
+
+  const finish = (skipped: boolean) => {
+    const { next } = finishSession(skipped);
+    setMessage(`${skipped ? 'Sesión saltada' : '¡Sesión terminada!'} Ahora toca: ${FOCUS_MODE_INFO[next].label.toLowerCase()}, ${FOCUS_MODE_INFO[next].minutes} minutos.`);
   };
 
-  /** Termina la sesión (por tiempo o al saltar): guarda lo transcurrido si pasó al menos 1 s. */
-  const finish = useCallback(
-    (skipped: boolean) => {
-      const rest = status === 'running' ? Math.max(0, endsAt.current - Date.now()) : remaining;
-      const seconds = Math.round((total - rest) / 1000);
-      endsAt.current = Number.POSITIVE_INFINITY; // evita terminar dos veces
-      if (seconds >= 1) actions.add({ id: newId(), mode, seconds, dateKey: utcDayKey() });
-      const done = mode === 'focus' && !skipped ? completed + 1 : completed;
-      setCompleted(done);
-      // Saltar un enfoque lleva a un descanso corto; completarlo cuenta para el largo.
-      const next = mode === 'focus' && skipped ? 'short' : nextFocusMode(mode, done);
-      switchTo(next);
-      setMessage(`${skipped ? 'Sesión saltada' : '¡Sesión terminada!'} Ahora toca: ${FOCUS_MODE_INFO[next].label.toLowerCase()}, ${FOCUS_MODE_INFO[next].minutes} minutos.`);
-    },
-    [actions, completed, mode, remaining, status, total],
-  );
-
-  // Mientras corre: refresca la pantalla y termina al llegar a cero.
+  // Mientras corre: refresca la pantalla (la sesión la termina FocusWatcher).
   useEffect(() => {
     if (status !== 'running') return;
-    const t = window.setInterval(() => {
-      if (endsAt.current - Date.now() <= 0) finish(false);
-      else setTick((n) => n + 1);
-    }, 250);
+    const t = window.setInterval(() => setTick((n) => n + 1), 250);
     return () => window.clearInterval(t);
-  }, [status, finish]);
-
-  // El título de la pestaña muestra el tiempo restante mientras corre.
-  const shown = clock(left);
-  useEffect(() => {
-    if (status === 'running') document.title = `${shown} · ${label}`;
-  }, [status, shown, label]);
-  useEffect(() => {
-    if (status !== 'running') document.title = 'Enfoque · Design Your Core';
   }, [status]);
-  useEffect(() => () => void (document.title = 'Design Your Core'), []);
+
+  const shown = clock(left);
 
   const start = () => {
-    endsAt.current = Date.now() + remaining;
-    setStatus('running');
-    setMessage(`${label} en marcha. Quedan ${spoken(remaining)}.`);
+    setFocusTimer((t) => ({ ...t, status: 'running', endsAt: Date.now() + t.remaining }));
+    setMessage(`${label} en marcha. Quedan ${spoken(timer.remaining)}.`);
   };
   const pause = () => {
-    const rest = Math.max(0, endsAt.current - Date.now());
-    setRemaining(rest);
-    setStatus('paused');
+    const rest = focusLeft(getFocusTimer());
+    setFocusTimer((t) => ({ ...t, status: 'paused', endsAt: 0, remaining: rest }));
     setMessage(`En pausa. Quedan ${spoken(rest)}.`);
   };
   const reset = () => {
-    setRemaining(total);
-    setStatus('idle');
+    setFocusTimer((t) => ({ ...t, status: 'idle', endsAt: 0, remaining: total }));
     setMessage('Temporizador reiniciado.');
   };
 
@@ -137,7 +106,7 @@ export function Focus() {
               <span key={i} className={`cycle__dot${i < cycle ? ' cycle__dot--on' : ''}`} />
             ))}
           </div>
-          <p className="muted small center">Cada cuatro sesiones de enfoque toca un descanso largo. Se guarda cada sesión que termines o saltes.</p>
+          <p className="muted small center">Cada cuatro sesiones de enfoque toca un descanso largo. Sigue contando aunque vayas a otra sección, y se guarda cada sesión que termines o saltes.</p>
           <p className="visually-hidden" aria-live="polite">
             {message}
           </p>

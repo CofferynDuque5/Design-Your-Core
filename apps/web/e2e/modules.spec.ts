@@ -168,6 +168,11 @@ test('horario: clase desde una materia, próxima clase y edición', async ({ pag
   await seedLegacy(page, { ...OLD, subjects: [{ id: 'mat1', name: 'Física', teacher: '', room: 'B-3', color: '#22B8CF', nextClass: '', topics: [] }] });
   await page.goto('/horario');
   await expect(page.getByRole('heading', { name: 'Tu horario está vacío' })).toBeVisible();
+  // Vacío también se ve la cuadrícula de la semana, en escritorio y en el teléfono.
+  const week = page.getByRole('region', { name: 'Semana' });
+  await expect(week).toBeVisible();
+  await expect(week.getByText('Dom', { exact: true })).toBeVisible();
+  await expect(week.getByText('20:00')).toBeVisible();
 
   await page.getByRole('button', { name: 'Nueva clase' }).click();
   const dialog = page.getByRole('dialog', { name: 'Nueva clase' });
@@ -179,15 +184,51 @@ test('horario: clase desde una materia, próxima clase y edición', async ({ pag
   await dialog.getByRole('button', { name: 'Añadir clase' }).click();
 
   await expect(page.getByText(/Próxima clase|Clase en curso/)).toBeVisible();
-  await page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula B-3/ }).click();
+  await page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula B-3/ }).first().click();
   const edit = page.getByRole('dialog', { name: 'Editar clase' });
   await edit.getByLabel('Aula (opcional)').fill('Lab 2');
   await edit.getByRole('button', { name: 'Guardar' }).click();
   await reloadWhenSaved(page);
-  await expect(page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula Lab 2/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Física, martes de 10:00 a 11:30, aula Lab 2/ }).first()).toBeVisible();
 
   const doc = await readLegacy(page);
   expect(doc.classes).toEqual([expect.objectContaining({ day: 2, start: '10:00', end: '11:30', title: 'Física', room: 'Lab 2', color: '#22B8CF', subject: 'mat1' })]);
+  expect(doc).toMatchObject(OLD);
+});
+
+test('cursos: tema con enlaces, estado y datos guardados', async ({ page }) => {
+  await register(page, 'cursos');
+  await onboard(page);
+  await seedLegacy(page, OLD);
+  await page.goto('/mas');
+  await page.getByRole('link', { name: /Cursos/ }).first().click();
+  await expect(page.getByRole('heading', { name: 'Anota lo que quieres aprender' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Añadir el primero' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Nuevo curso' });
+  await dialog.getByLabel('Tema').fill('Inglés');
+  await dialog.getByLabel('Enlace (opcional)').fill('youtube.com/watch?v=abc');
+  await expect(dialog.getByText('Se abrirá en YouTube.')).toBeVisible();
+  await dialog.getByLabel('Nombre (opcional)').fill('Inglés básico');
+  await dialog.getByRole('button', { name: 'Añadir curso' }).click();
+
+  const card = page.getByRole('list', { name: 'Cursos de Inglés' });
+  await expect(card.getByRole('link', { name: /Inglés básico/ })).toHaveAttribute('href', 'https://youtube.com/watch?v=abc');
+  await page.getByRole('button', { name: 'Añadir a Inglés' }).click();
+  dialog = page.getByRole('dialog', { name: 'Nuevo curso' });
+  await expect(dialog.getByLabel('Tema')).toHaveValue('Inglés');
+  await dialog.getByLabel('Enlace (opcional)').fill('https://www.udemy.com/course/ingles/');
+  await dialog.getByRole('button', { name: 'Añadir curso' }).click();
+  await card.getByRole('button', { name: /Estado de «Inglés básico»: Por ver/ }).click();
+  await expect(card.getByRole('button', { name: /Estado de «Inglés básico»: Viendo/ })).toBeVisible();
+  await reloadWhenSaved(page);
+  await expect(page.getByRole('link', { name: /Curso en Udemy/ })).toBeVisible();
+
+  const doc = await readLegacy(page);
+  expect(doc.courses).toEqual([
+    { id: expect.any(String), topic: 'Inglés', title: 'Inglés básico', url: 'https://youtube.com/watch?v=abc', status: 'curso', notes: '' },
+    { id: expect.any(String), topic: 'Inglés', title: '', url: 'https://www.udemy.com/course/ingles/', status: 'pendiente', notes: '' },
+  ]);
   expect(doc).toMatchObject(OLD);
 });
 
@@ -488,10 +529,10 @@ test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) =>
   await page.getByRole('button', { name: 'Definir' }).click();
   const budget = page.getByRole('dialog', { name: 'Presupuesto mensual' });
   await expect(budget.getByLabel('Cuánto quieres gastar al mes')).toHaveValue('300');
-  await expect(budget.getByText(/La app anterior tenía 300/)).toBeVisible();
+  await expect(budget.getByText(/La app anterior tenía \$300/)).toBeVisible();
   await budget.getByLabel('Cuánto quieres gastar al mes').fill('250,5');
   await budget.getByRole('button', { name: 'Guardar' }).click();
-  await expect(page.getByText(/Quedan 210,50/)).toBeVisible();
+  await expect(page.getByText(/Quedan \$210,50/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Nuevo movimiento' }).click();
   let dialog = page.getByRole('dialog', { name: 'Nuevo movimiento' });
@@ -499,13 +540,13 @@ test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) =>
   await dialog.getByLabel('Monto').fill('1200');
   await dialog.getByLabel('Categoría').selectOption('Sueldo');
   await dialog.getByRole('button', { name: 'Añadir movimiento' }).click();
-  await page.getByRole('button', { name: 'Editar: Gasto de 40 en Comida (Mercado)' }).click();
+  await page.getByRole('button', { name: 'Editar: Gasto de $40 en Comida (Mercado)' }).click();
   dialog = page.getByRole('dialog', { name: 'Editar movimiento' });
   await dialog.getByLabel('Monto').fill('45,75');
   await dialog.getByRole('button', { name: 'Guardar' }).click();
   await reloadWhenSaved(page);
-  await expect(page.getByRole('button', { name: 'Editar: Ingreso de 1200 en Sueldo' })).toBeVisible();
-  await expect(page.getByText(/Quedan 204,75/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editar: Ingreso de $1200 en Sueldo' })).toBeVisible();
+  await expect(page.getByText(/Quedan \$204,75/)).toBeVisible();
 
   let doc = await readLegacy(page);
   expect(doc.budget).toEqual({ monthly: 250.5 });
@@ -794,11 +835,9 @@ test('notas: biblioteca por materia, formato, imagen subida y formatos de la app
   expect(await readLegacy(page)).toMatchObject(OLD);
 });
 
-test('trabajo y respiración: tareas por proyecto y una sesión guiada', async ({ page }) => {
-  await page.clock.install();
+test('trabajo: tareas por proyecto; Respiración se quitó sin tocar sus minutos', async ({ page }) => {
   await register(page, 'trabajo');
   await onboard(page);
-  const today = utcToday();
   await seedLegacy(page, { ...OLD, workItems: [{ id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: false, due: 'Hoy' }], meditations: [{ id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' }] });
 
   await page.goto('/trabajo');
@@ -816,27 +855,16 @@ test('trabajo y respiración: tareas por proyecto y una sesión guiada', async (
   await reloadWhenSaved(page);
   await expect(page.getByRole('region', { name: /Hecho/ }).getByText('Informe')).toBeVisible();
   await expect(page.getByRole('region', { name: /En curso/ }).getByText('Viernes')).toBeVisible();
-  let doc = await readLegacy(page);
+  const doc = await readLegacy(page);
   expect(doc.workItems).toEqual([
     { id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: true, due: 'Hoy' },
     { id: expect.any(String), title: 'Preparar la demo', project: 'p3', status: 'curso', done: false, due: 'Viernes' },
   ]);
 
+  // Respiración se quitó: el enlace viejo lleva a Más y los minutos guardados siguen en el documento.
   await page.goto('/respiracion');
-  await page.getByRole('button', { name: '1 min' }).click();
-  await page.getByRole('button', { name: 'Empezar' }).click();
-  await expect(page.locator('.breathe__phase')).toHaveText('Inhala');
-  await page.clock.runFor(5_000);
-  await expect(page.locator('.breathe__phase')).toHaveText('Mantén');
-  await page.clock.runFor(56_000);
-  await expect(page.getByRole('button', { name: 'Empezar' })).toBeVisible();
-  await expect(page.getByText('1 min', { exact: true }).first()).toBeVisible();
-  await reloadWhenSaved(page);
-  doc = await readLegacy(page);
-  expect(doc.meditations).toEqual([
-    { id: expect.any(String), date: today, minutes: 1, kind: 'respiracion' },
-    { id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' },
-  ]);
+  await expect(page).toHaveURL(/\/mas$/);
+  expect(doc.meditations).toEqual([{ id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' }]);
   expect(doc).toMatchObject(OLD);
 });
 
@@ -974,4 +1002,93 @@ test('asistente: clave en este navegador, respuestas simuladas de Google y acci�
   await page.reload();
   await expect(page.getByText('Repasar física')).toBeHidden();
   await expect(page.getByLabel('Clave de la API de Gemini')).toBeVisible();
+});
+
+test('emprendimientos: notas, imágenes, archivos y enlaces por proyecto, guardados en la nube', async ({ page }) => {
+  await register(page, 'emprendimientos');
+  await onboard(page);
+  await seedLegacy(page, OLD);
+  await page.goto('/mas');
+  await page.getByRole('link', { name: /Emprendimientos/ }).first().click();
+  await expect(page.getByRole('heading', { name: 'Guarda aquí cada negocio o proyecto' })).toBeVisible();
+  await page.getByRole('button', { name: 'Crear el primero' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nuevo emprendimiento' });
+  await dialog.getByLabel('Nombre').fill('Tienda de velas');
+  await dialog.getByLabel('Etapa').selectOption('validando');
+  await dialog.getByRole('button', { name: 'Crear emprendimiento' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Tienda de velas' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Nota', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Título').fill('Proveedores');
+  await page.getByRole('dialog').getByLabel('Texto').fill('Cera de **soya**');
+  await page.getByRole('dialog').getByRole('button', { name: 'Guardar nota' }).click();
+  await page.getByLabel('Elegir archivos').setInputFiles({ name: 'costos.csv', mimeType: 'text/csv', buffer: Buffer.from('vela,30\n') });
+  await expect(page.getByRole('heading', { name: 'costos.csv' })).toBeVisible();
+  await page.getByRole('button', { name: 'Enlace', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Enlace').fill('instagram.com/velas');
+  await page.getByRole('dialog').getByRole('button', { name: 'Guardar enlace' }).click();
+  await expect(page.getByRole('link', { name: /instagram\.com\/velas/ })).toHaveAttribute('href', 'https://instagram.com/velas');
+  await reloadWhenSaved(page);
+  await expect(page.getByText('1 nota · 1 archivo · 1 enlace')).toBeVisible();
+
+  const doc = await readLegacy(page);
+  const file = (doc.ventureItems as Array<{ kind: string; ref: string }>).find((i) => i.kind === 'file')!;
+  expect(file.ref).toMatch(/^vf_/);
+  const token = await sessionToken(page);
+  const stored = await (await page.request.post('/api/images/fetch', { data: { ids: [file.ref] }, headers: { Authorization: `Bearer ${token}` } })).json();
+  expect(stored.images[file.ref]).toBe(`data:text/csv;base64,${Buffer.from('vela,30\n').toString('base64')}`);
+
+  // Borrar el emprendimiento se lleva sus elementos y sus archivos.
+  await page.getByRole('button', { name: 'Editar' }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Borrar', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Borrar definitivamente' }).click();
+  await expect(page).toHaveURL(/\/emprendimientos$/);
+  await expect.poll(async () => (await readLegacy(page)).ventureItems).toEqual([]);
+  await expect
+    .poll(async () => (await (await page.request.post('/api/images/fetch', { data: { ids: [file.ref] }, headers: { Authorization: `Bearer ${token}` } })).json()).images)
+    .toEqual({});
+  expect(doc).toMatchObject(OLD);
+});
+
+test('asistente: adjuntos, historial y sugerencias con «Hacer» en una sección', async ({ page }) => {
+  await register(page, 'sugerencias');
+  await onboard(page);
+  await seedLegacy(page, { ...OLD, todos: [{ id: 'td1', title: 'Pagar la luz', done: false }] });
+  const sent: Array<{ messages: Array<{ role: string; content: unknown }>; tools?: Array<{ function: { name: string } }> }> = [];
+  await page.route('https://generativelanguage.googleapis.com/**', async (route) => {
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'POST, OPTIONS' };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const body = route.request().postDataJSON();
+    sent.push(body);
+    const suggest = body.tools?.[0]?.function?.name === 'suggest_change';
+    const message = suggest
+      ? { role: 'assistant', content: 'Una idea:', tool_calls: [{ id: 's1', type: 'function', function: { name: 'suggest_change', arguments: JSON.stringify({ title: 'Añade un recordatorio', reason: 'Para no olvidarlo', action: 'add', key: 'subtasks', fields: JSON.stringify({ todoId: 'td1', title: 'Buscar el recibo' }) }) } }] }
+      : { role: 'assistant', content: 'Es una foto de un recibo.' };
+    return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ choices: [{ message }] }) });
+  });
+  await page.addInitScript(() => localStorage.setItem('dyc.assistant', JSON.stringify({ apiKey: 'clave-falsa-e2e-1111', model: 'gemini-flash-latest', seenPrivacy: true })));
+
+  await page.goto('/asistente');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await page.locator('input[type=file]').setInputFiles({ name: 'recibo.png', mimeType: 'image/png', buffer: png });
+  await expect(page.getByRole('list', { name: 'Archivos para enviar' })).toContainText('recibo.png');
+  await page.getByLabel('Mensaje para el asistente').fill('¿Qué es esto?');
+  await page.getByRole('button', { name: 'Enviar' }).click();
+  await expect(page.getByText('Es una foto de un recibo.')).toBeVisible();
+  expect(JSON.stringify(sent[0].messages.at(-1)!.content)).toContain('"type":"image_url"');
+  await expect.poll(async () => ((await readLegacy(page)).chats as unknown[] | undefined)?.length).toBe(1);
+  expect(JSON.stringify((await readLegacy(page)).chats)).not.toContain('base64');
+
+  await page.reload();
+  await page.getByRole('button', { name: /^¿Qué es esto\?/ }).click();
+  await expect(page.getByText('Es una foto de un recibo.')).toBeVisible();
+
+  await page.goto('/pendientes');
+  await page.getByRole('button', { name: 'Sugerencias' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Sugerencias para Pendientes' });
+  await dialog.getByRole('button', { name: 'Pedir sugerencias' }).click();
+  await expect(dialog.getByText('Añade un recordatorio')).toBeVisible();
+  expect((await readLegacy(page)).subtasks).toBeUndefined();
+  await dialog.getByRole('button', { name: 'Hacer' }).click();
+  await expect.poll(async () => (await readLegacy(page)).subtasks).toEqual([{ id: expect.any(String), todoId: 'td1', title: 'Buscar el recibo', done: false }]);
 });

@@ -1,4 +1,4 @@
-import type { CheckInInput, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
+import type { CheckInInput, CourseLength, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
@@ -160,6 +160,11 @@ export function createClient(opts: ClientOptions) {
       remove: (password: string) => request<{ ok: true }>('DELETE', '/api/v2/account', { password }),
     },
 
+    courses: {
+      /** Cuánto dura un curso con solo su enlace (lo lee el servidor). 404 si la página no lo dice. */
+      length: (url: string) => request<CourseLength>('POST', '/api/v2/courses/length', { url }),
+    },
+
     /** Datos de la app anterior (v1): un documento JSON por persona. Para editar, usa `modules`. */
     legacy: {
       get: () => request<{ data: Record<string, unknown>; updatedAt: string | null }>('GET', '/api/sync'),
@@ -167,13 +172,15 @@ export function createClient(opts: ClientOptions) {
       images: (ids: string[]) => request<{ images: Record<string, string> }>('POST', '/api/images/fetch', { ids }),
       /** Sube imágenes `{ id: dataURL }` (máx. 50, 4 MB cada una); `count` = las que se guardaron. La app anterior las descarga igual. */
       uploadImages: (images: Record<string, string>) => request<{ ok: true; count: number }>('POST', '/api/images', { images }),
+      /** Borra imágenes o archivos propios por id (los ajenos se ignoran). */
+      deleteImages: (ids: string[]) => request<{ ok: true; count: number }>('POST', '/api/images/delete', { ids }),
     },
 
     /**
      * Módulos de la app anterior elemento a elemento (Agenda, Pendientes,
      * Calendario, Horario, Enfoque, Materias, Proyectos, Roadmaps, Cuadernos,
      * Contenido, Ideas, Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño,
-     * Diario, Rutina, Notas, Trabajo y Respiración) sobre el mismo documento de /api/sync. Los temas, hitos
+     * Diario, Rutina, Notas, Trabajo y las sesiones de respiración que ya existan) sobre el mismo documento de /api/sync. Los temas, hitos
      * y pasos se cambian enviando su lista completa en `update`. Las claves que
      * son un objeto (`cycle`, `dayLog`, `budget`) se guardan con `set` o `patch`.
      */

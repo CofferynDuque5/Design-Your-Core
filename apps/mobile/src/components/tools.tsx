@@ -25,13 +25,14 @@ import { useState, type ReactNode, type Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '../lib/theme';
 import { Button, Card, Field, PageHeader, Screen, T, fonts } from './ui';
+import { SuggestButton } from './SectionSuggestions';
 import { UiIcon } from './UiIcon';
 
 // Piezas comunes de las herramientas de la app anterior en el móvil
 // (tanda 1: Agenda, Pendientes, Calendario, Horario y Enfoque; tanda 2:
 // Materias, Proyectos, Roadmaps, Cuadernos, Contenido e Ideas; tanda 3:
 // Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño, Diario y Rutina;
-// tanda 4: Notas, Trabajo y Respiración).
+// tanda 4: Notas y Trabajo).
 
 /**
  * Pantalla de una herramienta: vuelve a «Más» (o a donde diga `back`) y
@@ -77,6 +78,7 @@ export function ToolScreen({
           </T>
         </Pressable>
         {header ?? <PageHeader eyebrow={eyebrow} title={title} right={right} />}
+        <SuggestButton />
       </View>
       {children}
     </Screen>

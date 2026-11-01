@@ -13,11 +13,13 @@ import {
   FolderKanban,
   GraduationCap,
   KeyRound,
+  MonitorPlay,
   Lightbulb,
   ListTodo,
   Moon,
   NotebookPen,
   PawPrint,
+  Rocket,
   Route,
   School,
   Sparkles,
@@ -25,18 +27,19 @@ import {
   Target,
   Timer,
   Wallet,
-  Wind,
   type LucideIcon,
 } from 'lucide-react-native';
 
 /** Los mismos iconos que la web para cada herramienta. */
 export const TOOL_ICONS: Record<ToolId, LucideIcon> = {
   agenda: CalendarClock,
+  emprendimientos: Rocket,
   pendientes: ListTodo,
   calendario: CalendarDays,
   horario: School,
   enfoque: Timer,
   materias: GraduationCap,
+  cursos: MonitorPlay,
   proyectos: FolderKanban,
   roadmaps: Route,
   cuadernos: BookOpen,
@@ -53,7 +56,6 @@ export const TOOL_ICONS: Record<ToolId, LucideIcon> = {
   sueno: Moon,
   diario: NotebookPen,
   rutina: AlarmClock,
-  respiracion: Wind,
   ciclo: Flower2,
 };
 
@@ -68,6 +70,8 @@ export const NATIVE_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'horario',
   'enfoque',
   'materias',
+  'cursos',
+  'emprendimientos',
   'proyectos',
   'roadmaps',
   'cuadernos',
@@ -83,7 +87,6 @@ export const NATIVE_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'sueno',
   'diario',
   'rutina',
-  'respiracion',
   'asistente',
   'boveda',
 ]);

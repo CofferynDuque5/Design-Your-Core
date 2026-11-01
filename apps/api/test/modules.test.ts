@@ -382,6 +382,31 @@ describe('v2 · módulos de la app anterior', () => {
     expect((doc.petCares as Array<{ id: string }>).map((c) => c.id)).toEqual(['c2']);
   });
 
+  it('emprendimientos: guardan notas y archivos, y al borrarlos se borra lo suyo; conversaciones del Asistente, la más reciente primero', async () => {
+    const { api, auth, sync } = await setup();
+    await api.post('/api/v2/modules/ventures').set(auth).send({ item: { id: 'v1', name: 'Café' } }).expect(201);
+    await api.post('/api/v2/modules/ventures').set(auth).send({ item: { id: 'v2', name: 'Tienda', stage: 'lanzado' } }).expect(201);
+    await api.post('/api/v2/modules/ventureItems').set(auth).send({ item: { id: 'n1', ventureId: 'v1', kind: 'note', title: 'Plan', text: 'Vender en la feria' } }).expect(201);
+    await api.post('/api/v2/modules/ventureItems').set(auth).send({ item: { id: 'f1', ventureId: 'v2', kind: 'file', title: 'menu.pdf', ref: 'vf_1', mime: 'application/pdf', size: 900 } }).expect(201);
+    await api.post('/api/v2/modules/ventureItems').set(auth).send({ item: { id: 'x', ventureId: 'nadie', kind: 'note' } }).expect(400);
+    await api.post('/api/v2/modules/ventureItems').set(auth).send({ item: { id: 'x', ventureId: 'v1', kind: 'link', url: 'javascript:alert(1)' } }).expect(400);
+    await api.delete('/api/v2/modules/ventures/v1').set(auth).expect(200);
+    let doc = await sync();
+    expect((doc.ventures as Array<{ id: string }>).map((v) => v.id)).toEqual(['v2']);
+    expect((doc.ventureItems as Array<{ id: string }>).map((i) => i.id)).toEqual(['f1']);
+
+    const chat = (id: string) => ({ id, title: id, model: 'gemini-flash-latest', updatedAt: '2026-10-31T10:00:00.000Z', messages: [{ role: 'user', content: 'Hola' }], cards: {} });
+    await api.post('/api/v2/modules/chats').set(auth).send({ item: chat('c1') }).expect(201);
+    await api.post('/api/v2/modules/chats').set(auth).send({ item: chat('c2') }).expect(201);
+    await api.patch('/api/v2/modules/chats/c1').set(auth).send({ messages: [{ role: 'user', content: 'Hola' }, { role: 'assistant', content: '¡Hola!' }] }).expect(200);
+    await api.patch('/api/v2/modules/chats/c1').set(auth).send({ messages: [{ role: 'user', content: 'x', attachments: [{ name: 'a.png', mime: 'image/png', kind: 'image', ref: 'ai_1', data: 'data:image/png;base64,A' }] }] }).expect(400);
+    doc = await sync();
+    expect((doc.chats as Array<{ id: string; messages: unknown[] }>).map((c) => [c.id, c.messages.length])).toEqual([
+      ['c2', 1],
+      ['c1', 2],
+    ]);
+  });
+
   it('objetos cycle, dayLog y budget: PUT completo y PATCH parcial, conservando el resto', async () => {
     const { api, auth, sync } = await setup({ ...OLD_DOC, cycle: { cycleLength: 28, periodLength: 5, notaVieja: 1 }, dayLog: { dateKey: '2026-09-24', water: 5, waterGoal: 8 } });
     let res = await api.patch('/api/v2/modules/cycle').set(auth).send({ cycleLength: 30 }).expect(200);

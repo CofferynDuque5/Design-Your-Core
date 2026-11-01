@@ -11,11 +11,13 @@ import {
   FolderKanban,
   GraduationCap,
   KeyRound,
+  MonitorPlay,
   Lightbulb,
   ListTodo,
   Moon,
   NotebookPen,
   PawPrint,
+  Rocket,
   Route,
   School,
   Sparkles,
@@ -23,7 +25,6 @@ import {
   Target,
   Timer,
   Wallet,
-  Wind,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -38,11 +39,13 @@ export interface Tool extends ToolInfo {
 /** Iconos de Lucide de cada sección (los mismos que usa la app móvil). */
 const ICONS: Record<ToolId, LucideIcon> = {
   agenda: CalendarClock,
+  emprendimientos: Rocket,
   pendientes: ListTodo,
   calendario: CalendarDays,
   horario: School,
   enfoque: Timer,
   materias: GraduationCap,
+  cursos: MonitorPlay,
   proyectos: FolderKanban,
   roadmaps: Route,
   cuadernos: BookOpen,
@@ -59,7 +62,6 @@ const ICONS: Record<ToolId, LucideIcon> = {
   sueno: Moon,
   diario: NotebookPen,
   rutina: AlarmClock,
-  respiracion: Wind,
   ciclo: Flower2,
 };
 

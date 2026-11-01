@@ -130,7 +130,7 @@ function DayView({ data }: { data: Record<string, unknown> }) {
             );
           })}
         </ul>
-        <p className="muted small">Los bloques no llevan fecha: tu plan se repite cada día, igual que en la app anterior.</p>
+        <p className="muted small">Los bloques no llevan fecha: tu plan se repite cada día.</p>
       </aside>
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo bloque' : 'Editar bloque'}>
         {editing !== null && <BlockForm block={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />}

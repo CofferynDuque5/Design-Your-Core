@@ -23,7 +23,9 @@ describe('web en el mismo dominio', () => {
       const res = await api.get(path).set('Accept', 'text/html').expect(200);
       expect(res.text).toContain('<title>Design Your Core</title>');
       expect(res.headers['cache-control']).toBe('no-cache');
-      expect(res.headers['content-security-policy']).toBeUndefined();
+      // Sin CSP de scripts (la web tiene uno en línea), pero nadie la carga dentro de otra página.
+      expect(res.headers['content-security-policy']).toBe("frame-ancestors 'self'");
+      expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
     }
   });
 

@@ -65,8 +65,9 @@ export const dashboard = (over: Partial<Dashboard> = {}): Dashboard => ({
  * memoria: aplica cada cambio de /api/v2/modules como el servidor (con
  * `applyLegacyOp`, también los borrados en cascada) y guarda cada llamada.
  */
-export function fakeModules(initial: LegacyData, over: Record<string, Handler> = {}) {
+export function fakeModules(initial: LegacyData, over: Record<string, Handler> = {}, files: Record<string, string> = {}) {
   let doc = initial;
+  const store: Record<string, string> = { ...files };
   const parts = (url: URL) => url.pathname.split('/').slice(4) as [LegacyKey, string?];
   const api = fakeFetch({
     'GET /api/v2/profile': () => ({ profile: profile() }),
@@ -97,11 +98,23 @@ export function fakeModules(initial: LegacyData, over: Record<string, Handler> =
       doc = { ...doc, [key]: value };
       return { value, updatedAt: 'x' };
     },
+    // Archivos (fotos de notas, adjuntos del Asistente, archivos de Emprendimientos).
+    'POST /api/images': (b) => {
+      const images = (b as { images: Record<string, string> }).images;
+      Object.assign(store, images);
+      return { ok: true, count: Object.keys(images).length };
+    },
+    'POST /api/images/fetch': (b) => ({ images: Object.fromEntries((b as { ids: string[] }).ids.filter((id) => id in store).map((id) => [id, store[id]])) }),
+    'POST /api/images/delete': (b) => {
+      const ids = (b as { ids: string[] }).ids.filter((id) => id in store);
+      for (const id of ids) delete store[id];
+      return { ok: true, count: ids.length };
+    },
     // Ajustes de la cuenta (mostrar Ciclo).
     'PATCH /api/v2/me': (b) => ({ user: { ...USER, ...(b as object) } }),
     ...over,
   });
-  return { ...api, doc: () => doc };
+  return { ...api, doc: () => doc, files: () => store };
 }
 
 type Rendered = string | { children?: Rendered[] | null } | Rendered[] | null;

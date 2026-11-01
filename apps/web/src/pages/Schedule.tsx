@@ -1,5 +1,6 @@
-import { CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, validClass, type LegacyClass } from '@dyc/core';
-import { Clock, MapPin, Plus, Trash2 } from 'lucide-react';
+import { CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, scheduleHours, showableClasses, type LegacyClass } from '@dyc/core';
+import { Clock, MapPin, Play, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
@@ -25,13 +26,13 @@ const whenLabel = classWhenLabel;
 export function Schedule() {
   const legacy = useLegacyData();
   const all = useLegacyList(legacy.data?.data, 'classes');
-  const classes = all.filter(validClass);
+  // Datos antiguos con «8:00» o el día como texto también se dibujan.
+  const classes = showableClasses(all);
   const [editing, setEditing] = useState<LegacyClass | 'new' | null>(null);
   const now = useNow();
   const today = isoDay(now);
 
-  const from = Math.min(7, ...classes.map((c) => Math.floor(hhmmToHours(c.start))));
-  const to = Math.max(from + 1, ...classes.map((c) => Math.ceil(hhmmToHours(c.end))));
+  const { from, to } = scheduleHours(classes);
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i);
   const nowH = nowHours(now);
   const next = nextClass(classes, now);
@@ -48,10 +49,11 @@ export function Schedule() {
         <Loading label="Cargando tu horario" />
       ) : legacy.isError ? (
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
-      ) : classes.length === 0 ? (
-        <EmptyState title="Tu horario está vacío">Añade tus clases: se repiten cada semana en el mismo día y hora.</EmptyState>
       ) : (
         <div className="stack-lg">
+          {classes.length === 0 && (
+            <EmptyState title="Tu horario está vacío">Añade tus clases con «Nueva clase»: se repiten cada semana en el mismo día y hora.</EmptyState>
+          )}
           {next && (
             <section className="card card--accent next-class" aria-labelledby="next-class-title" style={{ ['--c' as string]: next.c.color }}>
               <p id="next-class-title" className="eyebrow">
@@ -71,12 +73,17 @@ export function Schedule() {
                       </span>
                     )}
                   </span>
+                  {next.c.course && (
+                    <Link to={`/cursos?abrir=${encodeURIComponent(next.c.course)}`} className="small">
+                      Continuar el curso
+                    </Link>
+                  )}
                 </div>
               </div>
             </section>
           )}
 
-          {/* Cuadrícula semanal (pantallas anchas) */}
+          {/* Cuadrícula semanal: siempre visible, también vacía y en el teléfono */}
           <section className="card week-grid-card" aria-labelledby="week-title">
             <h2 id="week-title" className="visually-hidden">
               Semana
@@ -132,7 +139,7 @@ export function Schedule() {
             </div>
           </section>
 
-          {/* Lista por días (móvil) */}
+          {/* Lista por días (teléfono, debajo de la cuadrícula) */}
           <div className="day-list stack">
             {DAY_NAMES.map((name, i) => {
               const list = classes.filter((c) => c.day === i + 1).sort(byStart);
@@ -211,6 +218,11 @@ function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; 
 
   return (
     <form className="stack" onSubmit={submit}>
+      {cls?.course && (
+        <Link to={`/cursos?abrir=${encodeURIComponent(cls.course)}`} className="btn btn--secondary" style={{ alignSelf: 'flex-start' }}>
+          <Play size={16} aria-hidden="true" /> Abrir el curso
+        </Link>
+      )}
       {subjects.length > 0 && (
         <SelectField label="Materia" value={subject} onChange={(e) => pickSubject(e.target.value)}>
           <option value="">Clase suelta</option>

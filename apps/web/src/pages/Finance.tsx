@@ -239,7 +239,9 @@ function TxForm({ tx, today, month, onDone }: { tx: LegacyTransaction | null; to
           onChange={(e) => setAmount(e.target.value)}
           required
           autoFocus
-          error={amount.trim() && !valid ? 'Escribe un monto mayor que 0, con hasta dos decimales (12,50).' : null}
+          // Una sola línea siempre (pista o error): el diálogo no cambia de alto al escribir.
+          hint={amount.trim() && !valid ? undefined : 'En $, por ejemplo 12,50'}
+          error={!amount.trim() || valid ? null : value !== null && value > 1e12 ? 'El máximo es 1.000.000.000.000.' : 'Usa un número mayor que 0, como 12,50.'}
         />
         <TextField label="Fecha" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
       </div>

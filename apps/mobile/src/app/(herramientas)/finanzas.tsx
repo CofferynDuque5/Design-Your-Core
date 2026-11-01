@@ -287,7 +287,8 @@ function TxForm({ tx, today, month, onDone }: { tx: LegacyTransaction | null; to
         placeholder="0,00"
         autoFocus={!tx}
         maxLength={16}
-        error={amount.trim() && !valid ? 'Escribe un monto mayor que 0, con hasta dos decimales (12,50).' : null}
+        hint={amount.trim() && !valid ? undefined : 'En $, por ejemplo 12,50'}
+        error={!amount.trim() || valid ? null : parseAmount(amount) !== null && (parseAmount(amount) as number) > 1e12 ? 'El máximo es 1.000.000.000.000.' : 'Usa un número mayor que 0, como 12,50.'}
       />
       <DayStepper label="Fecha" value={date} onChange={(d) => d && setDate(d)} today={today} />
       <DotChoices legend="Categoría" value={category} onChange={setCategory} options={categories.map((c) => ({ value: c, label: c }))} />
@@ -331,7 +332,7 @@ function BudgetForm({ monthly, onDone }: { monthly: number; onDone: () => void }
         maxLength={16}
         placeholder="500"
         hint="Vale para todos los meses y se guarda en tu cuenta, así lo ves en todos tus dispositivos."
-        error={value.trim() && !valid ? 'Escribe una cantidad mayor que 0, con hasta dos decimales.' : null}
+        error={!value.trim() || valid ? null : parseAmount(value) !== null && (parseAmount(value) as number) > 1e12 ? 'El máximo es 1.000.000.000.000.' : 'Usa un número mayor que 0, como 500 o 499,90.'}
       />
       <View style={{ gap: space[2] }}>
         <Button label="Guardar" onPress={save} disabled={!valid} />

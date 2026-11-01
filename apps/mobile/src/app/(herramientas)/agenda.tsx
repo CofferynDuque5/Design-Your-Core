@@ -164,7 +164,7 @@ function DayView({ data }: { data: LegacyData }) {
           );
         })}
         <T v="small" tint="muted">
-          Los bloques no llevan fecha: tu plan se repite cada día, igual que en la app anterior.
+          Los bloques no llevan fecha: tu plan se repite cada día.
         </T>
       </Card>
 

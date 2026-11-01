@@ -76,7 +76,7 @@ La app anterior puede seguir publicada en su dominio mientras tanto: ambas usan 
 1. Crea `apps/site/.env.production` a partir de `apps/site/.env.example`:
    - `SITE_URL`: el dominio del sitio (se usa en el sitemap y en los enlaces para compartir).
    - `PUBLIC_APP_URL`: la dirección de la app web; los botones «Entrar» y «Crear cuenta» llevan ahí.
-   - `PUBLIC_CONTACT_EMAIL` (opcional): si lo pones, aparece en la página de privacidad.
+   - `PUBLIC_CONTACT_EMAIL` (opcional): cambia el correo de contacto del sitio (por defecto designyourcore@nvcorx.com).
 2. `pnpm build`. El resultado queda en `apps/site/dist/`.
 3. Sube el **contenido** de `dist/` a la carpeta pública del dominio del sitio. El `.htaccess` incluido hace que `/privacidad` funcione sin `.html` y usa `404.html` para las páginas que no existen.
 

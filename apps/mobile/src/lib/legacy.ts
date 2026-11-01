@@ -1,5 +1,6 @@
 import {
   applyLegacyOp,
+  legacyWithSaved,
   legacyList,
   legacyObject,
   newLegacyId,
@@ -11,7 +12,7 @@ import {
   type LegacyOp,
   type LegacyPatch,
 } from '@dyc/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { errorMessage } from '../components/ui';
 import { api } from './api';
@@ -48,6 +49,17 @@ function send<K extends LegacyKey>(key: K, op: LegacyOp<K>): Promise<{ updatedAt
   }
 }
 
+/**
+ * Si algo falló, al terminar el último cambio en vuelo se vuelve a pedir el
+ * documento (para quedar igual que el servidor). Si todo salió bien, no.
+ */
+let reloadAfterSave = false;
+function settle(qc: QueryClient) {
+  if (qc.isMutating({ mutationKey: ['legacy'] }) > 1 || !reloadAfterSave) return;
+  reloadAfterSave = false;
+  return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
+}
+
 /** Acciones sobre una clave: se ven al instante y se deshacen con un aviso si la API falla. */
 export function useModule<K extends LegacyKey>(key: K) {
   const qc = useQueryClient();
@@ -63,14 +75,17 @@ export function useModule<K extends LegacyKey>(key: K) {
       if (prev) qc.setQueryData<Legacy>(LEGACY_QUERY, { ...prev, data: applyLegacyOp(prev.data, key, op) });
       return { prev };
     },
+    onSuccess: (res, op) => {
+      // La copia del servidor sustituye a la optimista; no se recarga todo el documento.
+      const item = 'item' in res ? (res.item as LegacyItems[K]) : null;
+      qc.setQueryData<Legacy>(LEGACY_QUERY, (prev) => prev && { data: op.type === 'add' || op.type === 'update' ? legacyWithSaved(prev.data, key, item) : prev.data, updatedAt: res.updatedAt ?? prev.updatedAt });
+    },
     onError: (e, _op, ctx) => {
       if (ctx?.prev) qc.setQueryData(LEGACY_QUERY, ctx.prev);
+      reloadAfterSave = true;
       toast(errorMessage(e), { tone: 'error' });
     },
-    onSettled: () => {
-      // Se recarga solo cuando termina el último cambio en vuelo.
-      if (qc.isMutating({ mutationKey: ['legacy'] }) <= 1) return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
-    },
+    onSettled: () => settle(qc),
   });
   return useMemo(
     () => ({
@@ -106,13 +121,15 @@ export function useModuleObject<K extends LegacyObjectKey>(key: K) {
       if (prev) qc.setQueryData<Legacy>(LEGACY_QUERY, { ...prev, data: { ...prev.data, [key]: { ...legacyObject(prev.data, key), ...patch } } });
       return { prev };
     },
+    onSuccess: (res) => {
+      qc.setQueryData<Legacy>(LEGACY_QUERY, (prev) => prev && { data: { ...prev.data, [key]: res.value }, updatedAt: res.updatedAt ?? prev.updatedAt });
+    },
     onError: (e, _patch, ctx) => {
       if (ctx?.prev) qc.setQueryData(LEGACY_QUERY, ctx.prev);
+      reloadAfterSave = true;
       toast(errorMessage(e), { tone: 'error' });
     },
-    onSettled: () => {
-      if (qc.isMutating({ mutationKey: ['legacy'] }) <= 1) return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
-    },
+    onSettled: () => settle(qc),
   });
   return useMemo(() => ({ patch: (patch: Partial<LegacyObjects[K]>) => mutate(patch) }), [mutate]);
 }

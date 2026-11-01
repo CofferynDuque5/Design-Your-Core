@@ -14,7 +14,6 @@ import {
   cyclePredictions,
   hhmmToHours,
   IDEA_CATEGORIES,
-  MEDITATION_KIND,
   NOTE_DEFAULT_SUBJECT,
   NOTE_DEFAULT_TITLE,
   noteTag,
@@ -34,11 +33,11 @@ import {
   type GoalCategory,
   type IdeaCategory,
   type LegacyClass,
+  type LegacyCourse,
   type LegacyContent,
   type LegacyData,
   type LegacyIdea,
   type LegacyJournal,
-  type LegacyMeditation,
   type LegacyNote,
   type LegacyNoteBox,
   type LegacyPetCare,
@@ -52,6 +51,8 @@ import {
   type WorkProject,
   type WorkStatus,
   type LegacyWorkItem,
+  type LegacyVentureItem,
+  type VentureItemKind,
 } from './legacy.js';
 import { markdownToText } from './markdown.js';
 import { legacyVault, vaultSecureOf } from './vault.js';
@@ -82,12 +83,14 @@ export type ToolId =
   | 'horario'
   | 'enfoque'
   | 'materias'
+  | 'cursos'
   | 'proyectos'
   | 'roadmaps'
   | 'cuadernos'
   | 'contenido'
   | 'ideas'
   | 'trabajo'
+  | 'emprendimientos'
   | 'notas'
   | 'boveda'
   | 'asistente'
@@ -98,7 +101,6 @@ export type ToolId =
   | 'sueno'
   | 'diario'
   | 'rutina'
-  | 'respiracion'
   | 'ciclo';
 
 export interface ToolInfo {
@@ -173,6 +175,15 @@ export const TOOL_CATALOG: ToolInfo[] = [
     unit: ['materia', 'materias'],
   },
   {
+    id: 'cursos',
+    path: '/cursos',
+    label: 'Cursos',
+    group: 'estudio',
+    description: 'Temas por estudiar con sus enlaces de YouTube u otras plataformas',
+    count: (d) => legacyList(d, 'courses').filter((c) => c.status !== 'hecho').length,
+    unit: ['por ver', 'por ver'],
+  },
+  {
     id: 'proyectos',
     path: '/proyectos',
     label: 'Proyectos',
@@ -225,6 +236,15 @@ export const TOOL_CATALOG: ToolInfo[] = [
     description: 'Tareas de trabajo por proyecto, de la app anterior',
     count: (d) => legacyList(d, 'workItems').filter((w) => !w.done).length,
     unit: ['por hacer', 'por hacer'],
+  },
+  {
+    id: 'emprendimientos',
+    path: '/emprendimientos',
+    label: 'Emprendimientos',
+    group: 'estudio',
+    description: 'Tus negocios y proyectos con notas, imágenes, archivos y enlaces',
+    count: (d) => legacyList(d, 'ventures').length,
+    unit: ['proyecto', 'proyectos'],
   },
   {
     id: 'notas',
@@ -316,15 +336,6 @@ export const TOOL_CATALOG: ToolInfo[] = [
     unit: ['rutina', 'rutinas'],
   },
   {
-    id: 'respiracion',
-    path: '/respiracion',
-    label: 'Respiración',
-    group: 'salud',
-    description: 'Respiración guiada y tus minutos de calma',
-    count: (d) => legacyList(d, 'meditations').length,
-    unit: ['sesión', 'sesiones'],
-  },
-  {
     id: 'ciclo',
     path: '/ciclo',
     label: 'Ciclo',
@@ -371,10 +382,14 @@ export const localDayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth(
 /** "HH:MM" de una fecha local. */
 export const localTime = (d = new Date()) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-/** Cantidades sin moneda: con céntimos, siempre dos decimales (1234.5 → "1234,50"); sin ellos, ninguno (12345 → "12.345"). */
+/** Símbolo de moneda de Finanzas (el mismo en web, móvil y Asistente). */
+export const CURRENCY_SYMBOL = '$';
+
+/** Cantidad con moneda: con céntimos, siempre dos decimales (1234.5 → "$1234,50"); sin ellos, ninguno (12345 → "$12.345"; -8 → "-$8"). */
 export const money = (n: number) => {
   const cents = Math.round(n * 100) % 100 !== 0;
-  return new Intl.NumberFormat('es', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 }).format(n);
+  const text = new Intl.NumberFormat('es', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 }).format(Math.abs(n));
+  return `${n < 0 ? '-' : ''}${CURRENCY_SYMBOL}${text}`;
 };
 
 /** 465 → "7 h 45 min". */
@@ -472,6 +487,28 @@ export function normalizeHHMM(v: string): string {
   const m = /^(\d{1,2})[:.h]?(\d{2})$/.exec(t);
   if (!m) return t;
   return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
+
+/**
+ * Clases que se pueden dibujar. Acepta datos antiguos un poco distintos («8:00»,
+ * el día como texto «1») y los muestra con la forma correcta, sin cambiar el dato.
+ */
+export function showableClasses(list: LegacyClass[]): LegacyClass[] {
+  return list
+    .map((c) => ({
+      ...c,
+      day: typeof (c.day as unknown) === 'string' && /^[1-7]$/.test(String(c.day)) ? Number(c.day) : c.day,
+      start: typeof (c.start as unknown) === 'string' ? normalizeHHMM(c.start) : c.start,
+      end: typeof (c.end as unknown) === 'string' ? normalizeHHMM(c.end) : c.end,
+    }))
+    .filter(validClass);
+}
+
+/** Horas que muestra la cuadrícula del Horario: de 7:00 a 21:00, ampliadas para que quepan todas las clases. */
+export function scheduleHours(classes: LegacyClass[]): { from: number; to: number } {
+  const from = Math.min(7, ...classes.map((c) => Math.floor(hhmmToHours(c.start))));
+  const to = Math.max(21, ...classes.map((c) => Math.ceil(hhmmToHours(c.end))));
+  return { from, to };
 }
 
 /** La clase en curso o la siguiente de la semana (las clases se repiten cada semana). */
@@ -661,7 +698,7 @@ export const inlineImages = (text: string): string[] => Array.from(new Set(text.
 
 /** "12,30" o "12.30" → 12.3 (hasta dos decimales). null si no es una cantidad. */
 export function parseAmount(text: string): number | null {
-  const t = text.trim().replace(/\s/g, '');
+  const t = text.trim().replace(/\s/g, '').replace(/^\$/, ''); // «$12,50» también vale
   if (!/^\d+([.,]\d{1,2})?$/.test(t)) return null;
   return Number(t.replace(',', '.'));
 }
@@ -787,7 +824,7 @@ export function toggleWeekday(days: string, iso: string): string {
   return next || days;
 }
 
-// ---------- Tanda 4: Notas, Trabajo y Respiración ----------
+// ---------- Tanda 4: Notas y Trabajo ----------
 
 /** Orden alfabético español sin distinguir mayúsculas ni tildes. */
 export const byNameEs = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
@@ -796,6 +833,12 @@ export const byNameEs = (a: string, b: string) => a.localeCompare(b, 'es', { sen
 export const searchFold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 // Una nota con datos raros se muestra con los valores por defecto, sin cambiar el dato.
+/** Nota recién creada que nunca se escribió: sin título propio ni texto. Se borra al salir del editor. */
+export const noteIsBlank = (n: { title?: string | null; body?: string | null }): boolean => {
+  const t = (n.title ?? '').trim();
+  return (!t || t === NOTE_DEFAULT_TITLE) && !(n.body ?? '').trim();
+};
+
 export const noteSubjectOf = (n: Pick<LegacyNote, 'subject'>): string => (typeof n.subject === 'string' && n.subject.trim() ? n.subject.trim() : NOTE_DEFAULT_SUBJECT);
 export const noteTitleOf = (n: Pick<LegacyNote, 'title'>): string => (typeof n.title === 'string' && n.title.trim() ? n.title : NOTE_DEFAULT_TITLE);
 export const noteBodyOf = (n: Pick<LegacyNote, 'body'>): string => (typeof n.body === 'string' ? n.body : '');
@@ -837,59 +880,167 @@ export const WORK_BUCKETS: Array<{ id: 'curso' | 'todo' | 'hecho'; label: string
 ];
 export const workBucketOf = (w: Pick<LegacyWorkItem, 'done' | 'status'>): 'curso' | 'todo' | 'hecho' => (w.done ? 'hecho' : workStatusOf(w));
 
-export type BreathPhase = 'in' | 'hold' | 'out';
-export type BreathPatternId = 'caja' | '478';
+// ---------- Cursos ----------
 
-/** Técnicas de respiración de la app anterior (fases con sus segundos). */
-export const BREATH_PATTERNS: Record<BreathPatternId, { label: string; hint: string; phases: Array<[BreathPhase, number]> }> = {
-  caja: { label: 'Caja 4-4-4-4', hint: 'Inhala 4, mantén 4, exhala 4 y mantén 4 segundos. Ayuda a calmarte y concentrarte.', phases: [['in', 4], ['hold', 4], ['out', 4], ['hold', 4]] },
-  '478': { label: '4-7-8', hint: 'Inhala 4, mantén 7 y exhala 8 segundos. Ayuda a relajarte antes de dormir.', phases: [['in', 4], ['hold', 7], ['out', 8]] },
-};
-/** Orden fijo: «478» parece un número y Object.keys lo pondría primero. */
-export const BREATH_PATTERN_ORDER: BreathPatternId[] = ['caja', '478'];
-export const BREATH_PHASE_LABEL: Record<BreathPhase, string> = { in: 'Inhala', hold: 'Mantén', out: 'Exhala' };
-export const BREATH_DURATIONS = [1, 3, 5] as const;
-export type BreathMinutes = (typeof BREATH_DURATIONS)[number];
+/** «youtube.com/watch?v=…» → «https://youtube.com/watch?v=…». Vacío se queda vacío. */
+export function normalizeCourseUrl(v: string): string {
+  const t = v.trim();
+  if (!t) return '';
+  return /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
+}
 
-/** Duración de un ciclo completo de la técnica, en milisegundos. */
-export const breathCycleMs = (pattern: BreathPatternId) => BREATH_PATTERNS[pattern].phases.reduce((s, [, n]) => s + n, 0) * 1000;
-
-/** Fase de la respiración en un momento de la sesión (en milisegundos desde el inicio). */
-export function breathPhase(pattern: BreathPatternId, ms: number): { phase: BreathPhase; index: number; secondsLeft: number; seconds: number } {
-  const phases = BREATH_PATTERNS[pattern].phases;
-  let t = ms % breathCycleMs(pattern);
-  for (let i = 0; i < phases.length; i++) {
-    const len = phases[i][1] * 1000;
-    if (t < len) return { phase: phases[i][0], index: i, seconds: phases[i][1], secondsLeft: Math.ceil((len - t) / 1000) };
-    t -= len;
+/** Un enlace que se puede guardar y abrir (solo http y https). */
+export function validCourseUrl(v: string): boolean {
+  if (!v) return true;
+  try {
+    const u = new URL(v);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && u.hostname.includes('.') && v.length <= 2000;
+  } catch {
+    return false;
   }
-  return { phase: phases[0][0], index: 0, seconds: phases[0][1], secondsLeft: phases[0][1] };
 }
 
-/** El círculo está grande al inhalar y al mantener después de inhalar; pequeño en lo demás. */
-export function breathExpanded(pattern: BreathPatternId, index: number): boolean {
-  const phases = BREATH_PATTERNS[pattern].phases;
-  const phase = phases[index][0];
-  const prev = phases[(index + phases.length - 1) % phases.length][0];
-  return phase === 'in' || (phase === 'hold' && prev === 'in');
+const COURSE_SITES: Array<{ match: RegExp; label: string; video: boolean }> = [
+  { match: /(^|\.)(youtube\.com|youtu\.be)$/, label: 'YouTube', video: true },
+  { match: /(^|\.)udemy\.com$/, label: 'Udemy', video: false },
+  { match: /(^|\.)coursera\.org$/, label: 'Coursera', video: false },
+  { match: /(^|\.)platzi\.com$/, label: 'Platzi', video: false },
+  { match: /(^|\.)domestika\.org$/, label: 'Domestika', video: false },
+  { match: /(^|\.)edx\.org$/, label: 'edX', video: false },
+  { match: /(^|\.)khanacademy\.org$/, label: 'Khan Academy', video: false },
+  { match: /(^|\.)crehana\.com$/, label: 'Crehana', video: false },
+  { match: /(^|\.)skillshare\.com$/, label: 'Skillshare', video: false },
+  { match: /(^|\.)linkedin\.com$/, label: 'LinkedIn Learning', video: false },
+  { match: /(^|\.)vimeo\.com$/, label: 'Vimeo', video: true },
+  { match: /(^|\.)twitch\.tv$/, label: 'Twitch', video: true },
+];
+
+/** De dónde es un enlace: «YouTube», «Udemy»… o el dominio («miweb.com»). */
+export function courseSource(url: string): { label: string; video: boolean } | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    const site = COURSE_SITES.find((s) => s.match.test(host));
+    return site ? { label: site.label, video: site.video } : { label: host, video: false };
+  } catch {
+    return null;
+  }
 }
 
-/** 90500 → "1:31" (el reloj de Respiración). */
-export const breathClock = (ms: number) => {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
+/** Nombre que se muestra: el título, o la plataforma si solo hay enlace. */
+export const courseName = (c: { title?: string; url?: string; topic?: string }) => c.title?.trim() || (c.url ? `Curso en ${courseSource(c.url)?.label ?? 'internet'}` : (c.topic ?? 'Curso'));
 
-/** Minutos de hoy, de esta semana y sesiones válidas de Respiración (día en UTC, como la app anterior). */
-export function meditationStats(sessions: LegacyMeditation[], today: Day) {
-  const valid = sessions.filter((s) => isDay(s.date) && typeof s.minutes === 'number');
-  const week = periodRange('week', today);
+/** Cursos agrupados por tema, en el orden en que aparece cada tema por primera vez. */
+export function coursesByTopic<T extends { topic: string }>(list: T[]): Array<{ topic: string; items: T[] }> {
+  const groups = new Map<string, { topic: string; items: T[] }>();
+  for (const c of list) {
+    const topic = (c.topic ?? '').trim() || 'Sin tema';
+    const key = topic.toLocaleLowerCase('es');
+    const g = groups.get(key) ?? groups.set(key, { topic, items: [] }).get(key)!;
+    g.items.push(c);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Video (y lista) de un enlace de YouTube, para verlo dentro de la app y
+ * guardar dónde se pausó. `null` si no es de YouTube o no tiene video ni lista.
+ */
+export function youtubeRef(url: string): { video: string; list: string; start: number } | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase().replace(/^(www|m|music)\./, '');
+  const id = (v: string | null | undefined) => (v && /^[\w-]{6,20}$/.test(v) ? v : '');
+  let video = '';
+  if (host === 'youtu.be') video = id(u.pathname.split('/')[1]);
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    const parts = u.pathname.split('/').filter(Boolean);
+    video = parts[0] === 'watch' ? id(u.searchParams.get('v')) : ['embed', 'shorts', 'live', 'v'].includes(parts[0]) ? id(parts[1]) : '';
+  } else return null;
+  const list = u.searchParams.get('list') ?? '';
+  const t = u.searchParams.get('t') ?? u.searchParams.get('start') ?? '';
+  const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(t);
+  const start = m ? Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0) : 0;
+  if (!video && !/^[\w-]{10,64}$/.test(list)) return null;
+  return { video, list: /^[\w-]{10,64}$/.test(list) ? list : '', start };
+}
+
+/** Porcentaje visto (0-100): con YouTube, la posición guardada; si no, lo que anotó la persona. */
+export function courseProgress(c: Pick<LegacyCourse, 'progress' | 'position' | 'duration' | 'status'>): number {
+  if (c.status === 'hecho') return 100;
+  const p = typeof c.progress === 'number' ? c.progress : c.duration && c.position ? (c.position / c.duration) * 100 : 0;
+  return Math.max(0, Math.min(100, Math.round(p)));
+}
+
+/** 75 → «1:15», 3725 → «1:02:05». */
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/** Texto corto de dónde se quedó: «Lección 12 · 40 %» o «Vas en 12:05 de 45:10». */
+export function courseResume(c: LegacyCourse): string {
+  const pct = courseProgress(c);
+  if (c.status === 'hecho') return 'Terminado';
+  const parts: string[] = [];
+  if (c.spot?.trim()) parts.push(c.spot.trim());
+  else if (c.position && c.duration) parts.push(`Vas en ${formatClock(c.position)} de ${formatClock(c.duration)}`);
+  else if (c.position) parts.push(`Vas en ${formatClock(c.position)}`);
+  if (pct > 0 && !(c.position && c.duration && !c.spot)) parts.push(`${pct} %`);
+  return parts.join(' · ');
+}
+
+/** Lo que se guarda al pausar o cerrar el video. */
+export function coursePlaybackPatch(c: LegacyCourse, at: { position: number; duration: number; video?: string; index?: number; count?: number }, now = new Date()): Partial<LegacyCourse> {
+  const position = Math.max(0, Math.round(at.position));
+  const duration = Math.max(0, Math.round(at.duration));
+  const one = duration ? position / duration : 0;
+  const count = at.count && at.count > 1 ? at.count : 1;
+  const index = count > 1 ? Math.max(0, Math.min(count - 1, at.index ?? 0)) : 0;
+  const progress = Math.round(Math.min(1, (index + one) / count) * 100);
+  const finished = count === 1 ? one >= 0.97 : index === count - 1 && one >= 0.97;
   return {
-    valid,
-    todayMinutes: valid.filter((s) => s.date === today).reduce((n, s) => n + s.minutes, 0),
-    weekMinutes: valid.filter((s) => s.date >= week.from && s.date <= week.to).reduce((n, s) => n + s.minutes, 0),
+    position,
+    duration,
+    progress: finished ? 100 : progress,
+    ...(at.video !== undefined ? { video: /^[\w-]{6,20}$/.test(at.video) ? at.video : '' } : {}),
+    lastAt: now.toISOString(),
+    status: finished ? 'hecho' : c.status === 'hecho' ? 'hecho' : 'curso',
   };
 }
 
-/** Nombre del tipo de sesión («Respiración» para la de la app anterior o sin tipo). */
-export const meditationKindLabel = (kind: unknown) => (kind === MEDITATION_KIND || !kind || typeof kind !== 'string' ? 'Respiración' : kind);
+/** Clases del Horario que vienen de un curso. */
+export const courseClasses = (data: LegacyData | null | undefined, courseId: string): LegacyClass[] => legacyList(data, 'classes').filter((k) => k.course === courseId);
+
+// ---------- Emprendimientos ----------
+
+/** Lo guardado en un emprendimiento, lo más nuevo primero (como se añadió). */
+export function ventureItemsOf(data: LegacyData | undefined, ventureId: string, kind?: VentureItemKind): LegacyVentureItem[] {
+  return legacyList(data, 'ventureItems')
+    .filter((i) => i.ventureId === ventureId && (!kind || i.kind === kind))
+    .reverse();
+}
+
+/** «3 notas · 2 imágenes · 1 archivo». */
+export function ventureSummary(items: LegacyVentureItem[]): string {
+  const n = (k: VentureItemKind) => items.filter((i) => i.kind === k).length;
+  const parts = [
+    [n('note'), 'nota', 'notas'],
+    [n('image'), 'imagen', 'imágenes'],
+    [n('file'), 'archivo', 'archivos'],
+    [n('link'), 'enlace', 'enlaces'],
+  ] as const;
+  const out = parts.filter(([c]) => c > 0).map(([c, one, many]) => plural(c, one, many));
+  return out.length ? out.join(' · ') : 'Vacío';
+}
+
+/** Nombre para mostrar de lo guardado: su título, el nombre del archivo o el enlace. */
+export const ventureItemName = (i: Pick<LegacyVentureItem, 'title' | 'kind' | 'url'>) =>
+  i.title || (i.kind === 'link' ? i.url.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 80) : i.kind === 'note' ? 'Nota sin título' : i.kind === 'image' ? 'Imagen' : 'Archivo');

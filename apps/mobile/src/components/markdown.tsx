@@ -1,4 +1,4 @@
-import { isNoteImageRef, MD_MAX_QUOTE_DEPTH, mdImageLabel, parseBlocks, parseInline, SAFE_LINK, type MdBlock, type MdInline } from '@dyc/core';
+import { isNoteImageRef, mathRuns, mathSpoken, MD_MAX_QUOTE_DEPTH, mdImageLabel, parseBlocks, parseInline, SAFE_LINK, type MdBlock, type MdInline } from '@dyc/core';
 import { radius, space } from '@dyc/tokens';
 import { Check, ImageOff } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -36,10 +36,11 @@ function inline(tokens: MdInline[], ctx: Ctx, key: string): ReactNode[] {
     switch (t.type) {
       case 'text':
         return t.text;
-      case 'code':
       case 'math':
+        return <Formula key={k} src={t.text} color={colors.primary} />;
+      case 'code':
         return (
-          <Text key={k} style={[s.codeInline, { fontFamily: MONO, backgroundColor: colors.surfaceSunken, color: t.type === 'math' ? colors.primary : colors.ink }]}>
+          <Text key={k} style={[s.codeInline, { fontFamily: MONO, backgroundColor: colors.surfaceSunken, color: colors.ink }]}>
             {t.text}
           </Text>
         );
@@ -183,17 +184,26 @@ function blocks(list: MdBlock[], ctx: Ctx, key: string, depth: number): ReactNod
             {rich(b.text, ctx, k, body)}
           </View>
         );
-      case 'code':
       case 'math':
+        return (
+          <View key={k} accessible accessibilityLabel={`Fórmula: ${mathSpoken(b.text)}`} style={s.formulaBlock}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.formulaInner}>
+              <Text maxFontSizeMultiplier={1.4}>
+                <Formula src={b.text} color={colors.primary} size={20} />
+              </Text>
+            </ScrollView>
+          </View>
+        );
+      case 'code':
         return (
           <View
             key={k}
             accessible
-            accessibilityLabel={b.type === 'math' ? `Fórmula: ${b.text}` : `Código${b.lang ? ` (${b.lang})` : ''}: ${b.text}`}
+            accessibilityLabel={`Código${b.lang ? ` (${b.lang})` : ''}: ${b.text}`}
             style={[s.codeBlock, { backgroundColor: colors.surfaceSunken, borderColor: colors.line }]}
           >
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <Text style={{ fontFamily: MONO, fontSize: 14, lineHeight: 20, color: b.type === 'math' ? colors.primary : colors.ink }} maxFontSizeMultiplier={1.4}>
+              <Text style={{ fontFamily: MONO, fontSize: 14, lineHeight: 20, color: colors.ink }} maxFontSizeMultiplier={1.4}>
                 {b.text}
               </Text>
             </ScrollView>
@@ -245,6 +255,8 @@ export function Markdown({ text, resolveImage }: { text: string; resolveImage: I
 const s = StyleSheet.create({
   codeInline: { fontSize: 14 },
   codeBlock: { borderRadius: radius.md, borderWidth: 1, padding: space[3] },
+  formulaBlock: { paddingVertical: space[2] },
+  formulaInner: { flexGrow: 1, justifyContent: 'center' },
   quote: { borderLeftWidth: 3, paddingLeft: space[3], gap: space[2] },
   item: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
   marker: { minWidth: 18, textAlign: 'right' },
@@ -252,3 +264,46 @@ const s = StyleSheet.create({
   missing: { flexDirection: 'row', alignItems: 'center', gap: space[2], borderWidth: 1, borderRadius: radius.md, padding: space[3] },
   image: { width: '100%', borderRadius: radius.sm },
 });
+
+const SERIF = Platform.select({ ios: 'Times New Roman', android: 'serif', default: "Georgia, 'Times New Roman', serif" });
+
+/**
+ * Una fórmula dibujada como fórmula (no como código): letra de libro en
+ * cursiva, símbolos, y exponentes o subíndices más pequeños y desplazados.
+ */
+function Formula({ src, color, size = 17 }: { src: string; color: string; size?: number }) {
+  const small = Math.round(size * 0.68);
+  return (
+    <Text accessibilityLabel={`Fórmula: ${mathSpoken(src)}`} style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: size, color }}>
+      {mathRuns(src).map((r, i) =>
+        r.pos === 'base' ? (
+          <Text key={i}>{r.text}</Text>
+        ) : scriptChars(r.text, r.pos) ? (
+          // En el teléfono, los números y letras comunes salen con su versión Unicode (² ₁ ⁿ…), que siempre se ve en su sitio.
+          <Text key={i}>{scriptChars(r.text, r.pos)}</Text>
+        ) : (
+          // Sin versión Unicode (p. ej. «x^{\alpha}»): más pequeño, con ^ o _ para que se entienda.
+          <Text key={i} style={{ fontSize: small }}>
+            {r.pos === 'sup' ? '^' : '_'}
+            {r.text}
+          </Text>
+        ),
+      )}
+    </Text>
+  );
+}
+
+const SUP: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾', n: 'ⁿ', i: 'ⁱ', x: 'ˣ', y: 'ʸ', k: 'ᵏ', m: 'ᵐ', t: 'ᵗ', a: 'ᵃ', b: 'ᵇ', c: 'ᶜ', d: 'ᵈ', e: 'ᵉ' };
+const SUB: Record<string, string> = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉', '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎', i: 'ᵢ', j: 'ⱼ', n: 'ₙ', k: 'ₖ', m: 'ₘ', t: 'ₜ', x: 'ₓ', a: 'ₐ', e: 'ₑ', o: 'ₒ' };
+
+/** El exponente o subíndice con caracteres Unicode, o null si alguno no existe. */
+function scriptChars(text: string, pos: 'sup' | 'sub'): string | null {
+  const map = pos === 'sup' ? SUP : SUB;
+  let out = '';
+  for (const ch of text) {
+    const m = map[ch];
+    if (!m) return null;
+    out += m;
+  }
+  return out;
+}

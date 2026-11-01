@@ -1,9 +1,10 @@
 import { addDays, noteDateLabel, noteTag, reorderById, utcDayKey } from '@dyc/core';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tokenStore } from '../app/api';
+import { resetFocusTimer } from '../app/focusTimer';
 import { AppRoutes, makeQueryClient, Providers } from '../app/App';
 import { fakeFetch, legacyDoc, profile, USER, type Handler } from '../test/fakeApi';
 import { localDayKey } from '../lib/tools';
@@ -277,9 +278,269 @@ describe('Horario', () => {
     expect(within(dialog).getByText('Debe ser después de la hora de inicio.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Añadir clase' })).toBeDisabled();
   });
+
+  it('vacío, sigue mostrando la cuadrícula de la semana; y dibuja horas antiguas como «8:00»', async () => {
+    withApi({}, (doc) => {
+      doc.classes = [];
+    });
+    const { unmount } = renderAt('/horario');
+    expect(await screen.findByText('Tu horario está vacío')).toBeInTheDocument();
+    for (const day of ['Lunes', 'Domingo']) expect(screen.getByRole('list', { name: day })).toBeInTheDocument();
+    unmount();
+
+    withApi({}, (doc) => {
+      doc.classes = [{ id: 'old', title: 'Química', day: '2', start: '8:00', end: '9:30', room: '', color: '#4F7CFF', subject: '' }];
+    });
+    renderAt('/horario');
+    expect((await screen.findAllByRole('button', { name: /Química, martes de 08:00 a 09:30/ })).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Tu horario está vacío')).not.toBeInTheDocument();
+  });
+});
+
+describe('Cursos', () => {
+  it('agrupa por tema, abre los enlaces aparte y cambia el estado', async () => {
+    const api = withApi();
+    renderAt('/cursos');
+    const ingles = await screen.findByRole('list', { name: 'Cursos de Inglés' });
+    const link = within(ingles).getByRole('link', { name: /Inglés básico/ });
+    expect(link).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abc');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    // Sin nombre, se muestra la plataforma.
+    expect(within(ingles).getByRole('link', { name: /Curso en Udemy/ })).toBeInTheDocument();
+    expect(within(ingles).getByText(/YouTube · Lección 6/)).toBeInTheDocument();
+
+    await userEvent.click(within(ingles).getByRole('button', { name: /Estado de «Inglés básico»: Viendo\. Cambiar a Terminado/ }));
+    expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/cr1', body: { status: 'hecho' } });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Terminado' }));
+    expect(screen.getByRole('link', { name: /Inglés básico/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Curso en Udemy/ })).not.toBeInTheDocument();
+  });
+
+  it('añade un curso con un enlace sin https y con un tema nuevo', async () => {
+    const api = withApi();
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo curso' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Tema'), 'Guitarra');
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'youtu.be/xyz');
+    expect(within(dialog).getByText('Se abrirá en YouTube.')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
+    expect(writes(api).filter((c) => c.path.startsWith('/api/v2/modules'))[0]).toMatchObject({
+      method: 'POST',
+      path: '/api/v2/modules/courses',
+      body: { item: { topic: 'Guitarra', url: 'https://youtu.be/xyz', title: '', status: 'pendiente', notes: '' } },
+    });
+    expect(await screen.findByRole('list', { name: 'Cursos de Guitarra' })).toBeInTheDocument();
+  });
+
+  it('no deja guardar un enlace que no es web', async () => {
+    withApi();
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo curso' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Tema'), 'X');
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'javascript:alert(1)');
+    expect(within(dialog).getByRole('button', { name: 'Añadir curso' })).toBeDisabled();
+    expect(within(dialog).getByText(/Pega un enlace completo/)).toBeInTheDocument();
+  });
+});
+
+describe('Cursos: progreso y horario', () => {
+  afterEach(() => {
+    delete (window as { YT?: unknown }).YT;
+  });
+
+  it('un video de YouTube se ve dentro, empieza donde se pausó y guarda el avance al pausar', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [{ id: 'yt1', topic: 'Inglés', title: 'Inglés básico', url: 'https://www.youtube.com/watch?v=abcdefghijk', status: 'curso', notes: '', position: 600, duration: 2400, progress: 25 }];
+    });
+    let opts: { videoId?: string; playerVars: { start: number }; events: { onStateChange: (e: { data: number }) => void } } | undefined;
+    const player = { getCurrentTime: () => 1200.4, getDuration: () => 2400, getVideoData: () => ({ video_id: 'abcdefghijk' }), getPlaylist: () => null, getPlaylistIndex: () => -1, destroy: vi.fn() };
+    (window as { YT?: unknown }).YT = {
+      Player: function (_el: HTMLElement, o: typeof opts) {
+        opts = o;
+        return player;
+      },
+    };
+    renderAt('/cursos');
+    expect(await screen.findByText('Vas en 10:00 de 40:00')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar «Inglés básico» aquí' }));
+    const dialog = screen.getByRole('dialog', { name: 'Inglés básico' });
+    await waitFor(() => expect(opts?.videoId).toBe('abcdefghijk'));
+    expect(opts!.playerVars.start).toBe(597);
+    act(() => opts!.events.onStateChange({ data: 2 }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/yt1', body: { position: 1200, duration: 2400, progress: 50, status: 'curso' } }));
+    expect(within(dialog).getByText('Guardado: Vas en 20:00 de 40:00.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: /Abrir en YouTube/ })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abcdefghijk');
+  });
+
+  it('en otras plataformas abre el enlace y al volver pregunta hasta dónde llegaste', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [{ id: 'ud1', topic: 'Inglés', title: 'Gramática', url: 'https://www.udemy.com/course/gramatica/', status: 'pendiente', notes: '' }];
+    });
+    renderAt('/cursos');
+    const link = await screen.findByRole('link', { name: /Gramática/ });
+    link.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(link);
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/courses/ud1', body: { status: 'curso' } }));
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    const dialog = await screen.findByRole('dialog', { name: '¿Hasta dónde llegaste?' });
+    await userEvent.type(within(dialog).getByLabelText('Dónde lo dejaste (opcional)'), 'Lección 12');
+    fireEvent.change(within(dialog).getByLabelText(/Avance/), { target: { value: '40' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar avance' }));
+    expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', body: { spot: 'Lección 12', progress: 40, status: 'curso' } });
+    expect(await screen.findByText('Lección 12 · 40 %')).toBeInTheDocument();
+  });
+
+  it('agrega el curso al horario los días elegidos y desde el Horario se abre', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [{ id: 'ud1', topic: 'Inglés', title: 'Gramática', url: 'https://www.udemy.com/course/gramatica/', status: 'curso', notes: '' }];
+      doc.classes = [];
+    });
+    const { unmount } = renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Agregar «Gramática» al horario' }));
+    const dialog = screen.getByRole('dialog', { name: 'Agregar al horario' });
+    expect(within(dialog).getByRole('button', { name: 'Agregar al horario' })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'lunes' }));
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'miércoles' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Agregar al horario' }));
+    const added = writes(api).filter((c) => c.path === '/api/v2/modules/classes');
+    expect(added.map((c) => (c.body as { item: unknown }).item)).toEqual([
+      { id: expect.any(String), day: 1, start: '18:00', end: '19:00', title: 'Gramática', room: 'Udemy', color: expect.any(String), subject: '', course: 'ud1' },
+      { id: expect.any(String), day: 3, start: '18:00', end: '19:00', title: 'Gramática', room: 'Udemy', color: expect.any(String), subject: '', course: 'ud1' },
+    ]);
+    expect(await screen.findByRole('link', { name: 'En tu horario: Lun y Mié 18:00' })).toBeInTheDocument();
+    unmount();
+
+    renderAt('/horario');
+    await userEvent.click((await screen.findAllByRole('button', { name: /Gramática, lunes/ }))[0]);
+    expect(screen.getByRole('link', { name: 'Abrir el curso' })).toHaveAttribute('href', '/cursos?abrir=ud1');
+  });
+
+  it('con solo pegar el enlace lee cuánto dura, y si no puede deja escribirla', async () => {
+    const asked: string[] = [];
+    const api = withApi(
+      {
+        'POST /api/v2/courses/length': (b) => {
+          const url = (b as { url: string }).url;
+          asked.push(url);
+          return url.includes('youtube') ? { seconds: 45000, exact: true, videos: 12 } : [404, { error: 'Esa página no dice cuánto dura. Escribe la duración a mano.' }];
+        },
+      },
+      (doc) => {
+        doc.courses = [];
+      },
+    );
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir el primero' }));
+    let dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Tema'), 'Inglés');
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
+    await userEvent.tab();
+    expect(await within(dialog).findByText('Dura 12 h 30 min (12 videos), según la página.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Duración total en horas (opcional)')).toHaveValue(12.5);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
+    expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/courses', body: { item: { length: 45000, lengthFrom: 'enlace' } } });
+    expect(await screen.findByText(/YouTube · 12 h 30 min/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir a Inglés' }));
+    dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://ejemplo.com/curso');
+    await userEvent.tab();
+    expect(await within(dialog).findByText('Esa página no dice cuánto dura. Escribe la duración a mano.')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Duración total en horas (opcional)'), '6');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
+    expect(writes(api).at(-1)).toMatchObject({ body: { item: { url: 'https://ejemplo.com/curso', length: 21600, lengthFrom: 'manual' } } });
+    expect(asked).toHaveLength(2);
+  });
+
+  it('cada tema va en orden de lo básico a lo avanzado y al terminar uno sus clases pasan al siguiente', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [
+        { id: 'r1', topic: 'React', title: 'Redux avanzado', url: '', status: 'pendiente', notes: '' },
+        { id: 'r2', topic: 'React', title: 'Hooks en React', url: '', status: 'pendiente', notes: '' },
+        { id: 'r3', topic: 'React', title: 'React desde cero', url: 'https://www.udemy.com/course/react/', status: 'curso', notes: '' },
+      ];
+      doc.classes = [{ id: 'k1', day: 1, start: '18:00', end: '19:00', title: 'React desde cero', room: 'Udemy', color: '#4F7CFF', subject: '', course: 'r3' }];
+    });
+    renderAt('/cursos');
+    const card = await screen.findByRole('list', { name: 'Cursos de React' });
+    expect(within(card).getAllByRole('listitem').map((li) => li.querySelector('.course-row__name')?.textContent?.replace(' (se abre en otra pestaña)', ''))).toEqual(['React desde cero', 'Hooks en React', 'Redux avanzado']);
+    expect(within(card).getAllByRole('listitem')[0]).toHaveTextContent('Sigue');
+    await userEvent.click(within(card).getByRole('button', { name: /Estado de «React desde cero»: Viendo/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/classes/k1', body: { course: 'r2', title: 'Hooks en React' } }));
+    expect(await screen.findByText('Terminaste «React desde cero». Tus clases siguen con «Hooks en React».')).toBeInTheDocument();
+  });
+
+  it('«Armar mi horario» reparte los cursos en los huecos libres y dice cuándo terminas', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [
+        { id: 'a', topic: 'Inglés', title: 'Inglés', url: '', status: 'curso', notes: '', length: 36000, progress: 50 },
+        { id: 'b', topic: 'React', title: 'React', url: '', status: 'curso', notes: '', length: 21600 },
+        { id: 'z', topic: 'Otro', title: 'Guitarra', url: '', status: 'pendiente', notes: '' },
+      ];
+      doc.classes = [
+        { id: 'k1', day: 1, start: '18:00', end: '19:00', title: 'Gimnasio', room: '', color: '#4F7CFF', subject: '' },
+        { id: 'old', day: 2, start: '07:00', end: '08:00', title: 'Inglés', room: '', color: '#4F7CFF', subject: '', course: 'a' },
+      ];
+    });
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Armar mi horario' }));
+    const dialog = screen.getByRole('dialog', { name: 'Armar mi horario' });
+    // Por defecto, los que estás viendo.
+    expect(within(dialog).getByRole('checkbox', { name: /Inglés.*1 curso.*faltan 5 h/ })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Otro.*empieza por «Guitarra»/ })).not.toBeChecked();
+    // Solo lunes y miércoles, de 18 a 20.
+    for (const d of ['martes', 'jueves', 'viernes']) await userEvent.click(within(dialog).getByRole('checkbox', { name: d }));
+    fireEvent.change(within(dialog).getByLabelText('Hasta'), { target: { value: '20:00' } });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Horas a la semana'), '5');
+    // Lunes 18-19 ya está ocupado: caben 3 h.
+    expect(within(dialog).getByText('En esos días y horas caben 3 h a la semana, así que usamos esas.')).toBeInTheDocument();
+    const sessions = within(dialog).getAllByRole('listitem').map((li) => li.textContent);
+    expect(sessions.slice(0, 3)).toEqual(['Lun 19:00–20:00 Inglés', 'Mié 18:00–19:00 React', 'Mié 19:00–20:00 React']);
+    expect(sessions.slice(3)).toEqual([expect.stringMatching(/^Inglés: 1 sesión a la semana · lo terminas hacia el .+ \(5 semanas\)$/), expect.stringMatching(/^React: 2 sesiones a la semana · lo terminas hacia el .+ \(3 semanas\)$/)]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Poner en mi horario' }));
+    await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(3));
+    expect(writes(api).find((c) => c.method === 'DELETE')).toMatchObject({ path: '/api/v2/modules/classes/old' });
+    expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0].body).toMatchObject({ item: { day: 1, start: '19:00', end: '20:00', title: 'Inglés', course: 'a' } });
+  });
 });
 
 describe('Enfoque', () => {
+  beforeEach(() => resetFocusTimer());
+
+  it('sigue contando al ir a otra sección y vuelve donde iba', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    withApi();
+    renderAt('/enfoque');
+    await userEvent.click(await screen.findByRole('button', { name: 'Empezar' }));
+    act(() => vi.advanceTimersByTime(3_000));
+    await userEvent.click(screen.getAllByRole('link', { name: /^Hoy$/ })[0]);
+    act(() => vi.advanceTimersByTime(60_000));
+    const chip = await screen.findByRole('link', { name: /Enfoque en marcha: quedan 23:57/ });
+    expect(document.title).toBe('23:57 · Enfoque');
+    await userEvent.click(chip);
+    expect(await screen.findByRole('timer')).toHaveTextContent('23:57');
+    expect(screen.getByRole('button', { name: 'Pausar' })).toBeInTheDocument();
+  });
+
+  it('termina la sesión aunque estés en otra sección', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    const api = withApi();
+    renderAt('/enfoque');
+    await userEvent.click(await screen.findByRole('button', { name: 'Empezar' }));
+    await userEvent.click(screen.getAllByRole('link', { name: /^Hoy$/ })[0]);
+    act(() => vi.advanceTimersByTime(25 * 60_000 + 500));
+    vi.useRealTimers();
+    await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/focus')).toHaveLength(1));
+    expect(await screen.findByText(/Enfoque: ¡sesión terminada! Ahora toca descanso corto/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /en marcha/ })).not.toBeInTheDocument();
+  });
+
   it('guarda la sesión al saltar y alterna con el descanso', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     const api = withApi();
@@ -351,8 +612,8 @@ describe('Más', () => {
     expect(within(personal).getByRole('link', { name: /Metas.*1 en curso/ })).toHaveAttribute('href', '/metas');
     expect(within(personal).getByRole('link', { name: /Mascotas.*1 mascota/ })).toHaveAttribute('href', '/mascotas');
     const health = within(tools).getByRole('list', { name: 'Salud' });
-    expect(within(health).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/ejercicio', '/sueno', '/diario', '/rutina', '/respiracion', '/ciclo']);
-    expect(within(health).getByRole('link', { name: /Respiración.*1 sesión/ })).toBeInTheDocument();
+    expect(within(health).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/ejercicio', '/sueno', '/diario', '/rutina', '/ciclo']);
+    expect(within(tools).queryByRole('link', { name: /Respiración/ })).toBeNull();
     // Ciclo siempre se abre desde Más, aunque esté oculto en el menú.
     expect(within(health).getByRole('link', { name: /Ciclo.*oculto en el menú.*Vacío/ })).toBeInTheDocument();
     expect(within(study).getByRole('link', { name: /Trabajo.*1 por hacer/ })).toHaveAttribute('href', '/trabajo');
@@ -668,12 +929,12 @@ describe('Barra lateral', () => {
     const salud = within(nav).getByRole('button', { name: 'Salud' });
     expect(salud).toHaveAttribute('aria-expanded', 'true');
     const list = within(nav).getByRole('list', { name: 'Salud' });
-    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Ejercicio', 'Sueño', 'Diario', 'Rutina', 'Respiración']);
+    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Ejercicio', 'Sueño', 'Diario', 'Rutina']);
     // Todos los grupos empiezan abiertos: cada sección se ve en el menú. Se pueden plegar.
     const personal = within(nav).getByRole('button', { name: 'Vida personal' });
     expect(personal).toHaveAttribute('aria-expanded', 'true');
     expect(within(within(nav).getByRole('list', { name: 'Vida personal' })).getByRole('link', { name: 'Finanzas' })).toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(23);
+    expect(within(nav).getAllByRole('link')).toHaveLength(24);
     await userEvent.click(personal);
     expect(personal).toHaveAttribute('aria-expanded', 'false');
     expect(within(nav).queryByRole('list', { name: 'Vida personal' })).not.toBeInTheDocument();
@@ -691,9 +952,9 @@ describe('Finanzas', () => {
   it('resume el mes, define el presupuesto y añade un gasto', async () => {
     const api = withApi();
     renderAt('/finanzas');
-    expect(await screen.findByText('+1200', { selector: '.stat__value *' })).toBeInTheDocument();
-    expect(screen.getByText('−45,50', { selector: '.stat__value *' })).toBeInTheDocument();
-    expect(screen.getByText('1154,50', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(await screen.findByText('+$1200', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(screen.getByText('−$45,50', { selector: '.stat__value *' })).toBeInTheDocument();
+    expect(screen.getByText('$1154,50', { selector: '.stat__value *' })).toBeInTheDocument();
     // El movimiento antiguo de otro mes no cuenta.
     expect(within(screen.getByRole('region', { name: /Movimientos/ })).getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getByRole('progressbar', { name: 'Comida: 100 % de los gastos' })).toBeInTheDocument();
@@ -704,7 +965,7 @@ describe('Finanzas', () => {
     await userEvent.click(within(budget).getByRole('button', { name: 'Guardar' }));
     expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/budget', body: { monthly: 500 } });
     expect(await screen.findByRole('progressbar', { name: 'Presupuesto gastado' })).toHaveAttribute('aria-valuenow', '9');
-    expect(screen.getByText(/Quedan 454,50/)).toBeInTheDocument();
+    expect(screen.getByText(/Quedan \$454,50/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Nuevo movimiento' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo movimiento' });
@@ -717,7 +978,7 @@ describe('Finanzas', () => {
       path: '/api/v2/modules/transactions',
       body: { item: { type: 'expense', amount: 12.3, category: 'Transporte', note: 'Metro', date: utcDayKey() } },
     });
-    expect(await screen.findByRole('button', { name: 'Editar: Gasto de 12,30 en Transporte (Metro)' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Editar: Gasto de $12,30 en Transporte (Metro)' })).toBeInTheDocument();
   });
 
   it('un ingreso cambia las categorías y se puede borrar con deshacer', async () => {
@@ -729,7 +990,7 @@ describe('Finanzas', () => {
     expect(within(within(dialog).getByLabelText('Categoría')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Sueldo', 'Freelance', 'Contenido', 'Regalo', 'Otro']);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Borrar: Gasto de 45,50 en Comida (Mercado)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Borrar: Gasto de $45,50 en Comida (Mercado)' }));
     expect(writes(api)[0]).toMatchObject({ method: 'DELETE', path: '/api/v2/modules/transactions/x2' });
     await userEvent.click(await screen.findByRole('button', { name: 'Deshacer' }));
     expect(writes(api)[1]).toMatchObject({ method: 'POST', body: { item: { id: 'x2', amount: 45.5 } } });
@@ -1036,6 +1297,18 @@ describe('Notas', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Notas' })).toBeInTheDocument();
   });
 
+  it('una nota nueva que no se escribe no se queda guardada', async () => {
+    const api = withApi();
+    renderAt('/notas');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva nota' }));
+    await screen.findByLabelText('Título');
+    await userEvent.click(screen.getAllByRole('link', { name: 'Notas' }).find((a) => a.classList.contains('back-link'))!);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Notas' })).toBeInTheDocument();
+    const id = (writes(api)[0].body as { item: { id: string } }).item.id;
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'DELETE', path: `/api/v2/modules/notes/${id}` }));
+    expect(screen.queryByText('Nota sin título')).not.toBeInTheDocument();
+  });
+
   it('inserta una imagen reducida y subida a la nube como coreimg:', async () => {
     const api = withApi({ 'POST /api/images': (b) => ({ ok: true, count: Object.keys((b as { images: object }).images).length }) });
     renderAt('/notas/n2');
@@ -1082,35 +1355,10 @@ describe('Trabajo', () => {
 });
 
 describe('Respiración', () => {
-  it('guía con texto cada fase y guarda la sesión al terminar', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+  it('se quitó: el enlace viejo lleva a Más y los minutos guardados no se tocan', async () => {
     const api = withApi();
     renderAt('/respiracion');
-    expect(await screen.findByText('Sesión en total')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '1 min' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Empezar' }));
-    expect(screen.getAllByText('Inhala').length).toBeGreaterThan(0);
-    act(() => vi.advanceTimersByTime(4_500));
-    expect(screen.getAllByText('Mantén').length).toBeGreaterThan(0);
-    act(() => vi.advanceTimersByTime(4_000));
-    expect(screen.getAllByText('Exhala').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Caja 4-4-4-4' })).toBeDisabled();
-    act(() => vi.advanceTimersByTime(52_000));
-    await waitFor(() => expect(writes(api)).toHaveLength(1));
-    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/meditations', body: { item: { date: utcDayKey(), minutes: 1, kind: 'respiracion' } } });
-    expect(screen.getByRole('button', { name: 'Empezar' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Sesiones en total')).toBeInTheDocument());
-  });
-
-  it('terminar antes del primer minuto no guarda nada', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
-    const api = withApi();
-    renderAt('/respiracion');
-    await userEvent.click(await screen.findByRole('button', { name: '4-7-8' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Empezar' }));
-    act(() => vi.advanceTimersByTime(30_000));
-    await userEvent.click(screen.getByRole('button', { name: 'Terminar' }));
-    expect(screen.getByText(/Con menos de un minuto no se guarda/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /herramientas/i })).toBeInTheDocument();
     expect(writes(api)).toHaveLength(0);
   });
 });
@@ -1262,8 +1510,10 @@ describe('Asistente', () => {
     expect(within(todo).getByText('Comprar pan')).toBeInTheDocument();
     const water = screen.getByRole('group', { name: 'Acción propuesta: Registrar agua' });
     // Nada se ha escrito todavía y no se puede seguir sin decidir.
-    expect(api.calls.filter((c) => c.path.startsWith('/api/v2/modules') && c.method !== 'GET')).toHaveLength(0);
+    expect(api.calls.filter((c) => c.path.startsWith('/api/v2/modules') && !c.path.includes('/chats') && c.method !== 'GET')).toHaveLength(0);
     expect(screen.getByText('Elige «Hacer» o «Descartar» en la acción propuesta para seguir.')).toBeInTheDocument();
+    // La conversación sí se guarda en la cuenta, con sus acciones pendientes.
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'POST' && c.path === '/api/v2/modules/chats')?.body).toMatchObject({ item: { title: 'Añade comprar pan y 2 vasos de agua', cards: { call_1: { status: 'pending' } } } }));
     const google = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions');
     expect(google?.auth).toBe('Bearer clave-de-prueba');
     const first = google?.body as { model: string; messages: Array<{ role: string; content: string }> };
@@ -1306,5 +1556,230 @@ describe('Asistente', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Google no aceptó tu clave');
     // El mensaje vuelve al cuadro para reintentarlo.
     expect(screen.getByLabelText('Mensaje para el asistente')).toHaveValue('Otra');
+  });
+});
+
+describe('Asistente: archivos e historial', () => {
+  const GOOGLE = 'POST /v1beta/openai/chat/completions';
+  const answer = (message: object) => ({ choices: [{ message }] });
+  const ready = () => localStorage.setItem('dyc.assistant', JSON.stringify({ apiKey: 'clave-de-prueba', model: 'gemini-flash-latest', seenPrivacy: true }));
+  afterEach(() => localStorage.clear());
+
+  it('adjunta un archivo de texto, lo envía a Gemini y guarda la conversación en el historial', async () => {
+    ready();
+    const api = withApi({ [GOOGLE]: () => answer({ content: 'Dice «hola mundo».' }) });
+    const { container } = renderAt('/asistente');
+    await screen.findByLabelText('Mensaje para el asistente');
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await userEvent.upload(input, new File(['x'], 'informe.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), { applyAccept: false });
+    expect(await screen.findByRole('alert')).toHaveTextContent('«informe.docx» no se puede leer');
+
+    await userEvent.upload(input, new File(['hola mundo'], 'notas.txt', { type: 'text/plain' }), { applyAccept: false });
+    const pending = await screen.findByRole('list', { name: 'Archivos para enviar' });
+    expect(within(pending).getByText('notas.txt')).toBeInTheDocument();
+    // Con un archivo se puede enviar sin escribir nada.
+    expect(screen.getByRole('button', { name: 'Enviar' })).toBeEnabled();
+    await userEvent.type(screen.getByLabelText('Mensaje para el asistente'), 'Resume esto{Enter}');
+
+    expect(await screen.findByText('Dice «hola mundo».')).toBeInTheDocument();
+    const sent = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions')?.body as { messages: Array<{ role: string; content: unknown }> };
+    expect(sent.messages[1].content).toEqual([
+      { type: 'text', text: 'Archivo adjunto «notas.txt»:\n\nhola mundo' },
+      { type: 'text', text: 'Resume esto' },
+    ]);
+    const log = screen.getByRole('log', { name: 'Mensajes' });
+    expect(within(log).getByRole('list', { name: 'Archivos adjuntos' })).toHaveTextContent('notas.txt');
+
+    await waitFor(() => expect(api.calls.some((c) => c.method === 'POST' && c.path === '/api/v2/modules/chats')).toBe(true));
+    const saved = api.calls.find((c) => c.path === '/api/v2/modules/chats')?.body as { item: { title: string; messages: Array<{ attachments?: Array<{ text?: string }> }> } };
+    expect(saved.item.title).toBe('Resume esto');
+    expect(saved.item.messages[0].attachments?.[0].text).toBe('hola mundo');
+    const history = await screen.findByRole('list', { name: 'Conversaciones guardadas' });
+    expect(within(history).getByRole('button', { name: /^Resume esto/ })).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('abre una conversación guardada con sus imágenes, sigue en ella y la borra', async () => {
+    ready();
+    const api = withApi(
+      {
+        [GOOGLE]: () => answer({ content: 'Sigo aquí.' }),
+        'POST /api/images/fetch': () => ({ images: { ai_foto: 'data:image/jpeg;base64,AAAA' } }),
+        'POST /api/images/delete': () => ({ ok: true, count: 1 }),
+      },
+      (doc) => {
+        doc.chats = [
+          {
+            id: 'ch1',
+            title: 'Mi horario',
+            model: 'gemini-flash-latest',
+            updatedAt: '2026-09-20T10:00:00.000Z',
+            messages: [
+              { role: 'user', content: 'Mi horario', attachments: [{ name: 'horario.jpg', mime: 'image/jpeg', kind: 'image', size: 10, ref: 'ai_foto' }] },
+              { role: 'assistant', content: 'Veo tres clases.' },
+            ],
+            cards: {},
+          },
+        ];
+      },
+    );
+    renderAt('/asistente');
+    const history = await screen.findByRole('list', { name: 'Conversaciones guardadas' });
+    await userEvent.click(within(history).getByRole('button', { name: /^Mi horario/ }));
+    expect(await screen.findByText('Veo tres clases.')).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'horario.jpg' })).toHaveAttribute('src', 'data:image/jpeg;base64,AAAA');
+
+    await userEvent.type(screen.getByLabelText('Mensaje para el asistente'), '¿Y el viernes?{Enter}');
+    expect(await screen.findByText('Sigo aquí.')).toBeInTheDocument();
+    const sent = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions')?.body as { messages: Array<{ role: string; content: unknown }> };
+    // La imagen de antes vuelve a ir a Gemini para que la conversación tenga sentido.
+    expect(sent.messages[1].content).toEqual([
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAAA' } },
+      { type: 'text', text: 'Mi horario' },
+    ]);
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'PATCH' && c.path === '/api/v2/modules/chats/ch1')).toBeTruthy());
+    const patch = api.calls.find((c) => c.method === 'PATCH' && c.path === '/api/v2/modules/chats/ch1')?.body as { messages: unknown[] };
+    expect(patch.messages).toHaveLength(4);
+    expect(JSON.stringify(patch)).not.toContain('base64');
+
+    await userEvent.click(within(history).getByRole('button', { name: 'Borrar «Mi horario»' }));
+    await userEvent.click(within(history).getByRole('button', { name: 'Borrar definitivamente' }));
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'DELETE' && c.path === '/api/v2/modules/chats/ch1')).toBeTruthy());
+    expect(api.calls.find((c) => c.path === '/api/images/delete')?.body).toEqual({ ids: ['ai_foto'] });
+    expect(await screen.findByText(/Tus conversaciones aparecerán aquí/)).toBeInTheDocument();
+  });
+});
+
+describe('Emprendimientos', () => {
+  it('crea un emprendimiento y guarda una nota, un enlace y un archivo', async () => {
+    const api = withApi({ 'POST /api/images': (b) => ({ ok: true, count: Object.keys((b as { images: object }).images).length }) }, (doc) => {
+      doc.ventures = [];
+      doc.ventureItems = [];
+    });
+    const { container } = renderAt('/emprendimientos');
+    expect(await screen.findByText('Guarda aquí cada negocio o proyecto')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Crear el primero' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo emprendimiento' });
+    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Café Brote');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Etapa'), 'Validando');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear emprendimiento' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/ventures', body: { item: { name: 'Café Brote', stage: 'validando' } } });
+    // Se abre su página.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Café Brote' })).toBeInTheDocument();
+    const ventureId = (writes(api)[0].body as { item: { id: string } }).item.id;
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nota' }));
+    const note = screen.getByRole('dialog', { name: 'Nueva nota' });
+    await userEvent.type(within(note).getByLabelText('Título'), 'Plan');
+    await userEvent.type(within(note).getByLabelText('Texto'), '- Buscar local');
+    await userEvent.click(within(note).getByRole('button', { name: 'Guardar nota' }));
+    expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/ventureItems', body: { item: { ventureId, kind: 'note', title: 'Plan', text: '- Buscar local' } } });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Enlace' }));
+    const link = screen.getByRole('dialog', { name: 'Nuevo enlace' });
+    await userEvent.type(within(link).getByLabelText('Enlace'), 'instagram.com/cafebrote');
+    await userEvent.click(within(link).getByRole('button', { name: 'Guardar enlace' }));
+    expect(writes(api).at(-1)).toMatchObject({ body: { item: { kind: 'link', url: 'https://instagram.com/cafebrote' } } });
+    expect(await screen.findByRole('link', { name: /instagram\.com\/cafebrote/ })).toHaveAttribute('target', '_blank');
+
+    const files = container.querySelector('input[aria-label="Elegir archivos"]') as HTMLInputElement;
+    await userEvent.upload(files, new File(['%PDF-1.4'], 'menu.pdf', { type: 'application/pdf' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/ventureItems', body: { item: { kind: 'file', title: 'menu.pdf', mime: 'application/pdf', size: 8 } } }));
+    const upload = api.calls.find((c) => c.path === '/api/images')?.body as { images: Record<string, string> };
+    const [ref] = Object.keys(upload.images);
+    expect(ref).toMatch(/^vf_/);
+    expect(upload.images[ref]).toMatch(/^data:application\/pdf;base64,/);
+    expect((writes(api).at(-1)?.body as { item: { ref: string } }).item.ref).toBe(ref);
+    expect(await screen.findByRole('button', { name: 'Descargar «menu.pdf»' })).toBeInTheDocument();
+    expect(screen.getByText('1 nota · 1 archivo · 1 enlace')).toBeInTheDocument();
+  });
+
+  it('al borrar un emprendimiento se borran también sus archivos', async () => {
+    const api = withApi({ 'POST /api/images/fetch': () => ({ images: { vf_1: 'data:image/jpeg;base64,AAAA' } }), 'POST /api/images/delete': () => ({ ok: true, count: 1 }) }, (doc) => {
+      doc.ventures = [{ id: 'v1', name: 'Tienda', description: 'Stickers', stage: 'lanzado', color: '#4F7CFF' }];
+      doc.ventureItems = [{ id: 'i1', ventureId: 'v1', kind: 'image', title: 'Logo', text: '', url: '', ref: 'vf_1', mime: 'image/jpeg', size: 9, date: '' }];
+    });
+    renderAt('/emprendimientos');
+    await userEvent.click(await screen.findByRole('link', { name: /Tienda/ }));
+    expect(await screen.findByRole('button', { name: 'Ver «Logo»' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    const dialog = screen.getByRole('dialog', { name: 'Editar emprendimiento' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Borrar' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Borrar definitivamente' }));
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'DELETE' && c.path === '/api/v2/modules/ventures/v1')).toBeTruthy());
+    expect(api.calls.find((c) => c.path === '/api/images/delete')?.body).toEqual({ ids: ['vf_1'] });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Emprendimientos' })).toBeInTheDocument();
+  });
+});
+
+describe('Sugerencias de cada sección', () => {
+  const GOOGLE = 'POST /v1beta/openai/chat/completions';
+  afterEach(() => localStorage.clear());
+
+  it('sin clave de Gemini lleva al Asistente', async () => {
+    withApi();
+    renderAt('/pendientes');
+    await userEvent.click(await screen.findByRole('button', { name: 'Sugerencias' }));
+    const dialog = screen.getByRole('dialog', { name: 'Sugerencias para Pendientes' });
+    expect(within(dialog).getByRole('link', { name: 'Ir al Asistente' })).toHaveAttribute('href', '/asistente');
+  });
+
+  it('pide sugerencias con los datos de la sección y «Hacer» aplica la elegida', async () => {
+    localStorage.setItem('dyc.assistant', JSON.stringify({ apiKey: 'clave-de-prueba', model: 'gemini-flash-latest', seenPrivacy: true }));
+    const call = (id: string, args: object) => ({ id, type: 'function', function: { name: 'suggest_change', arguments: JSON.stringify(args) } });
+    const api = withApi({
+      [GOOGLE]: () => ({
+        choices: [
+          {
+            message: {
+              content: 'Dos ideas para tus pendientes.',
+              tool_calls: [
+                call('a', { title: 'Divide «Mudanza» en pasos', reason: 'Así sabes por dónde empezar.', action: 'add', key: 'subtasks', fields: JSON.stringify([{ todoId: 'td2', title: 'Etiquetar cajas' }, { todoId: 'td2', title: 'Contratar camión' }]) }),
+                call('b', { title: 'Añade «Pagar internet»', reason: 'Vence pronto.', action: 'add', key: 'todos', fields: '{"title":"Pagar internet"}' }),
+              ],
+            },
+          },
+        ],
+      }),
+    });
+    renderAt('/pendientes');
+    await userEvent.click(await screen.findByRole('button', { name: 'Sugerencias' }));
+    const dialog = screen.getByRole('dialog', { name: 'Sugerencias para Pendientes' });
+    await userEvent.click(within(dialog).getByText('Ver lo que se enviará'));
+    expect(within(dialog).getByLabelText('Datos de esta sección que se enviarán')).toHaveTextContent('Pedir cajas');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pedir sugerencias' }));
+
+    const split = await within(dialog).findByRole('group', { name: 'Sugerencia: Divide «Mudanza» en pasos' });
+    expect(within(split).getByText('Así sabes por dónde empezar.')).toBeInTheDocument();
+    expect(within(split).getByText('Etiquetar cajas')).toBeInTheDocument();
+    const sent = api.calls.find((c) => c.path === '/v1beta/openai/chat/completions')?.body as { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> };
+    expect(sent.tools[0].function.name).toBe('suggest_change');
+    expect(sent.messages[1].content).toContain('Pedir cajas');
+    // Nada se escribe hasta pulsar «Hacer».
+    expect(writes(api).map((c) => c.path)).toEqual(['/v1beta/openai/chat/completions']);
+
+    await userEvent.click(within(split).getByRole('button', { name: 'Hacer' }));
+    expect(await within(dialog).findByRole('group', { name: 'Hecho: Divide «Mudanza» en pasos' })).toBeInTheDocument();
+    const posts = writes(api).filter((c) => c.path === '/api/v2/modules/subtasks');
+    expect(posts.map((p) => (p.body as { item: { title: string; todoId: string } }).item)).toMatchObject([
+      { title: 'Etiquetar cajas', todoId: 'td2' },
+      { title: 'Contratar camión', todoId: 'td2' },
+    ]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Descartar' }));
+    expect(within(dialog).getByRole('group', { name: 'Descartado: Añade «Pagar internet»' })).toBeInTheDocument();
+    expect(writes(api).filter((c) => c.path === '/api/v2/modules/todos')).toHaveLength(0);
+
+    // «Pedir otras» avisa al modelo de lo que ya propuso.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pedir otras' }));
+    await waitFor(() => expect(api.calls.filter((c) => c.path === '/v1beta/openai/chat/completions')).toHaveLength(2));
+    const again = api.calls.filter((c) => c.path === '/v1beta/openai/chat/completions')[1].body as { messages: Array<{ content: string }> };
+    expect(again.messages[1].content).toContain('«Divide «Mudanza» en pasos»');
+  });
+
+  it('no aparece en secciones sin sugerencias', async () => {
+    withApi();
+    renderAt('/asistente');
+    await screen.findByLabelText('Mensaje para el asistente');
+    expect(screen.queryByRole('button', { name: 'Sugerencias' })).not.toBeInTheDocument();
   });
 });

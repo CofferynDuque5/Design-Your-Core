@@ -11,7 +11,7 @@ const attrs = (src: string, tag: string, attr: string) =>
 
 describe('sitio compilado', () => {
   it('existe (ejecuta pnpm build antes)', () => {
-    expect(pages).toEqual(expect.arrayContaining(['index.html', 'privacidad.html', 'condiciones.html', '404.html']));
+    expect(pages).toEqual(expect.arrayContaining(['index.html', 'descargar.html', 'privacidad.html', 'condiciones.html', '404.html']));
   });
 
   it.each(pages)('%s tiene idioma, título, descripción y un solo h1', (f) => {
@@ -30,7 +30,8 @@ describe('sitio compilado', () => {
   it.each(pages)('%s: los enlaces internos llevan a páginas y secciones que existen', (f) => {
     const ids = new Set(attrs(html('index.html'), '[a-z0-9]+', 'id'));
     for (const href of attrs(html(f), 'a', 'href')) {
-      if (/^(https?:|mailto:)/.test(href)) continue;
+      // Las apps de escritorio se suben aparte, a /descargas (ZIP de descargas).
+      if (/^(https?:|mailto:)/.test(href) || href.startsWith('/descargas/')) continue;
       const [path, hash] = href.split('#');
       if (path && path !== '/') expect(existsSync(join(DIST, `${path.replace(/^\//, '')}.html`)), `${f} → ${href}`).toBe(true);
       if (hash) expect(ids.has(hash), `${f} → #${hash}`).toBe(true);
@@ -47,6 +48,22 @@ describe('sitio compilado', () => {
     const hrefs = attrs(html('index.html'), 'a', 'href');
     expect(hrefs.some((h) => h.endsWith('/registro'))).toBe(true);
     expect(hrefs.some((h) => h.endsWith('/entrar'))).toBe(true);
+  });
+
+  it('enlaza las descargas de la computadora y la instalación en el teléfono', () => {
+    const hrefs = attrs(html('descargar.html'), 'a', 'href');
+    for (const f of ['DesignYourCore-Windows.exe', 'DesignYourCore-Mac-Apple.zip', 'DesignYourCore-Mac-Intel.zip', 'DesignYourCore-Linux.AppImage']) expect(hrefs).toContain(`/descargas/${f}`);
+    expect(hrefs.some((h) => h.endsWith('/?instalar'))).toBe(true);
+  });
+
+  it('muestra todas las herramientas del catálogo de la app', () => {
+    const src = html('index.html');
+    for (const name of ['Agenda', 'Cursos', 'Notas', 'Asistente', 'Bóveda', 'Finanzas', 'Emprendimientos']) expect(src).toContain(`<strong>${name}</strong>`);
+    expect(src).not.toContain('Respiración');
+  });
+
+  it('las capturas que usa el sitio existen', () => {
+    for (const f of pages) for (const src of attrs(html(f), 'img', 'src')) if (src.startsWith('/')) expect(existsSync(join(DIST, src.slice(1))), `${f} → ${src}`).toBe(true);
   });
 
   it('muestra los seis pilares con un reto real del catálogo', () => {

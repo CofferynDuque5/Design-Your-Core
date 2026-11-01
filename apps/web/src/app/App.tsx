@@ -12,6 +12,7 @@ import { NotFound } from '../pages/NotFound';
 import { Onboarding } from '../pages/Onboarding';
 import { Today } from '../pages/Today';
 import { useProfile } from './queries';
+import { InstallBanner } from '../components/InstallBanner';
 import { SessionProvider, useSession } from './session';
 import { ToastProvider } from './toast';
 
@@ -20,10 +21,11 @@ import { ToastProvider } from './toast';
 const page = <K extends string>(name: K, load: () => Promise<Record<K, ComponentType>>) => lazy(() => load().then((m) => ({ default: m[name] })));
 const Agenda = page('Agenda', () => import('../pages/Agenda'));
 const Assistant = page('Assistant', () => import('../pages/Assistant'));
-const Breathe = page('Breathe', () => import('../pages/Breathe'));
 const Calendar = page('Calendar', () => import('../pages/Calendar'));
 const Challenges = page('Challenges', () => import('../pages/Challenges'));
 const Content = page('Content', () => import('../pages/Content'));
+const Courses = page('Courses', () => import('../pages/Courses'));
+const Ventures = page('Ventures', () => import('../pages/Ventures'));
 const Cycle = page('Cycle', () => import('../pages/Cycle'));
 const Exercise = page('Exercise', () => import('../pages/Exercise'));
 const Finance = page('Finance', () => import('../pages/Finance'));
@@ -111,6 +113,9 @@ export function AppRoutes() {
         <Route path="horario" element={<Schedule />} />
         <Route path="enfoque" element={<Focus />} />
         <Route path="materias" element={<Subjects />} />
+        <Route path="cursos" element={<Courses />} />
+        <Route path="emprendimientos" element={<Ventures />} />
+        <Route path="emprendimientos/:ventureId" element={<Ventures />} />
         <Route path="proyectos" element={<Projects />} />
         <Route path="roadmaps" element={<Roadmaps />} />
         <Route path="cuadernos" element={<Notebooks />} />
@@ -130,7 +135,8 @@ export function AppRoutes() {
         <Route path="boveda" element={<Vault />} />
         <Route path="asistente" element={<Assistant />} />
         <Route path="trabajo" element={<Work />} />
-        <Route path="respiracion" element={<Breathe />} />
+        {/* Respiración se quitó: quien la tenga guardada llega a Más. */}
+        <Route path="respiracion" element={<Navigate to="/mas" replace />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
@@ -157,6 +163,7 @@ export function App() {
       <Router>
         <AppRoutes />
         {!import.meta.env.VITE_DEMO && <UpdatePrompt />}
+        {!import.meta.env.VITE_DEMO && <InstallBanner />}
       </Router>
     </Providers>
   );

@@ -1,35 +1,46 @@
-import type { LegacyData } from '@dyc/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ExternalLink, KeyRound, MessageSquarePlus, Send, ShieldCheck, Sparkles, X } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Check, ExternalLink, FileText, History, KeyRound, MessageSquarePlus, Paperclip, Send, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { api } from '../app/api';
-import { LEGACY_QUERY, newId, useLegacyData } from '../app/legacy';
+import { deleteFiles, readAttachment, uploadFile } from '../app/files';
+import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
+import { useRunPlan } from '../app/plan';
 import { keys } from '../app/queries';
 import { PageHeader } from '../components/AppShell';
 import { SelectField, TextField } from '../components/Form';
+import { ProposalCard } from '../components/ProposalCard';
 import { errorMessage } from '../components/States';
+import { ConfirmDelete } from '../components/ToolParts';
 import {
+  ASSISTANT_MODEL_NOTE,
   ASSISTANT_MODELS,
   AssistantError,
+  attachmentProblem,
   buildContext,
   chat,
+  chatAttachmentRefs,
+  chatCards,
+  chatWhen,
   clearSettings,
+  formatBytes,
   loadSettings,
   maskKey,
   planTool,
   saveSettings,
+  storedChat,
   testConnection,
-  waterPatch,
+  withAttachmentData,
   type AssistantModel,
   type AssistantSettings,
+  type CardStatus,
+  type ChatAttachment,
+  type ChatCard,
   type ChatMessage,
-  type Plan,
-  type Proposal,
+  type LegacyChat,
 } from '../lib/assistant';
 import { Markdown } from '../lib/markdown';
 
-type Status = 'pending' | 'running' | 'done' | 'discarded' | 'invalid';
-type Card = Proposal & { status: Status; error?: string };
+type Card = ChatCard;
 
 const SUGGESTIONS = ['Añade «comprar pan» a mis pendientes', 'Anota 2 vasos de agua', 'Ayúdame a planear mi tarde de estudio'];
 const errText = (e: unknown) => (e instanceof AssistantError ? e.message : 'Algo salió mal. Inténtalo de nuevo.');
@@ -42,6 +53,13 @@ export function Assistant() {
     setMemoryOnly(!saveSettings(next));
   };
   const ready = !!settings.apiKey && settings.seenPrivacy;
+  // Cada conversación abierta es una sesión nueva del chat (con su id guardado, si ya existe).
+  const [session, setSession] = useState<{ n: number; chat: LegacyChat | null }>({ n: 0, chat: null });
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const open = (c: LegacyChat | null) => {
+    setSession((s) => ({ n: s.n + 1, chat: c }));
+    setCurrentId(c?.id ?? null);
+  };
 
   return (
     <div className="page">
@@ -59,9 +77,10 @@ export function Assistant() {
               setMemoryOnly(false);
             }}
           />
+          <HistoryCard currentId={currentId} onOpen={open} />
           <PrivacyCard seen={settings.seenPrivacy} onSeen={() => update({ ...settings, seenPrivacy: true })} />
         </aside>
-        <Chat settings={settings} ready={ready} />
+        <Chat key={session.n} initial={session.chat} settings={settings} ready={ready} onSaved={setCurrentId} onNew={() => open(null)} />
       </div>
     </div>
   );
@@ -144,8 +163,7 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
       <SelectField label="Modelo" value={settings.model} onChange={(e) => onChange({ ...settings, model: e.target.value as AssistantModel })}>
         {ASSISTANT_MODELS.map((m) => (
           <option key={m} value={m}>
-            {m}
-            {m === 'gemini-flash-latest' ? ' (recomendado)' : ''}
+            {m} ({ASSISTANT_MODEL_NOTE[m]})
           </option>
         ))}
       </SelectField>
@@ -170,11 +188,11 @@ function PrivacyCard({ seen, onSeen }: { seen: boolean; onSeen: () => void }) {
         <ShieldCheck size={16} aria-hidden="true" /> {seen ? 'Qué se envía a Google' : 'Antes de empezar: qué se envía a Google'}
       </h2>
       <ul className="facts small">
-        <li>Siempre: lo que escribes en esta conversación, las respuestas anteriores de la misma conversación, la fecha de hoy y la lista de acciones que puede proponer.</li>
+        <li>Siempre: lo que escribes en esta conversación (y los archivos que adjuntes), las respuestas anteriores de la misma conversación, la fecha de hoy y la lista de acciones que puede proponer.</li>
         <li>Solo con «Incluir un resumen de mis datos» activado: pendientes y tareas sin hacer, rutina de hoy, metas en curso, totales de finanzas del mes, agua, última noche de sueño, entrenos de la semana, si ya escribiste en el diario hoy y las puntuaciones y hábitos de tu panel.</li>
         <li>Nunca: tu Bóveda, tus notas, el texto de tu diario ni tu contraseña.</li>
         <li>Google trata estos datos según las condiciones de tu clave de Gemini.</li>
-        <li>La conversación solo vive en esta pestaña: se borra al recargar o salir, y no se guarda en tu cuenta.</li>
+        <li>Tus conversaciones y sus archivos se guardan en tu cuenta para verlas en «Historial» (también en el móvil). Puedes borrar cada una cuando quieras.</li>
         <li>Las acciones que proponga (añadir un pendiente, registrar agua…) solo se hacen si pulsas «Hacer».</li>
       </ul>
       {!seen && (
@@ -188,23 +206,72 @@ function PrivacyCard({ seen, onSeen }: { seen: boolean; onSeen: () => void }) {
   );
 }
 
+// ---------- Historial ----------
+
+function HistoryCard({ currentId, onOpen }: { currentId: string | null; onOpen: (c: LegacyChat | null) => void }) {
+  const legacy = useLegacyData();
+  const chats = useLegacyList(legacy.data?.data, 'chats');
+  const actions = useModule('chats');
+  const [asking, setAsking] = useState<LegacyChat | null>(null);
+  const remove = (c: LegacyChat) => {
+    actions.remove(c.id);
+    void deleteFiles(chatAttachmentRefs(c.messages ?? []));
+    setAsking(null);
+    if (c.id === currentId) onOpen(null);
+  };
+  return (
+    <section className="card stack-sm" aria-labelledby="assistant-history">
+      <h2 id="assistant-history" className="list-count">
+        <History size={16} aria-hidden="true" /> Historial
+      </h2>
+      {chats.length === 0 ? (
+        <p className="muted small">Tus conversaciones aparecerán aquí para que puedas volver a ellas desde la web o el móvil.</p>
+      ) : (
+        <ul className="history-list" aria-label="Conversaciones guardadas">
+          {chats.map((c) => (
+            <li key={c.id} className="history-item">
+              {asking?.id === c.id ? (
+                <ConfirmDelete onConfirm={() => remove(c)} onCancel={() => setAsking(null)}>
+                  Se borrará «{c.title}» con sus archivos.
+                </ConfirmDelete>
+              ) : (
+                <>
+                  <button type="button" className="history-item__open" onClick={() => onOpen(c)} aria-current={c.id === currentId ? 'true' : undefined}>
+                    <span className="history-item__title">{c.title}</span>
+                    <span className="small muted">{chatWhen(c.updatedAt)}</span>
+                  </button>
+                  <button type="button" className="icon-btn" onClick={() => setAsking(c)} aria-label={`Borrar «${c.title}»`}>
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 // ---------- Conversación ----------
 
-function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean }) {
+function Chat({ initial, settings, ready, onSaved, onNew }: { initial: LegacyChat | null; settings: AssistantSettings; ready: boolean; onSaved: (id: string) => void; onNew: () => void }) {
   const legacy = useLegacyData();
   const [includeData, setIncludeData] = useState(false);
   const dashboard = useQuery({ queryKey: keys.dashboard('week'), queryFn: () => api.dashboard('week'), enabled: includeData });
   const context = useMemo(() => (includeData ? buildContext(legacy.data?.data, dashboard.data) : null), [includeData, legacy.data, dashboard.data]);
 
-  // Solo en memoria: nada de la conversación se guarda.
-  const [history, setHistory] = useState<ChatMessage[]>([]);
-  const [cards, setCards] = useState<Record<string, Card>>({});
+  const [history, setHistory] = useState<ChatMessage[]>(() => initial?.messages ?? []);
+  const [cards, setCards] = useState<Record<string, Card>>(() => (initial ? chatCards(initial) : {}));
+  const [files, setFiles] = useState<ChatAttachment[]>([]);
+  const [reading, setReading] = useState(false);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const switchId = useId();
   useEffect(() => () => abort.current?.abort(), []);
@@ -213,22 +280,81 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
     if (el) el.scrollTop = el.scrollHeight;
   }, [history, cards, busy]);
 
+  // Al abrir una conversación guardada, se vuelven a descargar sus imágenes y PDF.
+  useEffect(() => {
+    const refs = initial ? chatAttachmentRefs(initial.messages ?? []) : [];
+    if (!refs.length) return;
+    let live = true;
+    api.legacy
+      .images(refs.slice(0, 100))
+      .then((r) => live && setHistory((h) => withAttachmentData(h, r.images)))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [initial]);
+
+  // Guardar en tu cuenta: la primera vez se crea, luego se actualiza.
+  const chats = useModule('chats');
+  const chatId = useRef<string | null>(initial?.id ?? null);
+  const dirty = useRef(false);
+  useEffect(() => {
+    if (busy || !dirty.current || !history.length) return;
+    dirty.current = false;
+    if (chatId.current) {
+      const { id: _id, ...patch } = storedChat(chatId.current, settings.model, history, cards);
+      chats.update(chatId.current, patch);
+    } else {
+      chatId.current = newId();
+      chats.add(storedChat(chatId.current, settings.model, history, cards));
+      onSaved(chatId.current);
+    }
+  }, [busy, history, cards, chats, settings.model, onSaved]);
+
   const pending = Object.values(cards).some((c) => c.status === 'pending' || c.status === 'running');
-  const canSend = ready && !busy && !pending && !!text.trim();
+  const canSend = ready && !busy && !pending && !reading && (!!text.trim() || files.length > 0);
+
+  const pick = async (e: ChangeEvent<HTMLInputElement>) => {
+    const list = [...(e.target.files ?? [])];
+    e.target.value = '';
+    setError(null);
+    setReading(true);
+    const added: ChatAttachment[] = [];
+    try {
+      for (const f of list) {
+        const problem = attachmentProblem({ name: f.name, mime: f.type, size: f.size }, files.length + added.length);
+        if (problem) {
+          setError(problem);
+          break;
+        }
+        added.push(await readAttachment(f));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo leer el archivo.');
+    } finally {
+      setFiles((x) => [...x, ...added]);
+      setReading(false);
+    }
+  };
 
   const send = async (e?: FormEvent) => {
     e?.preventDefault();
     if (!canSend) return;
     const message = text.trim();
+    const attachments = files;
     const before = history;
-    const next: ChatMessage[] = [...history, { role: 'user', content: message }];
+    const userMsg: ChatMessage = attachments.length ? { role: 'user', content: message, attachments } : { role: 'user', content: message };
+    const next: ChatMessage[] = [...history, userMsg];
     setHistory(next);
     setText('');
+    setFiles([]);
     setBusy(true);
     setError(null);
     setNote(null);
     const ctrl = new AbortController();
     abort.current = ctrl;
+    // Los archivos se guardan en tu cuenta mientras Gemini responde.
+    const uploads = Promise.all(attachments.map(async (a) => (a.data ? { ...a, ref: await uploadFile(a.data, 'ai').catch(() => '') } : a)));
     try {
       const reply = await chat({ apiKey: settings.apiKey, model: settings.model, history: next, context, signal: ctrl.signal });
       const added: ChatMessage[] = [reply.message];
@@ -239,31 +365,27 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
         // Lo que no se puede hacer se le dice al modelo en seguida.
         if (!p.plan) added.push({ role: 'tool', tool_call_id: call.id, content: `No se pudo proponer: ${p.error}` });
       }
-      setHistory([...next, ...added]);
+      const saved = attachments.length ? { ...userMsg, attachments: await uploads } : userMsg;
+      dirty.current = true;
+      setHistory([...before, saved, ...added]);
       setCards((c) => ({ ...c, ...newCards }));
       if (reply.fellBack) setNote(`${settings.model} no respondió; se usó ${reply.model}.`);
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') return;
-      // El mensaje vuelve al cuadro de texto para reintentarlo.
+      // El mensaje y los archivos vuelven al cuadro de texto para reintentarlo.
+      void uploads.then((done) => deleteFiles(done.map((a) => a.ref).filter(Boolean)));
       setHistory(before);
       setText(message);
+      setFiles(attachments);
       setError(errText(err));
     } finally {
       setBusy(false);
     }
   };
 
-  const qc = useQueryClient();
-  const exec = useMutation({
-    mutationKey: ['legacy', 'assistant'],
-    scope: { id: 'legacy' },
-    mutationFn: (plan: Plan) => runPlan(plan, qc.getQueryData<{ data: LegacyData }>(LEGACY_QUERY)?.data),
-    onSettled: () => {
-      if (qc.isMutating({ mutationKey: ['legacy'] }) <= 1) return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
-    },
-  });
-
-  const resolve = (id: string, status: Status, result: string) => {
+  const exec = useRunPlan();
+  const resolve = (id: string, status: CardStatus, result: string) => {
+    dirty.current = true;
     setCards((c) => ({ ...c, [id]: { ...c[id], status, error: undefined } }));
     setHistory((h) => [...h, { role: 'tool', tool_call_id: id, content: result }]);
   };
@@ -281,11 +403,7 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
 
   const reset = () => {
     abort.current?.abort();
-    setHistory([]);
-    setCards({});
-    setError(null);
-    setNote(null);
-    setBusy(false);
+    onNew();
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -302,18 +420,18 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
     <section className="card card--raised assistant-chat" aria-labelledby="assistant-chat">
       <div className="assistant-chat__head">
         <h2 id="assistant-chat" className="list-count">
-          <Sparkles size={16} aria-hidden="true" /> Conversación
+          <Sparkles size={16} aria-hidden="true" /> {initial ? initial.title : 'Conversación'}
         </h2>
         <button type="button" className="btn btn--ghost btn--sm" onClick={reset} disabled={!history.length && !busy}>
           <MessageSquarePlus size={16} aria-hidden="true" /> Nueva conversación
         </button>
       </div>
-      <p className="muted small">Solo vive en esta pestaña: se borra al recargar o salir, y no se guarda en tu cuenta.</p>
+      <p className="muted small">Se guarda en tu cuenta: la encuentras en «Historial».</p>
 
       <div className="assistant-log" ref={logRef} role="log" aria-label="Mensajes" tabIndex={0}>
         {shown.length === 0 && !busy ? (
           <div className="assistant-empty">
-            <p className="muted">Pregunta lo que quieras o pídele que añada algo por ti. Antes de escribir en tus datos, te mostrará la acción para que la confirmes.</p>
+            <p className="muted">Pregunta lo que quieras, adjunta una foto o un PDF, o pídele que añada algo por ti. Antes de escribir en tus datos, te mostrará la acción para que la confirmes.</p>
             <div className="chips" role="group" aria-label="Ideas para empezar">
               {SUGGESTIONS.map((s) => (
                 <button key={s} type="button" className="chip-btn" onClick={() => setText(s)} disabled={!ready}>
@@ -328,6 +446,7 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
               m.role === 'user' ? (
                 <li key={i} className="bubble bubble--user">
                   <span className="visually-hidden">Tú: </span>
+                  {m.attachments?.length ? <AttachmentList items={m.attachments} /> : null}
                   {m.content}
                 </li>
               ) : (
@@ -373,7 +492,25 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
         </details>
       )}
 
+      {files.length > 0 && (
+        <ul className="attach-pending" aria-label="Archivos para enviar">
+          {files.map((f, i) => (
+            <li key={`${f.name}-${i}`} className="attach-chip">
+              {f.kind === 'image' && f.data ? <img src={f.data} alt="" /> : <FileText size={16} aria-hidden="true" />}
+              <span className="attach-chip__name">{f.name}</span>
+              <span className="small muted numeric">{formatBytes(f.size)}</span>
+              <button type="button" className="icon-btn" onClick={() => setFiles((x) => x.filter((_, k) => k !== i))} aria-label={`Quitar «${f.name}»`}>
+                <X size={14} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <form className="assistant-composer" onSubmit={send}>
+        <input ref={fileRef} type="file" multiple hidden accept="image/*,.pdf,application/pdf,text/*,.md,.csv,.json" onChange={pick} aria-hidden="true" tabIndex={-1} />
+        <button type="button" className="icon-btn assistant-attach" onClick={() => fileRef.current?.click()} disabled={!ready || busy || reading} aria-label="Adjuntar imagen o archivo">
+          <Paperclip size={20} aria-hidden="true" />
+        </button>
         <label className="visually-hidden" htmlFor={inputId}>
           Mensaje para el asistente
         </label>
@@ -385,7 +522,7 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKey}
           maxLength={4000}
-          placeholder="Escribe un mensaje…"
+          placeholder={files.length ? 'Pregunta algo sobre el archivo…' : 'Escribe un mensaje…'}
           disabled={!ready}
           aria-describedby={blocked ? `${inputId}-why` : undefined}
         />
@@ -393,6 +530,11 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
           <Send size={16} aria-hidden="true" /> Enviar
         </button>
       </form>
+      {reading && (
+        <p className="muted small" role="status">
+          Preparando el archivo…
+        </p>
+      )}
       {blocked && (
         <p className="muted small" id={`${inputId}-why`}>
           {blocked}
@@ -402,54 +544,21 @@ function Chat({ settings, ready }: { settings: AssistantSettings; ready: boolean
   );
 }
 
-function ProposalCard({ card, onDo, onDiscard }: { card: Card; onDo: (c: Card) => void; onDiscard: (c: Card) => void }) {
-  const label = card.status === 'done' ? 'Hecho' : card.status === 'discarded' ? 'Descartado' : card.status === 'invalid' ? 'No se puede hacer' : 'Acción propuesta';
+/** Archivos de un mensaje: las imágenes en miniatura, el resto con su nombre. */
+function AttachmentList({ items }: { items: ChatAttachment[] }) {
   return (
-    <div className={`proposal proposal--${card.status}`} role="group" aria-label={`${label}: ${card.title}`}>
-      <div className="proposal__head">
-        <strong>{card.title}</strong>
-        {card.where && <span className="chip small">{card.where}</span>}
-        <span className={`proposal__state small${card.status === 'done' ? ' success-text' : ''}`}>{label}</span>
-      </div>
-      {card.fields.length > 0 && (
-        <dl className="proposal__fields small">
-          {card.fields.map((f) => (
-            <div key={f.label}>
-              <dt>{f.label}</dt>
-              <dd>{f.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {card.status === 'invalid' && <p className="field__error">{card.error}</p>}
-      {card.error && card.status === 'pending' && (
-        <p className="field__error" role="alert">
-          {card.error}
-        </p>
-      )}
-      {(card.status === 'pending' || card.status === 'running') && (
-        <div className="row">
-          <button type="button" className="btn btn--sm" onClick={() => onDo(card)} disabled={card.status === 'running'}>
-            <Check size={16} aria-hidden="true" /> {card.status === 'running' ? 'Haciendo…' : 'Hacer'}
-          </button>
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => onDiscard(card)} disabled={card.status === 'running'}>
-            Descartar
-          </button>
-        </div>
-      )}
-      {card.status === 'done' && <p className="small muted">{card.done}</p>}
-    </div>
+    <ul className="bubble__files" aria-label="Archivos adjuntos">
+      {items.map((a, i) => (
+        <li key={`${a.name}-${i}`}>
+          {a.kind === 'image' && a.data ? (
+            <img src={a.data} alt={a.name} className="bubble__img" />
+          ) : (
+            <span className="bubble__file">
+              <FileText size={16} aria-hidden="true" /> {a.name}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
   );
-}
-
-/** Escribe la acción confirmada con la API de módulos (como cualquier otra sección). */
-async function runPlan(plan: Plan, data: LegacyData | undefined): Promise<unknown> {
-  switch (plan.kind) {
-    case 'add':
-      return api.modules.add(plan.key, plan.item as never);
-    case 'update':
-      return api.modules.update(plan.key, plan.id, plan.patch as never);
-    case 'water':
-      return api.modules.patch('dayLog', waterPatch(data, plan.glasses, plan.today));
-  }
 }
