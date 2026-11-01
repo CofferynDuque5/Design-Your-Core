@@ -7,14 +7,25 @@ const year = new Date().getFullYear();
 
 <footer class="site-footer">
   <div class="container site-footer__inner">
-    <div class="stack-sm">
+    <div class="site-footer__brand">
       <Logo />
-      <p class="muted small">Bienestar personal en seis pilares, con pasos pequeños.</p>
+      <p class="muted small">Tu bienestar, tus estudios y tu día, en un solo panel.</p>
     </div>
-    <nav aria-label="Pie de página" class="site-footer__nav">
+    <nav aria-label="Producto" class="site-footer__nav">
+      <span class="site-footer__title">Producto</span>
+      <a href="/#funciones">Funciones</a>
+      <a href="/#herramientas">Herramientas</a>
       <a href="/#pilares">Pilares</a>
-      <a href="/#como-funciona">Cómo funciona</a>
+      <a href="/descargar">Descargar</a>
+    </nav>
+    <nav aria-label="Cuenta" class="site-footer__nav">
+      <span class="site-footer__title">Cuenta</span>
+      <a href={appLink('/registro')}>Crear cuenta</a>
       <a href={appLink('/entrar')}>Entrar</a>
+      <a href="/#preguntas">Preguntas</a>
+    </nav>
+    <nav aria-label="Legal" class="site-footer__nav">
+      <span class="site-footer__title">Legal</span>
       <a href="/privacidad">Privacidad</a>
       <a href="/condiciones">Condiciones</a>
     </nav>

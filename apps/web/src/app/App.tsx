@@ -12,6 +12,7 @@ import { NotFound } from '../pages/NotFound';
 import { Onboarding } from '../pages/Onboarding';
 import { Today } from '../pages/Today';
 import { useProfile } from './queries';
+import { InstallBanner } from '../components/InstallBanner';
 import { SessionProvider, useSession } from './session';
 import { ToastProvider } from './toast';
 
@@ -162,6 +163,7 @@ export function App() {
       <Router>
         <AppRoutes />
         {!import.meta.env.VITE_DEMO && <UpdatePrompt />}
+        {!import.meta.env.VITE_DEMO && <InstallBanner />}
       </Router>
     </Providers>
   );
