@@ -27,3 +27,10 @@ export const DOWNLOADS = {
 
 /** Correo de contacto: PUBLIC_CONTACT_EMAIL o el oficial. */
 export const CONTACT_EMAIL = import.meta.env.PUBLIC_CONTACT_EMAIL || CORE_CONTACT_EMAIL;
+
+/** Creadores del proyecto (pie de página). */
+export const AUTHORS = [
+  { name: 'Valeryn Rouse Duque Valladares', role: 'Estudiante de Ingeniería de Sistemas · Margarita' },
+  { name: 'Nathan Gabriel Quevedo Morales', role: 'Socio · Aragua' },
+] as const;
+export const PORTFOLIO_URL = 'https://cofferyncode.nvcorx.com/';

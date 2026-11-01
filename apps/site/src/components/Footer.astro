@@ -1,5 +1,5 @@
 ---
-import { appLink, CONTACT_EMAIL } from '../config';
+import { appLink, AUTHORS, CONTACT_EMAIL, PORTFOLIO_URL } from '../config';
 import Logo from './Logo.astro';
 
 const year = new Date().getFullYear();
@@ -31,7 +31,23 @@ const year = new Date().getFullYear();
       <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
     </nav>
   </div>
+  <div class="container site-footer__authors">
+    <span class="site-footer__title">Creado por</span>
+    <ul>
+      {
+        AUTHORS.map((a) => (
+          <li>
+            <strong>{a.name}</strong>
+            <span class="muted small">{a.role}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <a class="site-footer__portfolio" href={PORTFOLIO_URL} rel="noopener">
+      Ver el portafolio de Valeryn: cofferyncode.nvcorx.com
+    </a>
+  </div>
   <div class="container">
-    <p class="muted small site-footer__legal">© {year} Design Your Core.</p>
+    <p class="muted small site-footer__legal">© {year} Design Your Core. Hecho en Venezuela.</p>
   </div>
 </footer>

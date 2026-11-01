@@ -1084,6 +1084,39 @@
     text-decoration: underline;
   }
 
+  .site-footer__authors {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-10, 40px);
+    padding-top: var(--space-6);
+    border-top: var(--site-border);
+  }
+
+  .site-footer__authors ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3) var(--space-8);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-footer__authors li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .site-footer__portfolio {
+    justify-self: start;
+    color: var(--color-primary-ink, var(--color-ink));
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    overflow-wrap: anywhere;
+  }
+
   .site-footer__legal {
     margin: var(--space-10, 40px) 0 0;
   }
