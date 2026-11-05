@@ -126,6 +126,15 @@ export const PROJECT_STATUS_INFO: Record<ProjectStatus, { label: string }> = {
   entregado: { label: 'Entregado' },
 };
 
+/** Prioridad de un proyecto (campo nuevo: la app anterior no lo tenía). */
+export const PROJECT_PRIORITIES = ['alta', 'media', 'baja'] as const;
+export type ProjectPriority = (typeof PROJECT_PRIORITIES)[number];
+export const PROJECT_PRIORITY_INFO: Record<ProjectPriority, { label: string; rank: number }> = {
+  alta: { label: 'Alta', rank: 0 },
+  media: { label: 'Media', rank: 1 },
+  baja: { label: 'Baja', rank: 2 },
+};
+
 export const CONTENT_STAGES = ['idea', 'guion', 'grabar', 'editar', 'publicado'] as const;
 export type ContentStage = (typeof CONTENT_STAGES)[number];
 export const CONTENT_STAGE_INFO: Record<ContentStage, { label: string }> = {
@@ -455,6 +464,8 @@ export interface LegacyProject {
   /** Texto libre, p. ej. "20 SEP". */
   deadline: string;
   status: ProjectStatus;
+  /** Falta en los proyectos de la app anterior: cuenta como «media». */
+  priority?: ProjectPriority;
   color: string;
   milestones: LegacyMilestone[];
 }
@@ -939,6 +950,7 @@ const shapes = {
     subject: line(120),
     deadline: line(60),
     status: z.enum(PROJECT_STATUSES).default('curso'),
+    priority: z.enum(PROJECT_PRIORITIES).default('media'),
     color: hex.default(PROJECT_COLORS[0]),
     milestones: checkList(checkItem.extend({ date: z.string().max(60).default('') })),
   }),

@@ -85,6 +85,29 @@ describe('app web', () => {
     expect(tokenStore.get()).toBeNull();
   });
 
+  it('Hoy muestra el proyecto que toca terminar primero', async () => {
+    tokenStore.set('t1');
+    fakeFetch({
+      'GET /api/me': () => ({ user: USER }),
+      'GET /api/v2/profile': () => ({ profile: profile() }),
+      'GET /api/v2/dashboard': () => dashboard(),
+      'GET /api/v2/modules': () => ({
+        updatedAt: null,
+        data: {
+          projects: [
+            { id: 'a', title: 'Portafolio', subject: '', deadline: '', status: 'entregado', priority: 'alta', color: '#0FA968', milestones: [] },
+            { id: 'b', title: 'App de notas', subject: '', deadline: '20 NOV', status: 'curso', priority: 'alta', color: '#0FA968', milestones: [] },
+            { id: 'c', title: 'Bot', subject: '', deadline: '', status: 'curso', color: '#0FA968', milestones: [] },
+          ],
+        },
+      }),
+    });
+    renderApp('/');
+    const card = await screen.findByRole('region', { name: 'Termina primero' });
+    expect(within(card).getByText('App de notas')).toBeInTheDocument();
+    expect(within(card).getByText(/Prioridad alta · Entrega 20 NOV · 0 % hecho/)).toBeInTheDocument();
+  });
+
   it('el progreso muestra un estado vacío sin datos', async () => {
     tokenStore.set('t1');
     fakeFetch({

@@ -2640,6 +2640,39 @@
     gap: var(--space-2);
   }
 
+  .first-project__name {
+    margin: 0;
+    font-size: var(--text-lead, 1.125rem);
+    font-weight: var(--weight-semibold);
+  }
+
+  .projects-toolbar {
+    justify-content: space-between;
+  }
+
+  .project-place {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    min-width: 28px;
+    height: 28px;
+    padding-inline: 6px;
+    border-radius: 999px;
+    background: var(--c, var(--color-primary));
+    color: #0a0b09;
+    font-size: var(--text-small);
+    font-weight: var(--weight-semibold);
+  }
+
+  .tool-card__head > .tool-card__title {
+    flex: 1;
+  }
+
+  .project-priority--alta {
+    color: var(--color-danger, #f07a7a);
+    font-weight: var(--weight-semibold);
+  }
+
   .tool-card__head > .icon-btn,
   .tool-card__head > .row {
     flex-wrap: nowrap;

@@ -191,13 +191,13 @@ describe('herramientas de la tanda 2 en el móvil', () => {
     fireEvent.press(await screen.findByRole('radio', { name: 'Física' }));
     fireEvent.changeText(screen.getByLabelText('Entrega (opcional)'), ' 3 oct ');
     fireEvent.press(screen.getByRole('button', { name: 'Guardar' }));
-    expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/projects/p2')).body).toEqual({ title: 'Maqueta', subject: 'Física', deadline: '3 oct', status: 'entregado', color: '#0FA968' });
+    expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/projects/p2')).body).toEqual({ title: 'Maqueta', subject: 'Física', deadline: '3 oct', status: 'entregado', priority: 'media', color: '#0FA968' });
 
     // Nuevo: color cíclico de la paleta.
     fireEvent.press(screen.getByRole('button', { name: 'Nuevo proyecto' }));
     fireEvent.changeText(await screen.findByLabelText('Nombre'), 'Póster');
     fireEvent.press(screen.getByRole('button', { name: 'Añadir proyecto' }));
-    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/projects'))).toEqual({ id: expect.any(String), title: 'Póster', subject: '', deadline: '', status: 'curso', color: '#E8912A', milestones: [] });
+    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/projects'))).toEqual({ id: expect.any(String), title: 'Póster', subject: '', deadline: '', status: 'curso', priority: 'media', color: '#E8912A', milestones: [] });
 
     fireEvent.press(await screen.findByRole('button', { name: 'Editar «Póster»' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Borrar' }));
@@ -207,6 +207,27 @@ describe('herramientas de la tanda 2 en el móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Borrar definitivamente' }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'DELETE' }));
     expect(writes(api).at(-1)?.path).toMatch(/^\/api\/v2\/modules\/projects\//);
+  });
+
+  it('Proyectos: prioridad y orden «terminar primero»', async () => {
+    const api = setup();
+    await open('/proyectos', 'Ensayo de Historia');
+    expect(screen.getByLabelText('Puesto 1 de 1')).toBeOnTheScreen();
+    expect(screen.getAllByLabelText('Prioridad media').length).toBeGreaterThan(0);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Nuevo proyecto' }));
+    fireEvent.changeText(await screen.findByLabelText('Nombre'), 'App de notas');
+    fireEvent.press(within(screen.getByLabelText('Prioridad')).getByRole('radio', { name: 'Alta' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir proyecto' }));
+    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/projects'))).toMatchObject({ title: 'App de notas', priority: 'alta' });
+
+    expect(await screen.findByLabelText('Puesto 2 de 2')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Subir «App de notas»' }));
+    const order = await waitForWrite(api, 'PUT', '/api/v2/modules/projects/order');
+    expect((order.body as { ids: string[] }).ids[1]).toBe('p1');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Ordenar por prioridad' }));
+    await waitFor(() => expect(writes(api).filter((w) => w.method === 'PUT')).toHaveLength(2));
   });
 
   it('si la API falla, el estado del proyecto se deshace y avisa', async () => {

@@ -743,6 +743,32 @@ describe('Proyectos', () => {
     });
     expect(await screen.findByRole('article', { name: 'Informe de laboratorio' })).toBeInTheDocument();
   });
+
+  it('pone prioridad y ordena «terminar primero»', async () => {
+    const api = withApi();
+    renderAt('/proyectos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo proyecto' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo proyecto' });
+    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'App de notas');
+    await userEvent.click(within(within(dialog).getByRole('group', { name: 'Prioridad' })).getByRole('button', { name: 'Alta' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir proyecto' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', body: { item: { title: 'App de notas', priority: 'alta' } } });
+
+    const nueva = await screen.findByRole('article', { name: 'App de notas' });
+    expect(within(nueva).getByText('Prioridad alta')).toBeInTheDocument();
+    expect(within(nueva).getByLabelText('Puesto 2 de 2')).toBeInTheDocument();
+    expect(within(screen.getByRole('article', { name: 'Maqueta del puente' })).getByText('Prioridad media')).toBeInTheDocument();
+
+    await userEvent.click(within(nueva).getByRole('button', { name: 'Subir «App de notas»' }));
+    const order = writes(api)[1];
+    expect(order).toMatchObject({ method: 'PUT', path: '/api/v2/modules/projects/order' });
+    expect((order.body as { ids: string[] }).ids.slice(0, 2)).toEqual([expect.any(String), 'p1']);
+    expect((order.body as { ids: string[] }).ids[0]).not.toBe('p1');
+
+    await userEvent.click(screen.getByRole('button', { name: /Ordenar por prioridad/ }));
+    expect(writes(api)[2]).toMatchObject({ method: 'PUT', path: '/api/v2/modules/projects/order' });
+
+  });
 });
 
 describe('Roadmaps', () => {

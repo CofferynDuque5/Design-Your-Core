@@ -1,9 +1,11 @@
 import type { CheckIn, Dashboard } from '@dyc/api-client';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowRight, PenLine } from 'lucide-react';
+import { firstProject, PROJECT_PRIORITY_INFO, projectPriorityOf, projectProgress } from '@dyc/core';
+import { ArrowRight, Flag, PenLine } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../app/api';
+import { useLegacyData, useLegacyList } from '../app/legacy';
 import { useToggleChallenge, useToggleHabit } from '../app/mutations';
 import { useDashboard, useRefresh } from '../app/queries';
 import { useSession } from '../app/session';
@@ -115,6 +117,7 @@ function TodayContent({ d }: { d: Dashboard }) {
       </div>
 
       <aside className="stack-lg" aria-label="Resumen y sugerencias">
+        <FirstProjectCard />
         <WeekCard d={d} />
         {recs.length > 0 && (
           <section className="stack" aria-labelledby="recs">
@@ -186,6 +189,33 @@ function CheckInCard({ today, checkIn }: { today: string; checkIn: CheckIn | nul
           Check-in completo
         </Link>
       </div>
+    </section>
+  );
+}
+
+/** El proyecto que toca terminar primero (el número 1 de Proyectos). */
+function FirstProjectCard() {
+  const legacy = useLegacyData();
+  const projects = useLegacyList(legacy.data?.data, 'projects');
+  const p = firstProject(projects);
+  if (!p) return null;
+  const priority = projectPriorityOf(p);
+  const pct = projectProgress(p);
+  return (
+    <section className="card stack" aria-labelledby="first-project-title">
+      <div className="section-head">
+        <h2 id="first-project-title" className="section-title">
+          Termina primero
+        </h2>
+        <Link to="/proyectos" className="section-link">
+          Proyectos <ArrowRight size={16} aria-hidden="true" />
+        </Link>
+      </div>
+      <p className="first-project__name">{p.title || 'Sin título'}</p>
+      <p className="muted small">
+        <Flag size={14} aria-hidden="true" className="inline-icon" /> Prioridad {PROJECT_PRIORITY_INFO[priority].label.toLowerCase()}
+        {p.deadline?.trim() ? ` · Entrega ${p.deadline}` : ''} · {pct} % hecho
+      </p>
     </section>
   );
 }

@@ -1,8 +1,8 @@
 import type { CheckIn, Dashboard } from '@dyc/api-client';
-import { firstName, greeting, longDay, plural } from '@dyc/core';
+import { firstName, firstProject, greeting, longDay, plural, PROJECT_PRIORITY_INFO, projectPriorityOf, projectProgress } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { ChallengeCard, HabitRow, RecommendationCard } from '../../components/cards';
@@ -10,6 +10,7 @@ import { pillarShort } from '../../components/pillar';
 import { ScoreRing } from '../../components/score';
 import { Button, Card, EmptyState, ErrorState, errorMessage, Loading, PageHeader, Scale, Screen, SectionHeader, T } from '../../components/ui';
 import { api, useAuth } from '../../lib/api';
+import { useLegacyData, useLegacyList } from '../../lib/legacy';
 import { useToggleChallenge, useToggleHabit } from '../../lib/mutations';
 import { useDashboard, useRefresh } from '../../lib/queries';
 import { useToast } from '../../lib/toast';
@@ -86,6 +87,7 @@ function TodayContent({ d }: { d: Dashboard }) {
         )}
       </View>
 
+      <FirstProjectCard />
       <WeekCard d={d} />
 
       {recs.length > 0 && (
@@ -149,6 +151,28 @@ function CheckInCard({ today, checkIn }: { today: string; checkIn: CheckIn | nul
         <Button label="Guardar" onPress={() => save.mutate()} busy={save.isPending} disabled={!mood && !energy} />
         <Button variant="ghost" label="Check-in completo" onPress={() => router.push('/check-in')} />
       </View>
+    </Card>
+  );
+}
+
+/** El proyecto que toca terminar primero (el número 1 de Proyectos). */
+function FirstProjectCard() {
+  const router = useRouter();
+  const legacy = useLegacyData();
+  const projects = useLegacyList(legacy.data?.data, 'projects');
+  const p = firstProject(projects);
+  if (!p) return null;
+  const priority = projectPriorityOf(p);
+  return (
+    <Card>
+      <SectionHeader title="Termina primero" right={<Button small variant="link" label="Proyectos" onPress={() => router.push('/proyectos' as Href)} />} />
+      <T v="heading" style={{ fontSize: 18, lineHeight: 24 }}>
+        {p.title || 'Sin título'}
+      </T>
+      <T v="small" tint="muted">
+        Prioridad {PROJECT_PRIORITY_INFO[priority].label.toLowerCase()}
+        {p.deadline?.trim() ? ` · Entrega ${p.deadline}` : ''} · {projectProgress(p)} % hecho
+      </T>
     </Card>
   );
 }

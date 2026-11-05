@@ -26,6 +26,9 @@ import {
   PERIOD_FLOWS,
   PET_SPECIES,
   PROJECT_STATUSES,
+  PROJECT_PRIORITIES,
+  PROJECT_PRIORITY_INFO,
+  type ProjectPriority,
   SLEEP_QUALITY_LABELS,
   type CareKind,
   type ContentPlatform,
@@ -657,6 +660,26 @@ export function legacySubjectNames(data: Record<string, unknown> | undefined): s
 }
 
 // Un valor desconocido se muestra como el de por defecto, sin cambiar el dato.
+export const projectPriorityOf = (p: { priority?: unknown }): ProjectPriority => (PROJECT_PRIORITIES.includes(p.priority as ProjectPriority) ? (p.priority as ProjectPriority) : 'media');
+
+/**
+ * Orden «terminar primero»: los pendientes en el orden que eligió la persona, y los entregados al final.
+ * El orden de la lista es el que se guarda; esta función solo aparta los entregados.
+ */
+export function projectsInOrder<T extends { status?: unknown }>(list: readonly T[]): T[] {
+  return [...list.filter((p) => projectStatusOf(p) !== 'entregado'), ...list.filter((p) => projectStatusOf(p) === 'entregado')];
+}
+
+/** Ids reordenados por prioridad (alta, media, baja), sin cambiar el orden dentro de cada prioridad. Entregados al final. */
+export function projectIdsByPriority<T extends { id: string; status?: unknown; priority?: unknown }>(list: readonly T[]): string[] {
+  const open = list.filter((p) => projectStatusOf(p) !== 'entregado');
+  const sorted = open.map((p, i) => ({ p, i })).sort((a, b) => PROJECT_PRIORITY_INFO[projectPriorityOf(a.p)].rank - PROJECT_PRIORITY_INFO[projectPriorityOf(b.p)].rank || a.i - b.i);
+  return [...sorted.map((x) => x.p.id), ...list.filter((p) => projectStatusOf(p) === 'entregado').map((p) => p.id)];
+}
+
+/** El proyecto que toca terminar primero (el primero sin entregar), o undefined. */
+export const firstProject = <T extends { status?: unknown }>(list: readonly T[]): T | undefined => list.find((p) => projectStatusOf(p) !== 'entregado');
+
 export const projectStatusOf = (p: { status?: unknown }): ProjectStatus => (PROJECT_STATUSES.includes(p.status as ProjectStatus) ? (p.status as ProjectStatus) : 'curso');
 export const contentPlatformOf = (c: Pick<LegacyContent, 'platform'>): ContentPlatform => (CONTENT_PLATFORMS.includes(c.platform) ? c.platform : 'otro');
 export const contentStageOf = (c: Pick<LegacyContent, 'stage'>): ContentStage => (CONTENT_STAGES.includes(c.stage) ? c.stage : 'idea');

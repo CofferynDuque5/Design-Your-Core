@@ -86,7 +86,7 @@ describe('módulos de la app anterior', () => {
 
   it('tanda 2: valores por defecto de la app anterior', () => {
     expect(legacyItemSchemas.subjects.parse({ id: 's1', name: 'Física' })).toEqual({ id: 's1', name: 'Física', teacher: '', room: '', color: '#4F7CFF', nextClass: '', topics: [] });
-    expect(legacyItemSchemas.projects.parse({ id: 'p1', title: 'Ensayo' })).toEqual({ id: 'p1', title: 'Ensayo', subject: '', deadline: '', status: 'curso', color: '#0FA968', milestones: [] });
+    expect(legacyItemSchemas.projects.parse({ id: 'p1', title: 'Ensayo' })).toEqual({ id: 'p1', title: 'Ensayo', subject: '', deadline: '', status: 'curso', priority: 'media', color: '#0FA968', milestones: [] });
     expect(legacyItemSchemas.roadmaps.parse({ id: 'r1', name: 'Ingeniería' })).toEqual({ id: 'r1', name: 'Ingeniería', color: '#8B5CF6', steps: [] });
     expect(legacyItemSchemas.notebooks.parse({ id: 'n1', category: '  ' })).toEqual({ id: 'n1', title: 'Cuaderno', category: 'General', subject: '', topic: '', color: '#4F7CFF', emoji: '📓' });
     expect(legacyItemSchemas.noteBoxes.parse({ id: 'b1', notebookId: 'n1' })).toEqual({ id: 'b1', notebookId: 'n1', title: '', text: '', color: '#FFF7D6', kind: 'text', lang: '' });

@@ -6,17 +6,23 @@ import {
   COLOR_NAMES,
   dueThisWeek,
   PROJECT_COLORS,
+  PROJECT_PRIORITIES,
+  PROJECT_PRIORITY_INFO,
   PROJECT_STATUS_INFO,
   PROJECT_STATUSES,
+  projectIdsByPriority,
+  projectPriorityOf,
   projectProgress,
+  projectsInOrder,
   projectStatusOf,
   type LegacyClass,
   type LegacyMilestone,
   type LegacyProject,
   type LegacySubject,
+  type ProjectPriority,
   type ProjectStatus,
 } from '@dyc/core';
-import { CalendarClock, ChevronDown, Clock, Pencil, Plus } from 'lucide-react';
+import { ArrowDownWideNarrow, CalendarClock, ChevronDown, ChevronUp, Clock, Flag, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, newSubId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
@@ -34,6 +40,7 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'entregado', label: 'Entregados' },
 ];
 const STATUS_OPTIONS = PROJECT_STATUSES.map((s) => ({ value: s, label: PROJECT_STATUS_INFO[s].label }));
+const PRIORITY_OPTIONS = PROJECT_PRIORITIES.map((p) => ({ value: p, label: PROJECT_PRIORITY_INFO[p].label }));
 /** Un estado desconocido se muestra como «En curso», sin cambiar el dato. */
 const statusOf = projectStatusOf;
 
@@ -42,7 +49,9 @@ export function Projects() {
   const raw = useLegacyList(legacy.data?.data, 'projects');
   const subjects = useLegacyList(legacy.data?.data, 'subjects');
   const classes = useLegacyList(legacy.data?.data, 'classes');
-  const projects = useMemo<Project[]>(() => raw.map((p) => ({ ...p, milestones: checkItems<LegacyMilestone>(p.milestones, newSubId) })), [raw]);
+  // Orden «terminar primero»: el de la lista guardada, con los entregados al final.
+  const projects = useMemo<Project[]>(() => projectsInOrder(raw.map((p) => ({ ...p, milestones: checkItems<LegacyMilestone>(p.milestones, newSubId) }))), [raw]);
+  const actions = useModule('projects');
   const [filter, setFilter] = useState<Filter>('todos');
   const [editing, setEditing] = useState<Project | 'new' | null>(null);
 
@@ -50,6 +59,17 @@ export function Projects() {
   const thisWeek = projects.filter((p) => dueThisWeek(p.deadline)).length;
   // Igual que la app anterior: «En curso» incluye los que están en revisión.
   const shown = filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? statusOf(p) === 'entregado' : statusOf(p) !== 'entregado'));
+  const open = projects.filter((p) => statusOf(p) !== 'entregado');
+
+  // Sube o baja un proyecto pendiente un puesto; los entregados quedan al final.
+  const move = (id: string, delta: -1 | 1) => {
+    const ids = open.map((p) => p.id);
+    const i = ids.indexOf(id);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    actions.reorder([...ids, ...projects.filter((p) => statusOf(p) === 'entregado').map((p) => p.id)]);
+  };
 
   return (
     <div className="page">
@@ -72,14 +92,30 @@ export function Projects() {
               { value: thisWeek, label: thisWeek === 1 ? 'Entrega esta semana' : 'Entregas esta semana' },
             ]}
           />
-          <Segmented label="Mostrar" options={FILTERS} value={filter} onChange={setFilter} />
+          <div className="row projects-toolbar">
+            <Segmented label="Mostrar" options={FILTERS} value={filter} onChange={setFilter} />
+            {open.length > 1 && (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => actions.reorder(projectIdsByPriority(projects))}>
+                <ArrowDownWideNarrow size={16} aria-hidden="true" /> Ordenar por prioridad
+              </button>
+            )}
+          </div>
+          {open.length > 0 && filter !== 'entregado' && <p className="muted small">El orden es el de «terminar primero»: sube o baja cada proyecto con las flechas.</p>}
           {shown.length === 0 ? (
             <EmptyState title="Nada por aquí con este filtro" />
           ) : (
             <ul className="card-grid tool-grid" aria-label="Proyectos">
               {shown.map((p) => (
                 <li key={p.id}>
-                  <ProjectCard project={p} subjects={subjects} classes={classes} onEdit={() => setEditing(p)} />
+                  <ProjectCard
+                    project={p}
+                    subjects={subjects}
+                    classes={classes}
+                    place={open.indexOf(p)}
+                    total={open.length}
+                    onMove={(d) => move(p.id, d)}
+                    onEdit={() => setEditing(p)}
+                  />
                 </li>
               ))}
             </ul>
@@ -93,12 +129,30 @@ export function Projects() {
   );
 }
 
-function ProjectCard({ project: p, subjects, classes, onEdit }: { project: Project; subjects: LegacySubject[]; classes: LegacyClass[]; onEdit: () => void }) {
+function ProjectCard({
+  project: p,
+  subjects,
+  classes,
+  place,
+  total,
+  onMove,
+  onEdit,
+}: {
+  project: Project;
+  subjects: LegacySubject[];
+  classes: LegacyClass[];
+  /** Puesto en «terminar primero» (desde 0), o -1 si está entregado. */
+  place: number;
+  total: number;
+  onMove: (d: -1 | 1) => void;
+  onEdit: () => void;
+}) {
   const actions = useModule('projects');
   const [open, setOpen] = useState(false);
   const color = safeColor(p.color, PROJECT_COLORS[0]);
   const title = p.title || 'Sin título';
   const status = statusOf(p);
+  const priority = projectPriorityOf(p);
   const pct = projectProgress(p);
   const done = p.milestones.filter((m) => m.done).length;
   // La materia va por nombre; su primera clase de la semana, como en la app anterior.
@@ -110,12 +164,29 @@ function ProjectCard({ project: p, subjects, classes, onEdit }: { project: Proje
   return (
     <article className={`card tool-card${status === 'entregado' ? ' tool-card--done' : ''}`} style={{ ['--c' as string]: color }} aria-labelledby={titleId}>
       <div className="tool-card__head">
+        {place >= 0 && (
+          <span className="project-place numeric" aria-label={`Puesto ${place + 1} de ${total}`}>
+            {place + 1}
+          </span>
+        )}
         <h2 id={titleId} className="tool-card__title">
           {title}
         </h2>
-        <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
-          <Pencil size={18} aria-hidden="true" />
-        </button>
+        <div className="row">
+          {place >= 0 && total > 1 && (
+            <>
+              <button type="button" className="icon-btn" disabled={place === 0} onClick={() => onMove(-1)} aria-label={`Subir «${title}»`}>
+                <ChevronUp size={18} aria-hidden="true" />
+              </button>
+              <button type="button" className="icon-btn" disabled={place === total - 1} onClick={() => onMove(1)} aria-label={`Bajar «${title}»`}>
+                <ChevronDown size={18} aria-hidden="true" />
+              </button>
+            </>
+          )}
+          <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
+            <Pencil size={18} aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <ul className="meta-list">
         {p.subject && (
@@ -131,6 +202,10 @@ function ProjectCard({ project: p, subjects, classes, onEdit }: { project: Proje
             )}
           </li>
         )}
+        <li className={`project-priority project-priority--${priority}`}>
+          <Flag size={15} aria-hidden="true" />
+          Prioridad {PROJECT_PRIORITY_INFO[priority].label.toLowerCase()}
+        </li>
         <li>
           <CalendarClock size={15} aria-hidden="true" />
           Entrega · {p.deadline?.trim() ? p.deadline : 'sin fecha'}
@@ -168,6 +243,7 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   const [subject, setSubject] = useState(project?.subject ?? '');
   const [deadline, setDeadline] = useState(project?.deadline ?? '');
   const [status, setStatus] = useState<ProjectStatus>(project ? statusOf(project) : 'curso');
+  const [priority, setPriority] = useState<ProjectPriority>(project ? projectPriorityOf(project) : 'media');
   const [color, setColor] = useState(safeColor(project?.color, PROJECT_COLORS[count % PROJECT_COLORS.length]));
   const names = subjects.map((s) => s.name).filter((n): n is string => typeof n === 'string' && !!n);
   const unknown = subject && !names.includes(subject);
@@ -181,7 +257,7 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, color };
+    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color };
     if (project) actions.update(project.id, fields);
     else actions.add({ id: newId(), ...fields, milestones: [] });
     onDone();
@@ -208,6 +284,7 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
           </option>
         ))}
       </SelectField>
+      <Segmented label="Prioridad" options={PRIORITY_OPTIONS} value={priority} onChange={setPriority} />
       <ColorPicker legend="Color" colors={paletteWith(PROJECT_COLORS, color)} value={color} onChange={setColor} names={COLOR_NAMES} />
       <FormActions
         submitLabel={project ? 'Guardar' : 'Añadir proyecto'}
