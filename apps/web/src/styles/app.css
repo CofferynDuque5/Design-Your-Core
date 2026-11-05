@@ -5601,6 +5601,22 @@
     flex-direction: column;
   }
 
+  /* Subcategoría dentro de un tema. */
+  .course-sub + .course-sub {
+    margin-top: var(--space-2);
+  }
+
+  .course-sub__title {
+    margin: 0;
+    padding-block: var(--space-2) var(--space-1);
+    border-bottom: 1px solid var(--color-line);
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+  }
+
   .course-row {
     display: flex;
     flex-wrap: wrap;

@@ -671,8 +671,12 @@ export interface LegacyCourse {
   id: string;
   /** Tema que se quiere estudiar («Inglés», «React»…). Agrupa los cursos. */
   topic: string;
+  /** Subcategoría dentro del tema («Hooks», «Gramática»…); vacía o ausente si no tiene. */
+  subtopic?: string;
   /** Nombre del curso o video; "" si solo hay enlace. */
   title: string;
+  /** Canal de YouTube o academia que lo dicta («midudev», «Platzi»…). */
+  source?: string;
   /** Enlace http(s) o "". */
   url: string;
   status: CourseStatus;
@@ -1100,7 +1104,9 @@ const shapes = {
   courses: z.object({
     id: legacyIdSchema,
     topic: z.string().trim().min(1, 'Escribe el tema').max(120),
+    subtopic: z.string().trim().max(120).optional(),
     title: line(200),
+    source: z.string().trim().max(120).optional(),
     url: z.union([z.literal(''), z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).default(''),
     status: z.enum(COURSE_STATUSES).default('pendiente'),
     notes: text(5000),

@@ -8,7 +8,9 @@ import {
   courseProgress,
   courseResume,
   coursePlaybackPatch,
+  coursesBySubtopic,
   coursesByTopic,
+  courseOrigin,
   courseLevel,
   courseRemaining,
   courseRoute,
@@ -40,6 +42,7 @@ import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions, WeekdayPicker } from '../components/ToolParts';
 import { useToast } from '../app/toast';
 import { YouTubePlayer } from '../components/YouTubePlayer';
+import { readYouTubeLength } from '../lib/youtubeLength';
 import { plural } from '../lib/format';
 
 type Filter = 'todos' | CourseStatus;
@@ -117,7 +120,7 @@ export function Courses() {
         </button>
         {pending > 0 && (
           <button type="button" className="btn btn--secondary" onClick={() => setPlanning(true)} disabled={!legacy.data}>
-            <CalendarClock size={18} aria-hidden="true" /> Armar mi horario
+            <CalendarClock size={18} aria-hidden="true" /> Crear horario
           </button>
         )}
       </PageHeader>
@@ -172,7 +175,7 @@ export function Courses() {
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing && 'id' in editing ? 'Editar curso' : 'Nuevo curso'}>
-        {editing && <CourseForm course={'id' in editing ? editing : null} topic={editing.topic} topics={topics} onDone={() => setEditing(null)} />}
+        {editing && <CourseForm course={'id' in editing ? editing : null} topic={editing.topic} topics={topics} courses={courses} onDone={() => setEditing(null)} />}
       </Dialog>
       <Dialog open={!!watched} onClose={() => setWatching(null)} title={watched ? courseName(watched) : 'Curso'} wide>
         {watched && <Watch course={watched} />}
@@ -180,7 +183,7 @@ export function Courses() {
       <Dialog open={!!logged} onClose={() => setLogging(null)} title="¿Hasta dónde llegaste?">
         {logged && <ProgressForm course={logged} onDone={() => setLogging(null)} />}
       </Dialog>
-      <Dialog open={planning} onClose={() => setPlanning(false)} title="Armar mi horario" wide>
+      <Dialog open={planning} onClose={() => setPlanning(false)} title="Crear horario" wide>
         {planning && <StudyPlanner courses={courses} onDone={() => setPlanning(false)} />}
       </Dialog>
       <Dialog open={!!scheduled} onClose={() => setScheduling(null)} title="Agregar al horario">
@@ -217,11 +220,20 @@ function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items:
         </span>
       </div>
       {all.length > 2 && <p className="small muted course-card__route">En orden: lo que empezaste y de lo básico a lo avanzado.</p>}
-      <ul className="course-list" aria-label={`Cursos de ${topic}`}>
-        {shown.map((c) => (
-          <CourseRow key={c.id} course={c} next={all.length > 1 && c === next} {...row} />
-        ))}
-      </ul>
+      {coursesBySubtopic(shown).map((g) => (
+        <div key={g.subtopic || '-'} className="course-sub">
+          {g.subtopic && (
+            <h3 className="course-sub__title">
+              {g.subtopic}
+            </h3>
+          )}
+          <ul className="course-list" aria-label={g.subtopic ? `${topic}: ${g.subtopic}` : `Cursos de ${topic}`}>
+            {g.items.map((c) => (
+              <CourseRow key={c.id} course={c} next={all.length > 1 && c === next} {...row} />
+            ))}
+          </ul>
+        </div>
+      ))}
       <button type="button" className="btn btn--ghost btn--sm" onClick={onAdd}>
         <Plus size={16} aria-hidden="true" /> Añadir a {topic}
       </button>
@@ -294,7 +306,7 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
         )}
         <span className="small muted course-row__meta">
           {next && <span className="course-row__next">Sigue</span>}
-          {[levelLabel(c), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ')}
+          {[levelLabel(c), c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ')}
         </span>
         {(pct > 0 || resume) && status !== 'hecho' && (
           <span className="course-progress">
@@ -428,7 +440,7 @@ function ScheduleForm({ course: c, count, onDone }: { course: LegacyCourse; coun
         start,
         end,
         title: courseName(c).slice(0, 120),
-        room: (courseSource(c.url)?.label ?? '').slice(0, 60),
+        room: courseOrigin(c).slice(0, 60),
         color,
         subject: '',
         course: c.id,
@@ -468,10 +480,17 @@ function ScheduleForm({ course: c, count, onDone }: { course: LegacyCourse; coun
   );
 }
 
-function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: LegacyCourse | null; topic: string; topics: string[]; onDone: () => void }) {
+function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { course: LegacyCourse | null; topic: string; topics: string[]; courses: LegacyCourse[]; onDone: () => void }) {
   const actions = useModule('courses');
   const listId = useId();
+  const subListId = useId();
+  const sourceListId = useId();
   const [topic, setTopic] = useState(course?.topic ?? initialTopic);
+  const [subtopic, setSubtopic] = useState(course?.subtopic ?? '');
+  const [origin, setOrigin] = useState(course?.source ?? '');
+  // Sugerencias: subcategorías de este tema y canales o academias ya usados.
+  const subtopics = uniq(courses.filter((c) => c.topic.trim().toLocaleLowerCase('es') === topic.trim().toLocaleLowerCase('es')).map((c) => c.subtopic ?? ''));
+  const origins = uniq(courses.map((c) => c.source ?? ''));
   const [url, setUrl] = useState(course?.url ?? '');
   const [title, setTitle] = useState(course?.title ?? '');
   const [status, setStatus] = useState<CourseStatus>(course ? statusOf(course) : 'pendiente');
@@ -479,12 +498,18 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
   const link = normalizeCourseUrl(url);
   const badUrl = !validCourseUrl(link);
   const source = !badUrl ? courseSource(link) : null;
-  const length = useCourseLength(course);
+  const length = useCourseLength(course, (r) => {
+    // Lo que diga YouTube solo llena lo que está vacío.
+    if (r.author) setOrigin((v) => v || r.author!.slice(0, 120));
+    if (r.title && !r.videos) setTitle((v) => v || r.title!.slice(0, 200));
+  });
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const fields = {
       topic: topic.trim(),
+      subtopic: subtopic.trim(),
+      source: origin.trim(),
       url: link,
       title: title.trim(),
       status,
@@ -494,7 +519,7 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
     const id = course?.id ?? newId();
     if (course) actions.update(id, fields);
     else actions.add({ id, ...fields });
-    if (link && !badUrl) length.later(id, link, actions.update);
+    if (link && !badUrl) length.later(id, link, actions.update, { source: !fields.source });
     onDone();
   };
 
@@ -513,6 +538,22 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
       {topics.length > 0 && (
         <datalist id={listId}>
           {topics.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      )}
+      <TextField
+        label="Subcategoría (opcional)"
+        value={subtopic}
+        onChange={(e) => setSubtopic(e.target.value)}
+        maxLength={120}
+        placeholder="Hooks, Gramática, Ahorro…"
+        hint="Agrupa los cursos dentro del tema."
+        list={subtopics.length ? subListId : undefined}
+      />
+      {subtopics.length > 0 && (
+        <datalist id={subListId}>
+          {subtopics.map((t) => (
             <option key={t} value={t} />
           ))}
         </datalist>
@@ -553,6 +594,22 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
         </button>
       </div>
       <TextField label="Nombre (opcional)" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="Curso completo de inglés básico" />
+      <TextField
+        label="Canal de YouTube o academia (opcional)"
+        value={origin}
+        onChange={(e) => setOrigin(e.target.value)}
+        maxLength={120}
+        placeholder="midudev, Platzi, EDteam…"
+        hint={length.busy ? undefined : 'En YouTube se llena solo al leer el enlace.'}
+        list={origins.length ? sourceListId : undefined}
+      />
+      {origins.length > 0 && (
+        <datalist id={sourceListId}>
+          {origins.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      )}
       <SelectField label="Estado" value={status} onChange={(e) => setStatus(e.target.value as CourseStatus)}>
         {COURSE_STATUSES.map((s) => (
           <option key={s} value={s}>
@@ -583,7 +640,7 @@ function CourseForm({ course, topic: initialTopic, topics, onDone }: { course: L
  * (lo hace el servidor). Si la persona ya la escribió, el enlace no la pisa
  * salvo que pulse «Leer del enlace».
  */
-function useCourseLength(course: LegacyCourse | null) {
+function useCourseLength(course: LegacyCourse | null, onFound?: (r: CourseLength) => void) {
   const initial = course?.length ? String(Math.round((course.length / 3600) * 100) / 100) : '';
   const [hours, setHours] = useState(initial);
   const [from, setFrom] = useState<CourseLengthFrom | undefined>(course?.lengthFrom);
@@ -591,13 +648,20 @@ function useCourseLength(course: LegacyCourse | null) {
   const [busy, setBusy] = useState(false);
   // Una consulta por enlace: si se guarda antes de que responda, se aprovecha la misma.
   const asked = useRef(new Map<string, Promise<CourseLength | null>>());
+  const found = useRef(onFound);
+  found.current = onFound;
   const ask = (url: string) => {
     let p = asked.current.get(url);
     if (!p) {
-      p = api.courses.length(url).catch((e: unknown) => {
-        setMessage(e instanceof Error && e.message ? e.message : 'No pude leerla. Escríbela a mano.');
-        return null;
-      });
+      const server = () =>
+        api.courses.length(url).catch((e: unknown) => {
+          setMessage(e instanceof Error && e.message ? e.message : 'No pude leerla. Escríbela a mano.');
+          return null;
+        });
+      // YouTube se lee aquí mismo con su reproductor; si no se puede, lo intenta el servidor.
+      p = youtubeRef(url)
+        ? readYouTubeLength(url, (done, total) => total > 1 && setMessage(`Midiendo los videos de la lista: ${done} de ${total}…`)).catch(server)
+        : server();
       asked.current.set(url, p);
     }
     return p;
@@ -614,7 +678,8 @@ function useCourseLength(course: LegacyCourse | null) {
     if (!r) return;
     setHours(String(Math.round((r.seconds / 3600) * 100) / 100));
     setFrom(r.exact ? 'enlace' : 'aprox');
-    setMessage(`${r.exact ? 'Dura' : 'Dura unas'} ${formatLength(r.seconds)}${r.videos ? ` (${r.videos} videos)` : ''}, según la página.`);
+    setMessage(`${r.exact ? 'Dura' : 'Dura unas'} ${formatLength(r.seconds)}${r.videos ? ` (${r.videos} videos)` : ''}${r.author ? `, de ${r.author}` : ''}, según la página.`);
+    found.current?.(r);
   };
   return {
     hours,
@@ -634,12 +699,19 @@ function useCourseLength(course: LegacyCourse | null) {
       return { length: Math.round(value * 3600), lengthFrom: from ?? 'manual' };
     },
     /** Guardado sin duración pero con enlace: se busca después y se completa sola. */
-    later: (id: string, url: string, save: (id: string, patch: Partial<LegacyCourse>) => void) => {
+    later: (id: string, url: string, save: (id: string, patch: Partial<LegacyCourse>) => void, empty: { source: boolean }) => {
       if (value || bad || !url || (course?.length && course.url === url)) return;
-      void ask(url).then((r) => r && save(id, { length: r.seconds, lengthFrom: r.exact ? 'enlace' : 'aprox' }));
+      void ask(url).then((r) => r && save(id, { length: r.seconds, lengthFrom: r.exact ? 'enlace' : 'aprox', ...(empty.source && r.author ? { source: r.author.slice(0, 120) } : {}) }));
     },
   };
 }
+
+/** Valores distintos y no vacíos, sin repetir mayúsculas. */
+const uniq = (list: string[]) => {
+  const seen = new Map<string, string>();
+  for (const v of list.map((x) => x.trim()).filter(Boolean)) if (!seen.has(v.toLocaleLowerCase('es'))) seen.set(v.toLocaleLowerCase('es'), v);
+  return [...seen.values()];
+};
 
 /** Reparte los cursos en las horas libres de la semana y los pone en el Horario. */
 function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: () => void }) {
@@ -651,10 +723,8 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
   const topics = coursesByTopic(courses)
     .map((g) => ({ topic: g.topic, route: courseRoute(g.items).filter((c) => statusOf(c) !== 'hecho') }))
     .filter((g) => g.route.length);
-  const [chosen, setChosen] = useState<string[]>(() => {
-    const started = topics.filter((g) => g.route.some((c) => statusOf(c) === 'curso')).map((g) => g.topic);
-    return started.length ? started : topics.map((g) => g.topic);
-  });
+  // Todos los temas de entrada: un curso de cada uno va al horario.
+  const [chosen, setChosen] = useState<string[]>(() => topics.map((g) => g.topic));
   const [days, setDays] = useState('12345');
   const [from, setFrom] = useState('18:00');
   const [to, setTo] = useState('21:00');
@@ -679,7 +749,7 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
     plan.sessions.forEach((s) => {
       const c = courses.find((x) => x.id === s.courseId)!;
       const color = CLASS_COLORS[Math.max(0, chosen.findIndex((t) => t.toLocaleLowerCase('es') === c.topic.trim().toLocaleLowerCase('es'))) % CLASS_COLORS.length];
-      classes.add({ id: newId(), day: s.day, start: s.start, end: s.end, title: courseName(c).slice(0, 120), room: (courseSource(c.url)?.label ?? '').slice(0, 60), color, subject: '', course: c.id });
+      classes.add({ id: newId(), day: s.day, start: s.start, end: s.end, title: courseName(c).slice(0, 120), room: courseOrigin(c).slice(0, 60), color, subject: '', course: c.id });
     });
     toast(`Listo: ${plural(plan.sessions.length, 'sesión', 'sesiones')} de estudio en tu horario.`, { action: { label: 'Ver horario', run: () => navigate('/horario') } });
     onDone();
@@ -688,7 +758,7 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
   return (
     <form className="stack planner" onSubmit={submit}>
       <p className="muted small">
-        Elige qué temas quieres estudiar y cuándo tienes tiempo. Cada tema va un curso a la vez, de lo básico a lo avanzado, y cuando terminas uno sus clases pasan solas al siguiente.
+        Pone en tu horario un curso de cada tema, el que sigue en su orden. Elige cuándo tienes tiempo y listo. Cuando terminas un curso, sus clases pasan solas al siguiente del tema.
       </p>
       <fieldset className="field">
         <legend className="field__label">Temas</legend>

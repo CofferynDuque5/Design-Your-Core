@@ -53,7 +53,7 @@ export const FEATURES: Feature[] = [
     kicker: 'Cursos y estudio',
     title: 'Tus cursos, en orden y con horario',
     body: 'Pega el enlace de un curso de YouTube, Udemy o Coursera. La app calcula cuánto dura, lo ordena de lo básico a lo avanzado y arma tu horario de estudio.',
-    points: ['Orden automático por tema', 'Videos de YouTube dentro de la app, con tu avance', '«Armar mi horario» en tus horas libres'],
+    points: ['Orden automático por tema', 'Videos de YouTube dentro de la app, con tu avance', '«Crear horario»: un curso de cada tema en tus horas libres'],
     shot: 'cursos',
     alt: 'Pantalla Cursos: temas con sus cursos ordenados y el siguiente marcado',
   },

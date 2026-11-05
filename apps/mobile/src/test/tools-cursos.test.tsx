@@ -103,19 +103,22 @@ describe('Cursos y Horario en el móvil', () => {
     expect(await screen.findByLabelText('Dónde lo dejaste (opcional)')).toBeOnTheScreen();
   });
 
-  it('Cursos: con solo pegar el enlace lee cuánto dura', async () => {
+  it('Cursos: con solo pegar el enlace lee cuánto dura (si YouTube no responde, lo lee el servidor)', async () => {
     const api = fakeModules(legacyDoc({ courses: [] }), { 'POST /api/v2/courses/length': () => ({ seconds: 45000, exact: true, videos: 12 }) });
     renderRouter('./src/app', { initialUrl: '/cursos' });
     fireEvent.press(await screen.findByRole('button', { name: 'Añadir el primero' }));
     fireEvent.changeText(await screen.findByLabelText('Tema'), 'Inglés');
     fireEvent.changeText(screen.getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
     fireEvent(screen.getByLabelText('Enlace (opcional)'), 'blur');
+    const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
+    await waitFor(() => expect(screen.getByTestId('webview', { includeHiddenElements: true })).toBeOnTheScreen());
+    act(() => wv.__send({ type: 'fail' }));
     expect(await screen.findByText('Dura 12 h 30 min (12 videos), según la página.')).toBeOnTheScreen();
     fireEvent.press(screen.getByRole('button', { name: 'Añadir curso' }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'POST', path: '/api/v2/modules/courses', body: { item: { length: 45000, lengthFrom: 'enlace' } } }));
   });
 
-  it('Cursos: «Armar mi horario» reparte los cursos en los huecos libres', async () => {
+  it('Cursos: «Crear horario» pone un curso de cada tema en los huecos libres', async () => {
     const api = fakeModules(
       legacyDoc({
         courses: [
@@ -126,7 +129,7 @@ describe('Cursos y Horario en el móvil', () => {
       }),
     );
     renderRouter('./src/app', { initialUrl: '/cursos' });
-    fireEvent.press(await screen.findByRole('button', { name: 'Armar mi horario' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Crear horario' }));
     for (const d of ['martes', 'jueves', 'viernes']) fireEvent.press(await screen.findByRole('checkbox', { name: d }));
     fireEvent.changeText(screen.getByLabelText('Hasta'), '20:00');
     expect(await screen.findByText('En esos días y horas caben 3 h a la semana, así que usamos esas.')).toBeOnTheScreen();
@@ -134,6 +137,32 @@ describe('Cursos y Horario en el móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Poner en mi horario' }));
     await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(3));
     expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0]).toMatchObject({ body: { item: { day: 1, start: '19:00', end: '20:00', course: 'a' } } });
+  });
+
+  it('Cursos: subcategoría y canal; YouTube se mide en el teléfono y llena el canal y el nombre', async () => {
+    const api = fakeModules(
+      legacyDoc({ courses: [{ id: 'a', topic: 'React', subtopic: 'Bases', title: 'React desde cero', url: '', status: 'curso', notes: '', source: 'Platzi' }] as unknown as LegacyData['courses'] }),
+      { 'POST /api/v2/courses/length': () => [500, { error: 'no debería llamarse' }] },
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByRole('header', { name: 'BASES' })).toBeOnTheScreen();
+    expect(screen.getByText(/Platzi/)).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir a React' }));
+    fireEvent.changeText(await screen.findByLabelText('Subcategoría (opcional)'), 'Hooks');
+    fireEvent.changeText(screen.getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
+    fireEvent(screen.getByLabelText('Enlace (opcional)'), 'blur');
+    const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
+    await waitFor(() => expect(screen.getByTestId('webview', { includeHiddenElements: true })).toBeOnTheScreen());
+    act(() => wv.__send({ type: 'step', done: 1, total: 3 }));
+    expect(await screen.findByText('Midiendo los videos de la lista: 1 de 3…')).toBeOnTheScreen();
+    act(() => wv.__send({ type: 'length', seconds: 5400, exact: true, videos: 3, author: 'midudev' }));
+    expect(await screen.findByText('Dura 1 h 30 min (3 videos), de midudev, según la página.')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Canal de YouTube o academia (opcional)').props.value).toBe('midudev');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir curso' }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({ method: 'POST', path: '/api/v2/modules/courses', body: { item: { topic: 'React', subtopic: 'Hooks', source: 'midudev', length: 5400, lengthFrom: 'enlace' } } }),
+    );
+    expect(await screen.findByRole('header', { name: 'HOOKS' })).toBeOnTheScreen();
   });
 
   it('Cursos: cada tema va de lo básico a lo avanzado y al terminar uno sus clases pasan al siguiente', async () => {

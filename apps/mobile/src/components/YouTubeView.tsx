@@ -77,5 +77,71 @@ export const YouTubeView = forwardRef<YouTubeViewHandle, { video: string; list: 
 });
 
 const st = StyleSheet.create({
+  // Fuera de la vista pero con tamaño real: YouTube no reproduce en 0×0.
+  hidden: { position: 'absolute', left: -1000, top: 0, width: 320, height: 180, opacity: 0 },
   frame: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' },
 });
+
+/**
+ * Cuánto dura un video o una lista de YouTube, leído con un reproductor
+ * invisible y sin sonido dentro de un WebView (YouTube no deja que el servidor
+ * lea su página muchas veces). Manda `{type:'step'}` mientras mide una lista y
+ * al final `{type:'length', seconds, exact, videos?, author?, title?}` o `{type:'fail'}`.
+ */
+export function lengthReaderHtml(cfg: { video: string; list: string }): string {
+  const json = JSON.stringify({ ...cfg, origin: ORIGIN }).replace(/</g, '\\u003c');
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#000"><div id="p"></div><script>
+var cfg=${json};var player,failed=false;
+function post(o){window.ReactNativeWebView.postMessage(JSON.stringify(o))}
+function until(get,ms){return new Promise(function(res){var end=Date.now()+ms;(function tick(){var v=null;try{v=get()}catch(e){}if(v)return res(v);if(Date.now()>end)return res(null);setTimeout(tick,250)})()})}
+function data(){try{return player.getVideoData()||{}}catch(e){return {}}}
+function done(o){try{player.stopVideo()}catch(e){}post(o)}
+async function run(){
+if(!cfg.list){var s=await until(function(){return failed?-1:player.getDuration()},15000);if(!s||s<0)return done({type:'fail'});var d=data();return done({type:'length',seconds:Math.round(s),exact:true,author:d.author||'',title:d.title||''})}
+var ids=await until(function(){var l=player.getPlaylist();return l&&l.length?l:null},15000);if(!ids)return done({type:'fail'});
+var n=Math.min(ids.length,200),total=0,measured=0,author='';
+for(var i=0;i<n;i++){if(i>0)player.playVideoAt(i);failed=false;var s=await until(function(){return failed?-1:(data().video_id===ids[i]?player.getDuration():null)},8000);if(s&&s>0){total+=s;measured++;author=author||data().author||''}post({type:'step',done:i+1,total:ids.length})}
+if(!measured)return done({type:'fail'});var exact=measured===ids.length;
+done({type:'length',seconds:Math.round(exact?total:total/measured*ids.length),exact:exact,videos:ids.length,author:author})}
+window.onYouTubeIframeAPIReady=function(){var vars={autoplay:1,mute:1,controls:0,playsinline:1,rel:0,origin:cfg.origin};if(cfg.list){vars.list=cfg.list;vars.listType='playlist'}player=new YT.Player('p',{width:320,height:180,videoId:cfg.list?undefined:(cfg.video||undefined),playerVars:vars,events:{onReady:function(){player.mute();player.playVideo();run()},onError:function(){failed=true}}})};
+var s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';s.onerror=function(){post({type:'fail'})};document.head.appendChild(s);
+</script></body></html>`;
+}
+
+export interface LengthFound {
+  seconds: number;
+  exact: boolean;
+  videos?: number;
+  author?: string;
+  title?: string;
+}
+
+/** Reproductor invisible que mide `video`/`list` y avisa con `onDone(null)` si no pudo. */
+export function YouTubeLengthReader({ video, list, onStep, onDone }: { video: string; list: string; onStep?: (done: number, total: number) => void; onDone: (r: LengthFound | null) => void }) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const html = useMemo(() => lengthReaderHtml({ video, list }), []);
+  const onMessage = (e: WebViewMessageEvent) => {
+    try {
+      const m = JSON.parse(e.nativeEvent.data) as { type: string; done?: number; total?: number } & LengthFound;
+      if (m.type === 'step') onStep?.(m.done ?? 0, m.total ?? 0);
+      if (m.type === 'fail') onDone(null);
+      if (m.type === 'length' && m.seconds > 0)
+        onDone({ seconds: m.seconds, exact: m.exact, ...(m.videos ? { videos: m.videos } : {}), ...(m.author ? { author: m.author } : {}), ...(m.title ? { title: m.title } : {}) });
+    } catch {
+      /* mensaje que no es nuestro */
+    }
+  };
+  return (
+    <View style={st.hidden} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <WebView
+        source={{ html, baseUrl: ORIGIN }}
+        originWhitelist={['*']}
+        onMessage={onMessage}
+        javaScriptEnabled
+        allowsInlineMediaPlayback
+        mediaPlaybackRequiresUserAction={false}
+        onShouldStartLoadWithRequest={(r) => ALLOWED.test(r.url) || r.url.startsWith(ORIGIN)}
+      />
+    </View>
+  );
+}

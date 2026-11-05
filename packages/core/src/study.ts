@@ -44,6 +44,44 @@ export interface CourseLength {
   exact: boolean;
   /** Videos de una lista de YouTube. */
   videos?: number;
+  /** Canal o academia, si la página lo dice (YouTube). */
+  author?: string;
+  /** Nombre del video o de la lista, si la página lo dice (YouTube). */
+  title?: string;
+}
+
+/** Texto de una cadena JSON tal como viene en la página («Caf\u00e9» → «Café»). */
+function jsonText(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const v = (JSON.parse(`"${raw}"`) as string).trim();
+    return v ? v.slice(0, 200) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Contenido de una etiqueta <meta> («&amp;» → «&»). */
+function metaText(body: string, name: string): string | undefined {
+  const m = new RegExp(`<meta\\s+(?:name|property)="${name}"\\s+content="([^"]*)"`, 'i').exec(body);
+  if (!m) return undefined;
+  const v = m[1]
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&#x27;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .trim();
+  return v ? v.slice(0, 200) : undefined;
+}
+
+/** Canal y nombre que trae la página de YouTube (si los trae). */
+function youtubeInfo(body: string, list: boolean): Pick<CourseLength, 'author' | 'title'> {
+  const author = list
+    ? jsonText(/"ownerText":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"/.exec(body)?.[1]) ?? jsonText(/"ownerChannelName":"((?:[^"\\]|\\.)*)"/.exec(body)?.[1])
+    : jsonText(/"ownerChannelName":"((?:[^"\\]|\\.)*)"/.exec(body)?.[1]) ?? jsonText(/"videoDetails":\{[^}]*?"author":"((?:[^"\\]|\\.)*)"/.exec(body)?.[1]) ?? metaText(body, 'author');
+  const title = metaText(body, 'og:title') ?? metaText(body, 'title');
+  return { ...(author ? { author } : {}), ...(title ? { title } : {}) };
 }
 
 /** «PT1H2M3S» → 3723. */
@@ -84,10 +122,10 @@ const fromHours = (h: number | null, exact = false): CourseLength | null => (h &
 export function parseCourseLength(kind: LengthSource['kind'], body: string): CourseLength | null {
   if (kind === 'youtube-video') {
     const s = /"lengthSeconds":"(\d+)"/.exec(body) ?? /"approxDurationMs":"(\d+)"/.exec(body);
-    if (s) return { seconds: s[0].includes('Ms') ? Math.round(Number(s[1]) / 1000) : Number(s[1]), exact: true };
+    if (s) return { seconds: s[0].includes('Ms') ? Math.round(Number(s[1]) / 1000) : Number(s[1]), exact: true, ...youtubeInfo(body, false) };
     const iso = /itemprop="duration"\s+content="([^"]+)"/.exec(body);
     const v = iso && parseIsoDuration(iso[1]);
-    return v ? { seconds: v, exact: true } : null;
+    return v ? { seconds: v, exact: true, ...youtubeInfo(body, false) } : null;
   }
   if (kind === 'youtube-list') {
     // Cada video de la lista trae su id y su duración; la página muestra hasta 100.
@@ -98,8 +136,9 @@ export function parseCourseLength(kind: LengthSource['kind'], body: string): Cou
     const total = [...seen.values()].reduce((a, b) => a + b, 0);
     const count = /"numVideosText":\{"runs":\[\{"text":"([\d.,]+)"/.exec(body) ?? /"stats":\[\{"runs":\[\{"text":"([\d.,]+)"/.exec(body);
     const n = count ? Number(count[1].replace(/[.,]/g, '')) : seen.size;
-    if (n > seen.size) return { seconds: Math.round((total / seen.size) * n), exact: false, videos: n };
-    return { seconds: total, exact: true, videos: seen.size };
+    const info = youtubeInfo(body, true);
+    if (n > seen.size) return { seconds: Math.round((total / seen.size) * n), exact: false, videos: n, ...info };
+    return { seconds: total, exact: true, videos: seen.size, ...info };
   }
   if (kind === 'coursera') {
     try {
@@ -244,6 +283,8 @@ export interface StudyPrefs {
   session: number;
   /** Horas de estudio a la semana. */
   weekly: number;
+  /** Sesiones mínimas a la semana aunque pasen de `weekly` (una por tema). */
+  atLeast?: number;
 }
 
 export interface StudySession {
@@ -316,7 +357,7 @@ export function planStudy(
   // Una por día, luego la segunda de cada día…
   const order: StudySession[] = [];
   for (let round = 0; slots.some((s) => s.length > round); round++) for (const s of slots) if (s[round]) order.push(s[round]);
-  const wanted = Math.max(1, Math.round((prefs.weekly * 60) / session));
+  const wanted = Math.max(1, Math.round((prefs.weekly * 60) / session), Math.min(chosen.length, Math.floor(prefs.atLeast ?? 0)));
   const picked = order.slice(0, wanted);
   const fits = Math.round(((order.length * session) / 60) * 10) / 10;
   if (!picked.length) return { ...empty, fits };
@@ -390,7 +431,8 @@ export function planTopics(data: LegacyData | null | undefined, topics: string[]
       return [g.lead.id, { sum: known.length ? known.reduce((a, b) => a + b, 0) : null, unknown: g.open.length - known.length }];
     }),
   );
-  const plan = planStudy(data, groups.map((g) => g.lead.id), prefs, now, (c) => totals.get(c.id)?.sum ?? courseRemaining(c));
+  // Cada tema recibe al menos una sesión si caben, aunque pase de las horas pedidas.
+  const plan = planStudy(data, groups.map((g) => g.lead.id), { ...prefs, atLeast: groups.length }, now, (c) => totals.get(c.id)?.sum ?? courseRemaining(c));
   const session = Math.max(15, Math.min(240, Math.round(prefs.session)));
   const byId = new Map(plan.courses.map((c) => [c.courseId, c]));
   return {

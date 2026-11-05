@@ -12,6 +12,10 @@ import { localDayKey } from '../lib/tools';
 // Herramientas de la app anterior (tandas 1 a 4) contra una API falsa.
 
 // jsdom no carga imágenes: la reducción a JPEG se prueba en el navegador (e2e).
+// Sin YouTube en las pruebas: por defecto falla y lo lee el servidor.
+const readYouTubeLength = vi.hoisted(() => vi.fn((_url: string): Promise<unknown> => Promise.reject(new Error('sin YouTube'))));
+vi.mock('../lib/youtubeLength', () => ({ readYouTubeLength }));
+
 vi.mock('../app/images', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../app/images')>()),
   compressImage: vi.fn(async () => 'data:image/jpeg;base64,/9j/4AAQSkZJRg=='),
@@ -476,7 +480,7 @@ describe('Cursos: progreso y horario', () => {
     expect(await screen.findByText('Terminaste «React desde cero». Tus clases siguen con «Hooks en React».')).toBeInTheDocument();
   });
 
-  it('«Armar mi horario» reparte los cursos en los huecos libres y dice cuándo terminas', async () => {
+  it('«Crear horario» pone un curso de cada tema en los huecos libres y dice cuándo terminas', async () => {
     const api = withApi({}, (doc) => {
       doc.courses = [
         { id: 'a', topic: 'Inglés', title: 'Inglés', url: '', status: 'curso', notes: '', length: 36000, progress: 50 },
@@ -489,11 +493,12 @@ describe('Cursos: progreso y horario', () => {
       ];
     });
     renderAt('/cursos');
-    await userEvent.click(await screen.findByRole('button', { name: 'Armar mi horario' }));
-    const dialog = screen.getByRole('dialog', { name: 'Armar mi horario' });
-    // Por defecto, los que estás viendo.
+    await userEvent.click(await screen.findByRole('button', { name: 'Crear horario' }));
+    const dialog = screen.getByRole('dialog', { name: 'Crear horario' });
+    // Por defecto, todos los temas.
     expect(within(dialog).getByRole('checkbox', { name: /Inglés.*1 curso.*faltan 5 h/ })).toBeChecked();
-    expect(within(dialog).getByRole('checkbox', { name: /Otro.*empieza por «Guitarra»/ })).not.toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Otro.*empieza por «Guitarra»/ })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Otro/ }));
     // Solo lunes y miércoles, de 18 a 20.
     for (const d of ['martes', 'jueves', 'viernes']) await userEvent.click(within(dialog).getByRole('checkbox', { name: d }));
     fireEvent.change(within(dialog).getByLabelText('Hasta'), { target: { value: '20:00' } });
@@ -507,6 +512,36 @@ describe('Cursos: progreso y horario', () => {
     await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(3));
     expect(writes(api).find((c) => c.method === 'DELETE')).toMatchObject({ path: '/api/v2/modules/classes/old' });
     expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0].body).toMatchObject({ item: { day: 1, start: '19:00', end: '20:00', title: 'Inglés', course: 'a' } });
+  });
+
+  it('subcategoría y canal: YouTube se lee aquí y llena el canal y el nombre', async () => {
+    readYouTubeLength.mockResolvedValueOnce({ seconds: 5400, exact: true, author: 'midudev', title: 'Hooks en React' });
+    const api = withApi(
+      {
+        'POST /api/v2/courses/length': () => [500, { error: 'no debería llamarse' }],
+      },
+      (doc) => {
+        doc.courses = [{ id: 'a', topic: 'React', subtopic: 'Bases', title: 'React desde cero', url: '', status: 'curso', notes: '', source: 'Platzi' }];
+      },
+    );
+    renderAt('/cursos');
+    expect(await screen.findByRole('heading', { name: 'Bases', level: 3 })).toBeInTheDocument();
+    expect(screen.getByText(/Platzi/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir a React' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Subcategoría (opcional)'), 'Hooks');
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://youtu.be/abcdefghijk');
+    await userEvent.tab();
+    expect(await within(dialog).findByText('Dura 1 h 30 min, de midudev, según la página.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Canal de YouTube o academia (opcional)')).toHaveValue('midudev');
+    expect(within(dialog).getByLabelText('Nombre (opcional)')).toHaveValue('Hooks en React');
+    expect(readYouTubeLength).toHaveBeenCalledWith('https://youtu.be/abcdefghijk', expect.any(Function));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
+    expect(writes(api).at(-1)).toMatchObject({
+      path: '/api/v2/modules/courses',
+      body: { item: { topic: 'React', subtopic: 'Hooks', source: 'midudev', title: 'Hooks en React', length: 5400, lengthFrom: 'enlace' } },
+    });
+    expect(await screen.findByRole('heading', { name: 'Hooks', level: 3 })).toBeInTheDocument();
   });
 });
 

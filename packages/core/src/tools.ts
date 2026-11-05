@@ -966,6 +966,25 @@ export function coursesByTopic<T extends { topic: string }>(list: T[]): Array<{ 
 }
 
 /**
+ * Cursos de un tema por subcategoría, en el orden en que aparece cada una:
+ * primero los que no tienen subcategoría (`subtopic: ''`).
+ */
+export function coursesBySubtopic<T extends { subtopic?: string }>(list: T[]): Array<{ subtopic: string; items: T[] }> {
+  const groups = new Map<string, { subtopic: string; items: T[] }>();
+  groups.set('', { subtopic: '', items: [] });
+  for (const c of list) {
+    const subtopic = (c.subtopic ?? '').trim();
+    const key = subtopic.toLocaleLowerCase('es');
+    const g = groups.get(key) ?? groups.set(key, { subtopic, items: [] }).get(key)!;
+    g.items.push(c);
+  }
+  return [...groups.values()].filter((g) => g.items.length);
+}
+
+/** Quién lo dicta: el canal o academia escrito, o si no, la plataforma del enlace. */
+export const courseOrigin = (c: { source?: string; url?: string }): string => c.source?.trim() || (c.url ? (courseSource(c.url)?.label ?? '') : '');
+
+/**
  * Video (y lista) de un enlace de YouTube, para verlo dentro de la app y
  * guardar dónde se pausó. `null` si no es de YouTube o no tiene video ni lista.
  */

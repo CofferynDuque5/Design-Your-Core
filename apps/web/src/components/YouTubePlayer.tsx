@@ -13,15 +13,15 @@ export interface PlaybackState {
   count: number;
 }
 
-interface YTPlayer {
+export interface YTPlayer {
   getCurrentTime(): number;
   getDuration(): number;
-  getVideoData(): { video_id?: string };
+  getVideoData(): { video_id?: string; author?: string; title?: string };
   getPlaylist(): string[] | null;
   getPlaylistIndex(): number;
   destroy(): void;
 }
-interface YTNamespace {
+export interface YTNamespace {
   Player: new (el: HTMLElement, opts: Record<string, unknown>) => YTPlayer;
 }
 declare global {
@@ -32,7 +32,7 @@ declare global {
 }
 
 let loading: Promise<YTNamespace> | null = null;
-function loadApi(): Promise<YTNamespace> {
+export function loadApi(): Promise<YTNamespace> {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   loading ??= new Promise((resolve, reject) => {
     const prev = window.onYouTubeIframeAPIReady;
