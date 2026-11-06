@@ -58,7 +58,17 @@ describe('readYouTubeLength', () => {
     fakeYouTube({ aaaaaaaaaaa: 600, bbbbbbbbbbb: 900, ccccccccccc: 300 }, ['aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc']);
     const steps: string[] = [];
     const r = await readYouTubeLength('https://www.youtube.com/playlist?list=PLabcdefghijk', (d, t) => steps.push(`${d}/${t}`));
-    expect(r).toEqual({ seconds: 1800, exact: true, videos: 3, author: 'Canal de prueba' });
+    expect(r).toEqual({
+      seconds: 1800,
+      exact: true,
+      videos: 3,
+      author: 'Canal de prueba',
+      items: [
+        { video: 'aaaaaaaaaaa', title: 'Video aaaaaaaaaaa', seconds: 600 },
+        { video: 'bbbbbbbbbbb', title: 'Video bbbbbbbbbbb', seconds: 900 },
+        { video: 'ccccccccccc', title: 'Video ccccccccccc', seconds: 300 },
+      ],
+    });
     expect(steps).toEqual(['1/3', '2/3', '3/3']);
   });
 });

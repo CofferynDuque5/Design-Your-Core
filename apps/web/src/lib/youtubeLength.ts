@@ -87,6 +87,7 @@ export async function readYouTubeLength(url: string, onStep?: (done: number, tot
     let total = 0;
     let measured = 0;
     let author = '';
+    const items: Array<{ video: string; title: string; seconds: number }> = [];
     for (let i = 0; i < count; i++) {
       if (i > 0) player.playVideoAt(i);
       failed = false;
@@ -97,6 +98,7 @@ export async function readYouTubeLength(url: string, onStep?: (done: number, tot
         measured++;
         author ||= data().author ?? '';
       }
+      items.push({ video: ids[i], title: (seconds && seconds > 0 ? data().title : '') ?? '', seconds: seconds && seconds > 0 ? Math.round(seconds) : 0 });
       onStep?.(i + 1, ids.length);
     }
     if (!measured) throw new Error('YouTube no dijo cuánto dura.');
@@ -106,6 +108,7 @@ export async function readYouTubeLength(url: string, onStep?: (done: number, tot
       exact,
       videos: ids.length,
       ...(author ? { author } : {}),
+      items,
     };
   } finally {
     try {

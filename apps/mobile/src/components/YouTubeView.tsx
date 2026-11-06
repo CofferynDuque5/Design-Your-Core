@@ -99,10 +99,10 @@ function done(o){try{player.stopVideo()}catch(e){}post(o)}
 async function run(){
 if(!cfg.list){var s=await until(function(){return failed?-1:player.getDuration()},15000);if(!s||s<0)return done({type:'fail'});var d=data();return done({type:'length',seconds:Math.round(s),exact:true,author:d.author||'',title:d.title||''})}
 var ids=await until(function(){var l=player.getPlaylist();return l&&l.length?l:null},15000);if(!ids)return done({type:'fail'});
-var n=Math.min(ids.length,200),total=0,measured=0,author='';
-for(var i=0;i<n;i++){if(i>0)player.playVideoAt(i);failed=false;var s=await until(function(){return failed?-1:(data().video_id===ids[i]?player.getDuration():null)},8000);if(s&&s>0){total+=s;measured++;author=author||data().author||''}post({type:'step',done:i+1,total:ids.length})}
+var n=Math.min(ids.length,200),total=0,measured=0,author='',items=[];
+for(var i=0;i<n;i++){if(i>0)player.playVideoAt(i);failed=false;var s=await until(function(){return failed?-1:(data().video_id===ids[i]?player.getDuration():null)},8000);var ok=s&&s>0;if(ok){total+=s;measured++;author=author||data().author||''}items.push({video:ids[i],title:ok?(data().title||''):'',seconds:ok?Math.round(s):0});post({type:'step',done:i+1,total:ids.length})}
 if(!measured)return done({type:'fail'});var exact=measured===ids.length;
-done({type:'length',seconds:Math.round(exact?total:total/measured*ids.length),exact:exact,videos:ids.length,author:author})}
+done({type:'length',seconds:Math.round(exact?total:total/measured*ids.length),exact:exact,videos:ids.length,author:author,items:items})}
 window.onYouTubeIframeAPIReady=function(){var vars={autoplay:1,mute:1,controls:0,playsinline:1,rel:0,origin:cfg.origin};if(cfg.list){vars.list=cfg.list;vars.listType='playlist'}player=new YT.Player('p',{width:320,height:180,videoId:cfg.list?undefined:(cfg.video||undefined),playerVars:vars,events:{onReady:function(){player.mute();player.playVideo();run()},onError:function(){failed=true}}})};
 var s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';s.onerror=function(){post({type:'fail'})};document.head.appendChild(s);
 </script></body></html>`;
@@ -114,6 +114,7 @@ export interface LengthFound {
   videos?: number;
   author?: string;
   title?: string;
+  items?: Array<{ video: string; title: string; seconds: number }>;
 }
 
 /** Reproductor invisible que mide `video`/`list` y avisa con `onDone(null)` si no pudo. */
@@ -126,7 +127,7 @@ export function YouTubeLengthReader({ video, list, onStep, onDone }: { video: st
       if (m.type === 'step') onStep?.(m.done ?? 0, m.total ?? 0);
       if (m.type === 'fail') onDone(null);
       if (m.type === 'length' && m.seconds > 0)
-        onDone({ seconds: m.seconds, exact: m.exact, ...(m.videos ? { videos: m.videos } : {}), ...(m.author ? { author: m.author } : {}), ...(m.title ? { title: m.title } : {}) });
+        onDone({ seconds: m.seconds, exact: m.exact, ...(m.videos ? { videos: m.videos } : {}), ...(m.author ? { author: m.author } : {}), ...(m.title ? { title: m.title } : {}), ...(Array.isArray(m.items) ? { items: m.items } : {}) });
     } catch {
       /* mensaje que no es nuestro */
     }

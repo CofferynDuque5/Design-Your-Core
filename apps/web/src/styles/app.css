@@ -5601,6 +5601,23 @@
     flex-direction: column;
   }
 
+  /* Lecciones de un curso. */
+  .lessons__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .lessons__row.is-done .check-row__label > span {
+    color: var(--color-ink-muted);
+    text-decoration: line-through;
+  }
+
+  .lessons__add {
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-line);
+  }
+
   /* Subcategoría dentro de un tema. */
   .course-sub + .course-sub {
     margin-top: var(--space-2);

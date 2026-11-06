@@ -1,4 +1,4 @@
-import { hhmmToHours, legacyList, type LegacyClass, type LegacyCourse, type LegacyData } from './legacy.js';
+import { COURSE_LESSONS_MAX, hhmmToHours, legacyList, type CourseLesson, type LegacyClass, type LegacyCourse, type LegacyData } from './legacy.js';
 import { courseProgress, youtubeRef } from './tools.js';
 
 // ---------- Duración de un curso a partir de su enlace ----------
@@ -48,6 +48,18 @@ export interface CourseLength {
   author?: string;
   /** Nombre del video o de la lista, si la página lo dice (YouTube). */
   title?: string;
+  /** Videos de una lista de YouTube, en orden (sirven de lecciones). */
+  items?: Array<{ video: string; title: string; seconds: number }>;
+}
+
+/** Lecciones a partir de los videos de una lista de YouTube. */
+export function lessonsFromPlaylist(items: NonNullable<CourseLength['items']>, list: string, newId: () => string): CourseLesson[] {
+  return items.slice(0, COURSE_LESSONS_MAX).map((v, i) => ({
+    id: newId(),
+    title: (v.title.trim() || `Video ${i + 1}`).slice(0, 200),
+    url: `https://www.youtube.com/watch?v=${v.video}&list=${list}`,
+    ...(v.seconds > 0 ? { seconds: Math.min(1e6, Math.round(v.seconds)) } : {}),
+  }));
 }
 
 /** Texto de una cadena JSON tal como viene en la página («Caf\u00e9» → «Café»). */

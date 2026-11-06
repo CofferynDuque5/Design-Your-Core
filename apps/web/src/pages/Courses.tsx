@@ -16,6 +16,7 @@ import {
   courseRoute,
   COURSE_LEVEL_LABEL,
   handoffClasses,
+  lessonsFromPlaylist,
   courseSource,
   formatLength,
   HHMM_RE,
@@ -30,7 +31,8 @@ import {
   type CourseStatus,
   type LegacyCourse,
 } from '@dyc/core';
-import { CalendarClock, CalendarPlus, ExternalLink, Gauge, GraduationCap, Link2, MonitorPlay, Pencil, Play, Plus } from 'lucide-react';
+import { CalendarClock, CalendarPlus, ExternalLink, Gauge, GraduationCap, Link2, ListChecks, MonitorPlay, Pencil, Play, Plus } from 'lucide-react';
+import { CourseLessons } from './CourseLessons';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api } from '../app/api';
@@ -68,6 +70,7 @@ export function Courses() {
   const [logging, setLogging] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
   const [planning, setPlanning] = useState(false);
+  const [listing, setListing] = useState<string | null>(null);
   const update = useCourseUpdate();
   const [params, setParams] = useSearchParams();
   // Volver de otra pestaña después de abrir un curso de Udemy, Coursera…: pregunta hasta dónde llegaste.
@@ -111,6 +114,7 @@ export function Courses() {
   const watched = byId(watching);
   const logged = byId(logging);
   const scheduled = byId(scheduling);
+  const listed = byId(listing);
 
   return (
     <div className="page">
@@ -168,6 +172,7 @@ export function Courses() {
                   onOpen={open}
                   onLog={(c) => setLogging(c.id)}
                   onSchedule={(c) => setScheduling(c.id)}
+                  onLessons={(c) => setListing(c.id)}
                 />
               ))}
             </div>
@@ -186,6 +191,9 @@ export function Courses() {
       <Dialog open={planning} onClose={() => setPlanning(false)} title="Crear horario" wide>
         {planning && <StudyPlanner courses={courses} onDone={() => setPlanning(false)} />}
       </Dialog>
+      <Dialog open={!!listed} onClose={() => setListing(null)} title={listed ? `Lecciones de «${courseName(listed)}»` : 'Lecciones'} wide>
+        {listed && <CourseLessons course={listed} update={update} />}
+      </Dialog>
       <Dialog open={!!scheduled} onClose={() => setScheduling(null)} title="Agregar al horario">
         {scheduled && <ScheduleForm course={scheduled} count={(legacy.data?.data.classes as unknown[] | undefined)?.length ?? 0} onDone={() => setScheduling(null)} />}
       </Dialog>
@@ -199,6 +207,7 @@ interface RowActions {
   onOpen: (c: LegacyCourse) => void;
   onLog: (c: LegacyCourse) => void;
   onSchedule: (c: LegacyCourse) => void;
+  onLessons: (c: LegacyCourse) => void;
   classes: (c: LegacyCourse) => Array<{ day: number; start: string }>;
 }
 
@@ -277,7 +286,7 @@ export function scheduleText(list: Array<{ day: number; start: string }>): strin
   return times.length === 1 ? `${d} ${times[0]}` : d;
 }
 
-function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedule, classes }: { course: LegacyCourse; next?: boolean } & RowActions) {
+function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedule, onLessons, classes }: { course: LegacyCourse; next?: boolean } & RowActions) {
   const source = courseSource(c.url);
   const name = courseName(c);
   const status = statusOf(c);
@@ -331,7 +340,10 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
         >
           {COURSE_STATUS_INFO[status].short}
         </button>
-        {!yt && (
+        <button type="button" className="icon-btn" onClick={() => onLessons(c)} aria-label={`Lecciones de «${name}»${c.lessons?.length ? ` (${c.lessons.filter((l) => l.done).length} de ${c.lessons.length})` : ''}`}>
+          <ListChecks size={18} aria-hidden="true" />
+        </button>
+        {!yt && !c.lessons?.length && (
           <button type="button" className="icon-btn" onClick={() => onLog(c)} aria-label={`Anotar avance de «${name}»`}>
             <Gauge size={18} aria-hidden="true" />
           </button>
@@ -498,7 +510,10 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
   const link = normalizeCourseUrl(url);
   const badUrl = !validCourseUrl(link);
   const source = !badUrl ? courseSource(link) : null;
+  // Una lista de YouTube leída trae sus videos: se guardan como lecciones si el curso no tiene.
+  const [found, setFound] = useState<CourseLength['items']>(undefined);
   const length = useCourseLength(course, (r) => {
+    if (r.items?.length && !course?.lessons?.length) setFound(r.items);
     // Lo que diga YouTube solo llena lo que está vacío.
     if (r.author) setOrigin((v) => v || r.author!.slice(0, 120));
     if (r.title && !r.videos) setTitle((v) => v || r.title!.slice(0, 200));
@@ -512,6 +527,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
       source: origin.trim(),
       url: link,
       title: title.trim(),
+      ...(found?.length && youtubeRef(link)?.list && !course?.lessons?.length ? { lessons: lessonsFromPlaylist(found, youtubeRef(link)!.list, newId) } : {}),
       status,
       notes,
       ...length.fields(),
@@ -563,7 +579,10 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
         type="url"
         inputMode="url"
         value={url}
-        onChange={(e) => setUrl(e.target.value)}
+        onChange={(e) => {
+          setUrl(e.target.value);
+          setFound(undefined);
+        }}
         onBlur={() => {
           setUrl(link);
           // Con solo pegar el enlace se busca cuánto dura.
@@ -586,7 +605,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
           value={length.hours}
           onChange={(e) => length.type(e.target.value)}
           placeholder="12.5"
-          hint={length.message}
+          hint={length.message && found?.length && !course?.lessons?.length ? `${length.message} Sus ${found.length} videos quedan como lecciones.` : length.message}
           error={length.bad ? 'Escribe un número de horas, por ejemplo 12.5.' : null}
         />
         <button type="button" className="btn btn--secondary btn--sm" onClick={() => length.lookup(link, true)} disabled={!link || badUrl || length.busy}>

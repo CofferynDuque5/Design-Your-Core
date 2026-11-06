@@ -696,7 +696,24 @@ export interface LegacyCourse {
   length?: number;
   /** De dónde salió `length`: exacta del enlace, aproximada o escrita a mano. */
   lengthFrom?: CourseLengthFrom;
+  /** Lecciones o videos del curso, en orden; `unit` las agrupa («Unidad 1»). */
+  lessons?: CourseLesson[];
 }
+
+export interface CourseLesson {
+  id: string;
+  title: string;
+  /** Unidad o módulo al que pertenece; vacío si no tiene. */
+  unit?: string;
+  /** Enlace http(s) de la lección (por ejemplo, un video de YouTube). */
+  url?: string;
+  done?: boolean;
+  /** Duración en segundos, si se sabe. */
+  seconds?: number;
+}
+
+/** Hasta cuántas lecciones guarda un curso. */
+export const COURSE_LESSONS_MAX = 500;
 
 export const COURSE_LENGTH_FROM = ['enlace', 'aprox', 'manual'] as const;
 export type CourseLengthFrom = (typeof COURSE_LENGTH_FROM)[number];
@@ -1120,6 +1137,19 @@ const shapes = {
     lastAt: z.union([z.literal(''), z.string().datetime()]).optional(),
     length: z.number().int().min(0).max(1e7).optional(),
     lengthFrom: z.enum(COURSE_LENGTH_FROM).optional(),
+    lessons: z
+      .array(
+        z.object({
+          id: legacyIdSchema,
+          title: z.string().trim().min(1, 'Escribe el nombre de la lección').max(200),
+          unit: z.string().trim().max(120).optional(),
+          url: z.union([z.literal(''), z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).optional(),
+          done: z.boolean().optional(),
+          seconds: z.number().int().min(0).max(1e6).optional(),
+        }),
+      )
+      .max(COURSE_LESSONS_MAX, `Máximo ${COURSE_LESSONS_MAX} lecciones por curso`)
+      .optional(),
   }),
   ventures: z.object({
     id: legacyIdSchema,

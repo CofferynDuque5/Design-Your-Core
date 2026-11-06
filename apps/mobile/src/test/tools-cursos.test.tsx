@@ -165,6 +165,44 @@ describe('Cursos y Horario en el móvil', () => {
     expect(await screen.findByRole('header', { name: 'HOOKS' })).toBeOnTheScreen();
   });
 
+  it('Cursos: lecciones por unidad, se marcan, se añaden y se traen de la lista de YouTube', async () => {
+    const api = fakeModules(
+      legacyDoc({
+        courses: [
+          {
+            id: 'a',
+            topic: 'React',
+            title: 'React desde cero',
+            url: 'https://www.youtube.com/playlist?list=PLabcdefghijk',
+            status: 'pendiente',
+            notes: '',
+            lessons: [
+              { id: 'l1', title: 'Instalación', unit: 'Unidad 1' },
+              { id: 'l2', title: 'JSX', unit: 'Unidad 1' },
+            ],
+          },
+        ] as unknown as LegacyData['courses'],
+      }),
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    fireEvent.press(await screen.findByRole('button', { name: 'Lecciones de «React desde cero» (0 de 2)' }));
+    expect(await screen.findByRole('header', { name: 'UNIDAD 1 · 0/2' })).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('checkbox', { name: 'Instalación' }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { progress: 50, status: 'curso', lessons: [{ id: 'l1', done: true }, { id: 'l2' }] } }),
+    );
+    fireEvent.changeText(screen.getByLabelText('Unidad (opcional)'), 'Unidad 2');
+    fireEvent.changeText(screen.getByLabelText('Lección o video'), 'useState');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir lección' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Traer los videos nuevos de la lista' }));
+    const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
+    await waitFor(() => expect(screen.getByTestId('webview', { includeHiddenElements: true })).toBeOnTheScreen());
+    act(() => wv.__send({ type: 'length', seconds: 900, exact: true, videos: 2, items: [{ video: 'aaaaaaaaaaa', title: 'Clase 1', seconds: 300 }, { video: 'bbbbbbbbbbb', title: 'Clase 2', seconds: 600 }] }));
+    expect(await screen.findByText('Listo: 2 lecciones nuevas de la lista.')).toBeOnTheScreen();
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{}, {}, {}, { title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabcdefghijk' }, { title: 'Clase 2' }] } }));
+  });
+
   it('Cursos: cada tema va de lo básico a lo avanzado y al terminar uno sus clases pasan al siguiente', async () => {
     const api = fakeModules(
       legacyDoc({

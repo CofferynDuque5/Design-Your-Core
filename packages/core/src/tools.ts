@@ -36,6 +36,7 @@ import {
   type GoalCategory,
   type IdeaCategory,
   type LegacyClass,
+  type CourseLesson,
   type LegacyCourse,
   type LegacyContent,
   type LegacyData,
@@ -1012,8 +1013,10 @@ export function youtubeRef(url: string): { video: string; list: string; start: n
 }
 
 /** Porcentaje visto (0-100): con YouTube, la posición guardada; si no, lo que anotó la persona. */
-export function courseProgress(c: Pick<LegacyCourse, 'progress' | 'position' | 'duration' | 'status'>): number {
+export function courseProgress(c: Pick<LegacyCourse, 'progress' | 'position' | 'duration' | 'status'> & { lessons?: LegacyCourse['lessons'] }): number {
   if (c.status === 'hecho') return 100;
+  // Con lecciones, el avance es cuántas marcaste como vistas.
+  if (c.lessons?.length) return Math.round((c.lessons.filter((l) => l.done).length / c.lessons.length) * 100);
   const p = typeof c.progress === 'number' ? c.progress : c.duration && c.position ? (c.position / c.duration) * 100 : 0;
   return Math.max(0, Math.min(100, Math.round(p)));
 }
@@ -1031,6 +1034,11 @@ export function formatClock(seconds: number): string {
 export function courseResume(c: LegacyCourse): string {
   const pct = courseProgress(c);
   if (c.status === 'hecho') return 'Terminado';
+  if (c.lessons?.length) {
+    const done = c.lessons.filter((l) => l.done).length;
+    const next = nextLesson(c);
+    return `${done} de ${c.lessons.length} lecciones${next && done ? ` · sigue «${next.title}»` : ''}`;
+  }
   const parts: string[] = [];
   if (c.spot?.trim()) parts.push(c.spot.trim());
   else if (c.position && c.duration) parts.push(`Vas en ${formatClock(c.position)} de ${formatClock(c.duration)}`);
@@ -1055,6 +1063,38 @@ export function coursePlaybackPatch(c: LegacyCourse, at: { position: number; dur
     ...(at.video !== undefined ? { video: /^[\w-]{6,20}$/.test(at.video) ? at.video : '' } : {}),
     lastAt: now.toISOString(),
     status: finished ? 'hecho' : c.status === 'hecho' ? 'hecho' : 'curso',
+  };
+}
+
+/** La primera lección sin ver. */
+export const nextLesson = (c: Pick<LegacyCourse, 'lessons'>): CourseLesson | undefined => c.lessons?.find((l) => !l.done);
+
+/** Lecciones por unidad, en el orden en que aparece cada una (las sin unidad, donde caigan). */
+export function lessonsByUnit(lessons: CourseLesson[]): Array<{ unit: string; items: CourseLesson[] }> {
+  const out: Array<{ unit: string; items: CourseLesson[] }> = [];
+  for (const l of lessons) {
+    const unit = (l.unit ?? '').trim();
+    const g = out.find((x) => x.unit.toLocaleLowerCase('es') === unit.toLocaleLowerCase('es'));
+    if (g) g.items.push(l);
+    else out.push({ unit, items: [l] });
+  }
+  return out;
+}
+
+/**
+ * Lo que se guarda al cambiar las lecciones: el avance sale de las vistas, y
+ * el estado sigue: alguna vista → «Viendo», todas → «Terminado».
+ */
+export function lessonsPatch(c: LegacyCourse, lessons: CourseLesson[], now = new Date()): Partial<LegacyCourse> {
+  const done = lessons.filter((l) => l.done).length;
+  const all = lessons.length > 0 && done === lessons.length;
+  const status: LegacyCourse['status'] = all ? 'hecho' : done > 0 ? 'curso' : c.status === 'hecho' ? 'curso' : c.status;
+  const before = c.lessons?.filter((l) => l.done).length ?? 0;
+  return {
+    lessons,
+    progress: lessons.length ? Math.round((done / lessons.length) * 100) : (c.progress ?? 0),
+    status,
+    ...(done !== before ? { lastAt: now.toISOString() } : {}),
   };
 }
 

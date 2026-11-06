@@ -514,6 +514,45 @@ describe('Cursos: progreso y horario', () => {
     expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0].body).toMatchObject({ item: { day: 1, start: '19:00', end: '20:00', title: 'Inglés', course: 'a' } });
   });
 
+  it('lecciones: se marcan, se añaden por unidad y se traen de la lista de YouTube', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [
+        {
+          id: 'a',
+          topic: 'React',
+          title: 'React desde cero',
+          url: 'https://www.youtube.com/playlist?list=PLabcdefghijk',
+          status: 'pendiente',
+          notes: '',
+          lessons: [
+            { id: 'l1', title: 'Instalación', unit: 'Unidad 1' },
+            { id: 'l2', title: 'JSX', unit: 'Unidad 1' },
+          ],
+        },
+      ];
+    });
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Lecciones de «React desde cero» (0 de 2)' }));
+    const dialog = screen.getByRole('dialog', { name: 'Lecciones de «React desde cero»' });
+    expect(within(dialog).getByRole('heading', { name: /Unidad 1/ })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Instalación' }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { progress: 50, status: 'curso', lessons: [{ id: 'l1', done: true }, { id: 'l2' }] } }),
+    );
+    await userEvent.clear(within(dialog).getByLabelText('Unidad (opcional)'));
+    await userEvent.type(within(dialog).getByLabelText('Unidad (opcional)'), 'Unidad 2');
+    await userEvent.type(within(dialog).getByLabelText('Lección o video'), 'useState');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir lección' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { progress: 33, lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));
+    expect(await within(dialog).findByRole('heading', { name: /Unidad 2/ })).toBeInTheDocument();
+
+    readYouTubeLength.mockResolvedValueOnce({ seconds: 900, exact: true, videos: 2, items: [{ video: 'aaaaaaaaaaa', title: 'Clase 1', seconds: 300 }, { video: 'bbbbbbbbbbb', title: 'Clase 2', seconds: 600 }] });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Traer los videos nuevos de la lista' }));
+    expect(await within(dialog).findByText('Listo: 2 lecciones nuevas de la lista.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Ver «Clase 2» aquí' })).toBeInTheDocument();
+    expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{}, {}, {}, { title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabcdefghijk', seconds: 300 }, { title: 'Clase 2' }] } });
+  });
+
   it('subcategoría y canal: YouTube se lee aquí y llena el canal y el nombre', async () => {
     readYouTubeLength.mockResolvedValueOnce({ seconds: 5400, exact: true, author: 'midudev', title: 'Hooks en React' });
     const api = withApi(

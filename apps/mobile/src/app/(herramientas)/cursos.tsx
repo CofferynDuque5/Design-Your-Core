@@ -12,6 +12,7 @@ import {
   courseRoute,
   COURSE_LEVEL_LABEL,
   handoffClasses,
+  lessonsFromPlaylist,
   planTopics,
   STUDY_SESSIONS,
   STUDY_WEEKLY,
@@ -34,7 +35,8 @@ import {
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarClock, CalendarPlus, ExternalLink, Gauge, GraduationCap, Link2, MonitorPlay, Pencil, Play, Plus } from 'lucide-react-native';
+import { CalendarClock, CalendarPlus, ExternalLink, Gauge, GraduationCap, Link2, ListChecks, MonitorPlay, Pencil, Play, Plus } from 'lucide-react-native';
+import { CourseLessons } from '../../components/CourseLessons';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
@@ -67,6 +69,7 @@ export default function Cursos() {
   const [logging, setLogging] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
   const [planning, setPlanning] = useState(false);
+  const [listing, setListing] = useState<string | null>(null);
   const router = useRouter();
   const { abrir } = useLocalSearchParams<{ abrir?: string }>();
   // Al volver a la app después de abrir un curso de Udemy, Coursera…: pregunta hasta dónde llegaste.
@@ -101,6 +104,7 @@ export default function Cursos() {
   const watched = byId(watching);
   const logged = byId(logging);
   const scheduled = byId(scheduling);
+  const listed = byId(listing);
 
   return (
     <ToolScreen
@@ -139,6 +143,7 @@ export default function Cursos() {
                 onOpen={open}
                 onLog={(c) => setLogging(c.id)}
                 onSchedule={(c) => setScheduling(c.id)}
+                onLessons={(c) => setListing(c.id)}
                 classes={(c) => courseClasses(legacy.data?.data, c.id)}
               />
             ))
@@ -151,6 +156,9 @@ export default function Cursos() {
       {watched && <Watch course={watched} onClose={() => setWatching(null)} />}
       <Sheet open={!!logged} onClose={() => setLogging(null)} title="¿Hasta dónde llegaste?">
         {logged && <ProgressForm course={logged} onDone={() => setLogging(null)} />}
+      </Sheet>
+      <Sheet open={!!listed} onClose={() => setListing(null)} title={listed ? `Lecciones de «${courseName(listed)}»` : 'Lecciones'}>
+        {listed && <CourseLessons course={listed} update={update} />}
       </Sheet>
       <Sheet open={planning} onClose={() => setPlanning(false)} title="Crear horario">
         {planning && <StudyPlanner courses={courses} onDone={() => setPlanning(false)} />}
@@ -171,6 +179,7 @@ interface RowActions {
   onOpen: (c: LegacyCourse) => void;
   onLog: (c: LegacyCourse) => void;
   onSchedule: (c: LegacyCourse) => void;
+  onLessons: (c: LegacyCourse) => void;
   classes: (c: LegacyCourse) => Array<{ day: number; start: string }>;
 }
 
@@ -252,7 +261,7 @@ export function scheduleText(list: Array<{ day: number; start: string }>): strin
   return times.length === 1 ? `${d} ${times[0]}` : d;
 }
 
-function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedule, classes }: { course: LegacyCourse; next?: boolean } & RowActions) {
+function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedule, onLessons, classes }: { course: LegacyCourse; next?: boolean } & RowActions) {
   const { colors } = useTheme();
   const router = useRouter();
   const source = courseSource(c.url);
@@ -334,7 +343,15 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
         </IconButton>
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space[1], marginLeft: 30 }}>
-        {!watch && !!c.url && <Button small variant="ghost" label="Anotar avance" accessibilityLabel={`Anotar avance de «${name}»`} icon={<Gauge size={16} color={colors.primary} />} onPress={() => onLog(c)} />}
+        <Button
+          small
+          variant="ghost"
+          label={c.lessons?.length ? `Lecciones ${c.lessons.filter((l) => l.done).length}/${c.lessons.length}` : 'Lecciones'}
+          accessibilityLabel={`Lecciones de «${name}»${c.lessons?.length ? ` (${c.lessons.filter((l) => l.done).length} de ${c.lessons.length})` : ''}`}
+          icon={<ListChecks size={16} color={colors.primary} />}
+          onPress={() => onLessons(c)}
+        />
+        {!watch && !!c.url && !c.lessons?.length && <Button small variant="ghost" label="Anotar avance" accessibilityLabel={`Anotar avance de «${name}»`} icon={<Gauge size={16} color={colors.primary} />} onPress={() => onLog(c)} />}
         <Button small variant="ghost" label="Al horario" accessibilityLabel={`Agregar «${name}» al horario`} icon={<CalendarPlus size={16} color={colors.primary} />} onPress={() => onSchedule(c)} />
         {!!inSchedule && (
           <Pressable accessibilityRole="link" accessibilityLabel={`En tu horario: ${inSchedule}`} onPress={() => router.push('/horario')} hitSlop={8}>
@@ -466,14 +483,28 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
   const link = normalizeCourseUrl(url);
   const badUrl = !validCourseUrl(link);
   const source = !badUrl ? courseSource(link) : null;
+  // Una lista de YouTube leída trae sus videos: se guardan como lecciones si el curso no tiene.
+  const [found, setFound] = useState<CourseLength['items']>(undefined);
   const length = useCourseLength(course, (r) => {
+    if (r.items?.length && !course?.lessons?.length) setFound(r.items);
     // Lo que diga YouTube solo llena lo que está vacío.
     if (r.author) setOrigin((v) => v || r.author!.slice(0, 120));
     if (r.title && !r.videos) setTitle((v) => v || r.title!.slice(0, 200));
   });
 
   const submit = () => {
-    const fields = { topic: topic.trim(), subtopic: subtopic.trim(), source: origin.trim(), url: link, title: title.trim(), status, notes, ...length.fields() };
+    const list = youtubeRef(link)?.list;
+    const fields = {
+      topic: topic.trim(),
+      subtopic: subtopic.trim(),
+      source: origin.trim(),
+      url: link,
+      title: title.trim(),
+      status,
+      notes,
+      ...length.fields(),
+      ...(found?.length && list && !course?.lessons?.length ? { lessons: lessonsFromPlaylist(found, list, newId) } : {}),
+    };
     const id = course?.id ?? newId();
     if (course) actions.update(id, fields);
     else actions.add({ id, ...fields });
@@ -490,7 +521,10 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
       <Field
         label="Enlace (opcional)"
         value={url}
-        onChangeText={setUrl}
+        onChangeText={(v) => {
+          setUrl(v);
+          setFound(undefined);
+        }}
         onBlur={() => {
           setUrl(link);
           // Con solo pegar el enlace se busca cuánto dura.
@@ -511,7 +545,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
         keyboardType="decimal-pad"
         maxLength={7}
         placeholder="12.5"
-        hint={length.message}
+        hint={length.message && found?.length && !course?.lessons?.length ? `${length.message} Sus ${found.length} videos quedan como lecciones.` : length.message}
         error={length.bad ? 'Escribe un número de horas, por ejemplo 12.5.' : null}
       />
       <Button small variant="secondary" label={length.busy ? 'Buscando…' : 'Leer del enlace'} onPress={() => length.lookup(link, true)} disabled={!link || badUrl || length.busy} />
