@@ -50,3 +50,14 @@ describe('Lecciones de un curso', () => {
     ]);
   });
 });
+
+import { reminderFallsOn } from '../src/index.js';
+describe('Eventos del 29, 30 y 31', () => {
+  it('salen el último día de los meses más cortos', () => {
+    expect(reminderFallsOn({ day: 31 }, '2026-11-30')).toBe(true);
+    expect(reminderFallsOn({ day: 31 }, '2026-12-31')).toBe(true);
+    expect(reminderFallsOn({ day: 31 }, '2026-12-30')).toBe(false);
+    expect(reminderFallsOn({ day: 30 }, '2027-02-28')).toBe(true);
+    expect(reminderFallsOn({ day: 15 }, '2027-02-15')).toBe(true);
+  });
+});

@@ -1,21 +1,41 @@
 ---
+import { Menu } from '@lucide/astro';
 import { appLink } from '../config';
 import Logo from './Logo.astro';
+
+const links = [
+  { href: '/#funciones', label: 'Funciones' },
+  { href: '/#herramientas', label: 'Herramientas' },
+  { href: '/#pilares', label: 'Pilares' },
+  { href: '/descargar', label: 'Descargar' },
+  { href: '/#preguntas', label: 'Preguntas' },
+];
 ---
 
 <header class="site-header">
   <div class="container site-header__inner">
     <a href="/" class="site-header__home" aria-label="Design Your Core, inicio"><Logo /></a>
     <nav aria-label="Principal" class="site-nav">
-      <a href="/#funciones">Funciones</a>
-      <a href="/#herramientas">Herramientas</a>
-      <a href="/#pilares">Pilares</a>
-      <a href="/descargar">Descargar</a>
-      <a href="/#preguntas">Preguntas</a>
+      {links.map((l) => <a href={l.href}>{l.label}</a>)}
     </nav>
     <div class="site-header__actions">
-      <a class="btn btn--ghost btn--sm" href={appLink('/entrar')}>Entrar</a>
+      <a class="btn btn--ghost btn--sm site-header__enter" href={appLink('/entrar')}>Entrar</a>
       <a class="btn btn--sm" href={appLink('/registro')}>Crear cuenta</a>
+      {/* En el teléfono: menú con las secciones y «Entrar». */}
+      <details class="site-menu">
+        <summary class="site-menu__button" aria-label="Menú">
+          <Menu size={22} aria-hidden="true" />
+        </summary>
+        <nav aria-label="Menú" class="site-menu__panel">
+          {links.map((l) => <a href={l.href}>{l.label}</a>)}
+          <a href={appLink('/entrar')} class="site-menu__enter">Entrar a mi panel</a>
+        </nav>
+      </details>
     </div>
   </div>
 </header>
+
+<script>
+  // Al elegir una sección, el menú se cierra.
+  for (const a of document.querySelectorAll('.site-menu__panel a')) a.addEventListener('click', () => a.closest('details')?.removeAttribute('open'));
+</script>

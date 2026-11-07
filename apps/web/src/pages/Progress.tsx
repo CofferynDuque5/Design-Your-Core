@@ -18,6 +18,8 @@ const PERIODS: Array<{ value: Period; label: string }> = [
   { value: 'week', label: 'Semana' },
   { value: 'month', label: 'Mes' },
 ];
+/** «36 puntos menos que…», «1 punto más que…», «Igual que…». */
+const pointsWord = (d: number | null) => (!d ? '' : `${Math.abs(d) === 1 ? 'punto' : 'puntos'} ${d > 0 ? 'más' : 'menos'} `);
 const PREVIOUS: Record<Period, string> = { day: 'que ayer', week: 'que la semana anterior', month: 'que el mes anterior' };
 
 export function Progress() {
@@ -91,7 +93,7 @@ function ProgressContent({ d, period, stale }: { d: Dashboard; period: Period; s
           <div className="overall__body">
             <ScoreRing value={d.overall.score} size={96} label="Puntuación general" />
             <div className="stack-xs">
-              <Delta value={deltaOverall} suffix={` ${PREVIOUS[period]}`} />
+              <Delta value={deltaOverall} suffix={` ${pointsWord(deltaOverall)}${PREVIOUS[period]}`} />
               <p className="muted small">Promedio de los pilares con datos, de 0 a 100.</p>
             </div>
           </div>

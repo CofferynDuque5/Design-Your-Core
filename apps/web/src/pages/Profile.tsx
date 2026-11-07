@@ -1,6 +1,6 @@
-import { CONTACT_EMAIL, PILLAR_IDS, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
+import { CLASS_LEADS, CONTACT_EMAIL, PILLAR_IDS, type NotifyPrefs, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Download, LogOut, Mail } from 'lucide-react';
+import { ArrowRight, BellRing, Download, LogOut, Mail } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { api } from '../app/api';
@@ -17,6 +17,7 @@ import { Dialog } from '../components/Dialog';
 import { PasswordField, Segmented, TextArea, TextField } from '../components/Form';
 import { pillarShort } from '../components/Pillar';
 import { ErrorState, errorMessage, Loading } from '../components/States';
+import { disablePush, enablePush, playAlarm, pushSupported, readAlarmPrefs, saveAlarmPrefs } from '../lib/alarms';
 import { deviceTimeZone } from '../lib/format';
 
 export function Profile() {
@@ -29,6 +30,7 @@ export function Profile() {
         {user && <p className="muted">{user.email}</p>}
         <FocusSection />
         <PreferencesSection />
+        <AlarmsSection />
         <PartnerSection />
         <SecuritySection />
         <DataSection />
@@ -277,6 +279,101 @@ function CycleSetting() {
         <span aria-hidden="true" />
       </label>
     </div>
+  );
+}
+
+/** Alarmas de clases, recordatorios y tareas en este navegador, también con el panel cerrado. */
+function AlarmsSection() {
+  const toast = useToast();
+  const [prefs, setPrefs] = useState(readAlarmPrefs);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const apply = (p: NotifyPrefs) => {
+    setPrefs(p);
+    saveAlarmPrefs(p);
+  };
+  const toggle = async (enabled: boolean) => {
+    setBusy(true);
+    try {
+      if (!enabled) {
+        apply({ ...prefs, enabled });
+        await disablePush();
+        setNote(null);
+        return;
+      }
+      apply({ ...prefs, enabled });
+      const r = await enablePush().catch(() => 'unsupported' as const);
+      if (r === 'on') {
+        setNote('Listo: suenan con el panel abierto y llegan como aviso aunque lo cierres.');
+        toast('Alarmas activadas.');
+      } else if (r === 'denied') setNote('El navegador no dio permiso para avisos: solo sonarán con el panel abierto. Puedes darlo en el candado de la barra de direcciones.');
+      else setNote('Este navegador no recibe avisos con el panel cerrado: sonarán con el panel abierto. En iPhone, instala el panel en la pantalla de inicio.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const test = () => {
+    const stop = playAlarm(3);
+    window.setTimeout(stop, 3200);
+    if (pushSupported() && Notification.permission === 'granted')
+      void navigator.serviceWorker.ready
+        .then((r) =>
+          r.showNotification('Prueba de alarma', {
+            body: 'Así te avisará Design Your Core.',
+            icon: '/icon-192.png',
+            tag: 'dyc-prueba',
+          }),
+        )
+        .catch(() => undefined);
+  };
+  const row = (label: string, checked: boolean, onChange: (v: boolean) => void) => (
+    <label className="setting-row">
+      <span>{label}</span>
+      <span className="switch">
+        <input type="checkbox" role="switch" checked={checked} disabled={busy} onChange={(e) => onChange(e.target.checked)} />
+        <span aria-hidden="true" />
+      </span>
+    </label>
+  );
+  return (
+    <section className="card stack" aria-labelledby="alarms-title">
+      <h2 id="alarms-title" className="section-title">
+        Alarmas
+      </h2>
+      <p className="muted small">Suenan a la hora de tus clases y cursos del Horario, los recordatorios del Calendario y las tareas de la Agenda con aviso. En el teléfono se activan en su app, en Perfil.</p>
+      {row('Alarmas en este navegador', prefs.enabled, (v) => void toggle(v))}
+      {note && (
+        <p className="small muted" role="status">
+          {note}
+        </p>
+      )}
+      {prefs.enabled && (
+        <div className="stack">
+          {row('Clases y cursos del Horario', prefs.classes, (classes) => apply({ ...prefs, classes }))}
+          {prefs.classes && (
+            <div className="field">
+              <span className="field__label">Avisarme antes de empezar</span>
+              <Segmented<string>
+                label="Avisarme antes de empezar"
+                value={String(prefs.classLead)}
+                onChange={(v) => apply({ ...prefs, classLead: Number(v) })}
+                options={CLASS_LEADS.map((m) => ({
+                  value: String(m),
+                  label: m === 0 ? 'A la hora' : `${m} min`,
+                }))}
+              />
+            </div>
+          )}
+          {row('Recordatorios del Calendario', prefs.reminders, (reminders) => apply({ ...prefs, reminders }))}
+          {row('Tareas de la Agenda con aviso', prefs.tasks, (tasks) => apply({ ...prefs, tasks }))}
+          <div>
+            <button type="button" className="btn btn--secondary btn--sm" onClick={test}>
+              <BellRing size={16} aria-hidden="true" /> Probar el sonido
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   byWeekday,
   CLASS_DAYS,
   checkItems,
@@ -21,7 +22,7 @@ import { CalendarPlus, Clock, MapPin, Pencil, Plus, User } from 'lucide-react-na
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckList, ColorSwatches, Disclosure, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
+import { Suggestions, SearchBar, CheckList, ColorSwatches, Disclosure, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -37,6 +38,8 @@ export default function Subjects() {
   // Temas con la defensa de la app anterior (lista, id y done garantizados).
   const subjects = useMemo<Subject[]>(() => raw.map((s) => ({ ...s, topics: checkItems(s.topics, newLegacySubId) })), [raw]);
   const [editing, setEditing] = useState<Subject | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = subjects.filter((s) => matchesSearch(q, s.name, s.teacher, s.room, ...s.topics.map((t) => t.name)));
 
   const topics = subjects.flatMap((s) => s.topics);
   const linked = classes.filter((c) => subjects.some((s) => s.id === c.subject));
@@ -63,7 +66,8 @@ export default function Subjects() {
               { value: String(linked.length), label: linked.length === 1 ? 'Clase a la semana' : 'Clases a la semana' },
             ]}
           />
-          {subjects.map((s) => (
+          <SearchBar label="Buscar en tus materias" value={q} onChange={setQ} placeholder="Buscar por materia, profesor, aula o tema…" count={found.length} />
+          {found.map((s) => (
             <SubjectCard key={s.id} subject={s} classes={classes.filter((c) => c.subject === s.id)} onEdit={() => setEditing(s)} />
           ))}
         </>
@@ -192,6 +196,8 @@ function SubjectCard({ subject: s, classes, onEdit }: { subject: Subject; classe
 }
 
 function SubjectForm({ subject, count, data, onDone }: { subject: Subject | null; count: number; data: LegacyData | undefined; onDone: () => void }) {
+  const pastSubjects = useLegacyList(data, 'subjects');
+  const rooms = [...pastSubjects.map((x) => x.room ?? ''), ...useLegacyList(data, 'classes').map((c) => c.room ?? '')];
   const actions = useModule('subjects');
   const projectActions = useModule('projects');
   const toast = useToast();
@@ -237,6 +243,7 @@ function SubjectForm({ subject, count, data, onDone }: { subject: Subject | null
         hint={renaming ? (projects.length === 1 ? 'Su proyecto se actualizará con el nuevo nombre.' : `Sus ${projects.length} proyectos se actualizarán con el nuevo nombre.`) : undefined}
       />
       <Field label="Profesor o profesora (opcional)" value={teacher} onChangeText={setTeacher} maxLength={120} placeholder="Prof. Ruiz" />
+      <Suggestions field="Profesor" values={pastSubjects.map((x) => x.teacher ?? '')} current={teacher} onPick={setTeacher} />
       <View style={{ flexDirection: 'row', gap: space[3] }}>
         <View style={{ flex: 1 }}>
           <Field label="Aula (opcional)" value={room} onChangeText={setRoom} maxLength={60} placeholder="B-3" />
@@ -245,6 +252,7 @@ function SubjectForm({ subject, count, data, onDone }: { subject: Subject | null
           <Field label="Próxima clase (opcional)" value={nextClass} onChangeText={setNextClass} maxLength={60} placeholder="Lunes 8:00" />
         </View>
       </View>
+      <Suggestions field="Aula" values={rooms} current={room} onPick={setRoom} />
       <ColorSwatches legend="Color" colors={paletteWith(SUBJECT_COLORS, color)} value={color} onChange={setColor} />
       <FormActions
         submitLabel={subject ? 'Guardar' : 'Añadir materia'}

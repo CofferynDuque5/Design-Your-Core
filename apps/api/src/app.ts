@@ -10,6 +10,7 @@ import { isLocalOrigin, isTrustedOrigin } from './lib/origins.js';
 import { databaseProblem } from './lib/safeMode.js';
 import { authRoutes } from './routes/auth.js';
 import { imageRoutes } from './routes/images.js';
+import { pushRoutes } from './routes/push.js';
 import { partnerRoutes } from './routes/partner.js';
 import { resetRoutes } from './routes/reset.js';
 import { syncRoutes } from './routes/sync.js';
@@ -71,6 +72,7 @@ export function createApp({ db, config, mailer, limits = { general: 600, strict:
   app.use('/api', authRoutes({ db, auth, mailer, config, strict }));
   app.use('/api', syncRoutes({ db, requireAuth }));
   app.use('/api', imageRoutes({ db, requireAuth }));
+  app.use('/api', pushRoutes({ db, requireAuth }));
   app.use('/api', partnerRoutes({ db, requireAuth, strict, mailer, config }));
   app.use('/api/v2', v2Routes({ db, auth, requireAuth, strict }));
   // Lee páginas de fuera: límite propio para que no sirva de proxy.

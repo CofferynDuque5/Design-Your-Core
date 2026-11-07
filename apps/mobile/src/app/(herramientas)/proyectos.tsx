@@ -1,4 +1,6 @@
 import {
+  matchesSearch,
+  parseDeadline,
   byWeekday,
   CLASS_DAYS,
   checkItems,
@@ -30,7 +32,7 @@ import { ArrowDownWideNarrow, CalendarClock, ChevronDown, ChevronUp, Clock, Flag
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckList, ColorSwatches, Disclosure, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
+import { SearchBar, CheckList, ColorSwatches, Disclosure, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, Segmented, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -57,12 +59,15 @@ export default function Projects() {
   const projects = useMemo<Project[]>(() => projectsInOrder(raw.map((p) => ({ ...p, milestones: checkItems<LegacyMilestone>(p.milestones, newLegacySubId) }))), [raw]);
   const actions = useModule('projects');
   const [filter, setFilter] = useState<Filter>('todos');
+  const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Project | 'new' | null>(null);
 
   const active = projects.filter((p) => projectStatusOf(p) !== 'entregado').length;
   const thisWeek = projects.filter((p) => dueThisWeek(p.deadline)).length;
   // Igual que la app anterior: «En curso» incluye los que están en revisión.
-  const shown = filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? projectStatusOf(p) === 'entregado' : projectStatusOf(p) !== 'entregado'));
+  const shown = (filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? projectStatusOf(p) === 'entregado' : projectStatusOf(p) !== 'entregado'))).filter((p) =>
+    matchesSearch(q, p.title, p.subject, p.deadline, ...p.milestones.map((m) => m.name)),
+  );
   const open = projects.filter((p) => projectStatusOf(p) !== 'entregado');
 
   // Sube o baja un proyecto pendiente un puesto; los entregados quedan al final.
@@ -96,6 +101,7 @@ export default function Projects() {
               { value: String(thisWeek), label: thisWeek === 1 ? 'Entrega esta semana' : 'Entregas esta semana' },
             ]}
           />
+          <SearchBar label="Buscar en tus proyectos" value={q} onChange={setQ} placeholder="Buscar por nombre, materia o hito…" count={shown.length} />
           <Segmented<Filter> label="Mostrar" options={FILTERS} value={filter} onChange={setFilter} />
           {open.length > 1 && filter !== 'entregado' && (
             <View style={{ gap: space[2] }}>
@@ -112,7 +118,9 @@ export default function Projects() {
             </View>
           )}
           {shown.length === 0 ? (
-            <EmptyState title="Nada por aquí con este filtro" />
+            q.trim() ? null : (
+              <EmptyState title="Nada por aquí con este filtro" />
+            )
           ) : (
             shown.map((p) => (
               <ProjectCard
@@ -280,6 +288,7 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   const [subject, setSubject] = useState(project?.subject ?? '');
   const [deadline, setDeadline] = useState(project?.deadline ?? '');
   const [status, setStatus] = useState<ProjectStatus>(project ? projectStatusOf(project) : 'curso');
+  const pendingMilestones = checkItems<LegacyMilestone>(project?.milestones, () => '').filter((m) => !m.done).length;
   const [priority, setPriority] = useState<ProjectPriority>(project ? projectPriorityOf(project) : 'media');
   const [color, setColor] = useState(safeColor(project?.color, PROJECT_COLORS[count % PROJECT_COLORS.length]));
   const named = subjects.filter((s): s is LegacySubject => typeof s.name === 'string' && !!s.name);
@@ -320,10 +329,31 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
           </T>
         )}
       </View>
-      <Field label="Entrega (opcional)" value={deadline} onChangeText={setDeadline} maxLength={60} placeholder="20 SEP" hint="Escríbela como quieras: «20 SEP», «viernes»…" />
+      <Field
+        label="Entrega (opcional)"
+        value={deadline}
+        onChangeText={setDeadline}
+        maxLength={60}
+        placeholder="20 SEP"
+        hint={deadline.trim() && !parseDeadline(deadline) ? 'No entendí la fecha: no contará en «Entregas esta semana». Prueba «20 SEP», «20/12» o «viernes».' : 'Escríbela como quieras: «20 SEP», «20/12», «viernes»…'}
+      />
       <View style={{ gap: space[2] }}>
         <T v="label">Estado</T>
-        <Segmented<ProjectStatus> label="Estado" options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: STATUS_SHORT[o.value], a11yLabel: o.label }))} value={status} onChange={setStatus} />
+        <Segmented<ProjectStatus>
+          label="Estado"
+          options={STATUS_OPTIONS.map((o) => ({
+            value: o.value,
+            label: STATUS_SHORT[o.value],
+            a11yLabel: o.label,
+          }))}
+          value={status}
+          onChange={setStatus}
+        />
+        {status === 'entregado' && pendingMilestones > 0 && (
+          <T v="small" tint="muted">
+            Ojo: {pendingMilestones === 1 ? 'falta 1 hito' : `faltan ${pendingMilestones} hitos`} por marcar.
+          </T>
+        )}
       </View>
       <View style={{ gap: space[2] }}>
         <T v="label">Prioridad</T>

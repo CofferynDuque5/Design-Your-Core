@@ -35,8 +35,9 @@ export function Exercise() {
   };
   const remove = (w: LegacyWorkout) => {
     const order = workouts.map((x) => x.id);
-    actions.remove(w.id);
+    actions.remove(w.id, { undo: false });
     toast('Entreno eliminado.', {
+      key: 'undo',
       action: {
         label: 'Deshacer',
         run: () => {

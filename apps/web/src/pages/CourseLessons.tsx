@@ -1,7 +1,8 @@
 import { formatLength, lessonsByUnit, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { useIsMutating } from '@tanstack/react-query';
 import { ExternalLink, ListVideo, Play, Plus, Trash2 } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
-import { newId } from '../app/legacy';
+import { newId, useLegacyData, useLegacyList, type ChangeOpts } from '../app/legacy';
 import { TextField } from '../components/Form';
 import { YouTubePlayer } from '../components/YouTubePlayer';
 import { readYouTubeLength } from '../lib/youtubeLength';
@@ -10,9 +11,15 @@ import { readYouTubeLength } from '../lib/youtubeLength';
  * Unidades y lecciones de un curso: se marcan como vistas, se añaden a mano o
  * se traen de la lista de YouTube del curso. El avance del curso sale de aquí.
  */
-export function CourseLessons({ course: c, update }: { course: LegacyCourse; update: (c: LegacyCourse, patch: Partial<LegacyCourse>) => void }) {
+export function CourseLessons({ course, update }: { course: LegacyCourse; update: (c: LegacyCourse, patch: Partial<LegacyCourse>, opts?: ChangeOpts) => void }) {
+  // Siempre la copia más reciente del curso (la ventana puede conservar la que se abrió).
+  const legacy = useLegacyData();
+  const c = useLegacyList(legacy.data?.data, 'courses').find((x) => x.id === course.id) ?? course;
   // Lo último guardado desde aquí: dos cambios seguidos no se pisan aunque el curso aún no se haya recargado.
   const mine = useRef<CourseLesson[] | null>(null);
+  // Sin cambios en camino manda lo guardado (otro dispositivo, «Deshacer»…).
+  const saving = useIsMutating({ mutationKey: ['legacy'] }) > 0;
+  if (!saving) mine.current = null;
   const lessons = mine.current ?? c.lessons ?? [];
   const unitList = useId();
   const [title, setTitle] = useState('');
@@ -25,14 +32,17 @@ export function CourseLessons({ course: c, update }: { course: LegacyCourse; upd
   const latest = useRef(c);
   latest.current = c;
   const current = () => mine.current ?? latest.current.lessons ?? [];
-  const save = (next: CourseLesson[]) => {
+  const save = (next: CourseLesson[], opts?: ChangeOpts) => {
     const patch = lessonsPatch({ ...latest.current, lessons: current() }, next);
     mine.current = next;
-    update(latest.current, patch);
+    update(latest.current, patch, opts);
   };
-  const toggle = (id: string, done?: boolean) => {
+  const toggle = (id: string, done?: boolean, opts?: ChangeOpts) => {
     const cur = current();
-    save(cur.map((l) => (l.id === id ? { ...l, done: done ?? !l.done } : l)));
+    save(
+      cur.map((l) => (l.id === id ? { ...l, done: done ?? !l.done } : l)),
+      opts,
+    );
   };
   const link = normalizeCourseUrl(url);
   const badUrl = !!url.trim() && !validCourseUrl(link);
@@ -86,7 +96,7 @@ export function CourseLessons({ course: c, update }: { course: LegacyCourse; upd
             onProgress={(s) => {
               // Al terminar el video, la lección queda vista sola.
               const l = current().find((x) => x.id === played.id);
-              if (l && !l.done && s.duration && s.position / s.duration >= 0.97) toggle(played.id, true);
+              if (l && !l.done && s.duration && s.position / s.duration >= 0.97) toggle(played.id, true, { undo: false });
             }}
           />
           <p className="small muted">Al terminar el video, la lección se marca como vista.</p>

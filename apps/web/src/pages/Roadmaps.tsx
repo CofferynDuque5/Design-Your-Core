@@ -1,8 +1,9 @@
-import { checkItems, checkItemsPayload, COLOR_NAMES, donePercent, ROADMAP_COLORS, STEP_STATE_LABEL, stepStates, type LegacyCheckItem, type LegacyRoadmap } from '@dyc/core';
+import { matchesSearch, checkItems, checkItemsPayload, COLOR_NAMES, donePercent, ROADMAP_COLORS, STEP_STATE_LABEL, stepStates, type LegacyCheckItem, type LegacyRoadmap } from '@dyc/core';
 import { ArrowRight, Check, Lock, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useId, useMemo, useState, type FormEvent } from 'react';
 import { newId, newSubId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -17,6 +18,8 @@ export function Roadmaps() {
   const raw = useLegacyList(legacy.data?.data, 'roadmaps');
   const roadmaps = useMemo<Roadmap[]>(() => raw.map((r) => ({ ...r, steps: checkItems(r.steps, newSubId) })), [raw]);
   const [editing, setEditing] = useState<Roadmap | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = roadmaps.filter((r) => matchesSearch(q, r.name, ...r.steps.map((s) => s.name)));
   const steps = roadmaps.flatMap((r) => r.steps);
   const done = steps.filter((s) => s.done).length;
 
@@ -45,8 +48,9 @@ export function Roadmaps() {
               </p>
             )}
           </div>
+          <SearchBox label="Buscar en tus roadmaps" value={q} onChange={setQ} placeholder="Buscar por nombre o paso…" count={found.length} />
           <ul className="card-grid tool-grid tool-grid--wide">
-            {roadmaps.map((r) => (
+            {found.map((r) => (
               <li key={r.id}>
                 <RoadmapCard roadmap={r} onEdit={() => setEditing(r)} />
               </li>
@@ -89,7 +93,8 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
             {title}
           </h2>
           <span className="muted small">
-            Ruta de materias{r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
+            Ruta de materias
+            {r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
           </span>
         </div>
         <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>

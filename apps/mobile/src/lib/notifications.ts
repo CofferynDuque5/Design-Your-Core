@@ -37,7 +37,8 @@ export const readReminder = () => readJson<ReminderPrefs>(PREFS_KEY, DEFAULT_REM
 
 if (notificationsSupported) {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
+    // Las alarmas de la Agenda, el Calendario y el Horario suenan también con la app abierta.
+    handleNotification: async (n) => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: !!(n.request.content.data as { alarm?: boolean } | undefined)?.alarm, shouldSetBadge: false }),
   });
 }
 
@@ -118,7 +119,8 @@ export async function forgetDevice(): Promise<void> {
 
 const NOTIFY_KEY = 'dyc.notify';
 const TOOL_PREFIX = 'dyc-tool-';
-const TOOL_CHANNEL = 'avisos';
+// Canal nuevo con sonido y vibración de alarma (Android no deja cambiar el sonido de un canal ya creado).
+const TOOL_CHANNEL = 'alarmas';
 
 export const readNotify = async (): Promise<NotifyPrefs> => parseNotifyPrefs(await readJson<unknown>(NOTIFY_KEY, DEFAULT_NOTIFY));
 
@@ -181,10 +183,22 @@ export async function syncToolNotifications(data: LegacyData | null | undefined,
   const { granted } = await Notifications.getPermissionsAsync();
   if (!granted) return 0;
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(TOOL_CHANNEL, { name: 'Clases, cursos y recordatorios', importance: Notifications.AndroidImportance.HIGH });
+    await Notifications.deleteNotificationChannelAsync('avisos').catch(() => undefined);
+    await Notifications.setNotificationChannelAsync(TOOL_CHANNEL, {
+      name: 'Alarmas de clases, tareas y recordatorios',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      vibrationPattern: [0, 600, 300, 600, 300, 600],
+      bypassDnd: false,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });
   }
   for (const p of plan) {
-    await Notifications.scheduleNotificationAsync({ identifier: TOOL_PREFIX + p.id, content: { title: p.title, body: p.body, data: { url: p.url } }, trigger: triggerOf(p) }).catch(() => undefined);
+    await Notifications.scheduleNotificationAsync({
+      identifier: TOOL_PREFIX + p.id,
+      content: { title: p.title, body: p.body, data: { url: p.url, alarm: true }, sound: 'default', priority: Notifications.AndroidNotificationPriority.MAX, interruptionLevel: 'timeSensitive' },
+      trigger: triggerOf(p),
+    }).catch(() => undefined);
   }
   return plan.length;
 }

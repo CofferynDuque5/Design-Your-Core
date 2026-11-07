@@ -125,7 +125,8 @@ describe('módulos de la app anterior', () => {
     expect(projectProgress({ status: 'entregado' })).toBe(100);
     expect(projectProgress({ status: 'entregado', milestones: [{ done: true }, { done: false }, { done: false }] })).toBe(33);
     const now = Date.parse('2026-09-25T12:00:00Z');
-    expect(dueThisWeek('la próxima clase', now)).toBe(true); // no se entiende: cuenta, como antes
+    expect(dueThisWeek('la próxima clase', now)).toBe(false); // no se entiende: no cuenta
+    expect(dueThisWeek('zzz no es fecha', now)).toBe(false);
     expect(dueThisWeek('', now)).toBe(false);
     expect(dueThisWeek('28 SEP', now)).toBe(true);
     expect(dueThisWeek('25 sep.', now)).toBe(true);
@@ -136,6 +137,15 @@ describe('módulos de la app anterior', () => {
     expect(parseDeadline('20 SEP', new Date(now))?.getMonth()).toBe(8);
     expect(parseDeadline('5 dic 2027')?.getFullYear()).toBe(2027);
     expect(parseDeadline('31 foo')).toBeNull();
+    // 2026-09-25 es viernes.
+    const fri = new Date(2026, 8, 25, 10);
+    expect(parseDeadline('hoy', fri)?.getDate()).toBe(25);
+    expect(parseDeadline('mañana', fri)?.getDate()).toBe(26);
+    expect(parseDeadline('lunes', fri)?.getDate()).toBe(28);
+    expect(parseDeadline('Miércoles', fri)?.getDate()).toBe(30);
+    expect(parseDeadline('20/12', fri)?.getMonth()).toBe(11);
+    expect(parseDeadline('31/11/2026', fri)).toBeNull();
+    expect(dueThisWeek('lunes', fri.getTime())).toBe(true);
   });
 
   it('estados de los pasos de un roadmap y etiquetas', () => {

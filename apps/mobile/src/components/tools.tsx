@@ -20,11 +20,11 @@ import {
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter, type Href } from 'expo-router';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Minus, Plus, Trash2 } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Minus, Plus, Search, Trash2, X } from 'lucide-react-native';
 import { useState, type ReactNode, type Ref } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '../lib/theme';
-import { Button, Card, Field, PageHeader, Screen, T, fonts } from './ui';
+import { Button, Card, Field, PageHeader, Screen, T, fonts, type as typo } from './ui';
 import { SuggestButton } from './SectionSuggestions';
 import { UiIcon } from './UiIcon';
 
@@ -476,7 +476,7 @@ export function FormActions({ submitLabel, onSubmit, disabled, onDelete, confirm
 export function Suggestions({ field, values, current, onPick }: { field: string; values: string[]; current: string; onPick: (v: string) => void }) {
   const { colors } = useTheme();
   const q = current.trim().toLowerCase();
-  const shown = values.filter((v) => v.toLowerCase() !== q && (!q || v.toLowerCase().includes(q))).slice(0, 8);
+  const shown = [...new Set(values.map((v) => v.trim()).filter(Boolean))].filter((v) => v.toLowerCase() !== q && (!q || v.toLowerCase().includes(q))).slice(0, 8);
   if (!shown.length) return null;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space[2] }} style={{ marginTop: -space[2] }}>
@@ -495,6 +495,42 @@ export function Suggestions({ field, values, current, onPick }: { field: string;
         </Pressable>
       ))}
     </ScrollView>
+  );
+}
+
+/**
+ * Buscador de una sección: filtra la lista mientras escribes (sin tildes ni
+ * mayúsculas). Con `count` dice cuántos quedan a la vista.
+ */
+export function SearchBar({ label, value, onChange, placeholder = 'Buscar…', count }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; count?: number }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: space[1] }}>
+      <View style={[s.search, { borderColor: colors.lineStrong, backgroundColor: colors.surface }]}>
+        <Search size={18} color={colors.inkMuted} />
+        <TextInput
+          accessibilityLabel={label}
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          placeholderTextColor={colors.inkSubtle}
+          returnKeyType="search"
+          autoCorrect={false}
+          maxLength={200}
+          style={[typo.body, { flex: 1, color: colors.ink, minHeight: touchTarget }]}
+        />
+        {value ? (
+          <IconButton label="Borrar la búsqueda" onPress={() => onChange('')} style={{ marginRight: -space[2] }}>
+            <X size={18} color={colors.inkMuted} />
+          </IconButton>
+        ) : null}
+      </View>
+      {!!value.trim() && count !== undefined && (
+        <T v="small" tint="muted" accessibilityLiveRegion="polite">
+          {count === 0 ? `Nada coincide con «${value.trim()}».` : count === 1 ? '1 resultado.' : `${count} resultados.`}
+        </T>
+      )}
+    </View>
   );
 }
 
@@ -725,8 +761,29 @@ export function CheckInNote({ children }: { children: string }) {
 }
 
 const s = StyleSheet.create({
-  back: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: touchTarget, alignSelf: 'flex-start', marginLeft: -space[1], paddingRight: space[3] },
-  iconBtn: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center' },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: space[3],
+  },
+  back: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    minHeight: touchTarget,
+    alignSelf: 'flex-start',
+    marginLeft: -space[1],
+    paddingRight: space[3],
+  },
+  iconBtn: {
+    width: touchTarget,
+    height: touchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   checkHit: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: touchTarget + 4, paddingVertical: space[1] },
   box: { width: 26, height: 26, borderRadius: radius.sm, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

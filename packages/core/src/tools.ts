@@ -612,7 +612,8 @@ export function calendarMarks(data: LegacyData | undefined, month: Day, cycleDay
   };
   const n = daysInMonth(month);
   for (const r of legacyList(data, 'reminders')) {
-    if (r.on !== false && Number.isInteger(r.day) && r.day >= 1 && r.day <= n) add(`${month.slice(0, 8)}${String(r.day).padStart(2, '0')}`, 'event');
+    // Un evento del 29, 30 o 31 sale el último día de los meses más cortos.
+    if (r.on !== false && Number.isInteger(r.day) && r.day >= 1 && r.day <= 31) add(`${month.slice(0, 8)}${String(Math.min(r.day, n)).padStart(2, '0')}`, 'event');
   }
   looseList<CalendarWorkout>(data, 'workouts').forEach((w) => add(w.date, 'workout'));
   looseList<CalendarGoal>(data, 'goals').forEach((g) => add(g.deadline, 'goal'));
@@ -622,12 +623,20 @@ export function calendarMarks(data: LegacyData | undefined, month: Day, cycleDay
   return byDay;
 }
 
+/**
+ * ¿El evento mensual cae en este día? Un evento del 29, 30 o 31 se muestra el
+ * último día de los meses más cortos (no desaparece).
+ */
+export function reminderFallsOn(r: Pick<LegacyReminder, 'day'>, day: Day): boolean {
+  if (!Number.isInteger(r.day) || r.day < 1 || r.day > 31) return false;
+  return Math.min(r.day, daysInMonth(`${day.slice(0, 7)}-01`)) === Number(day.slice(8, 10));
+}
+
 /** «: 2 eventos, entreno» para el nombre accesible de un día. */
 export function describeCalendarDay(day: Day, marks: Map<Day, Set<CalendarMark>>, reminders: LegacyReminder[]): string {
   const set = marks.get(day);
   if (!set) return '';
-  const dayNum = Number(day.slice(8));
-  const events = reminders.filter((r) => r.on !== false && r.day === dayNum).length;
+  const events = reminders.filter((r) => r.on !== false && reminderFallsOn(r, day)).length;
   const parts = [...set].map((k) => (k === 'event' ? `${events} ${events === 1 ? 'evento' : 'eventos'}` : CALENDAR_MARKS[k].toLowerCase()));
   return `: ${parts.join(', ')}`;
 }
@@ -855,6 +864,17 @@ export const byNameEs = (a: string, b: string) => a.localeCompare(b, 'es', { sen
 
 /** Texto para buscar: sin tildes y en minúsculas («Física» encuentra «fisica»). */
 export const searchFold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/**
+ * ¿Coincide con la búsqueda? Sin tildes ni mayúsculas, y cada palabra tiene
+ * que aparecer en alguno de los campos («pagar luz» encuentra «Pagar la luz»).
+ */
+export function matchesSearch(query: string, ...fields: unknown[]): boolean {
+  const words = searchFold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = searchFold(fields.filter((f) => typeof f === 'string' || typeof f === 'number').join(' \u0000 '));
+  return words.every((w) => hay.includes(w));
+}
 
 // Una nota con datos raros se muestra con los valores por defecto, sin cambiar el dato.
 /** Nota recién creada que nunca se escribió: sin título propio ni texto. Se borra al salir del editor. */

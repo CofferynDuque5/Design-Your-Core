@@ -175,7 +175,7 @@ describe('herramientas en el móvil', () => {
     // El panel sigue abierto tras renombrar.
     fireEvent.press(await screen.findByRole('button', { name: 'Borrar «Ordenar la mesa»' }));
     await waitForWrite(api, 'DELETE', '/api/v2/modules/todos/d2');
-    expect(await screen.findByText('Pendiente y subtareas eliminados.')).toBeOnTheScreen();
+    expect(await screen.findByText('Eliminado.')).toBeOnTheScreen();
     await waitFor(() => expect(screen.queryByText('Ordenar la mesa')).toBeNull());
   });
 

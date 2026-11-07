@@ -29,8 +29,9 @@ export function Sleep() {
 
   const remove = (n: LegacySleep) => {
     const order = nights.map((x) => x.id);
-    actions.remove(n.id);
+    actions.remove(n.id, { undo: false });
     toast('Noche eliminada.', {
+      key: 'undo',
       action: {
         label: 'Deshacer',
         run: () => {

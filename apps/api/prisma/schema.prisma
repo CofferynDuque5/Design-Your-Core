@@ -31,6 +31,8 @@ model User {
   dismissals     Dismissal[]
   refreshTokens  RefreshToken[]
   pushDevices    PushDevice[]
+  webPushSubs    WebPushSubscription[]
+  webPushAlarms  WebPushAlarm[]
 }
 
 // Imágenes de los apuntes (sincronizadas entre dispositivos). Guardadas como
@@ -195,4 +197,38 @@ model PushDevice {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+// Avisos del panel web aunque esté cerrado (Web Push).
+model WebPushKey {
+  id         String   @id
+  publicKey  String
+  privateKey String
+  createdAt  DateTime @default(now()) @db.Timestamp(3)
+}
+
+model WebPushSubscription {
+  endpoint  String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+  updatedAt DateTime @default(now()) @db.Timestamp(3)
+
+  @@index([userId])
+}
+
+model WebPushAlarm {
+  userId String
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String
+  at     DateTime  @db.Timestamp(3)
+  title  String
+  body   String    @default("")
+  url    String    @default("/")
+  sentAt DateTime? @db.Timestamp(3)
+
+  @@id([userId, id])
+  @@index([at])
 }

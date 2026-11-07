@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   CLASS_COLORS,
   CLASS_DAY_NAMES,
   COURSE_STATUSES,
@@ -40,11 +41,11 @@ import { CourseLessons } from '../../components/CourseLessons';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { DotChoices, FormActions, IconButton, Pill, Suggestions, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { SearchBar, DotChoices, FormActions, IconButton, Pill, Suggestions, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { YouTubeLengthReader, YouTubeView, type LengthFound, type YouTubeViewHandle } from '../../components/YouTubeView';
 import { api } from '../../lib/api';
-import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
+import { newId, useLegacyData, useLegacyList, useModule, type ChangeOpts } from '../../lib/legacy';
 import { useToast } from '../../lib/toast';
 import { useTheme } from '../../lib/theme';
 
@@ -62,7 +63,9 @@ export default function Cursos() {
   const [filter, setFilter] = useState<Filter>('todos');
   // `topic` sin curso: añadir uno nuevo a ese tema.
   const [editing, setEditing] = useState<LegacyCourse | { topic: string } | null>(null);
-  const groups = coursesByTopic(courses.filter((c) => filter === 'todos' || statusOf(c) === filter));
+  const [q, setQ] = useState('');
+  const shown = courses.filter((c) => (filter === 'todos' || statusOf(c) === filter) && matchesSearch(q, c.title, c.topic, c.subtopic, c.source, c.notes, ...(c.lessons ?? []).map((l) => l.title)));
+  const groups = coursesByTopic(shown);
   const topics = coursesByTopic(courses).map((g) => g.topic);
   const pending = courses.filter((c) => statusOf(c) !== 'hecho').length;
   const [watching, setWatching] = useState<string | null>(null);
@@ -97,7 +100,14 @@ export default function Cursos() {
     if (canWatch(c)) return setWatching(c.id);
     if (!validCourseUrl(c.url) || !c.url) return;
     away.current = c.id;
-    update(c, { lastAt: new Date().toISOString(), ...(statusOf(c) === 'pendiente' ? { status: 'curso' as const } : {}) });
+    update(
+      c,
+      {
+        lastAt: new Date().toISOString(),
+        ...(statusOf(c) === 'pendiente' ? { status: 'curso' as const } : {}),
+      },
+      { undo: false },
+    );
     Linking.openURL(c.url).catch(() => undefined);
   };
   const byId = (id: string | null) => (id ? courses.find((c) => c.id === id) : undefined);
@@ -127,9 +137,12 @@ export default function Cursos() {
             <Pill a11yLabel={plural(pending, 'curso por ver', 'cursos por ver')}>{plural(pending, 'por ver', 'por ver')}</Pill>
             {pending > 0 && <Button small variant="secondary" label="Crear horario" icon={<CalendarClock size={16} color={colors.primary} />} onPress={() => setPlanning(true)} />}
           </View>
+          <SearchBar label="Buscar en tus cursos" value={q} onChange={setQ} placeholder="Buscar por curso, tema, canal o lección…" count={shown.length} />
           <DotChoices legend="Estado" hideLegend value={filter} onChange={setFilter} options={FILTER_OPTIONS} />
           {groups.length === 0 ? (
-            <EmptyState title={`Nada en «${COURSE_STATUS_INFO[filter as CourseStatus].label}»`}>Cambia el estado de un curso con el botón que tiene al lado.</EmptyState>
+            q.trim() ? null : (
+              <EmptyState title={`Nada en «${COURSE_STATUS_INFO[filter as CourseStatus].label}»`}>Cambia el estado de un curso con el botón que tiene al lado.</EmptyState>
+            )
           ) : (
             groups.map((g) => (
               <TopicCard
@@ -240,8 +253,8 @@ function useCourseUpdate() {
   const courses = useModule('courses');
   const classes = useModule('classes');
   const toast = useToast();
-  return (c: LegacyCourse, patch: Partial<LegacyCourse>) => {
-    courses.update(c.id, patch);
+  return (c: LegacyCourse, patch: Partial<LegacyCourse>, opts?: ChangeOpts) => {
+    courses.update(c.id, patch, opts);
     if (patch.status !== 'hecho' || c.status === 'hecho') return;
     const { next, patches } = handoffClasses(legacy.data?.data, c.id);
     if (!next || !patches.length) return;
@@ -380,7 +393,7 @@ function Watch({ course: c, onClose }: { course: LegacyCourse; onClose: () => vo
   const [failed, setFailed] = useState(false);
   const save = (s: { position: number; duration: number; video?: string; index?: number; count?: number }) => {
     const patch = coursePlaybackPatch(latest.current, s);
-    update(latest.current, patch);
+    update(latest.current, patch, { undo: false });
     setSaved(courseResume({ ...latest.current, ...patch } as LegacyCourse));
     if (closing.current) onClose();
   };

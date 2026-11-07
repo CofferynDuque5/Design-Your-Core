@@ -1019,6 +1019,9 @@
 
   .pillar-bars__value {
     grid-area: value;
+    min-width: 3ch;
+    white-space: nowrap;
+    text-align: end;
     font-family: var(--font-display);
     font-weight: var(--weight-display);
     font-size: var(--text-title);
@@ -2002,6 +2005,16 @@
   }
 
   /* Interruptor */
+  /* Una opción con interruptor a la derecha (Perfil → Alarmas). */
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 44px;
+    cursor: pointer;
+  }
+
   .switch {
     position: relative;
     display: inline-grid;
@@ -2253,13 +2266,25 @@
   }
 
   .timer .segmented button {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     padding-inline: var(--space-2);
     white-space: nowrap;
   }
 
+  /* En 360 px «Descanso largo» no cabe en una línea: se parte en dos en vez de desbordar. */
+  @media (max-width: 400px) {
+    .timer .segmented button {
+      padding-inline: var(--space-1);
+      font-size: 0.8125rem;
+      white-space: normal;
+      line-height: 1.15;
+    }
+  }
+
   .timer .segmented button:disabled {
     cursor: not-allowed;
+    opacity: 0.45;
   }
 
   .timer__dial {
@@ -2457,10 +2482,69 @@
     margin: calc(var(--space-2) * -1) calc(var(--space-3) * -1) 0 0;
   }
 
-  /* «Instalar la app» (el sitio enlaza con ?instalar): arriba, sobre todo lo demás. */
-  .install-banner {
+  /* Alarma sonando (Agenda, Calendario, Horario): arriba y por encima de todo. */
+  .alarm {
     position: fixed;
     top: calc(var(--space-3) + env(safe-area-inset-top));
+    left: 50%;
+    z-index: 80;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-2) var(--space-3);
+    align-items: start;
+    width: min(100% - 2 * var(--space-4), 480px);
+    padding: var(--space-4);
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+    transform: translateX(-50%);
+  }
+
+  .alarm__icon {
+    color: var(--color-primary);
+    animation: alarm-shake 0.6s ease-in-out infinite;
+  }
+
+  .alarm__title {
+    margin: 0;
+    font-size: var(--text-h3, 1.25rem);
+  }
+
+  .alarm__text p {
+    margin: 0;
+  }
+
+  .alarm__actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  @keyframes alarm-shake {
+    0%,
+    100% {
+      transform: rotate(0);
+    }
+    25% {
+      transform: rotate(-14deg);
+    }
+    75% {
+      transform: rotate(14deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .alarm__icon {
+      animation: none;
+    }
+  }
+
+  /* «Instalar la app» (el sitio enlaza con ?instalar): abajo, encima de la barra, para no tapar el saludo ni el título. */
+  .install-banner {
+    position: fixed;
+    bottom: calc(80px + env(safe-area-inset-bottom));
     left: 50%;
     z-index: 60;
     display: flex;

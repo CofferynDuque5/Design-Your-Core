@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   CONTENT_PLATFORM_INFO,
   CONTENT_PLATFORMS,
   CONTENT_STAGE_INFO,
@@ -15,7 +16,7 @@ import { CalendarClock, Check, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { Dot, DotChoices, FormActions, IconButton, Pill, Stats, ToolScreen } from '../../components/tools';
+import { SearchBar, Dot, DotChoices, FormActions, IconButton, Pill, Stats, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -31,6 +32,8 @@ export default function Content() {
   const [title, setTitle] = useState('');
   const [platform, setPlatform] = useState<ContentPlatform>('youtube');
   const [editing, setEditing] = useState<LegacyContent | null>(null);
+  const [q, setQ] = useState('');
+  const hit = (c: LegacyContent) => matchesSearch(q, c.title, c.notes, c.script, CONTENT_PLATFORM_INFO[contentPlatformOf(c)].label);
   const published = items.filter((c) => contentStageOf(c) === 'publicado');
   const inProgress = items.filter((c) => contentStageOf(c) !== 'publicado');
 
@@ -89,9 +92,18 @@ export default function Content() {
                   })}
                 </View>
               </Card>
+              <SearchBar label="Buscar en tu contenido" value={q} onChange={setQ} placeholder="Buscar por título, guion o plataforma…" count={items.filter(hit).length} />
               {[
-                { id: 'produccion', label: 'En producción', list: inProgress },
-                { id: 'publicados', label: 'Publicados', list: published },
+                {
+                  id: 'produccion',
+                  label: 'En producción',
+                  list: inProgress.filter(hit),
+                },
+                {
+                  id: 'publicados',
+                  label: 'Publicados',
+                  list: published.filter(hit),
+                },
               ].map(
                 (g) =>
                   g.list.length > 0 && (

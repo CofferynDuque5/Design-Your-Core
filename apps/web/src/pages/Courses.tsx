@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   CLASS_COLORS,
   CLASS_DAY_NAMES,
   COURSE_STATUSES,
@@ -36,8 +37,9 @@ import { CourseLessons } from './CourseLessons';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api } from '../app/api';
-import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
+import { newId, useLegacyData, useLegacyList, useModule, type ChangeOpts } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -62,7 +64,8 @@ export function Courses() {
   const [filter, setFilter] = useState<Filter>('todos');
   // `topic` sin curso: añadir uno nuevo a ese tema.
   const [editing, setEditing] = useState<LegacyCourse | { topic: string } | null>(null);
-  const shown = courses.filter((c) => filter === 'todos' || statusOf(c) === filter);
+  const [q, setQ] = useState('');
+  const shown = courses.filter((c) => (filter === 'todos' || statusOf(c) === filter) && matchesSearch(q, c.title, c.topic, c.subtopic, c.source, c.notes, ...(c.lessons ?? []).map((l) => l.title)));
   const groups = coursesByTopic(shown);
   const topics = coursesByTopic(courses).map((g) => g.topic);
   const pending = courses.filter((c) => statusOf(c) !== 'hecho').length;
@@ -104,10 +107,14 @@ export function Courses() {
     if (youtubeRef(c.url)) setWatching(c.id);
     else {
       away.current = c.id;
-      actions.update(c.id, {
-        lastAt: new Date().toISOString(),
-        ...(statusOf(c) === 'pendiente' ? { status: 'curso' } : {}),
-      });
+      actions.update(
+        c.id,
+        {
+          lastAt: new Date().toISOString(),
+          ...(statusOf(c) === 'pendiente' ? { status: 'curso' } : {}),
+        },
+        { undo: false },
+      );
     }
   };
   const byId = (id: string | null) => (id ? courses.find((c) => c.id === id) : undefined);
@@ -155,8 +162,11 @@ export function Courses() {
             </div>
             <span className="chip numeric">{plural(pending, 'por ver', 'por ver')}</span>
           </div>
+          <SearchBox label="Buscar en tus cursos" value={q} onChange={setQ} placeholder="Buscar por curso, tema, canal o lección…" count={shown.length} />
           {groups.length === 0 ? (
-            <EmptyState title={`Nada en «${COURSE_STATUS_INFO[filter as CourseStatus].label}»`}>Cambia el estado de un curso con el botón que tiene al lado.</EmptyState>
+            q.trim() ? null : (
+              <EmptyState title={`Nada en «${COURSE_STATUS_INFO[filter as CourseStatus].label}»`}>Cambia el estado de un curso con el botón que tiene al lado.</EmptyState>
+            )
           ) : (
             <div className="card-grid tool-grid">
               {groups.map((g) => (
@@ -262,8 +272,8 @@ function useCourseUpdate() {
   const courses = useModule('courses');
   const classes = useModule('classes');
   const toast = useToast();
-  return (c: LegacyCourse, patch: Partial<LegacyCourse>) => {
-    courses.update(c.id, patch);
+  return (c: LegacyCourse, patch: Partial<LegacyCourse>, opts?: ChangeOpts) => {
+    courses.update(c.id, patch, opts);
     if (patch.status !== 'hecho' || c.status === 'hecho') return;
     const { next, patches } = handoffClasses(legacy.data?.data, c.id);
     if (!next || !patches.length) return;
@@ -378,7 +388,7 @@ function Watch({ course: c }: { course: LegacyCourse }) {
         title={courseName(c)}
         onProgress={(s) => {
           const patch = coursePlaybackPatch(latest.current, s);
-          update(latest.current, patch);
+          update(latest.current, patch, { undo: false });
           setSaved(courseResume({ ...latest.current, ...patch } as LegacyCourse));
         }}
       />

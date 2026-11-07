@@ -21,7 +21,7 @@ import { useRouter } from 'expo-router';
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { ColorSwatches, DotChoices, ToolScreen } from '../../components/tools';
+import { Suggestions, ColorSwatches, DotChoices, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -226,6 +226,8 @@ function WeekGrid({ classes, today, now, onOpen }: { classes: LegacyClass[]; tod
 }
 
 function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; count: number; subjects: Subject[]; onDone: () => void }) {
+  const saved = useLegacyData().data?.data;
+  const rooms = [...useLegacyList(saved, 'classes').map((c) => c.room ?? ''), ...subjects.map((x) => x.room ?? '')];
   const { colors } = useTheme();
   const actions = useModule('classes');
   const router = useRouter();
@@ -305,6 +307,7 @@ function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; 
         </View>
       </View>
       <Field label="Aula (opcional)" value={room} onChangeText={setRoom} maxLength={60} placeholder="A-201" />
+      <Suggestions field="Aula" values={rooms} current={room} onPick={setRoom} />
       <ColorSwatches legend="Color" colors={palette} value={color} onChange={setColor} />
       <View style={{ gap: space[2] }}>
         {cls?.course && (

@@ -211,7 +211,7 @@ function PrivacyCard({ seen, onSeen }: { seen: boolean; onSeen: () => void }) {
 function HistoryCard({ currentId, onOpen }: { currentId: string | null; onOpen: (c: LegacyChat | null) => void }) {
   const legacy = useLegacyData();
   const chats = useLegacyList(legacy.data?.data, 'chats');
-  const actions = useModule('chats');
+  const actions = useModule('chats', { undo: false });
   const [asking, setAsking] = useState<LegacyChat | null>(null);
   const remove = (c: LegacyChat) => {
     actions.remove(c.id);
@@ -295,7 +295,7 @@ function Chat({ initial, settings, ready, onSaved, onNew }: { initial: LegacyCha
   }, [initial]);
 
   // Guardar en tu cuenta: la primera vez se crea, luego se actualiza.
-  const chats = useModule('chats');
+  const chats = useModule('chats', { undo: false });
   const chatId = useRef<string | null>(initial?.id ?? null);
   const dirty = useRef(false);
   useEffect(() => {

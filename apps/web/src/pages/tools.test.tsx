@@ -192,7 +192,30 @@ describe('Pendientes', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Borrar «Organizar mudanza»' }));
     await waitFor(() => expect(screen.queryByRole('checkbox', { name: 'Organizar mudanza' })).not.toBeInTheDocument());
     expect(screen.queryByRole('checkbox', { name: 'Pedir cajas' })).not.toBeInTheDocument();
-    expect(writes(api)[3]).toMatchObject({ method: 'DELETE', path: '/api/v2/modules/todos/td2' });
+    expect(writes(api)[3]).toMatchObject({
+      method: 'DELETE',
+      path: '/api/v2/modules/todos/td2',
+    });
+
+    // «Deshacer» lo devuelve con sus subtareas y en su lugar.
+    await userEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
+    expect(await screen.findByRole('checkbox', { name: 'Organizar mudanza' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(writes(api)[4]).toMatchObject({
+        method: 'POST',
+        path: '/api/v2/modules/todos',
+        body: { item: { id: 'td2' } },
+      }),
+    );
+    await waitFor(() => expect(writes(api).some((w) => w.method === 'POST' && w.path === '/api/v2/modules/subtasks' && (w.body as { item: { title: string } }).item.title === 'Pedir cajas')).toBe(true));
+  });
+
+  it('avisa si intentas añadir un pendiente vacío', async () => {
+    withApi();
+    renderAt('/pendientes');
+    await screen.findByRole('heading', { name: /2 por hacer/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe qué tienes que hacer');
   });
 });
 
@@ -1881,5 +1904,61 @@ describe('Sugerencias de cada sección', () => {
     renderAt('/asistente');
     await screen.findByLabelText('Mensaje para el asistente');
     expect(screen.queryByRole('button', { name: 'Sugerencias' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Alarmas', () => {
+  afterEach(() => localStorage.removeItem('dyc-alarmas'));
+
+  it('suena a la hora de una tarea con aviso y se detiene', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    vi.setSystemTime(new Date(2026, 8, 25, 9, 59, 40));
+    localStorage.setItem(
+      'dyc-alarmas',
+      JSON.stringify({
+        enabled: true,
+        classes: false,
+        reminders: false,
+        tasks: true,
+      }),
+    );
+    withApi({}, (doc) => {
+      doc.tasks = [
+        {
+          id: 'tk',
+          title: 'Llamar al dentista',
+          pri: 'media',
+          time: '10:00',
+          rem: true,
+          done: false,
+          tags: '',
+        },
+      ];
+    });
+    renderAt('/');
+    await screen.findAllByRole('link', { name: /^Hoy$/ });
+    // Que lleguen los datos antes de que pase el tiempo.
+    await act(() => new Promise((r) => setTimeout(r, 100)));
+    act(() => vi.advanceTimersByTime(30_000));
+    const alarm = await screen.findByRole('alertdialog', {
+      name: 'Tarea: Llamar al dentista',
+    });
+    await userEvent.click(within(alarm).getByRole('button', { name: 'Detener' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('Buscadores', () => {
+  it('Ideas filtra sin tildes y dice cuántas quedan', async () => {
+    withApi();
+    renderAt('/ideas');
+    expect(await screen.findByRole('article', { name: 'App de hábitos' })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Buscar en tus ideas'), 'HABITOS');
+    expect(screen.getByRole('article', { name: 'App de hábitos' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: 'Landing para portfolio' })).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('1 resultado.');
+    await userEvent.clear(screen.getByLabelText('Buscar en tus ideas'));
+    await userEvent.type(screen.getByLabelText('Buscar en tus ideas'), 'zzz');
+    expect(screen.getByText('Nada coincide con «zzz».')).toBeInTheDocument();
   });
 });

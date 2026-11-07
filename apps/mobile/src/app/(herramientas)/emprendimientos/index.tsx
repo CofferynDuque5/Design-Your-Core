@@ -1,11 +1,11 @@
-import { safeColor, VENTURE_COLORS, VENTURE_STAGE_INFO, ventureItemsOf, ventureSummary, type LegacyVenture } from '@dyc/core';
+import { matchesSearch, safeColor, VENTURE_COLORS, VENTURE_STAGE_INFO, ventureItemsOf, ventureSummary, type LegacyVenture } from '@dyc/core';
 import { radius, space } from '@dyc/tokens';
 import { useRouter, type Href } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../../components/Sheet';
-import { Pill, ToolScreen } from '../../../components/tools';
+import { Pill, SearchBar, ToolScreen } from '../../../components/tools';
 import { Button, EmptyState, ErrorState, Loading, T, fonts } from '../../../components/ui';
 import { stageOf, VentureForm } from '../../../components/ventures';
 import { useLegacyData, useLegacyList } from '../../../lib/legacy';
@@ -17,6 +17,8 @@ export default function Ventures() {
   const legacy = useLegacyData();
   const ventures = useLegacyList(legacy.data?.data, 'ventures');
   const [creating, setCreating] = useState(false);
+  const [q, setQ] = useState('');
+  const found = ventures.filter((v) => matchesSearch(q, v.name, v.description, ...ventureItemsOf(legacy.data?.data, v.id).map((i) => `${i.title} ${i.text ?? ''}`)));
 
   return (
     <ToolScreen
@@ -35,7 +37,8 @@ export default function Ventures() {
         </EmptyState>
       ) : (
         <View style={{ gap: space[3] }} accessibilityLabel="Tus emprendimientos">
-          {ventures.map((v) => (
+          <SearchBar label="Buscar en tus emprendimientos" value={q} onChange={setQ} placeholder="Buscar por nombre, nota o enlace…" count={found.length} />
+          {found.map((v) => (
             <VentureCard key={v.id} venture={v} summary={ventureSummary(ventureItemsOf(legacy.data.data, v.id))} />
           ))}
         </View>

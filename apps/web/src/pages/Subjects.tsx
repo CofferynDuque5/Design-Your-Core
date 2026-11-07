@@ -1,10 +1,11 @@
-import { byWeekday, CLASS_DAYS, checkItems, checkItemsPayload, COLOR_NAMES, donePercent, legacyList, SUBJECT_COLORS, type LegacyCheckItem, type LegacyClass, type LegacySubject } from '@dyc/core';
+import { matchesSearch, byWeekday, CLASS_DAYS, checkItems, checkItemsPayload, COLOR_NAMES, donePercent, legacyList, SUBJECT_COLORS, type LegacyCheckItem, type LegacyClass, type LegacySubject } from '@dyc/core';
 import { CalendarPlus, ChevronDown, Clock, MapPin, Pencil, Plus, User } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { newId, newSubId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -20,6 +21,8 @@ export function Subjects() {
   // Temas con la defensa de la app anterior (lista, id y done garantizados).
   const subjects = useMemo<Subject[]>(() => raw.map((s) => ({ ...s, topics: checkItems(s.topics, newSubId) })), [raw]);
   const [editing, setEditing] = useState<Subject | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = subjects.filter((s) => matchesSearch(q, s.name, s.teacher, s.room, ...s.topics.map((t) => t.name)));
 
   const topics = subjects.flatMap((s) => s.topics);
   const linked = classes.filter((c) => subjects.some((s) => s.id === c.subject));
@@ -46,8 +49,9 @@ export function Subjects() {
               { value: linked.length, label: linked.length === 1 ? 'Clase a la semana' : 'Clases a la semana' },
             ]}
           />
+          <SearchBox label="Buscar en tus materias" value={q} onChange={setQ} placeholder="Buscar por materia, profesor, aula o tema…" count={found.length} />
           <ul className="card-grid tool-grid">
-            {subjects.map((s) => (
+            {found.map((s) => (
               <li key={s.id}>
                 <SubjectCard subject={s} classes={classes.filter((c) => c.subject === s.id)} onEdit={() => setEditing(s)} />
               </li>
@@ -197,9 +201,9 @@ function SubjectForm({ subject, count, data, onDone }: { subject: Subject | null
       {subject && projects.length > 0 && name.trim() && name.trim() !== subject.name && (
         <p className="field__hint">{projects.length === 1 ? 'Su proyecto se actualizará con el nuevo nombre.' : `Sus ${projects.length} proyectos se actualizarán con el nuevo nombre.`}</p>
       )}
-      <TextField label="Profesor o profesora (opcional)" value={teacher} onChange={(e) => setTeacher(e.target.value)} maxLength={120} placeholder="Prof. Ruiz" />
+      <TextField label="Profesor o profesora (opcional)" suggestions={legacyList(data, 'subjects').map((x) => x.teacher ?? '')} value={teacher} onChange={(e) => setTeacher(e.target.value)} maxLength={120} placeholder="Prof. Ruiz" />
       <div className="grid-2">
-        <TextField label="Aula (opcional)" value={room} onChange={(e) => setRoom(e.target.value)} maxLength={60} placeholder="B-3" />
+        <TextField label="Aula (opcional)" suggestions={[...legacyList(data, 'subjects').map((x) => x.room ?? ''), ...legacyList(data, 'classes').map((c) => c.room ?? '')]} value={room} onChange={(e) => setRoom(e.target.value)} maxLength={60} placeholder="B-3" />
         <TextField label="Próxima clase (opcional)" value={nextClass} onChange={(e) => setNextClass(e.target.value)} maxLength={60} placeholder="Lunes 8:00" />
       </div>
       <ColorPicker legend="Color" colors={paletteWith(SUBJECT_COLORS, color)} value={color} onChange={setColor} names={COLOR_NAMES} />

@@ -5,9 +5,11 @@ interface Toast {
   message: string;
   tone: 'info' | 'error';
   action?: { label: string; run: () => void };
+  key?: string;
 }
 
-type Show = (message: string, opts?: { tone?: Toast['tone']; action?: Toast['action'] }) => void;
+/** `key`: un aviso nuevo con la misma clave sustituye al anterior (p. ej. un solo «Deshacer» a la vez). */
+type Show = (message: string, opts?: { tone?: Toast['tone']; action?: Toast['action']; key?: string }) => void;
 
 const ToastContext = createContext<Show | null>(null);
 
@@ -19,7 +21,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const show = useCallback<Show>(
     (message, opts = {}) => {
       const id = next.current++;
-      setToasts((t) => [...t.slice(-2), { id, message, tone: opts.tone ?? 'info', action: opts.action }]);
+      setToasts((t) => [...t.filter((x) => !opts.key || x.key !== opts.key).slice(-2), { id, message, tone: opts.tone ?? 'info', action: opts.action, key: opts.key }]);
       window.setTimeout(() => dismiss(id), opts.action ? 7000 : 4000);
     },
     [dismiss],

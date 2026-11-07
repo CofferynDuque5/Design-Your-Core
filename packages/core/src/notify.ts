@@ -104,3 +104,55 @@ export function notificationPlan(data: LegacyData | null | undefined, prefs: Not
 
   return out.slice(0, NOTIFY_MAX);
 }
+
+/** Una alarma con fecha y hora exactas (para el panel web y su servidor de avisos). */
+export interface AlarmAt {
+  id: string;
+  /** ISO en UTC. */
+  at: string;
+  title: string;
+  body: string;
+  url: string;
+}
+
+/** Cuántos días por delante se programan en el servidor (el panel los renueva cada vez que se abre). */
+export const ALARM_DAYS = 14;
+export const ALARM_MAX = 200;
+
+/**
+ * Convierte el plan (semanal, mensual o con fecha) en alarmas concretas de los
+ * próximos `days` días, con la hora local de este dispositivo. Un recordatorio
+ * del día 31 suena el último día de los meses más cortos.
+ */
+export function expandNotificationPlan(plan: PlannedNotification[], now: Date = new Date(), days: number = ALARM_DAYS): AlarmAt[] {
+  const out: AlarmAt[] = [];
+  const end = now.getTime() + days * 86_400_000;
+  const push = (p: PlannedNotification, at: Date) => {
+    const t = at.getTime();
+    if (t > now.getTime() && t <= end)
+      out.push({
+        id: `${p.id}@${at.toISOString()}`,
+        at: at.toISOString(),
+        title: p.title,
+        body: p.body,
+        url: p.url,
+      });
+  };
+  for (const p of plan) {
+    const t = p.trigger;
+    if (t.kind === 'date') {
+      push(p, new Date(t.at));
+      continue;
+    }
+    for (let d = 0; d <= days; d++) {
+      const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, t.hour, t.minute, 0, 0);
+      if (t.kind === 'weekly' && ((at.getDay() + 6) % 7) + 1 !== t.weekday) continue;
+      if (t.kind === 'monthly') {
+        const last = new Date(at.getFullYear(), at.getMonth() + 1, 0).getDate();
+        if (Math.min(t.day, last) !== at.getDate()) continue;
+      }
+      push(p, at);
+    }
+  }
+  return out.sort((a, b) => a.at.localeCompare(b.at)).slice(0, ALARM_MAX);
+}

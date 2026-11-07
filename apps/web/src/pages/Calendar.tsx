@@ -1,4 +1,5 @@
 import {
+  reminderFallsOn,
   CALENDAR_MARKS,
   calendarCycleDays,
   calendarMarks,
@@ -186,8 +187,7 @@ function DayPanel({
   cycle: { period: boolean; predicted: boolean } | null;
 }) {
   const actions = useModule('reminders');
-  const dayNum = Number(day.slice(8));
-  const events = reminders.filter((r) => r.day === dayNum);
+  const events = reminders.filter((r) => reminderFallsOn(r, day));
   const workouts = arr<Workout>(data, 'workouts').filter((w) => w.date === day);
   const goals = arr<Goal>(data, 'goals').filter((g) => g.deadline === day);
   const journal = arr<Journal>(data, 'journal').filter((j) => j.date === day);
@@ -303,6 +303,8 @@ function JournalMood({ mood }: { mood: unknown }) {
 
 function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder | null; day: number; onDone: () => void }) {
   const actions = useModule('reminders');
+  const saved = useLegacyData().data?.data;
+  const past = useLegacyList(saved, 'reminders');
   const [title, setTitle] = useState(displayTitle(event?.title));
   const [when, setWhen] = useState(event?.when ?? '');
   const [day, setDay] = useState(event?.day ?? initialDay);
@@ -318,10 +320,10 @@ function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder |
 
   return (
     <form className="stack" onSubmit={submit}>
-      <TextField label="Título" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus placeholder="Dentista" />
+      <TextField label="Título" suggestions={past.map((r) => displayTitle(r.title))} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus placeholder="Dentista" />
       <div className="grid-2">
-        <TextField label="Hora o nota (opcional)" value={when} onChange={(e) => setWhen(e.target.value)} maxLength={60} placeholder="14:00" />
-        <SelectField label="Día del mes" value={day} onChange={(e) => setDay(Number(e.target.value))} hint={`Se repite el día ${day} de cada mes.`}>
+        <TextField label="Hora o nota (opcional)" suggestions={past.map((r) => r.when ?? '')} value={when} onChange={(e) => setWhen(e.target.value)} maxLength={60} placeholder="14:00" />
+        <SelectField label="Día del mes" value={day} onChange={(e) => setDay(Number(e.target.value))} hint={`Se repite el día ${day} de cada mes.${day > 28 ? ' En los meses más cortos sale el último día.' : ''}`}>
           {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
             <option key={d} value={d}>
               {d}

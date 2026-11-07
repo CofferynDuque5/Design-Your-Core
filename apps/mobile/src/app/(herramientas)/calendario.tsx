@@ -1,4 +1,5 @@
 import {
+  reminderFallsOn,
   CALENDAR_MARKS,
   calendarCycleDays,
   calendarMarks,
@@ -31,7 +32,7 @@ import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { ColorSwatches, Dot, IconButton, MonthNav, Stepper, Toggle, ToolScreen } from '../../components/tools';
+import { Suggestions, ColorSwatches, Dot, IconButton, MonthNav, Stepper, Toggle, ToolScreen } from '../../components/tools';
 import { Button, Card, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { UiIcon } from '../../components/UiIcon';
 import { useAuth } from '../../lib/api';
@@ -165,8 +166,7 @@ function DayPanel({
   const { colors } = useTheme();
   const markColor = useMarkColors();
   const actions = useModule('reminders');
-  const dayNum = Number(day.slice(8));
-  const events = reminders.filter((r) => r.day === dayNum);
+  const events = reminders.filter((r) => reminderFallsOn(r, day));
   const workouts = looseList<CalendarWorkout>(data, 'workouts').filter((w) => w.date === day);
   const goals = looseList<CalendarGoal>(data, 'goals').filter((g) => g.deadline === day);
   const journal = looseList<CalendarJournal>(data, 'journal').filter((j) => j.date === day);
@@ -264,6 +264,8 @@ function ReadOnlyItem({ color, title, mood, meta, cycleLink }: { color: string; 
 }
 
 function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder | null; day: number; onDone: () => void }) {
+  const saved = useLegacyData().data?.data;
+  const past = useLegacyList(saved, 'reminders');
   const actions = useModule('reminders');
   const [title, setTitle] = useState(displayTitle(event?.title));
   const [when, setWhen] = useState(event?.when ?? '');
@@ -280,7 +282,9 @@ function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder |
   return (
     <ScrollView style={{ maxHeight: 560 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
       <Field label="Título" value={title} onChangeText={setTitle} maxLength={200} placeholder="Dentista" autoFocus={!event} />
+      <Suggestions field="Título" values={past.map((r) => displayTitle(r.title))} current={title} onPick={setTitle} />
       <Field label="Hora o nota (opcional)" value={when} onChangeText={setWhen} maxLength={60} placeholder="14:00" />
+      <Suggestions field="Hora o nota" values={past.map((r) => r.when ?? '')} current={when} onPick={setWhen} />
       <View style={{ flexDirection: 'row' }}>
         <Stepper
           label="Día del mes"
@@ -291,7 +295,7 @@ function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder |
           incDisabled={day >= 31}
           decLabel="Un día antes"
           incLabel="Un día después"
-          hint={`Se repite el día ${day} de cada mes.`}
+          hint={`Se repite el día ${day} de cada mes.${day > 28 ? ' En los meses más cortos sale el último día.' : ''}`}
         />
       </View>
       <ColorSwatches legend="Color" colors={REMINDER_COLORS} value={color} onChange={setColor} />

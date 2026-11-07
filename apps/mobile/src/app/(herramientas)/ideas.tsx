@@ -1,10 +1,10 @@
-import { IDEA_CATEGORIES, IDEA_CATEGORY_INFO, ideaCategoryOf, plural, splitTags, type IdeaCategory, type LegacyIdea } from '@dyc/core';
+import { matchesSearch, IDEA_CATEGORIES, IDEA_CATEGORY_INFO, ideaCategoryOf, plural, splitTags, type IdeaCategory, type LegacyIdea } from '@dyc/core';
 import { radius, space } from '@dyc/tokens';
 import { Lightbulb, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { Dot, DotChoices, FormActions, IconButton, Pill, ToolScreen } from '../../components/tools';
+import { SearchBar, Dot, DotChoices, FormActions, IconButton, Pill, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts, type as typo } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -25,12 +25,13 @@ export default function Ideas() {
   const actions = useModule('ideas');
   const toast = useToast();
   const [filter, setFilter] = useState<Filter>('todas');
+  const [q, setQ] = useState('');
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<LegacyIdea | null>(null);
   const input = useRef<TextInput>(null);
   // Como la app anterior: una idea nueva toma la categoría del filtro (o App con «Todas»).
   const category: IdeaCategory = filter === 'todas' ? 'app' : filter;
-  const shown = ideas.filter((i) => filter === 'todas' || ideaCategoryOf(i) === filter);
+  const shown = ideas.filter((i) => (filter === 'todas' || ideaCategoryOf(i) === filter) && matchesSearch(q, i.title, i.body, i.tags));
 
   const add = () => {
     if (!title.trim()) return;
@@ -40,7 +41,7 @@ export default function Ideas() {
 
   const remove = (idea: LegacyIdea) => {
     const order = ideas.map((i) => i.id);
-    actions.remove(idea.id);
+    actions.remove(idea.id, { undo: false });
     toast('Idea eliminada.', {
       action: {
         label: 'Deshacer',
@@ -65,8 +66,15 @@ export default function Ideas() {
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
       ) : (
         <>
+          {ideas.length > 0 && <SearchBar label="Buscar en tus ideas" value={q} onChange={setQ} placeholder="Buscar por título, texto o etiqueta…" count={shown.length} />}
           <DotChoices legend="Categoría" hideLegend value={filter} onChange={setFilter} options={FILTER_OPTIONS} />
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space[2] }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              gap: space[2],
+            }}
+          >
             <View style={{ flex: 1 }}>
               <Field
                 ref={input}
@@ -110,7 +118,9 @@ export default function Ideas() {
               Anota lo que se te ocurra: apps, webs o estrategias de marketing. ¿Sin inspiración? Prueba con un ejemplo:
             </EmptyState>
           ) : shown.length === 0 ? (
-            <EmptyState title={`Aún no hay ideas de ${IDEA_CATEGORY_INFO[category].label}`}>Escribe la primera arriba.</EmptyState>
+            q.trim() ? null : (
+              <EmptyState title={`Aún no hay ideas de ${IDEA_CATEGORY_INFO[category].label}`}>Escribe la primera arriba.</EmptyState>
+            )
           ) : (
             shown.map((i) => <IdeaCard key={i.id} idea={i} onEdit={() => setEditing(i)} onRemove={() => remove(i)} />)
           )}

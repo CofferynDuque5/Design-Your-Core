@@ -180,8 +180,8 @@ describe('herramientas compartidas', () => {
       journal: [{ id: 'j', date: '2026-10-01' }],
     } as unknown as LegacyData;
     const marks = calendarMarks(data, '2026-09-01', calendarCycleDays(data, '2026-09-01', '2026-09-26', false));
-    // Septiembre tiene 30 días: el evento del 31 no aparece.
-    expect(marks.get('2026-09-30')).toBeUndefined();
+    // Septiembre tiene 30 días: el evento del 31 sale el 30.
+    expect([...(marks.get('2026-09-30') ?? [])]).toEqual(['event']);
     expect([...(marks.get('2026-09-05') ?? [])]).toEqual(['event', 'workout']);
     expect([...(marks.get('2026-09-20') ?? [])]).toEqual(['goal']);
     expect(describeCalendarDay('2026-09-05', marks, data.reminders ?? [])).toBe(': 1 evento, entreno');
@@ -304,5 +304,16 @@ describe('herramientas compartidas', () => {
     // Sin entrada hoy, la racha cuenta desde ayer.
     expect(journalStats([j('2026-09-25'), j('2026-09-24')], '2026-09-26')).toEqual({ month: 2, streak: 2, top: null, topLabel: null });
     expect(journalStats([], '2026-09-26').streak).toBe(0);
+  });
+});
+
+describe('matchesSearch', () => {
+  it('busca sin tildes ni mayúsculas y pide todas las palabras', async () => {
+    const { matchesSearch } = await import('../src/tools');
+    expect(matchesSearch('', 'lo que sea')).toBe(true);
+    expect(matchesSearch('fisica', 'Física II')).toBe(true);
+    expect(matchesSearch('pagar luz', 'Pagar la luz')).toBe(true);
+    expect(matchesSearch('pagar agua', 'Pagar la luz')).toBe(false);
+    expect(matchesSearch('react', 'Curso', undefined, 'React básico')).toBe(true);
   });
 });

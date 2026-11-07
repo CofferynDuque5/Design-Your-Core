@@ -47,24 +47,25 @@ import Base from '../layouts/Base.astro';
           <li>
             <Monitor size={22} aria-hidden="true" />
             <span><strong>{DOWNLOADS.windows.label}</strong><span class="muted small">{DOWNLOADS.windows.file} · {DOWNLOADS.windows.size} · se abre sin instalar</span></span>
-            <a class="btn btn--sm" href={DOWNLOADS.windows.href} download>Descargar</a>
+            <a class="btn btn--sm" href={DOWNLOADS.windows.href} download data-download>Descargar</a>
           </li>
           <li>
             <Apple size={22} aria-hidden="true" />
             <span><strong>{DOWNLOADS.macApple.label}</strong><span class="muted small">{DOWNLOADS.macApple.file} · {DOWNLOADS.macApple.size}</span></span>
-            <a class="btn btn--sm" href={DOWNLOADS.macApple.href} download>Descargar</a>
+            <a class="btn btn--sm" href={DOWNLOADS.macApple.href} download data-download>Descargar</a>
           </li>
           <li>
             <Apple size={22} aria-hidden="true" />
             <span><strong>{DOWNLOADS.macIntel.label}</strong><span class="muted small">{DOWNLOADS.macIntel.file} · {DOWNLOADS.macIntel.size}</span></span>
-            <a class="btn btn--sm btn--secondary" href={DOWNLOADS.macIntel.href} download>Descargar</a>
+            <a class="btn btn--sm btn--secondary" href={DOWNLOADS.macIntel.href} download data-download>Descargar</a>
           </li>
           <li>
             <Monitor size={22} aria-hidden="true" />
             <span><strong>{DOWNLOADS.linux.label}</strong><span class="muted small">{DOWNLOADS.linux.file} · {DOWNLOADS.linux.size}</span></span>
-            <a class="btn btn--sm btn--secondary" href={DOWNLOADS.linux.href} download>Descargar</a>
+            <a class="btn btn--sm btn--secondary" href={DOWNLOADS.linux.href} download data-download>Descargar</a>
           </li>
         </ul>
+        <p class="muted small" data-downloads-note hidden>Las versiones para computadora llegan pronto. Mientras tanto, abre tu panel desde el navegador.</p>
         <details class="faq__item">
           <summary>Windows dice «Windows protegió tu PC»</summary>
           <p class="muted">Pasa con las apps nuevas que aún no tienen firma digital. Toca «Más información» y luego «Ejecutar de todas formas».</p>
@@ -95,3 +96,25 @@ import Base from '../layouts/Base.astro';
     </div>
   </section>
 </Base>
+
+<script>
+  // Si un archivo aún no está en el servidor, el botón dice «Próximamente» en vez de llevar a una página de error.
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('a[data-download]')];
+  let missing = 0;
+  void Promise.all(
+    links.map(async (a) => {
+      const ok = await fetch(a.href, { method: 'HEAD', cache: 'no-store' })
+        .then((r) => r.ok && !(r.headers.get('content-type') ?? '').includes('text/html'))
+        .catch(() => true);
+      if (ok) return;
+      missing++;
+      const soon = document.createElement('span');
+      soon.className = 'btn btn--sm btn--secondary is-soon';
+      soon.setAttribute('aria-disabled', 'true');
+      soon.textContent = 'Próximamente';
+      a.replaceWith(soon);
+    }),
+  ).then(() => {
+    if (missing) document.querySelector<HTMLElement>('[data-downloads-note]')?.removeAttribute('hidden');
+  });
+</script>

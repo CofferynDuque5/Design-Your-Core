@@ -1,4 +1,21 @@
-import { BOX_COLORS, CODE_LANGS, COLOR_NAMES, coreImageIds, inlineImages, legacySubjectNames, newNoteBox, NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, notebookIconOptions, noteBoxKind, sameEmoji, uniqueTexts, type LegacyNoteBox, type LegacyNotebook } from '@dyc/core';
+import {
+  matchesSearch,
+  BOX_COLORS,
+  CODE_LANGS,
+  COLOR_NAMES,
+  coreImageIds,
+  inlineImages,
+  legacySubjectNames,
+  newNoteBox,
+  NOTEBOOK_COLORS,
+  NOTEBOOK_EMOJIS,
+  notebookIconOptions,
+  noteBoxKind,
+  sameEmoji,
+  uniqueTexts,
+  type LegacyNoteBox,
+  type LegacyNotebook,
+} from '@dyc/core';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Code2, Copy, ImageOff, Palette, Plus, Trash2, Type } from 'lucide-react';
 import { useId, useMemo, useState, type FormEvent } from 'react';
@@ -7,6 +24,7 @@ import { api } from '../app/api';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
 import { NotebookCover } from '../components/NotebookCover';
@@ -29,11 +47,12 @@ export function Notebooks() {
   const [category, setCategory] = useState('');
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
+  const [q, setQ] = useState('');
 
   // Filtros en cascada Categoría → Materia → Tema, con los valores que existen (como la app anterior).
   const inCategory = notebooks.filter((n) => !category || n.category === category);
   const inSubject = inCategory.filter((n) => !subject || n.subject === subject);
-  const shown = inSubject.filter((n) => !topic || n.topic === topic);
+  const shown = inSubject.filter((n) => (!topic || n.topic === topic) && matchesSearch(q, n.title, n.category, n.subject, n.topic));
   const filtering = !!(category || subject || topic);
 
   return (
@@ -51,6 +70,7 @@ export function Notebooks() {
         <EmptyState title="Aún no tienes cuadernos">Organiza tus apuntes por categoría, materia y tema, y guárdalos en cajitas de texto o de código fáciles de copiar.</EmptyState>
       ) : (
         <div className="stack-lg">
+          <SearchBox label="Buscar cuadernos" value={q} onChange={setQ} placeholder="Buscar por título, materia o tema…" count={shown.length} />
           <div className="filters" role="group" aria-label="Filtrar cuadernos">
             <SelectField
               label="Categoría"
@@ -100,7 +120,9 @@ export function Notebooks() {
             )}
           </div>
           {shown.length === 0 ? (
-            <EmptyState title="Ningún cuaderno con estos filtros" />
+            q.trim() ? null : (
+              <EmptyState title="Ningún cuaderno con estos filtros" />
+            )
           ) : (
             <ul className="notebook-grid" aria-label="Cuadernos">
               {shown.map((n) => {

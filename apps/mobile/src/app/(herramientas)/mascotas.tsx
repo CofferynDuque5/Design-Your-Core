@@ -23,7 +23,7 @@ import { Check, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { DotChoices, FormActions, IconButton, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { Suggestions, DotChoices, FormActions, IconButton, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T } from '../../components/ui';
 import { UiIcon } from '../../components/UiIcon';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
@@ -210,6 +210,8 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
 }
 
 function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare | null; onDone: () => void }) {
+  const saved = useLegacyData().data?.data;
+  const pastTitles = useLegacyList(saved, 'petCares').map((c) => c.title ?? '');
   const actions = useModule('petCares');
   const [kind, setKind] = useState<CareKind>(care ? careKindOf(care) : 'comida');
   const [title, setTitle] = useState(care?.title ?? '');
@@ -229,6 +231,7 @@ function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare |
     <ScrollView style={{ maxHeight: 620 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
       <DotChoices legend="Tipo" value={kind} onChange={setKind} options={CARE_KINDS.map((k) => ({ value: k, ...CARE_KIND_INFO[k] }))} />
       <Field label="Qué hay que hacer" value={title} onChangeText={setTitle} maxLength={120} placeholder={kind === 'comida' ? 'Darle de comer' : CARE_KIND_INFO[kind].label} />
+      <Suggestions field="Qué hay que hacer" values={[...pastTitles, 'Darle de comer', 'Paseo', 'Agua fresca', 'Medicina', 'Baño', 'Cepillado']} current={title} onPick={setTitle} />
       <TimeField label="Hora (opcional)" value={time} onChange={setTime} optional />
       <WeekdayPicker legend="Días" value={days} onChange={setDays} />
       <FormActions

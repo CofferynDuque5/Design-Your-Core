@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   COLOR_NAMES,
   formatBytes,
   utcDayKey,
@@ -22,6 +23,7 @@ import { deleteFiles, readDataUrl, saveDataUrl, uploadFile, useFiles } from '../
 import { compressImage } from '../app/images';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, Segmented, SelectField, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -43,6 +45,8 @@ export function Ventures() {
   const legacy = useLegacyData();
   const ventures = useLegacyList(legacy.data?.data, 'ventures');
   const [editing, setEditing] = useState<LegacyVenture | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = ventures.filter((v) => matchesSearch(q, v.name, v.description, ...ventureItemsOf(legacy.data?.data, v.id).map((i) => `${i.title} ${i.text ?? ''}`)));
   const navigate = useNavigate();
 
   if (ventureId) {
@@ -82,24 +86,27 @@ export function Ventures() {
           Cada emprendimiento tiene su espacio para notas, imágenes, archivos (PDF, presentaciones, hojas de cálculo) y enlaces. Lo ves igual en la web y en el móvil.
         </EmptyState>
       ) : (
-        <ul className="card-grid venture-grid" aria-label="Tus emprendimientos">
-          {ventures.map((v) => {
-            const items = ventureItemsOf(legacy.data?.data, v.id);
-            return (
-              <li key={v.id}>
-                <Link to={`/emprendimientos/${v.id}`} className="card venture-card" style={{ ['--venture' as string]: v.color }}>
-                  <span className="venture-card__icon" aria-hidden="true">
-                    <Rocket size={20} />
-                  </span>
-                  <span className="venture-card__name">{v.name}</span>
-                  <span className="chip small">{VENTURE_STAGE_INFO[stageOf(v)].label}</span>
-                  {v.description && <span className="small muted venture-card__desc">{v.description}</span>}
-                  <span className="small muted numeric">{ventureSummary(items)}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="stack-lg">
+          <SearchBox label="Buscar en tus emprendimientos" value={q} onChange={setQ} placeholder="Buscar por nombre, nota o enlace…" count={found.length} />
+          <ul className="card-grid venture-grid" aria-label="Tus emprendimientos">
+            {found.map((v) => {
+              const items = ventureItemsOf(legacy.data?.data, v.id);
+              return (
+                <li key={v.id}>
+                  <Link to={`/emprendimientos/${v.id}`} className="card venture-card" style={{ ['--venture' as string]: v.color }}>
+                    <span className="venture-card__icon" aria-hidden="true">
+                      <Rocket size={20} />
+                    </span>
+                    <span className="venture-card__name">{v.name}</span>
+                    <span className="chip small">{VENTURE_STAGE_INFO[stageOf(v)].label}</span>
+                    {v.description && <span className="small muted venture-card__desc">{v.description}</span>}
+                    <span className="small muted numeric">{ventureSummary(items)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo emprendimiento' : 'Editar emprendimiento'}>
         {editing && (

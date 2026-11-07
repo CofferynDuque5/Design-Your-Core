@@ -1,9 +1,10 @@
-import { byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, moodIcon, shortDay, utcDayKey, type LegacyJournal } from '@dyc/core';
+import { matchesSearch, byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, moodIcon, shortDay, utcDayKey, type LegacyJournal } from '@dyc/core';
 import { Trash2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { TextArea, TextField } from '../components/Form';
 import { ErrorState, Loading } from '../components/States';
 import { CheckInNote, MoodPicker, Stats } from '../components/ToolParts';
@@ -21,7 +22,9 @@ export function Journal() {
   // Una entrada por fecha, con el día en UTC como la app anterior.
   const today = utcDayKey();
   const [date, setDate] = useState(today);
+  const [q, setQ] = useState('');
   const entries = useMemo(() => journal.filter((j) => isDay(j.date)).sort(byDateDesc), [journal]);
+  const found = entries.filter((j) => matchesSearch(q, j.note, j.gratitude, j.date, longDay(j.date)));
   const entry = entries.find((j) => j.date === date);
   // La app anterior creaba la entrada al abrir la sección; aquí se crea con lo primero que escribes.
   const created = useRef(new Map<string, string>());
@@ -37,8 +40,9 @@ export function Journal() {
   const remove = (j: LegacyJournal) => {
     const order = journal.map((x) => x.id);
     created.current.delete(j.date);
-    actions.remove(j.id);
+    actions.remove(j.id, { undo: false });
     toast(`Entrada del ${shortDay(j.date)} eliminada.`, {
+      key: 'undo',
       action: {
         label: 'Deshacer',
         run: () => {
@@ -75,11 +79,12 @@ export function Journal() {
               <h2 id="journal-history" className="list-count">
                 Entradas <span className="chip small numeric">{entries.length}</span>
               </h2>
+              {entries.length > 0 && <SearchBox label="Buscar en tu diario" value={q} onChange={setQ} placeholder="Buscar por texto o fecha…" count={found.length} />}
               {entries.length === 0 ? (
                 <p className="muted small recent-empty">Tus entradas aparecerán aquí. Empieza con cómo te sientes hoy.</p>
               ) : (
                 <ul className="journal-list">
-                  {entries.slice(0, HISTORY_MAX).map((j) => {
+                  {found.slice(0, HISTORY_MAX).map((j) => {
                     const mood = moodIcon(j.mood);
                     const text = j.note?.trim() || j.gratitude?.trim() || 'Sin texto';
                     return (

@@ -7,6 +7,7 @@ import { TOOL_GROUPS, TOOLS, type ToolGroup } from '../app/tools';
 import { Logo } from './Logo';
 import { PageErrorBoundary } from './PageErrorBoundary';
 import { FocusWatcher } from './FocusWatcher';
+import { AlarmWatcher } from './AlarmWatcher';
 import { SuggestButton } from './Suggestions';
 
 const NAV = [
@@ -167,6 +168,7 @@ export function AppShell() {
         </PageErrorBoundary>
       </main>
       <FocusWatcher />
+      <AlarmWatcher />
       <nav className="tabbar" aria-label="Principal">
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className="tabbar__link">

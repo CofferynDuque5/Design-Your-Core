@@ -8,8 +8,13 @@ interface FieldProps {
   error?: string | null;
 }
 
-export function TextField({ label, hint, error, valid, ...input }: FieldProps & { valid?: boolean } & InputHTMLAttributes<HTMLInputElement>) {
+/**
+ * Campo de texto. `suggestions`: valores que ya usaste (o habituales), que el
+ * navegador ofrece mientras escribes (autocompletado).
+ */
+export function TextField({ label, hint, error, valid, suggestions, ...input }: FieldProps & { valid?: boolean; suggestions?: readonly string[] } & InputHTMLAttributes<HTMLInputElement>) {
   const id = useId();
+  const options = suggestions ? [...new Set(suggestions.map((v) => v.trim()).filter(Boolean))].slice(0, 50) : [];
   const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined;
   const status = error ? 'invalid' : valid ? 'valid' : null;
   return (
@@ -18,9 +23,16 @@ export function TextField({ label, hint, error, valid, ...input }: FieldProps & 
         {label}
       </label>
       <div className={`input-wrap${status ? ` input-wrap--${status}` : ''}`}>
-        <input id={id} className="input" aria-invalid={error ? true : undefined} aria-describedby={describedBy} {...input} />
+        <input id={id} className="input" aria-invalid={error ? true : undefined} aria-describedby={describedBy} list={options.length ? `${id}-list` : undefined} {...input} />
         <FieldStatus status={status} />
       </div>
+      {options.length > 0 && (
+        <datalist id={`${id}-list`}>
+          {options.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
+      )}
       <FieldNotes id={id} hint={hint} error={error} valid={valid} />
     </div>
   );

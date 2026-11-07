@@ -103,7 +103,7 @@ export function resetFocusTimer() {
  * transcurrido si pasó al menos 1 s y pasa al siguiente tipo de sesión.
  */
 export function useFocusFinish() {
-  const actions = useModule('focus');
+  const actions = useModule('focus', { undo: false });
   return useCallback(
     (skipped: boolean): { mode: FocusMode; next: FocusMode } => {
       const t = getFocusTimer();

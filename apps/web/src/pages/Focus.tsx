@@ -72,6 +72,7 @@ export function Focus() {
             Temporizador
           </h2>
           <Segmented label="Tipo de sesión" options={MODE_OPTIONS} value={mode} onChange={switchTo} disabled={status === 'running'} />
+          {status === 'running' && <p className="small muted">Pausa para cambiar de modo.</p>}
           <div className="timer__dial" data-mode={mode}>
             <svg className="ring timer__ring" viewBox="0 0 36 36" style={{ ['--value' as string]: ((total - left) / total) * 100 }} aria-hidden="true">
               <circle className="ring__track" cx="18" cy="18" r="15.5" />

@@ -234,7 +234,7 @@ function HistoryList({ currentId, onOpen }: { currentId: string | null; onOpen: 
   const { colors } = useTheme();
   const legacy = useLegacyData();
   const chats = useLegacyList(legacy.data?.data, 'chats');
-  const actions = useModule('chats');
+  const actions = useModule('chats', { undo: false });
   const [asking, setAsking] = useState<string | null>(null);
   if (!chats.length)
     return (
@@ -334,7 +334,7 @@ function Conversation({
   }, [initial]);
 
   // Guardar en tu cuenta: la primera vez se crea, luego se actualiza.
-  const chats = useModule('chats');
+  const chats = useModule('chats', { undo: false });
   const chatId = useRef<string | null>(initial?.id ?? null);
   const dirty = useRef(false);
   useEffect(() => {

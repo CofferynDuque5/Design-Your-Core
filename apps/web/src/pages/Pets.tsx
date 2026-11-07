@@ -185,6 +185,8 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
 
 function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare | null; onDone: () => void }) {
   const actions = useModule('petCares');
+  const saved = useLegacyData().data?.data;
+  const pastTitles = useLegacyList(saved, 'petCares').map((c) => c.title ?? '');
   const [kind, setKind] = useState<CareKind>(care ? kindOf(care) : 'comida');
   const [title, setTitle] = useState(care?.title ?? '');
   const [time, setTime] = useState(care?.time ?? '');
@@ -201,7 +203,7 @@ function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare |
     <form className="stack" onSubmit={submit}>
       <IconChoices legend="Tipo" value={kind} onChange={setKind} options={CARE_KINDS.map((k) => ({ value: k, ...CARE_KIND_INFO[k] }))} />
       <div className="grid-2">
-        <TextField label="Qué hay que hacer" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} autoFocus placeholder={kind === 'comida' ? 'Darle de comer' : CARE_KIND_INFO[kind].label} />
+        <TextField label="Qué hay que hacer" suggestions={[...pastTitles, 'Darle de comer', 'Paseo', 'Agua fresca', 'Medicina', 'Baño', 'Cepillado']} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} autoFocus placeholder={kind === 'comida' ? 'Darle de comer' : CARE_KIND_INFO[kind].label} />
         <TextField label="Hora (opcional)" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
       </div>
       <WeekdayPicker legend="Días" value={days} onChange={setDays} />

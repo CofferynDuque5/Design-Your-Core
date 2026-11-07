@@ -166,16 +166,19 @@ export const isNoteImageRef = (ref: string): boolean => ref.startsWith('coreimg:
 
 /** Texto sin marcas de Markdown (para extractos y búsquedas). */
 export function markdownToText(src: string): string {
-  return src
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_m, alt: string) => (alt.trim() ? `[${alt.trim()}]` : '[imagen]'))
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]\s+\[[ xX]\]|[-*+]|\d+[.)])\s+/gm, '')
-    // Las fórmulas, legibles: «$\frac{a}{b}$» → «a/b».
-    .replace(/\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g, (_m, block: string | undefined, inline: string | undefined) => mathSpoken(block ?? inline ?? ''))
-    .replace(/(\*\*|__|~~|`+|\$\$?)/g, '')
-    .replace(/(^|\W)[*_](\S[^*_]*?)[*_](?=\W|$)/g, '$1$2')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    src
+      // Enlaces con paréntesis dentro (como los de Wikipedia) se quitan enteros, sin dejar «)» suelto.
+      .replace(/!\[([^\]]*)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+"[^"]*")?\)/g, (_m, alt: string) => (alt.trim() ? `[${alt.trim()}]` : '[imagen]'))
+      .replace(/\[([^\]]+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+"[^"]*")?\)/g, '$1')
+      .replace(/^\s{0,3}(#{1,6}|>|[-*+]\s+\[[ xX]\]|[-*+]|\d+[.)])\s+/gm, '')
+      // Las fórmulas, legibles: «$\frac{a}{b}$» → «a/b».
+      .replace(/\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g, (_m, block: string | undefined, inline: string | undefined) => mathSpoken(block ?? inline ?? ''))
+      .replace(/(\*\*|__|~~|`+|\$\$?)/g, '')
+      .replace(/(^|\W)[*_](\S[^*_]*?)[*_](?=\W|$)/g, '$1$2')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 // ---------- Barra de formato de las notas ----------

@@ -1449,6 +1449,79 @@ export type LegacyOp<K extends LegacyKey> =
   | { type: 'remove'; id: string }
   | { type: 'reorder'; ids: string[] };
 
+/** Un paso para deshacer: un cambio sobre una clave (puede ser otra, como las subtareas de un pendiente). */
+export type LegacyUndoStep = { key: LegacyKey; op: LegacyOp<LegacyKey> };
+
+/** Valor «vacío» del mismo tipo, para quitar un campo que antes no existía. */
+const emptyLike = (v: unknown): unknown => (typeof v === 'string' ? '' : typeof v === 'boolean' ? false : typeof v === 'number' ? 0 : Array.isArray(v) ? [] : null);
+
+/**
+ * Los pasos que devuelven la lista a como estaba antes de `op` (para el botón
+ * «Deshacer» que sale tras cada cambio). null si no hay nada que deshacer.
+ */
+export function undoLegacyOp<K extends LegacyKey>(data: LegacyData, key: K, op: LegacyOp<K>): LegacyUndoStep[] | null {
+  const list = legacyList(data, key) as Array<LegacyItems[K]>;
+  const ids = list.map((x) => x.id);
+  const step = (o: LegacyOp<K>): LegacyUndoStep => ({
+    key,
+    op: o as LegacyOp<LegacyKey>,
+  });
+  switch (op.type) {
+    case 'add':
+      return [step({ type: 'remove', id: op.item.id })];
+    case 'remove': {
+      const item = list.find((x) => x.id === op.id);
+      if (!item) return null;
+      const steps = [step({ type: 'add', item }), step({ type: 'reorder', ids })];
+      // Lo que se borró junto con él (pasos de un pendiente, cajitas de un cuaderno…) vuelve también.
+      const child = LEGACY_CHILDREN[key];
+      if (child) {
+        const kids = legacyList(data, child.key);
+        const gone = kids.filter((s) => (s as unknown as Record<string, unknown>)[child.field] === op.id);
+        for (const k of gone) steps.push({ key: child.key, op: { type: 'add', item: k } });
+        if (gone.length)
+          steps.push({
+            key: child.key,
+            op: { type: 'reorder', ids: kids.map((k) => k.id) },
+          });
+      }
+      return steps;
+    }
+    case 'update': {
+      const item = list.find((x) => x.id === op.id) as Record<string, unknown> | undefined;
+      if (!item) return null;
+      const back: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(op.patch as Record<string, unknown>)) {
+        if (JSON.stringify(item[k]) === JSON.stringify(v)) continue;
+        back[k] = item[k] === undefined ? emptyLike(v) : item[k];
+      }
+      return Object.keys(back).length ? [step({ type: 'update', id: op.id, patch: back as LegacyPatch<K> })] : null;
+    }
+    case 'reorder':
+      return ids.join() === op.ids.join() ? null : [step({ type: 'reorder', ids })];
+  }
+}
+
+/** Lo que devuelve un objeto (`cycle`, `dayLog`, `budget`) a como estaba antes de `patch`. */
+export function undoLegacyObjectPatch<K extends LegacyObjectKey>(data: LegacyData, key: K, patch: Partial<LegacyObjects[K]>): Partial<LegacyObjects[K]> | null {
+  const before = legacyObject(data, key) as unknown as Record<string, unknown>;
+  const back: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(patch as Record<string, unknown>)) {
+    if (JSON.stringify(before[k]) === JSON.stringify(v)) continue;
+    back[k] = before[k] === undefined ? emptyLike(v) : before[k];
+  }
+  return Object.keys(back).length ? (back as Partial<LegacyObjects[K]>) : null;
+}
+
+/** Cómo se dice el cambio en el aviso con «Deshacer». */
+export const legacyChangeLabel = (type: LegacyOp<LegacyKey>['type']): string =>
+  ({
+    add: 'Añadido.',
+    update: 'Cambio guardado.',
+    remove: 'Eliminado.',
+    reorder: 'Orden cambiado.',
+  })[type];
+
 /** Aplica un cambio en la copia local igual que lo hará el servidor (para las vistas optimistas). */
 export function applyLegacyOp<K extends LegacyKey>(data: LegacyData, key: K, op: LegacyOp<K>): LegacyData {
   const list = legacyList(data, key) as Array<LegacyItems[K]>;
@@ -1498,8 +1571,11 @@ export function newLegacyId(): string {
 
 // ---------- Enfoque (Pomodoro) ----------
 
-/** Día en UTC, como guarda la app anterior (`toISOString().slice(0,10)`). */
-export const utcDayKey = (now: Date = new Date()): Day => now.toISOString().slice(0, 10);
+/**
+ * «Hoy» con la fecha del lugar donde está la persona (no en UTC: en Caracas, a
+ * partir de las 20:00 UTC ya era «mañana»). Conserva el nombre por compatibilidad.
+ */
+export const utcDayKey = (now: Date = new Date()): Day => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 /**
  * Lo que viene después de una sesión. Tras cada cuarta sesión de enfoque
@@ -1581,14 +1657,39 @@ export function parseDeadline(text: unknown, now: Date = new Date()): Date | nul
     if (month < 0 || day < 1 || day > 31) return null;
     return new Date(m[3] ? Number(m[3]) : now.getFullYear(), month, day);
   }
+  // «hoy», «mañana», «viernes» (el próximo), «20/12» o «20/12/2026».
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (t === 'hoy') return base;
+  if (t === 'mañana' || t === 'manana') return new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
+  const wd = WEEKDAYS_ES.indexOf(
+    t
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/^(el|este|proximo)\s+/, ''),
+  );
+  if (wd >= 0) {
+    const ahead = (wd - base.getDay() + 7) % 7;
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate() + ahead);
+  }
+  const dm = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2}|\d{4}))?$/.exec(t);
+  if (dm) {
+    const day = Number(dm[1]);
+    const month = Number(dm[2]) - 1;
+    const year = dm[3] ? (dm[3].length === 2 ? 2000 + Number(dm[3]) : Number(dm[3])) : now.getFullYear();
+    const d = new Date(year, month, day);
+    return d.getMonth() === month && d.getDate() === day ? d : null;
+  }
   if (!/\d{4}/.test(t)) return null;
   const at = Date.parse(t);
   return Number.isNaN(at) ? null : new Date(at);
 }
 
+/** Domingo = 0, como `Date.getDay()`. */
+const WEEKDAYS_ES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+
 /**
- * ¿Cuenta como entrega de esta semana? Como la app anterior: entre ayer y
- * dentro de 7 días, y una fecha que no se entiende cuenta siempre (vacía no).
+ * ¿Cuenta como entrega de esta semana? Entre ayer y dentro de 7 días. Una
+ * fecha que no se entiende no cuenta (la app anterior la contaba siempre).
  * Mejora: "20 SEP" se lee en español del año en curso (la app anterior se lo
  * pasaba a `Date.parse`, que en Chrome lo toma como del año 2001).
  */
@@ -1596,7 +1697,7 @@ export function dueThisWeek(deadline: unknown, now: number = Date.now()): boolea
   const t = typeof deadline === 'string' ? deadline.trim() : '';
   if (!t) return false;
   const at = parseDeadline(t, new Date(now));
-  if (!at) return true;
+  if (!at) return false;
   const day = 86_400_000;
   // Fin del día de la entrega: "hoy" cuenta todo el día.
   const diff = at.getTime() + day - 1 - now;

@@ -1,9 +1,10 @@
-import { BLOCK_KIND_INFO, BLOCK_KINDS, hoursLabel, TASK_PRIORITIES, TASK_PRIORITY_INFO, type BlockKind, type LegacyBlock, type LegacyTask, type TaskPriority } from '@dyc/core';
+import { matchesSearch, BLOCK_KIND_INFO, BLOCK_KINDS, hoursLabel, TASK_PRIORITIES, TASK_PRIORITY_INFO, type BlockKind, type LegacyBlock, type LegacyTask, type TaskPriority } from '@dyc/core';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { Segmented, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -143,6 +144,8 @@ const halfHours = (from: number, to: number) => Array.from({ length: Math.round(
 
 function BlockForm({ block, onDone }: { block: LegacyBlock | null; onDone: () => void }) {
   const blocks = useModule('blocks');
+  const saved = useLegacyData().data?.data;
+  const past = useLegacyList(saved, 'blocks');
   const [label, setLabel] = useState(block?.label ?? '');
   const [sub, setSub] = useState(block?.sub ?? '');
   const [kind, setKind] = useState<BlockKind>(block && BLOCK_KINDS.includes(block.kind) ? block.kind : 'study');
@@ -165,8 +168,8 @@ function BlockForm({ block, onDone }: { block: LegacyBlock | null; onDone: () =>
 
   return (
     <form className="stack" onSubmit={submit}>
-      <TextField label="Nombre" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} required autoFocus placeholder="Estudiar cálculo" />
-      <TextField label="Detalle (opcional)" value={sub} onChange={(e) => setSub(e.target.value)} maxLength={200} placeholder="Capítulo 3" />
+      <TextField label="Nombre" suggestions={past.map((b) => b.label ?? '')} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} required autoFocus placeholder="Estudiar cálculo" />
+      <TextField label="Detalle (opcional)" suggestions={past.filter((b) => b.label === label).map((b) => b.sub ?? '')} value={sub} onChange={(e) => setSub(e.target.value)} maxLength={200} placeholder="Capítulo 3" />
       <fieldset className="field">
         <legend className="field__label">Tipo</legend>
         <div className="chips">
@@ -223,6 +226,7 @@ function TasksView({ data }: { data: Record<string, unknown> }) {
   const [title, setTitle] = useState('');
   const [pri, setPri] = useState<TaskPriority>('media');
   const [editing, setEditing] = useState<LegacyTask | null>(null);
+  const [q, setQ] = useState('');
 
   const add = (e: FormEvent) => {
     e.preventDefault();
@@ -254,12 +258,13 @@ function TasksView({ data }: { data: Record<string, unknown> }) {
         </button>
       </form>
 
+      {tasks.length > 3 && <SearchBox label="Buscar en tus tareas" value={q} onChange={setQ} placeholder="Buscar una tarea o etiqueta…" count={tasks.filter((t) => matchesSearch(q, t.title, t.tags)).length} />}
       {tasks.length === 0 ? (
         <EmptyState title="Sin tareas por ahora">Escribe la primera arriba y elige su prioridad.</EmptyState>
       ) : (
         <div className="task-groups">
           {TASK_PRIORITIES.map((p) => {
-            const group = tasks.filter((t) => priOf(t) === p);
+            const group = tasks.filter((t) => priOf(t) === p && matchesSearch(q, t.title, t.tags));
             const done = group.filter((t) => t.done).length;
             return (
               <section key={p} className="card stack-sm" aria-labelledby={`pri-${p}`} style={{ ['--c' as string]: TASK_PRIORITY_INFO[p].color }}>

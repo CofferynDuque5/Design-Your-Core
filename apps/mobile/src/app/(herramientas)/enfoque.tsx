@@ -72,7 +72,18 @@ export default function Focus() {
     <ToolScreen title="Enfoque" refreshing={legacy.isRefetching} onRefresh={() => legacy.refetch()}>
       <Card style={{ alignItems: 'stretch', gap: space[4] }}>
         <Segmented<FocusMode> label="Tipo de sesión" options={MODE_OPTIONS} value={mode} onChange={switchTo} disabled={status === 'running'} />
-        <View style={{ alignItems: 'center', justifyContent: 'center', height: RING }}>
+        {status === 'running' && (
+          <T v="small" tint="muted">
+            Pausa para cambiar de modo.
+          </T>
+        )}
+        <View
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: RING,
+          }}
+        >
           <Svg width={RING} height={RING} viewBox="0 0 36 36" style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
             <Circle cx={18} cy={18} r={R} fill="none" stroke={colors.line} strokeWidth={1.6} />
             {progress > 0 && <Circle cx={18} cy={18} r={R} fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeDasharray={`${progress * C} ${C}`} />}

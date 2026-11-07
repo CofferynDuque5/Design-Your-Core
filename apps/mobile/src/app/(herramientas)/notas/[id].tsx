@@ -57,7 +57,8 @@ function Editor({ note, fresh, subjects }: { note: LegacyNote; fresh: boolean; s
   const { colors } = useTheme();
   const router = useRouter();
   const toast = useToast();
-  const actions = useModule('notes');
+  // Se guarda solo mientras escribes: sin «Deshacer» por cada pausa.
+  const actions = useModule('notes', { undo: false });
   const saving = useIsMutating({ mutationKey: ['legacy'] }) > 0;
   const [mode, setMode] = useState<'write' | 'preview'>(fresh || !noteBodyOf(note) ? 'write' : 'preview');
   const [asking, setAsking] = useState(false);

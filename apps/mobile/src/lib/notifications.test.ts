@@ -65,7 +65,7 @@ describe('avisos de las herramientas', () => {
     await expect(syncToolNotifications(data, prefs)).resolves.toBe(3);
     const calls = N.scheduleNotificationAsync.mock.calls.map(([c]) => c as unknown as { identifier: string; trigger: Record<string, unknown>; content: { title: string; data: { url: string } } });
     // Lunes 7:50 → en Expo el lunes es 2; domingo 17:50 → 1.
-    expect(calls[0]).toMatchObject({ identifier: 'dyc-tool-class-k1', trigger: { type: 'weekly', weekday: 2, hour: 7, minute: 50, channelId: 'avisos' }, content: { title: 'Física en 10 min' } });
+    expect(calls[0]).toMatchObject({ identifier: 'dyc-tool-class-k1', trigger: { type: 'weekly', weekday: 2, hour: 7, minute: 50, channelId: 'alarmas' }, content: { title: 'Física en 10 min' } });
     expect(calls[1]).toMatchObject({ trigger: { weekday: 1, hour: 17, minute: 50 }, content: { title: 'Curso en 10 min: Inglés básico', data: { url: '/cursos?abrir=c1' } } });
     expect(calls[2]).toMatchObject({ identifier: 'dyc-tool-rem-r1', trigger: { type: 'monthly', day: 14, hour: 14, minute: 0 } });
 

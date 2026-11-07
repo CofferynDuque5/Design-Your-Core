@@ -189,7 +189,8 @@ const TOOLBAR: Array<{ kind: FormatKind; label: string; icon: typeof Bold }> = [
 const blankRemovals = new Map<string, number>();
 
 function Editor({ note, subjects }: { note: LegacyNote; subjects: string[] }) {
-  const actions = useModule('notes');
+  // Se guarda solo mientras escribes: sin «Deshacer» por cada pausa.
+  const actions = useModule('notes', { undo: false });
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();

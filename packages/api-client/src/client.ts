@@ -160,6 +160,15 @@ export function createClient(opts: ClientOptions) {
       remove: (password: string) => request<{ ok: true }>('DELETE', '/api/v2/account', { password }),
     },
 
+    /** Alarmas del panel web aunque esté cerrado (Web Push). */
+    push: {
+      key: () => request<{ publicKey: string }>('GET', '/api/push/key'),
+      subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/api/push/subscription', { subscription }),
+      unsubscribe: (endpoint: string) => request<{ ok: true }>('DELETE', '/api/push/subscription', { endpoint }),
+      /** Sustituye las alarmas pendientes por estas (hora exacta en UTC). */
+      alarms: (alarms: Array<{ id: string; at: string; title: string; body: string; url: string }>) => request<{ ok: true; count: number }>('PUT', '/api/push/alarms', { alarms }),
+    },
+
     courses: {
       /** Cuánto dura un curso con solo su enlace (lo lee el servidor). 404 si la página no lo dice. */
       length: (url: string) => request<CourseLength>('POST', '/api/v2/courses/length', { url }),

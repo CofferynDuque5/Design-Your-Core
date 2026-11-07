@@ -187,6 +187,8 @@ function subjectsOf(data: Record<string, unknown> | undefined): Subject[] {
 
 function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; count: number; subjects: Subject[]; onDone: () => void }) {
   const actions = useModule('classes');
+  const saved = useLegacyData().data?.data;
+  const rooms = [...useLegacyList(saved, 'classes').map((c) => c.room ?? ''), ...subjects.map((s) => s.room ?? '')];
   const [subject, setSubject] = useState(cls?.subject && subjects.some((s) => s.id === cls.subject) ? cls.subject : '');
   const [title, setTitle] = useState(cls?.title ?? '');
   const [day, setDay] = useState(cls?.day ?? 1);
@@ -245,7 +247,7 @@ function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; 
         <TextField label="Empieza" type="time" value={start} onChange={(e) => setStart(e.target.value)} required />
         <TextField label="Termina" type="time" value={end} onChange={(e) => setEnd(e.target.value)} required error={badTime && TIME_RE.test(start) && TIME_RE.test(end) ? 'Debe ser después de la hora de inicio.' : null} />
       </div>
-      <TextField label="Aula (opcional)" value={room} onChange={(e) => setRoom(e.target.value)} maxLength={60} placeholder="A-201" />
+      <TextField label="Aula (opcional)" suggestions={rooms} value={room} onChange={(e) => setRoom(e.target.value)} maxLength={60} placeholder="A-201" />
       <ColorPicker legend="Color" colors={palette} value={color} onChange={setColor} names={COLOR_NAMES} />
       <div className="form-actions">
         {cls && (

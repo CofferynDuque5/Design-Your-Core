@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   checkItems,
   checkItemsPayload,
   donePercent,
@@ -18,7 +19,7 @@ import { ArrowRight, Check, Lock, Pencil, Plus, Sparkles, Trash2 } from 'lucide-
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { ColorSwatches, FormActions, IconButton, Meter, Pill, tint, ToolScreen } from '../../components/tools';
+import { SearchBar, ColorSwatches, FormActions, IconButton, Meter, Pill, tint, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -31,6 +32,8 @@ export default function Roadmaps() {
   const raw = useLegacyList(legacy.data?.data, 'roadmaps');
   const roadmaps = useMemo<Roadmap[]>(() => raw.map((r) => ({ ...r, steps: checkItems(r.steps, newLegacySubId) })), [raw]);
   const [editing, setEditing] = useState<Roadmap | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = roadmaps.filter((r) => matchesSearch(q, r.name, ...r.steps.map((s) => s.name)));
   const steps = roadmaps.flatMap((r) => r.steps);
   const done = steps.filter((s) => s.done).length;
 
@@ -62,7 +65,8 @@ export default function Roadmaps() {
               </Pill>
             )}
           </View>
-          {roadmaps.map((r) => (
+          <SearchBar label="Buscar en tus roadmaps" value={q} onChange={setQ} placeholder="Buscar por nombre o paso…" count={found.length} />
+          {found.map((r) => (
             <RoadmapCard key={r.id} roadmap={r} onEdit={() => setEditing(r)} />
           ))}
         </>

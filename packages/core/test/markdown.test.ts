@@ -63,6 +63,7 @@ describe('Markdown de las notas (sin HTML)', () => {
 
   it('texto plano y barra de formato', () => {
     expect(markdownToText('# Ondas\n- [ ] **Repasar** la _fórmula_ `f=1/T`\n![imagen](coreimg:a)')).toBe('Ondas Repasar la fórmula f=1/T [imagen]');
+    expect(markdownToText('Ver [Onda (física)](https://es.wikipedia.org/wiki/Onda_(física)) hoy')).toBe('Ver Onda (física) hoy');
     expect(applyFormat('hola mundo', 5, 10, 'bold')).toEqual({ value: 'hola **mundo**', start: 7, end: 12 });
     expect(applyFormat('- uno', 2, 2, 'task')).toEqual({ value: '- [ ] uno', start: 9, end: 9 });
     expect(applyFormat('- uno\n- dos', 0, 11, 'list').value).toBe('uno\ndos');
