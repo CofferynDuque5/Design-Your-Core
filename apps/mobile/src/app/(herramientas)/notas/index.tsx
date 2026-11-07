@@ -142,7 +142,7 @@ function NoteCard({ note: n, onOpen }: { note: LegacyNote; onOpen: () => void })
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${preview || 'Nota vacía'}`}
-      accessibilityHint={[date, tags.map((t) => `#${t}`).join(' ')].filter(Boolean).join(' · ') || undefined}
+      accessibilityHint={[date, tags.map((t) => `#${t.toLowerCase()}`).join(' ')].filter(Boolean).join(' · ') || undefined}
       onPress={onOpen}
       style={({ pressed }) => [pressed && { opacity: 0.75 }]}
     >
@@ -162,7 +162,7 @@ function NoteCard({ note: n, onOpen }: { note: LegacyNote; onOpen: () => void })
             ) : null}
             {tags.map((t) => (
               <T key={t} v="small" tint="primary" style={{ fontFamily: fonts.medium }}>
-                #{t}
+                #{t.toLowerCase()}
               </T>
             ))}
           </View>

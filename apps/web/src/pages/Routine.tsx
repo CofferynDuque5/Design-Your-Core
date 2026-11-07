@@ -6,6 +6,7 @@ import { PageHeader } from '../components/AppShell';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
+import { useSyncCheckIn } from '../lib/checkinSync';
 import { CheckInNote, FormActions, Meter, optionsWith, WeekdayPicker } from '../components/ToolParts';
 import { isoDay, localTime } from '../lib/tools';
 
@@ -94,8 +95,8 @@ export function Routine() {
               </section>
             </div>
           </div>
-          <CheckInNote>El check-in diario registra aparte tus vasos de agua y tu alimentación para el pilar Alimentación.</CheckInNote>
-          <p className="muted small">Los avisos con sonido de la app anterior todavía no están en la app nueva: aquí organizas tus rutinas y ves qué toca cada día.</p>
+          <CheckInNote>Los vasos de agua que sumes aquí cuentan en tu check-in del día (pilar Alimentación). No hace falta anotarlos dos veces.</CheckInNote>
+          <p className="muted small">Aquí organizas tus rutinas y ves qué toca cada día. Para que suenen a su hora, activa las alarmas en Perfil.</p>
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nueva rutina' : 'Editar rutina'}>
@@ -141,7 +142,12 @@ function WaterCard({ today }: { today: string }) {
   const water = waterToday(log, today);
   const goal = typeof log.waterGoal === 'number' && log.waterGoal >= 1 && log.waterGoal <= 40 ? log.waterGoal : WATER_GOAL_DEFAULT;
   // Si el registro es de otro día, empieza en 0 (como la app anterior en el primer cambio).
-  const set = (n: number) => actions.patch({ dateKey: today, water: Math.max(0, Math.min(40, n)) });
+  const sync = useSyncCheckIn();
+  const set = (n: number) => {
+    const water = Math.max(0, Math.min(40, n));
+    actions.patch({ dateKey: today, water });
+    sync(today, { water });
+  };
   const pct = Math.min(100, Math.round((water / goal) * 100));
   return (
     <section className="card stack-sm water-card" aria-labelledby="water-title">

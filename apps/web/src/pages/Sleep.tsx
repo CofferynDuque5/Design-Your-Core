@@ -7,6 +7,7 @@ import { PageHeader } from '../components/AppShell';
 import { Dialog } from '../components/Dialog';
 import { Scale, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
+import { useSyncCheckIn } from '../lib/checkinSync';
 import { CheckInNote, FormActions, Stats } from '../components/ToolParts';
 import { minutesLabel } from '../lib/tools';
 
@@ -65,7 +66,7 @@ export function Sleep() {
           >
             Apunta a qué hora te acostaste y te levantaste y cómo dormiste. Verás tu media de las últimas dos semanas.
           </EmptyState>
-          <CheckInNote>El check-in diario registra aparte tus horas de sueño para el pilar Descanso.</CheckInNote>
+          <CheckInNote>Cada noche que registras aquí pasa a tu check-in de ese día (pilar Descanso).</CheckInNote>
         </div>
       ) : (
         <div className="stack-lg">
@@ -135,7 +136,7 @@ export function Sleep() {
               })}
             </ul>
           </section>
-          <CheckInNote>El check-in diario registra aparte tus horas de sueño para el pilar Descanso; estas noches aún no cambian tu puntuación.</CheckInNote>
+          <CheckInNote>Cada noche que registras aquí pasa a tu check-in de ese día (pilar Descanso).</CheckInNote>
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Registrar noche' : 'Editar noche'}>
@@ -147,6 +148,7 @@ export function Sleep() {
 
 function SleepForm({ night, today, onDone }: { night: LegacySleep | null; today: string; onDone: () => void }) {
   const actions = useModule('sleep');
+  const sync = useSyncCheckIn();
   const [date, setDate] = useState(night?.date ?? today);
   const [bedtime, setBedtime] = useState(night?.bedtime ?? '23:00');
   const [waketime, setWaketime] = useState(night?.waketime ?? '07:00');
@@ -160,6 +162,7 @@ function SleepForm({ night, today, onDone }: { night: LegacySleep | null; today:
     const fields = { date, bedtime, waketime, quality: quality as number, note: note.trim() };
     if (night) actions.update(night.id, fields);
     else actions.add({ id: newId(), ...fields });
+    if (minutes !== null) sync(date, { sleepHours: Math.round((minutes / 60) * 2) / 2, sleepQuality: quality as number });
     onDone();
   };
   return (

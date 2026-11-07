@@ -89,9 +89,9 @@ function FocusSection() {
 
   return (
     <Card>
-      <SectionHeader title="Tu enfoque" />
+      <SectionHeader title="Tus prioridades" />
       <T v="small" tint="muted">
-        Pilares en los que te enfocas (hasta 3)
+        Pilares que son tu prioridad (hasta 3)
       </T>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         {PILLAR_IDS.map((p) => (
@@ -246,6 +246,7 @@ function ToolNotifySection() {
           )}
           <ToggleRow label="Recordatorios del Calendario" value={prefs.reminders} disabled={busy} onChange={(reminders) => apply({ ...prefs, reminders })} />
           <ToggleRow label="Tareas de la Agenda con aviso" value={prefs.tasks} disabled={busy} onChange={(tasks) => apply({ ...prefs, tasks })} />
+          <ToggleRow label="Rutinas y cuidados de mascotas" value={prefs.routines} disabled={busy} onChange={(routines) => apply({ ...prefs, routines })} />
         </View>
       )}
     </Card>

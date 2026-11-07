@@ -180,7 +180,7 @@ function DayPanel({
           {longDay(day)}
         </T>
         <T v="small" tint="muted">
-          Los eventos se repiten cada mes en el mismo día, como en la app anterior.
+          Los eventos se repiten cada mes en el mismo día.
         </T>
       </View>
       {empty ? (

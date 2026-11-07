@@ -149,7 +149,7 @@ function CheckInCard({ today, checkIn }: { today: string; checkIn: CheckIn | nul
       <Scale legend="Energía" value={energy} onChange={setEnergy} low="Muy baja" high="Muy alta" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         <Button label="Guardar" onPress={() => save.mutate()} busy={save.isPending} disabled={!mood && !energy} />
-        <Button variant="ghost" label="Check-in completo" onPress={() => router.push('/check-in')} />
+        <Button variant="ghost" label="Abrir el check-in completo" onPress={() => router.push('/check-in')} />
       </View>
     </Card>
   );

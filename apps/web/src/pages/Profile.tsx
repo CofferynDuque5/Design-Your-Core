@@ -1,4 +1,4 @@
-import { CLASS_LEADS, CONTACT_EMAIL, PILLAR_IDS, type NotifyPrefs, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
+import { CLASS_LEADS, COMMON_TIMEZONES, CONTACT_EMAIL, PILLAR_IDS, type NotifyPrefs, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, BellRing, Download, LogOut, Mail } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -37,7 +37,7 @@ export function Profile() {
         <Link to="/mas" className="card link-card">
           <span>
             <strong>Más herramientas</strong>
-            <span className="muted"> · agenda, materias, finanzas, metas, ejercicio, sueño, diario y el resto de la app anterior</span>
+            <span className="muted"> · agenda, materias, finanzas, metas, ejercicio, sueño, diario y el resto de herramientas</span>
           </span>
           <ArrowRight size={18} aria-hidden="true" />
         </Link>
@@ -86,10 +86,10 @@ function FocusSection() {
   return (
     <form className="card stack" onSubmit={submit} aria-labelledby="focus-title">
       <h2 id="focus-title" className="section-title">
-        Tu enfoque
+        Tus prioridades
       </h2>
       <fieldset className="field">
-        <legend className="field__label">Pilares en los que te enfocas (hasta 3)</legend>
+        <legend className="field__label">Pilares que son tu prioridad (hasta 3)</legend>
         <div className="chips">
           {PILLAR_IDS.map((p) => (
             <label key={p} className="chip-radio" data-pillar={p}>
@@ -183,12 +183,23 @@ function PreferencesSection() {
         </label>
         {zones.length ? (
           <select id="tz" className="input" value={tz} onChange={(e) => saveTz.mutate(e.target.value)} disabled={saveTz.isPending}>
-            {!zones.includes(tz) && <option value={tz}>{tz}</option>}
-            {zones.map((z) => (
-              <option key={z} value={z}>
-                {z.replace(/_/g, ' ')}
-              </option>
-            ))}
+            {!zones.includes(tz) && !COMMON_TIMEZONES.some((c) => c.id === tz) && <option value={tz}>{tz}</option>}
+            <optgroup label="Latinoamérica y España">
+              {COMMON_TIMEZONES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Todas las zonas">
+              {zones
+                .filter((z) => !COMMON_TIMEZONES.some((c) => c.id === z))
+                .map((z) => (
+                  <option key={z} value={z}>
+                    {z.replace(/_/g, ' ')}
+                  </option>
+                ))}
+            </optgroup>
           </select>
         ) : (
           <input id="tz" className="input" value={tz} readOnly />
@@ -271,7 +282,7 @@ function CycleSetting() {
           Ciclo menstrual
         </span>
         <span className="field__hint" id="cycle-setting-hint">
-          Muestra Ciclo en el menú y tus días de regla en el Calendario. Es el mismo ajuste que usa la app anterior. Siempre puedes abrirlo desde Más.
+          Muestra Ciclo en el menú y tus días de regla en el Calendario. Siempre puedes abrirlo desde Más.
         </span>
       </span>
       <label className="switch">
@@ -366,6 +377,7 @@ function AlarmsSection() {
           )}
           {row('Recordatorios del Calendario', prefs.reminders, (reminders) => apply({ ...prefs, reminders }))}
           {row('Tareas de la Agenda con aviso', prefs.tasks, (tasks) => apply({ ...prefs, tasks }))}
+          {row('Rutinas y cuidados de mascotas', prefs.routines, (routines) => apply({ ...prefs, routines }))}
           <div>
             <button type="button" className="btn btn--secondary btn--sm" onClick={test}>
               <BellRing size={16} aria-hidden="true" /> Probar el sonido
@@ -597,7 +609,7 @@ function DataSection() {
             remove.mutate();
           }}
         >
-          <p>Se borrarán tu perfil, check-ins, hábitos, retos y los datos de la app anterior. No se puede deshacer.</p>
+          <p>Se borrarán tu perfil, check-ins, hábitos, retos y los datos de todas tus herramientas. No se puede deshacer.</p>
           {remove.isError && (
             <div className="alert alert--danger" role="alert">
               {errorMessage(remove.error)}

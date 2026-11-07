@@ -470,9 +470,9 @@ describe('v2 · módulos de la app anterior', () => {
     res = await api.patch('/api/v2/modules/notes/n1').set(auth).send({ body: img }).expect(200);
     expect(res.body.item.excerpt).toBe(img.slice(0, 90));
 
-    expect(await post('workItems', { id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: 'p1', status: 'todo', done: false, due: '' });
+    expect(await post('workItems', { id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: '', status: 'todo', done: false, due: '' });
     await api.patch('/api/v2/modules/workItems/w1').set(auth).send({ status: 'curso', project: 'p3', due: 'Hoy' }).expect(200);
-    await api.patch('/api/v2/modules/workItems/w1').set(auth).send({ project: 'otro' }).expect(400);
+    await api.patch('/api/v2/modules/workItems/w1').set(auth).send({ project: 'x'.repeat(81) }).expect(400);
 
     const meditations = Array.from({ length: 400 }, (_, i) => ({ id: `m${i}`, date: '2026-09-01', minutes: 1, kind: 'respiracion' }));
     const before = await sync();

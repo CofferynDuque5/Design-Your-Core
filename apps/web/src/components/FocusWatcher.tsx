@@ -56,7 +56,7 @@ export function FocusWatcher() {
       if (left <= 0) {
         const { mode, next } = finish(false);
         const msg = `${FOCUS_MODE_INFO[mode].label}: ¡sesión terminada! Ahora toca ${FOCUS_MODE_INFO[next].label.toLowerCase()}, ${FOCUS_MODE_INFO[next].minutes} minutos.`;
-        toast(msg, here.current ? undefined : { action: { label: 'Ir a Enfoque', run: () => navigate('/enfoque') } });
+        toast(msg, here.current ? undefined : { action: { label: 'Ir a Pomodoro', run: () => navigate('/enfoque') } });
         return;
       }
       // El título de la página se guarda para devolverlo al parar.
@@ -78,7 +78,7 @@ export function FocusWatcher() {
   if (!running || onFocusPage) return null;
   const clock = focusClock(focusLeft(timer, now));
   return (
-    <Link to="/enfoque" className="focus-chip" aria-label={`${FOCUS_MODE_INFO[timer.mode].label} en marcha: quedan ${clock}. Ir a Enfoque`}>
+    <Link to="/enfoque" className="focus-chip" aria-label={`${FOCUS_MODE_INFO[timer.mode].label} en marcha: quedan ${clock}. Ir a Pomodoro`}>
       <Timer size={16} aria-hidden="true" />
       <span className="numeric">{clock}</span>
     </Link>

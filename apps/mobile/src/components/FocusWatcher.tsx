@@ -25,7 +25,7 @@ export function FocusWatcher() {
       if (t.status !== 'running' || focusLeft(t) > 0) return;
       const { mode, next } = finish(false);
       const msg = `${FOCUS_MODE_INFO[mode].label}: ¡sesión terminada! Ahora toca ${FOCUS_MODE_INFO[next].label.toLowerCase()}, ${FOCUS_MODE_INFO[next].minutes} minutos.`;
-      toast(msg, here.current === '/enfoque' ? undefined : { action: { label: 'Ir a Enfoque', run: () => router.push('/enfoque') } });
+      toast(msg, here.current === '/enfoque' ? undefined : { action: { label: 'Ir a Pomodoro', run: () => router.push('/enfoque') } });
     };
     check();
     const id = setInterval(check, 500);

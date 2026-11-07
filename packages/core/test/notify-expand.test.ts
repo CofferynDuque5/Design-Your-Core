@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandNotificationPlan, type PlannedNotification } from '../src/notify';
+import { expandNotificationPlan, type PlannedNotification } from '../src/notify.js';
 
 const p = (id: string, trigger: PlannedNotification['trigger']): PlannedNotification => ({ id, title: id, body: '', url: '/', trigger });
 

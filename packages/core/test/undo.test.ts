@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyLegacyOp, undoLegacyObjectPatch, undoLegacyOp, type LegacyData, type LegacyKey, type LegacyOp } from '../src/legacy';
+import { applyLegacyOp, undoLegacyObjectPatch, undoLegacyOp, type LegacyData, type LegacyKey, type LegacyOp } from '../src/legacy.js';
 
 const base: LegacyData = {
   todos: [

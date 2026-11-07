@@ -64,3 +64,30 @@ export function daysLabel(days: string): string {
   if (/^[1-7]$/.test(days)) return `Los ${WEEKDAY_PLURALS[Number(days) - 1]}`;
   return WEEKDAYS.filter((w) => days.includes(w.iso)).map((w) => w.label).join(' · ');
 }
+
+/** Zonas horarias de Latinoamérica (y España) con nombre de país, para mostrarlas primero en el selector. */
+export const COMMON_TIMEZONES: ReadonlyArray<{ id: string; label: string }> = [
+  { id: 'America/Caracas', label: 'Venezuela (Caracas)' },
+  { id: 'America/Bogota', label: 'Colombia (Bogotá)' },
+  { id: 'America/Mexico_City', label: 'México (Ciudad de México)' },
+  { id: 'America/Lima', label: 'Perú (Lima)' },
+  { id: 'America/Santiago', label: 'Chile (Santiago)' },
+  { id: 'America/Argentina/Buenos_Aires', label: 'Argentina (Buenos Aires)' },
+  { id: 'America/Guayaquil', label: 'Ecuador (Guayaquil)' },
+  { id: 'America/La_Paz', label: 'Bolivia (La Paz)' },
+  { id: 'America/Asuncion', label: 'Paraguay (Asunción)' },
+  { id: 'America/Montevideo', label: 'Uruguay (Montevideo)' },
+  { id: 'America/Sao_Paulo', label: 'Brasil (São Paulo)' },
+  { id: 'America/Panama', label: 'Panamá' },
+  { id: 'America/Costa_Rica', label: 'Costa Rica' },
+  { id: 'America/Guatemala', label: 'Guatemala' },
+  { id: 'America/El_Salvador', label: 'El Salvador' },
+  { id: 'America/Tegucigalpa', label: 'Honduras' },
+  { id: 'America/Managua', label: 'Nicaragua' },
+  { id: 'America/Santo_Domingo', label: 'República Dominicana' },
+  { id: 'America/Havana', label: 'Cuba (La Habana)' },
+  { id: 'America/Puerto_Rico', label: 'Puerto Rico' },
+  { id: 'America/New_York', label: 'Estados Unidos (Nueva York, Miami)' },
+  { id: 'America/Los_Angeles', label: 'Estados Unidos (Los Ángeles)' },
+  { id: 'Europe/Madrid', label: 'España (Madrid)' },
+];

@@ -93,7 +93,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
             {title}
           </h2>
           <span className="muted small">
-            Ruta de materias
+            Ruta por pasos
             {r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
           </span>
         </div>
@@ -102,9 +102,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
         </button>
       </div>
       {r.steps.length > 0 && <Meter value={donePercent(r.steps)} color={color} label={`Avance de ${title}`} />}
-      {r.steps.length === 0 ? (
-        <p className="muted small">Sin pasos todavía. Añade la primera materia abajo.</p>
-      ) : (
+      {r.steps.length === 0 ? null : (
         <ol className="steps-path" aria-label={`Pasos de «${title}»`}>
           {r.steps.map((s, i) => {
             const state = states[i];
@@ -122,8 +120,8 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
                     </button>
                   </div>
                   {state === 'current' && (
-                    <button type="button" className="btn btn--sm" onClick={() => mark(s.id, true)} aria-label={`Marcar «${s.name}» como completada`}>
-                      <Check size={16} aria-hidden="true" /> Marcar como completada
+                    <button type="button" className="btn btn--sm" onClick={() => mark(s.id, true)} aria-label={`Marcar «${s.name}» como completado`}>
+                      <Check size={16} aria-hidden="true" /> Marcar como completado
                     </button>
                   )}
                   {state === 'done' && (
@@ -156,7 +154,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
             <Check size={15} aria-hidden="true" className="inline-icon" /> <strong>¡Ruta completada!</strong>
           </>
         ) : (
-          <span className="muted">Añade materias para empezar tu ruta.</span>
+          <span className="muted">Sin pasos todavía: añade el primero abajo.</span>
         )}
       </p>
     </article>

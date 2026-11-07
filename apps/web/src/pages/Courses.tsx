@@ -19,6 +19,7 @@ import {
   handoffClasses,
   lessonsFromPlaylist,
   courseSource,
+  courseLengthLabel,
   formatLength,
   HHMM_RE,
   planTopics,
@@ -261,7 +262,7 @@ function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items:
 }
 
 /** «4 h 30 min» o, si la página solo da una cifra aproximada, «unas 20 h». */
-export const lengthLabel = (c: LegacyCourse): string => (c.length ? `${c.lengthFrom === 'aprox' ? 'unas ' : ''}${formatLength(c.length)}` : '');
+export const lengthLabel = (c: LegacyCourse): string => courseLengthLabel(c);
 
 /**
  * Guarda cambios de un curso. Si con eso se termina, sus clases del Horario

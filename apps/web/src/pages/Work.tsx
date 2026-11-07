@@ -1,17 +1,19 @@
 import {
   WORK_BUCKETS as BUCKETS,
-  WORK_PROJECT_INFO,
   WORK_PROJECTS,
   WORK_STATUS_INFO,
   WORK_STATUSES,
   workBucketOf as bucketOf,
-  workProjectOf as projectOf,
+  workProjectOptions,
+  workProjectView,
   workStatusOf as statusOf,
+  type LegacyProject,
   type LegacyWorkItem,
   type WorkProject,
   type WorkStatus,
 } from '@dyc/core';
 import { Info, Pencil, Plus } from 'lucide-react';
+import { Link } from 'react-router';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
@@ -23,9 +25,12 @@ import { FormActions } from '../components/ToolParts';
 export function Work() {
   const legacy = useLegacyData();
   const items = useLegacyList(legacy.data?.data, 'workItems');
+  const projects = useLegacyList(legacy.data?.data, 'projects');
   const actions = useModule('workItems');
   const [title, setTitle] = useState('');
-  const [project, setProject] = useState<WorkProject>('p1');
+  const [project, setProject] = useState('');
+  const options = workProjectOptions(projects);
+  const oldOnes = items.filter((w) => !workProjectView(w, projects).real && WORK_PROJECTS.includes(w.project as WorkProject)).length;
   const [editing, setEditing] = useState<LegacyWorkItem | null>(null);
   const done = items.filter((w) => w.done).length;
 
@@ -59,10 +64,10 @@ export function Work() {
             <label className="visually-hidden" htmlFor="new-work-project">
               Proyecto de la tarea nueva
             </label>
-            <select id="new-work-project" className="input select work-add__project" value={project} onChange={(e) => setProject(e.target.value as WorkProject)}>
-              {WORK_PROJECTS.map((p) => (
-                <option key={p} value={p}>
-                  {WORK_PROJECT_INFO[p].label}
+            <select id="new-work-project" className="input select work-add__project" value={project} onChange={(e) => setProject(e.target.value)}>
+              {options.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
                 </option>
               ))}
             </select>
@@ -83,7 +88,7 @@ export function Work() {
                   </h2>
                   <ul className="work-list">
                     {list.map((w) => (
-                      <WorkRow key={w.id} item={w} onEdit={() => setEditing(w)} />
+                      <WorkRow key={w.id} item={w} projects={projects} onEdit={() => setEditing(w)} />
                     ))}
                   </ul>
                 </section>
@@ -92,20 +97,32 @@ export function Work() {
           )}
           <p className="checkin-note small">
             <Info size={16} aria-hidden="true" />
-            <span>Proyecto 1, 2 y 3 son los tres proyectos fijos de la app anterior. No están unidos a la sección Proyectos.</span>
+            <span>
+              {projects.length === 0 ? (
+                <>
+                  Crea tus proyectos en <Link to="/proyectos">Proyectos</Link> para agrupar aquí sus tareas.
+                </>
+              ) : oldOnes > 0 ? (
+                `${oldOnes === 1 ? 'Una tarea sigue' : `${oldOnes} tareas siguen`} en «Proyecto 1, 2 o 3». Edítalas para pasarlas a uno de tus proyectos.`
+              ) : (
+                <>
+                  Cada tarea va con uno de tus <Link to="/proyectos">proyectos</Link>.
+                </>
+              )}
+            </span>
           </p>
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title="Editar tarea de trabajo">
-        {editing && <WorkForm item={editing} onDone={() => setEditing(null)} />}
+        {editing && <WorkForm item={editing} projects={projects} onDone={() => setEditing(null)} />}
       </Dialog>
     </div>
   );
 }
 
-function WorkRow({ item: w, onEdit }: { item: LegacyWorkItem; onEdit: () => void }) {
+function WorkRow({ item: w, projects, onEdit }: { item: LegacyWorkItem; projects: LegacyProject[]; onEdit: () => void }) {
   const actions = useModule('workItems');
-  const p = WORK_PROJECT_INFO[projectOf(w)];
+  const p = workProjectView(w, projects);
   const title = w.title || 'Sin título';
   return (
     <li className={`check-row work-row${w.done ? ' check-row--done' : ''}`}>
@@ -129,10 +146,10 @@ function WorkRow({ item: w, onEdit }: { item: LegacyWorkItem; onEdit: () => void
   );
 }
 
-function WorkForm({ item, onDone }: { item: LegacyWorkItem; onDone: () => void }) {
+function WorkForm({ item, projects, onDone }: { item: LegacyWorkItem; projects: LegacyProject[]; onDone: () => void }) {
   const actions = useModule('workItems');
   const [title, setTitle] = useState(item.title ?? '');
-  const [project, setProject] = useState<WorkProject>(projectOf(item));
+  const [project, setProject] = useState(workProjectView(item, projects).id);
   const [status, setStatus] = useState<WorkStatus>(statusOf(item));
   const [due, setDue] = useState(item.due ?? '');
   const submit = (e: FormEvent) => {
@@ -144,10 +161,10 @@ function WorkForm({ item, onDone }: { item: LegacyWorkItem; onDone: () => void }
   return (
     <form className="stack" onSubmit={submit}>
       <TextField label="Tarea" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus />
-      <SelectField label="Proyecto" value={project} onChange={(e) => setProject(e.target.value as WorkProject)}>
-        {WORK_PROJECTS.map((p) => (
-          <option key={p} value={p}>
-            {WORK_PROJECT_INFO[p].label}
+      <SelectField label="Proyecto" value={project} onChange={(e) => setProject(e.target.value)}>
+        {workProjectOptions(projects, project).map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
           </option>
         ))}
       </SelectField>

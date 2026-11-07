@@ -19,6 +19,7 @@ import { Sheet } from '../../components/Sheet';
 import { CheckInNote, DayStepper, FormActions, IconButton, Pill, tint, TimeField, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, Scale, SectionHeader, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
+import { useSyncCheckIn } from '../../lib/checkinSync';
 import { useTheme } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
 
@@ -82,7 +83,7 @@ export default function Sleep() {
           <EmptyState title="Aún no has registrado noches" action={<Button small variant="secondary" label="Registrar la de anoche" icon={<Plus size={16} color={colors.primary} />} onPress={() => setEditing('new')} />}>
             Apunta a qué hora te acostaste y te levantaste y cómo dormiste. Verás tu media de las últimas dos semanas.
           </EmptyState>
-          <CheckInNote>El check-in diario registra aparte tus horas de sueño para el pilar Descanso.</CheckInNote>
+          <CheckInNote>Cada noche que registras aquí pasa a tu check-in de ese día (pilar Descanso).</CheckInNote>
         </>
       ) : (
         <>
@@ -167,7 +168,7 @@ export default function Sleep() {
               })}
             </Card>
           </View>
-          <CheckInNote>El check-in diario registra aparte tus horas de sueño para el pilar Descanso; estas noches aún no cambian tu puntuación.</CheckInNote>
+          <CheckInNote>Cada noche que registras aquí pasa a tu check-in de ese día (pilar Descanso).</CheckInNote>
         </>
       )}
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Registrar noche' : 'Editar noche'}>
@@ -192,6 +193,7 @@ function Figure({ value, label }: { value: string; label: string }) {
 
 function SleepForm({ night, today, onDone }: { night: LegacySleep | null; today: Day; onDone: () => void }) {
   const actions = useModule('sleep');
+  const sync = useSyncCheckIn();
   const [date, setDate] = useState<Day>(night?.date ?? today);
   const [bedtime, setBedtime] = useState(night?.bedtime ?? '23:00');
   const [waketime, setWaketime] = useState(night?.waketime ?? '07:00');
@@ -206,6 +208,7 @@ function SleepForm({ night, today, onDone }: { night: LegacySleep | null; today:
     const fields = { date, bedtime: bed, waketime: wake, quality: quality as number, note: note.trim() };
     if (night) actions.update(night.id, fields);
     else actions.add({ id: newId(), ...fields });
+    if (minutes !== null) sync(date, { sleepHours: Math.round((minutes / 60) * 2) / 2, sleepQuality: quality as number });
     onDone();
   };
   return (

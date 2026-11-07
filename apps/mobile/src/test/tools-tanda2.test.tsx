@@ -247,9 +247,9 @@ describe('herramientas de la tanda 2 en el móvil', () => {
     expect(screen.getByText('1 de 3 completadas')).toBeOnTheScreen();
     expect(screen.getByLabelText('Paso 2: Cálculo I, en curso')).toBeOnTheScreen();
     expect(screen.getByLabelText('Paso 3: Cálculo II, siguiente')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Marcar «Cálculo II» como completada' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Marcar «Cálculo II» como completado' })).toBeNull();
 
-    fireEvent.press(screen.getByRole('button', { name: 'Marcar «Cálculo I» como completada' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Marcar «Cálculo I» como completado' }));
     expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/roadmaps/r1')).body).toEqual({
       steps: [
         { id: 's1', name: 'Álgebra', done: true },
@@ -278,7 +278,7 @@ describe('herramientas de la tanda 2 en el móvil', () => {
     fireEvent.press(screen.getByRole('radio', { name: 'Verde' }));
     fireEvent.press(screen.getByRole('button', { name: 'Añadir roadmap' }));
     expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/roadmaps'))).toEqual({ id: expect.any(String), name: 'Idiomas', color: '#0FA968', steps: [] });
-    expect(await screen.findByText('Añade materias para empezar tu ruta.')).toBeOnTheScreen();
+    expect(await screen.findByText('Sin pasos todavía: añade el primero abajo.')).toBeOnTheScreen();
 
     fireEvent.press(screen.getByRole('button', { name: 'Editar «Ingeniería»' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Borrar' }));

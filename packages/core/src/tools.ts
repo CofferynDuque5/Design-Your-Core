@@ -19,9 +19,12 @@ import {
   noteTag,
   splitTags,
   WORK_PROJECTS,
+  WORK_PROJECT_INFO,
   WORK_STATUSES,
   legacyList,
   legacyObject,
+  sleepMinutes,
+  waterToday,
   nextDue,
   PERIOD_FLOWS,
   PET_SPECIES,
@@ -55,6 +58,7 @@ import {
   type WorkProject,
   type WorkStatus,
   type LegacyWorkItem,
+  type LegacyProject,
   type LegacyVentureItem,
   type VentureItemKind,
 } from './legacy.js';
@@ -163,7 +167,7 @@ export const TOOL_CATALOG: ToolInfo[] = [
   {
     id: 'enfoque',
     path: '/enfoque',
-    label: 'Enfoque',
+    label: 'Pomodoro',
     group: 'organizacion',
     description: 'Temporizador Pomodoro y tus horas de concentración',
     count: (d) => legacyList(d, 'focus').filter((f) => f.mode === 'focus').length,
@@ -237,7 +241,7 @@ export const TOOL_CATALOG: ToolInfo[] = [
     path: '/trabajo',
     label: 'Trabajo',
     group: 'estudio',
-    description: 'Tareas de trabajo por proyecto, de la app anterior',
+    description: 'Tareas de trabajo por proyecto',
     count: (d) => legacyList(d, 'workItems').filter((w) => !w.done).length,
     unit: ['por hacer', 'por hacer'],
   },
@@ -913,7 +917,33 @@ export function groupNotesBySubject<N extends LegacyNote>(notes: N[]): Array<[st
 }
 
 // Proyecto y estado desconocidos (datos raros) se muestran como el primero, sin cambiar el dato.
-export const workProjectOf = (w: Pick<LegacyWorkItem, 'project'>): WorkProject => (WORK_PROJECTS.includes(w.project) ? w.project : 'p1');
+export const workProjectOf = (w: Pick<LegacyWorkItem, 'project'>): WorkProject => (WORK_PROJECTS.includes(w.project as WorkProject) ? (w.project as WorkProject) : 'p1');
+
+export interface WorkProjectView {
+  id: string;
+  label: string;
+  color: string;
+  /** true si es un proyecto de la sección Proyectos. */
+  real: boolean;
+}
+
+const NO_PROJECT: WorkProjectView = { id: '', label: 'Sin proyecto', color: '#8A8F98', real: false };
+
+/** Proyecto al que pertenece una tarea de Trabajo: uno real de Proyectos, uno de los fijos antiguos o ninguno. */
+export function workProjectView(w: Pick<LegacyWorkItem, 'project'>, projects: Array<Pick<LegacyProject, 'id' | 'title' | 'color'>>): WorkProjectView {
+  const real = projects.find((p) => p.id === w.project);
+  if (real) return { id: real.id, label: real.title || 'Proyecto sin nombre', color: real.color || '#8A8F98', real: true };
+  if (WORK_PROJECTS.includes(w.project as WorkProject)) return { id: w.project, ...WORK_PROJECT_INFO[w.project as WorkProject], real: false };
+  return NO_PROJECT;
+}
+
+/** Opciones para elegir proyecto: los de Proyectos sin entregar, «Sin proyecto» y, si la tarea ya lo tiene, su proyecto actual. */
+export function workProjectOptions(projects: Array<Pick<LegacyProject, 'id' | 'title' | 'color' | 'status'>>, current = ''): WorkProjectView[] {
+  const open = projects.filter((p) => p.status !== 'entregado' || p.id === current).map((p) => workProjectView({ project: p.id }, projects));
+  const out = [...open, NO_PROJECT];
+  if (current && !out.some((o) => o.id === current)) out.push(workProjectView({ project: current }, projects));
+  return out;
+}
 export const workStatusOf = (w: Pick<LegacyWorkItem, 'status'>): WorkStatus => (WORK_STATUSES.includes(w.status) ? w.status : 'todo');
 
 /** Mismos grupos que la app anterior: en curso, por hacer y hecho. */
@@ -1146,3 +1176,91 @@ export function ventureSummary(items: LegacyVentureItem[]): string {
 /** Nombre para mostrar de lo guardado: su título, el nombre del archivo o el enlace. */
 export const ventureItemName = (i: Pick<LegacyVentureItem, 'title' | 'kind' | 'url'>) =>
   i.title || (i.kind === 'link' ? i.url.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 80) : i.kind === 'note' ? 'Nota sin título' : i.kind === 'image' ? 'Imagen' : 'Archivo');
+
+/**
+ * Lo que tus herramientas ya registraron un día y que el check-in también pide:
+ * agua (Rutina), sueño (Sueño), gratitud (Diario) y minutos activos (Ejercicio).
+ * Así el dato se escribe una sola vez: el check-in lo toma de aquí y las
+ * herramientas lo copian al check-in al guardarlo.
+ */
+export interface ToolSignals {
+  water?: number;
+  sleepHours?: number;
+  sleepQuality?: number;
+  gratitude?: string;
+  activeMinutes?: number;
+}
+
+export const TOOL_SIGNAL_SOURCE: Record<keyof ToolSignals, string> = {
+  water: 'Rutina',
+  sleepHours: 'Sueño',
+  sleepQuality: 'Sueño',
+  gratitude: 'Diario',
+  activeMinutes: 'Ejercicio',
+};
+
+export function toolSignals(data: LegacyData | null | undefined, date: Day): ToolSignals {
+  const out: ToolSignals = {};
+  const log = legacyObject(data, 'dayLog');
+  const water = waterToday(log, date);
+  if (water > 0) out.water = Math.min(40, water);
+  const night = legacyList(data, 'sleep').find((s) => s.date === date);
+  if (night) {
+    const m = sleepMinutes(night.bedtime, night.waketime);
+    if (m !== null && m > 0) out.sleepHours = Math.round((m / 60) * 2) / 2;
+    if (Number.isInteger(night.quality) && night.quality >= 1 && night.quality <= 5) out.sleepQuality = night.quality;
+  }
+  const page = legacyList(data, 'journal').find((j) => j.date === date);
+  if (page?.gratitude?.trim()) out.gratitude = page.gratitude.trim().slice(0, 1000);
+  const active = legacyList(data, 'workouts')
+    .filter((w) => w.date === date)
+    .reduce((sum, w) => sum + (Number.isFinite(w.minutes) && w.minutes > 0 ? w.minutes : 0), 0);
+  if (active > 0) out.activeMinutes = Math.min(1440, Math.round(active));
+  return out;
+}
+
+/** Valores del check-in completados con lo que ya registraron tus herramientas, y de dónde salió cada uno. */
+export function mergeToolSignals<V extends Partial<Record<keyof ToolSignals, unknown>>>(values: V, signals: ToolSignals): { values: V; from: Partial<Record<keyof ToolSignals, string>> } {
+  const next = { ...values } as Record<string, unknown>;
+  const from: Partial<Record<keyof ToolSignals, string>> = {};
+  for (const k of Object.keys(signals) as Array<keyof ToolSignals>) {
+    const empty = next[k] === null || next[k] === undefined || next[k] === '';
+    if (empty) {
+      next[k] = signals[k];
+      from[k] = TOOL_SIGNAL_SOURCE[k];
+    }
+  }
+  return { values: next as V, from };
+}
+
+/**
+ * Grupo de un pendiente según cómo lo escribiste: «Login de NV Hotel» → «NV Hotel»,
+ * «Logo para Café Luna» → «Café Luna». Sin un nombre propio al final, no hay grupo.
+ */
+export function todoGroupOf(title: string): string | null {
+  const m = /\s(?:de|del|para|en|-|·|:)\s+((?:[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ&.'-]*)(?:\s+[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ&.'-]*){0,3})\s*$/.exec((title ?? '').trim());
+  return m ? m[1] : null;
+}
+
+/** Pendientes agrupados por proyecto (solo grupos de 2 o más, del más grande al más pequeño) y el resto en «Otros». */
+export function todoGroups<T extends { title: string }>(todos: T[]): Array<{ label: string; items: T[] }> {
+  const map = new Map<string, T[]>();
+  for (const t of todos) {
+    const g = todoGroupOf(t.title);
+    const key = g ? searchFold(g) : '';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(t);
+  }
+  const groups: Array<{ label: string; items: T[] }> = [];
+  const rest: T[] = [...(map.get('') ?? [])];
+  for (const [key, items] of map) {
+    if (!key) continue;
+    if (items.length >= 2) groups.push({ label: todoGroupOf(items[0].title) as string, items });
+    else rest.push(...items);
+  }
+  groups.sort((a, b) => b.items.length - a.items.length || byNameEs(a.label, b.label));
+  const order = new Map(todos.map((t, i) => [t, i]));
+  rest.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+  if (rest.length) groups.push({ label: groups.length ? 'Otros' : 'Pendientes', items: rest });
+  return groups;
+}

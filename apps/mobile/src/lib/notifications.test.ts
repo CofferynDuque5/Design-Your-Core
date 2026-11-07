@@ -60,7 +60,7 @@ describe('avisos de las herramientas', () => {
 
   it('al encenderlos pide permiso y programa clases, cursos y recordatorios aunque la app se cierre', async () => {
     N.getPermissionsAsync.mockResolvedValue({ granted: true, canAskAgain: true } as never);
-    const prefs = { enabled: true, classes: true, classLead: 10, reminders: true, tasks: true };
+    const prefs = { enabled: true, classes: true, classLead: 10, reminders: true, tasks: true, routines: true };
     await expect(setToolNotifications(prefs)).resolves.toBe('on');
     await expect(syncToolNotifications(data, prefs)).resolves.toBe(3);
     const calls = N.scheduleNotificationAsync.mock.calls.map(([c]) => c as unknown as { identifier: string; trigger: Record<string, unknown>; content: { title: string; data: { url: string } } });
@@ -81,7 +81,7 @@ describe('avisos de las herramientas', () => {
 
   it('sin permiso se queda apagado', async () => {
     N.getPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false } as never);
-    await expect(setToolNotifications({ enabled: true, classes: true, classLead: 10, reminders: true, tasks: true })).resolves.toBe('denied');
+    await expect(setToolNotifications({ enabled: true, classes: true, classLead: 10, reminders: true, tasks: true, routines: true })).resolves.toBe('denied');
     expect(JSON.parse((await SecureStore.getItemAsync('dyc.notify'))!)).toMatchObject({ enabled: false });
   });
 });

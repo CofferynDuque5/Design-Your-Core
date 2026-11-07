@@ -8,6 +8,7 @@ import {
   courseName,
   courseProgress,
   courseRemaining,
+  courseLengthLabel,
   formatLength,
   courseLevel,
   courseRoute,
@@ -241,7 +242,7 @@ function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items:
 }
 
 /** «4 h 30 min» o, si la página solo da una cifra aproximada, «unas 20 h». */
-const lengthLabel = (c: LegacyCourse): string => (c.length ? `${c.lengthFrom === 'aprox' ? 'unas ' : ''}${formatLength(c.length)}` : '');
+const lengthLabel = (c: LegacyCourse): string => courseLengthLabel(c);
 const levelLabel = (c: LegacyCourse) => COURSE_LEVEL_LABEL[courseLevel(c).level];
 
 /**

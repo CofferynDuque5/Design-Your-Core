@@ -1,5 +1,6 @@
 import {
-  ASSISTANT_MODEL_NOTE,
+  ASSISTANT_MODEL_LABEL,
+  GEMINI_KEY_STEPS,
   ASSISTANT_MODELS,
   AssistantError,
   attachmentProblem,
@@ -138,6 +139,10 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
         </View>
       ) : (
         <View style={{ gap: space[3] }}>
+          <T v="small">Para hablar con el Asistente necesitas una clave gratuita de Google. Se consigue en un par de minutos:</T>
+          {GEMINI_KEY_STEPS.map((step, i) => (
+            <T key={step} v="small" tint="muted">{`${i + 1}. ${step}`}</T>
+          ))}
           <Field
             label="Clave de la API de Gemini"
             value={draft}
@@ -168,7 +173,7 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
         <T v="label">Modelo</T>
         <View accessibilityRole="radiogroup" accessibilityLabel="Modelo" style={st.chips}>
           {ASSISTANT_MODELS.map((m) => (
-            <Chip key={m} label={`${m} (${ASSISTANT_MODEL_NOTE[m]})`} selected={settings.model === m} onPress={() => onChange({ ...settings, model: m as AssistantModel })} />
+            <Chip key={m} label={ASSISTANT_MODEL_LABEL[m]} selected={settings.model === m} onPress={() => onChange({ ...settings, model: m as AssistantModel })} />
           ))}
         </View>
       </View>

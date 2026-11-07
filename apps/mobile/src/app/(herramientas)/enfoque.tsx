@@ -11,7 +11,7 @@ import { useLegacyData, useLegacyList } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
 
 // Etiquetas cortas para que quepan las tres; los lectores oyen el nombre completo.
-const SHORT: Record<FocusMode, string> = { focus: 'Enfoque', short: 'Corto', long: 'Largo' };
+const SHORT: Record<FocusMode, string> = { focus: 'Concentrar', short: 'Corto', long: 'Largo' };
 const MODE_OPTIONS = FOCUS_MODES.map((m) => ({ value: m, label: `${SHORT[m]} · ${FOCUS_MODE_INFO[m].minutes}`, a11yLabel: `${FOCUS_MODE_INFO[m].label}, ${FOCUS_MODE_INFO[m].minutes} minutos` }));
 const totalMs = (m: FocusMode) => FOCUS_MODE_INFO[m].minutes * 60_000;
 const RING = 232;
@@ -69,7 +69,7 @@ export default function Focus() {
   const tint = mode === 'focus' ? colors.primary : colors.sage;
 
   return (
-    <ToolScreen title="Enfoque" refreshing={legacy.isRefetching} onRefresh={() => legacy.refetch()}>
+    <ToolScreen title="Pomodoro" refreshing={legacy.isRefetching} onRefresh={() => legacy.refetch()}>
       <Card style={{ alignItems: 'stretch', gap: space[4] }}>
         <Segmented<FocusMode> label="Tipo de sesión" options={MODE_OPTIONS} value={mode} onChange={switchTo} disabled={status === 'running'} />
         {status === 'running' && (
@@ -120,7 +120,7 @@ export default function Focus() {
       </Card>
 
       <View style={{ gap: space[3] }}>
-        <SectionHeader title="Tu enfoque" />
+        <SectionHeader title="Tus sesiones" />
         {legacy.isPending ? (
           <Loading label="Cargando tus sesiones" />
         ) : legacy.isError ? (

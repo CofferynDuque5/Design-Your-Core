@@ -200,7 +200,7 @@ function DayPanel({
         <h2 id="day-panel-title" className="section-title">
           {longDay(day)}
         </h2>
-        <p className="muted small">Los eventos se repiten cada mes en el mismo día, como en la app anterior.</p>
+        <p className="muted small">Los eventos se repiten cada mes en el mismo día.</p>
       </div>
       {empty ? (
         <p className="muted">Nada este día.</p>

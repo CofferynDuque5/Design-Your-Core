@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View, type ScrollView } from 'react-native';
 import { SearchBar, CheckInNote, DayStepper, IconButton, MoodPicker, Pill, Stats, ToolScreen } from '../../components/tools';
 import { Card, ErrorState, Field, Loading, SectionHeader, T } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
+import { useSyncCheckIn } from '../../lib/checkinSync';
 import { useTheme } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
 import { UiIcon } from '../../components/UiIcon';
@@ -32,7 +33,9 @@ export default function Journal() {
   const created = useRef(new Map<string, string>());
   const stats = useMemo(() => journalStats(entries, today), [entries, today]);
 
+  const sync = useSyncCheckIn();
   const save = (fields: Fields) => {
+    if (fields.gratitude !== undefined) sync(date, { gratitude: fields.gratitude.trim().slice(0, 1000) || null });
     const id = entry?.id ?? created.current.get(date);
     if (id) return actions.update(id, fields);
     const fresh = newId();
@@ -129,7 +132,7 @@ export default function Journal() {
               </Card>
             )}
           </View>
-          <CheckInNote>El check-in diario guarda aparte su propia reflexión y gratitud; tu diario no cambia aún tus pilares.</CheckInNote>
+          <CheckInNote>Lo que agradeces aquí también aparece en tu check-in del día. La reflexión del check-in y tus notas del diario siguen separadas.</CheckInNote>
         </>
       )}
     </ToolScreen>

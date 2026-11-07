@@ -123,7 +123,7 @@ export function Notes() {
                             .slice(0, 4)
                             .map((t) => (
                               <span key={t} className="note-card__tag">
-                                #{t}
+                                #{t.toLowerCase()}
                               </span>
                             ))}
                         </span>
@@ -159,7 +159,7 @@ export function NoteEditor() {
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
           <EmptyState title="Esta nota ya no existe" action={<Link to="/notas" className="btn btn--secondary">Ver tus notas</Link>}>
-            Puede que la hayas borrado aquí o en la app anterior.
+            Puede que la hayas borrado.
           </EmptyState>
         )}
       </div>

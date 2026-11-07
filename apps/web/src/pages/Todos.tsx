@@ -1,10 +1,22 @@
-import { matchesSearch, type LegacySubtask, type LegacyTodo } from '@dyc/core';
+import { matchesSearch, todoGroups, type LegacySubtask, type LegacyTodo } from '@dyc/core';
 import { Check, ChevronDown, ChevronUp, ListChecks, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { Segmented } from '../components/Form';
 import { SearchBox } from '../components/SearchBox';
 import { EmptyState, ErrorState, Loading } from '../components/States';
+
+type View = { group: boolean; hideDone: boolean };
+const VIEW_KEY = 'dyc-pendientes-vista';
+function readView(): View {
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}') as Partial<View>;
+    return { group: v.group === true, hideDone: v.hideDone === true };
+  } catch {
+    return { group: false, hideDone: false };
+  }
+}
 
 export function Todos() {
   const legacy = useLegacyData();
@@ -15,7 +27,22 @@ export function Todos() {
   const [empty, setEmpty] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const found = todos.filter((t) => matchesSearch(q, t.title, ...subtasks.filter((s) => s.todoId === t.id).map((s) => s.title)));
+  const [view, setViewState] = useState<View>(readView);
+  const setView = (v: Partial<View>) => {
+    const next = { ...view, ...v };
+    setViewState(next);
+    try {
+      localStorage.setItem(VIEW_KEY, JSON.stringify(next));
+    } catch {
+      /* sin almacenamiento: la vista no se recuerda */
+    }
+  };
+  const found = todos.filter((t) => (!view.hideDone || !t.done || t.id === added) && matchesSearch(q, t.title, ...subtasks.filter((s) => s.todoId === t.id).map((s) => s.title)));
+  const doneCount = todos.filter((t) => t.done).length;
+  const row = (t: LegacyTodo) => {
+    const i = todos.indexOf(t);
+    return <TodoRow key={t.id} fresh={t.id === added} todo={t} subtasks={subtasks.filter((s) => s.todoId === t.id)} first={i === 0} last={i === todos.length - 1} onMove={(d) => move(i, d)} />;
+  };
   const pending = todos.filter((t) => !t.done).length;
 
   const add = (e: FormEvent) => {
@@ -75,17 +102,41 @@ export function Todos() {
           ) : (
             <>
               {todos.length > 3 && <SearchBox label="Buscar en tus pendientes" value={q} onChange={setQ} placeholder="Buscar un pendiente o un paso…" count={found.length} />}
+              {todos.length > 3 && (
+                <div className="todo-view">
+                  <Segmented
+                    label="Cómo ver tus pendientes"
+                    value={view.group ? 'grupos' : 'lista'}
+                    onChange={(v) => setView({ group: v === 'grupos' })}
+                    options={[
+                      { value: 'lista', label: 'Lista' },
+                      { value: 'grupos', label: 'Por proyecto' },
+                    ]}
+                  />
+                  {doneCount > 0 && (
+                    <label className="check-inline small">
+                      <input type="checkbox" checked={view.hideDone} onChange={(e) => setView({ hideDone: e.target.checked })} /> Ocultar los hechos ({doneCount})
+                    </label>
+                  )}
+                </div>
+              )}
               <section className="card card--list" aria-labelledby="todos-count">
                 <h2 id="todos-count" className="list-count">
                   {pending === 0 ? 'Todo hecho' : `${pending} por hacer`}
                   <span className="muted small"> · {todos.length} en total</span>
                 </h2>
-                <ul className="todo-list">
-                  {found.map((t) => {
-                    const i = todos.indexOf(t);
-                    return <TodoRow key={t.id} fresh={t.id === added} todo={t} subtasks={subtasks.filter((s) => s.todoId === t.id)} first={i === 0} last={i === todos.length - 1} onMove={(d) => move(i, d)} />;
-                  })}
-                </ul>
+                {view.group ? (
+                  todoGroups(found).map((g) => (
+                    <div key={g.label} className="todo-group">
+                      <h3 className="group-title">
+                        {g.label} <span className="muted small numeric">{g.items.filter((t) => !t.done).length} por hacer</span>
+                      </h3>
+                      <ul className="todo-list">{g.items.map(row)}</ul>
+                    </div>
+                  ))
+                ) : (
+                  <ul className="todo-list">{found.map(row)}</ul>
+                )}
               </section>
             </>
           )}

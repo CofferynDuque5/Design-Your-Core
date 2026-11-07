@@ -32,6 +32,7 @@ function legacyDoc(): LegacyData {
       { id: 'n2', title: 'Derivadas', subject: 'Cálculo', date: '21 sept', tag: '#0FA968', excerpt: '', body: 'Regla de la cadena', commit: false, tags: 'examen', shareId: null },
       { id: 'n3', title: 'Lista de la compra', subject: '', date: '', tag: '', excerpt: '', body: '', commit: false, tags: '', shareId: null },
     ],
+    projects: [{ id: 'pr1', title: 'NV Hotel', subject: '', deadline: '', status: 'curso', color: '#4F7CFF', milestones: [] }],
     workItems: [
       { id: 'wk1', title: 'Informe mensual', project: 'p1', status: 'curso', done: false, due: 'Viernes' },
       { id: 'wk2', title: 'Revisar contrato', project: 'p2', status: 'todo', done: false, due: '' },
@@ -221,9 +222,10 @@ describe('herramientas de la tanda 4 en el móvil', () => {
     expect(screen.getByRole('checkbox', { name: 'Enviar factura' })).toBeChecked();
 
     fireEvent.changeText(screen.getByLabelText('Nueva tarea de trabajo'), '  Preparar reunión ');
-    fireEvent.press(screen.getByRole('radio', { name: 'Proyecto 3' }));
+    expect(screen.getByText(/3 tareas siguen en «Proyecto 1, 2 o 3»/)).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('radio', { name: 'NV Hotel' }));
     fireEvent.press(screen.getByRole('button', { name: 'Añadir' }));
-    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/workItems'))).toEqual({ id: expect.any(String), title: 'Preparar reunión', project: 'p3', status: 'todo', done: false, due: '' });
+    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/workItems'))).toEqual({ id: expect.any(String), title: 'Preparar reunión', project: 'pr1', status: 'todo', done: false, due: '' });
     expect(await screen.findByLabelText('1 de 4 completadas')).toBeOnTheScreen();
 
     fireEvent.press(screen.getByRole('checkbox', { name: 'Revisar contrato' }));
@@ -232,12 +234,12 @@ describe('herramientas de la tanda 4 en el móvil', () => {
 
     fireEvent.press(screen.getByRole('button', { name: 'Editar «Informe mensual»' }));
     fireEvent.changeText(await screen.findByLabelText('Tarea'), 'Informe trimestral');
-    fireEvent.press(screen.getAllByRole('radio', { name: 'Proyecto 2' }).at(-1)!);
+    fireEvent.press(screen.getAllByRole('radio', { name: 'NV Hotel' }).at(-1)!);
     fireEvent.press(screen.getByRole('radio', { name: 'Por hacer' }));
     fireEvent.changeText(screen.getByLabelText('Para cuándo (opcional)'), ' Lunes ');
     fireEvent.press(screen.getByRole('button', { name: 'Guardar' }));
-    expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/workItems/wk1', 1)).body).toEqual({ title: 'Informe trimestral', project: 'p2', status: 'todo', due: 'Lunes' });
-    expect(await screen.findByRole('checkbox', { name: 'Informe trimestral' })).toHaveProp('accessibilityHint', 'Proyecto 2 · Lunes');
+    expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/workItems/wk1', 1)).body).toEqual({ title: 'Informe trimestral', project: 'pr1', status: 'todo', due: 'Lunes' });
+    expect(await screen.findByRole('checkbox', { name: 'Informe trimestral' })).toHaveProp('accessibilityHint', 'NV Hotel · Lunes');
     await waitFor(() => expect(screen.queryByRole('header', { name: 'En curso' })).toBeNull());
 
     fireEvent.press(screen.getByRole('button', { name: 'Editar «Enviar factura»' }));

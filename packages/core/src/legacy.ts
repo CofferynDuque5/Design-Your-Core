@@ -169,7 +169,7 @@ export const CLASS_DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as
 export const FOCUS_MODES = ['focus', 'short', 'long'] as const;
 export type FocusMode = (typeof FOCUS_MODES)[number];
 export const FOCUS_MODE_INFO: Record<FocusMode, { label: string; minutes: number }> = {
-  focus: { label: 'Enfoque', minutes: 25 },
+  focus: { label: 'Concentración', minutes: 25 },
   short: { label: 'Descanso corto', minutes: 5 },
   long: { label: 'Descanso largo', minutes: 15 },
 };
@@ -305,7 +305,7 @@ export const noteExcerpt = (body: string): string => body.slice(0, NOTE_EXCERPT_
  */
 export const noteDateLabel = (now: Date = new Date()): string => now.toLocaleDateString('es', { day: 'numeric', month: 'short' });
 
-/** Proyectos de Trabajo: tres proyectos de demostración fijos en el código de la app anterior (no son `projects`). */
+/** Proyectos fijos antiguos de Trabajo (no son `projects`): las tareas que los usan se pueden pasar a un proyecto real. */
 export const WORK_PROJECTS = ['p1', 'p2', 'p3'] as const;
 export type WorkProject = (typeof WORK_PROJECTS)[number];
 export const WORK_PROJECT_INFO: Record<WorkProject, { label: string; color: string }> = {
@@ -660,7 +660,8 @@ export interface LegacyNote {
 export interface LegacyWorkItem {
   id: string;
   title: string;
-  project: WorkProject;
+  /** Id de un proyecto de la sección Proyectos, "p1"/"p2"/"p3" (proyectos fijos antiguos) o "" (sin proyecto). */
+  project: string;
   status: WorkStatus;
   done: boolean;
   /** Texto libre («Hoy», «Vie»…) o "". */
@@ -1113,7 +1114,7 @@ const shapes = {
   workItems: z.object({
     id: legacyIdSchema,
     title: title(200),
-    project: z.enum(WORK_PROJECTS).default('p1'),
+    project: z.string().max(80).default(''),
     status: z.enum(WORK_STATUSES).default('todo'),
     done: z.boolean().default(false),
     due: line(60),

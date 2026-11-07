@@ -98,8 +98,17 @@ function DayView({ data }: { data: Record<string, unknown> }) {
                       ['--c' as string]: info.color,
                     }}
                   >
-                    <button type="button" className="tl-block__btn" onClick={() => setEditing(b)} aria-label={`Editar «${b.label}», ${hoursLabel(b.start)} a ${hoursLabel(b.start + b.dur)}, ${info.label}`}>
-                      <span className="tl-block__label">{b.label}</span>
+                    <button
+                      type="button"
+                      className="tl-block__btn"
+                      onClick={() => setEditing(b)}
+                      title={`${b.label} · ${hoursLabel(b.start)}–${hoursLabel(b.start + b.dur)}${b.sub ? ` · ${b.sub}` : ''}`}
+                      aria-label={`Editar «${b.label}», ${hoursLabel(b.start)} a ${hoursLabel(b.start + b.dur)}, ${info.label}`}
+                    >
+                      <span className="tl-block__label">
+                        {short && <span className="tl-block__time">{hoursLabel(b.start)} </span>}
+                        {b.label}
+                      </span>
                       {!short && (
                         <span className="tl-block__meta">
                           {hoursLabel(b.start)}–{hoursLabel(b.start + b.dur)}

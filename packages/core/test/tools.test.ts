@@ -309,11 +309,95 @@ describe('herramientas compartidas', () => {
 
 describe('matchesSearch', () => {
   it('busca sin tildes ni mayúsculas y pide todas las palabras', async () => {
-    const { matchesSearch } = await import('../src/tools');
+    const { matchesSearch } = await import('../src/tools.js');
     expect(matchesSearch('', 'lo que sea')).toBe(true);
     expect(matchesSearch('fisica', 'Física II')).toBe(true);
     expect(matchesSearch('pagar luz', 'Pagar la luz')).toBe(true);
     expect(matchesSearch('pagar agua', 'Pagar la luz')).toBe(false);
     expect(matchesSearch('react', 'Curso', undefined, 'React básico')).toBe(true);
+  });
+});
+
+describe('Trabajo unido a Proyectos', () => {
+  it('muestra el proyecto real, el fijo antiguo o «Sin proyecto»', async () => {
+    const { workProjectView, workProjectOptions } = await import('../src/tools.js');
+    const projects = [
+      { id: 'a', title: 'NV Hotel', color: '#ff0000', status: 'curso' as const },
+      { id: 'b', title: 'Viejo', color: '#00ff00', status: 'entregado' as const },
+    ];
+    expect(workProjectView({ project: 'a' }, projects)).toMatchObject({ label: 'NV Hotel', real: true });
+    expect(workProjectView({ project: 'p2' }, projects)).toMatchObject({ label: 'Proyecto 2', real: false });
+    expect(workProjectView({ project: '' }, projects).label).toBe('Sin proyecto');
+    expect(workProjectOptions(projects).map((o) => o.label)).toEqual(['NV Hotel', 'Sin proyecto']);
+    expect(workProjectOptions(projects, 'p1').map((o) => o.label)).toEqual(['NV Hotel', 'Sin proyecto', 'Proyecto 1']);
+  });
+});
+
+describe('Avisos de rutinas y mascotas', () => {
+  it('programa una alarma semanal por cada día elegido', async () => {
+    const { notificationPlan, DEFAULT_NOTIFY } = await import('../src/notify.js');
+    const data = {
+      routines: [{ id: 'r', title: 'Agua', time: '08:30', days: '15', icon: '', sound: true, enabled: true }],
+      pets: [{ id: 'p', name: 'Luna', species: 'perro', note: '' }],
+      petCares: [{ id: 'c', petId: 'p', kind: 'comida', title: 'Comer', time: '19:00', days: '', sound: true, enabled: true, lastDone: '' }],
+    };
+    const plan = notificationPlan(data as never, { ...DEFAULT_NOTIFY, enabled: true });
+    expect(plan.filter((x) => x.id.startsWith('routine-')).map((x) => x.trigger)).toEqual([
+      { kind: 'weekly', weekday: 1, hour: 8, minute: 30 },
+      { kind: 'weekly', weekday: 5, hour: 8, minute: 30 },
+    ]);
+    expect(plan.filter((x) => x.id.startsWith('pet-'))).toHaveLength(7);
+    expect(plan.find((x) => x.id.startsWith('pet-'))?.title).toBe('Comer: Luna');
+  });
+});
+
+describe('Datos que el check-in toma de tus herramientas', () => {
+  it('lee agua, sueño, gratitud y minutos del día, y solo rellena lo vacío', async () => {
+    const { toolSignals, mergeToolSignals } = await import('../src/tools.js');
+    const day = '2026-11-07';
+    const data = {
+      dayLog: { dateKey: day, water: 5, waterGoal: 8 },
+      sleep: [{ id: 's', date: day, bedtime: '23:00', waketime: '06:40', quality: 4, note: '' }],
+      journal: [{ id: 'j', date: day, mood: '', gratitude: ' Mi familia ', note: '' }],
+      workouts: [
+        { id: 'w1', date: day, plan: 'Fuerza', minutes: 30 },
+        { id: 'w2', date: day, plan: 'Cardio', minutes: 15 },
+        { id: 'w3', date: '2026-11-06', plan: 'Cardio', minutes: 50 },
+      ],
+    };
+    const s = toolSignals(data as never, day);
+    expect(s).toEqual({ water: 5, sleepHours: 7.5, sleepQuality: 4, gratitude: 'Mi familia', activeMinutes: 45 });
+    expect(toolSignals(data as never, '2026-11-08')).toEqual({});
+    const { values, from } = mergeToolSignals({ water: 3, sleepHours: null, gratitude: '' }, s);
+    expect(values).toMatchObject({ water: 3, sleepHours: 7.5, gratitude: 'Mi familia', activeMinutes: 45 });
+    expect(from).toEqual({ sleepHours: 'Sueño', sleepQuality: 'Sueño', gratitude: 'Diario', activeMinutes: 'Ejercicio' });
+  });
+});
+
+describe('Pendientes por grupo', () => {
+  it('agrupa por el nombre del final y deja el resto en «Otros»', async () => {
+    const { todoGroupOf, todoGroups } = await import('../src/tools.js');
+    expect(todoGroupOf('Login de NV Hotel')).toBe('NV Hotel');
+    expect(todoGroupOf('Logo para Café Luna')).toBe('Café Luna');
+    expect(todoGroupOf('Comprar pan')).toBeNull();
+    expect(todoGroupOf('Ir de compras')).toBeNull();
+    const list = ['Login de NV Hotel', 'Pagos de NV Streaming', 'Comprar pan', 'Menú de NV Hotel', 'Logo de nv hotel', 'Catálogo de NV Streaming', 'Banner de NV Streaming', 'Llamar a Eva'].map((title) => ({ title }));
+    const g = todoGroups(list);
+    // «nv hotel» en minúsculas no es un nombre propio: va a «Otros».
+    expect(g.map((x) => [x.label, x.items.length])).toEqual([
+      ['NV Streaming', 3],
+      ['NV Hotel', 2],
+      ['Otros', 3],
+    ]);
+  });
+});
+
+describe('Duración de un curso', () => {
+  it('usa la del reproductor si es un solo video y la guardada si es una lista', async () => {
+    const { courseLengthLabel } = await import('../src/study.js');
+    expect(courseLengthLabel({ url: 'https://www.youtube.com/watch?v=abc', length: 14940, lengthFrom: 'aprox', duration: 15214 })).toBe('4 h 14 min');
+    expect(courseLengthLabel({ url: 'https://www.youtube.com/watch?v=abc&list=PL1', length: 36000, lengthFrom: 'enlace', duration: 600 })).toBe('10 h');
+    expect(courseLengthLabel({ url: '', length: 7200, lengthFrom: 'aprox' })).toBe('unas 2 h');
+    expect(courseLengthLabel({ url: '' })).toBe('');
   });
 });

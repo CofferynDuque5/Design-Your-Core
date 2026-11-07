@@ -3,8 +3,8 @@ import { courseName, showableClasses } from './tools.js';
 
 /**
  * Avisos del teléfono para las herramientas: clases del Horario (también los
- * cursos que se agregaron al horario), recordatorios del Calendario y tareas
- * de la Agenda con aviso. Son notificaciones locales: el teléfono las muestra
+ * cursos que se agregaron al horario), recordatorios del Calendario, tareas
+ * de la Agenda con aviso, rutinas y cuidados de mascotas. Son notificaciones locales: el teléfono las muestra
  * a su hora aunque la app esté cerrada y sin pasar por el servidor.
  */
 
@@ -16,9 +16,11 @@ export interface NotifyPrefs {
   classLead: number;
   reminders: boolean;
   tasks: boolean;
+  /** Rutinas y cuidados de mascotas con hora y días. */
+  routines: boolean;
 }
 
-export const DEFAULT_NOTIFY: NotifyPrefs = { enabled: false, classes: true, classLead: 10, reminders: true, tasks: true };
+export const DEFAULT_NOTIFY: NotifyPrefs = { enabled: false, classes: true, classLead: 10, reminders: true, tasks: true, routines: true };
 export const CLASS_LEADS = [0, 5, 10, 15, 30] as const;
 /** iOS guarda como mucho 64 avisos programados; dejamos sitio al del check-in. */
 export const NOTIFY_MAX = 60;
@@ -46,6 +48,7 @@ export function parseNotifyPrefs(v: unknown): NotifyPrefs {
     classLead: (CLASS_LEADS as readonly number[]).includes(o.classLead as number) ? (o.classLead as number) : DEFAULT_NOTIFY.classLead,
     reminders: bool(o.reminders, DEFAULT_NOTIFY.reminders),
     tasks: bool(o.tasks, DEFAULT_NOTIFY.tasks),
+    routines: bool(o.routines, DEFAULT_NOTIFY.routines),
   };
 }
 
@@ -99,6 +102,24 @@ export function notificationPlan(data: LegacyData | null | undefined, prefs: Not
       if (r.on === false || !Number.isInteger(r.day) || r.day < 1 || r.day > 31) continue;
       const time = parseLooseTime(r.when) ?? { hour: 9, minute: 0 };
       out.push({ id: `rem-${r.id}`, title: r.title, body: r.when ? `Hoy, ${r.when}` : 'Recordatorio de hoy', url: '/calendario', trigger: { kind: 'monthly', day: r.day, ...time } });
+    }
+  }
+
+  if (prefs.routines) {
+    const weekly = (id: string, title: string, body: string, url: string, time: string, days: string) => {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(time ?? '');
+      if (!m) return;
+      const hour = Number(m[1]);
+      const minute = Number(m[2]);
+      if (hour > 23 || minute > 59) return;
+      for (const d of new Set((days || '1234567').split('').map(Number)))
+        if (d >= 1 && d <= 7) out.push({ id: `${id}-${d}`, title, body, url, trigger: { kind: 'weekly', weekday: d, hour, minute } });
+    };
+    for (const r of legacyList(data, 'routines')) if (r.enabled !== false && r.title) weekly(`routine-${r.id}`, r.title, `Rutina de las ${r.time}`, '/rutina', r.time, r.days);
+    const pets = new Map(legacyList(data, 'pets').map((p) => [p.id, p.name]));
+    for (const c of legacyList(data, 'petCares')) {
+      const name = pets.get(c.petId);
+      if (c.enabled !== false && name) weekly(`pet-${c.id}`, `${c.title || 'Cuidado'}: ${name}`, `A las ${c.time}`, '/mascotas', c.time, c.days);
     }
   }
 

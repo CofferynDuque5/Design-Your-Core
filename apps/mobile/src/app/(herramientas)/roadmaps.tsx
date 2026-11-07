@@ -104,7 +104,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
             {title}
           </T>
           <T v="small" tint="muted">
-            Ruta de materias{r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
+            Ruta por pasos{r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
           </T>
         </View>
         <IconButton label={`Editar «${title}»`} onPress={onEdit} style={{ marginRight: -space[2], marginTop: -space[2] }}>
@@ -112,11 +112,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
         </IconButton>
       </View>
       {r.steps.length > 0 && <Meter value={donePercent(r.steps)} color={color} label={`Avance de ${title}`} />}
-      {r.steps.length === 0 ? (
-        <T v="small" tint="muted">
-          Sin pasos todavía. Añade la primera materia abajo.
-        </T>
-      ) : (
+      {r.steps.length === 0 ? null : (
         <View accessibilityLabel={`Pasos de «${title}»`}>
           {r.steps.map((s, i) => (
             <Step
@@ -158,7 +154,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
           </>
         ) : (
           <T v="small" tint="muted">
-            Añade materias para empezar tu ruta.
+            Sin pasos todavía: añade el primero abajo.
           </T>
         )}
       </View>
@@ -208,8 +204,8 @@ function Step({ step: s, index, state, color, last, onMark, onRemove }: { step: 
         {state === 'current' && (
           <Button
             small
-            label="Marcar como completada"
-            accessibilityLabel={`Marcar «${name}» como completada`}
+            label="Marcar como completado"
+            accessibilityLabel={`Marcar «${name}» como completado`}
             icon={<Check size={16} color={colors.onPrimary} />}
             onPress={() => onMark(true)}
             style={{ alignSelf: 'flex-start' }}

@@ -1,5 +1,5 @@
 import { toolStatus } from '@dyc/core';
-import { ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router';
 import { useLegacyData } from '../app/legacy';
 import { useSession } from '../app/session';
@@ -10,14 +10,12 @@ import { ErrorState, Loading } from '../components/States';
 export function More() {
   const legacy = useLegacyData();
   const { user } = useSession();
-  // Si la app nueva ocupa el dominio de la anterior, el enlace apuntaría a sí misma.
-  const legacyUrl = sameOrigin(import.meta.env.VITE_LEGACY_APP_URL) ? undefined : import.meta.env.VITE_LEGACY_APP_URL;
 
   return (
     <div className="page page--narrow">
       <PageHeader eyebrow="Más" title="Otras herramientas" />
       <div className="stack-lg">
-        <p className="lead">Design Your Core se centra en tus seis pilares. Aquí tienes todas las herramientas de la app anterior, con tus datos, agrupadas como en el menú.</p>
+        <p className="lead">Design Your Core se centra en tus seis pilares. Aquí tienes el resto de herramientas, con lo que llevas en cada una.</p>
         {legacy.isPending ? (
           <Loading />
         ) : legacy.isError ? (
@@ -60,33 +58,10 @@ export function More() {
                 </div>
               ))}
             </section>
-
-            {legacyUrl && (
-              <section className="card stack-sm" aria-labelledby="legacy-app-title">
-                <h2 id="legacy-app-title" className="section-title">
-                  La app anterior
-                </h2>
-                <p className="muted">Sigue disponible y usa los mismos datos. Si la tienes abierta a la vez, recárgala para ver lo que cambies aquí.</p>
-                <div>
-                  <a className="btn btn--secondary" href={legacyUrl} target="_blank" rel="noopener noreferrer">
-                    Abrir la app anterior <ExternalLink size={16} aria-hidden="true" />
-                  </a>
-                </div>
-              </section>
-            )}
           </>
         )}
         <p className="muted small">¿Quieres una copia de todo? Descárgala desde Perfil › Tus datos.</p>
       </div>
     </div>
   );
-}
-
-function sameOrigin(url: string | undefined) {
-  if (!url) return false;
-  try {
-    return new URL(url).origin === window.location.origin;
-  } catch {
-    return false;
-  }
 }

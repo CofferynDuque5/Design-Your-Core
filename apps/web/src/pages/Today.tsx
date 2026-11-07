@@ -186,7 +186,7 @@ function CheckInCard({ today, checkIn }: { today: string; checkIn: CheckIn | nul
           Guardar
         </button>
         <Link to="/check-in" className="btn btn--ghost">
-          Check-in completo
+          Abrir el check-in completo
         </Link>
       </div>
     </section>

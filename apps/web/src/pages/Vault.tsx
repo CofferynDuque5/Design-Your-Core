@@ -142,8 +142,7 @@ function HowItWorks() {
         <li>El servidor solo guarda datos cifrados: no ve tus contraseñas ni tu contraseña maestra, que nunca sale de este navegador.</li>
         <li>Si pierdes la contraseña maestra, pierdes las entradas: nadie puede recuperarlas, tampoco nosotros.</li>
         <li>Se bloquea sola tras 5 minutos sin actividad y al salir de esta página.</li>
-        <li>La app anterior no puede ver esta bóveda cifrada.</li>
-      </ul>
+              </ul>
     </section>
   );
 }
@@ -334,7 +333,7 @@ function DestroyVault({ count, onDone }: { count: number; onDone: () => void }) 
         Sin la contraseña maestra no hay forma de descifrar {count === 1 ? 'la entrada' : `las ${count} entradas`}: no se guarda en ningún sitio y nadie puede restablecerla.
       </p>
       <p>
-        Si no la recuerdas, puedes borrar la bóveda cifrada y crear una nueva con otra contraseña. <strong>Se perderán {plural(count, 'entrada', 'entradas')}.</strong> Lo que quede de la app anterior no se toca.
+        Si no la recuerdas, puedes borrar la bóveda cifrada y crear una nueva con otra contraseña. <strong>Se perderán {plural(count, 'entrada', 'entradas')}.</strong> Las contraseñas sin cifrar, si quedan, no se tocan.
       </p>
       <div className="form-actions">
         <button type="button" className="btn btn--ghost" onClick={onDone} autoFocus>
@@ -372,15 +371,15 @@ function LegacyNotice({ entries, vault, cryptoKey }: { entries: LegacyVaultEntry
   const [asking, setAsking] = useState(false);
   const title =
     plain > 0
-      ? `${plain === 1 ? 'Hay 1 contraseña' : `Hay ${plain} contraseñas`} de la app anterior guardadas sin cifrar`
-      : `${plural(entries.length, 'entrada', 'entradas')} de la app anterior sin cifrar`;
+      ? `${plain === 1 ? 'Hay 1 contraseña' : `Hay ${plain} contraseñas`} guardadas sin cifrar`
+      : `${plural(entries.length, 'entrada', 'entradas')} sin cifrar`;
   return (
     <>
       <section className="alert alert--warning vault-legacy stack-sm" aria-labelledby="vault-legacy">
         <h2 id="vault-legacy" className="vault-legacy__title">
           <ShieldAlert size={18} aria-hidden="true" /> {title}
         </h2>
-        <p>La app anterior las guardaba tal cual en tus datos, que se envían y se guardan sin cifrar. Puedes pasarlas a esta bóveda cifrada; después, la bóveda de la app anterior quedará vacía.</p>
+        <p>Están guardadas tal cual en tus datos, que se envían y se guardan sin cifrar. Pásalas a esta bóveda cifrada para protegerlas.</p>
         {cryptoKey ? (
           <div>
             <button type="button" className="btn btn--sm" onClick={() => setAsking(true)}>
@@ -394,7 +393,7 @@ function LegacyNotice({ entries, vault, cryptoKey }: { entries: LegacyVaultEntry
         )}
       </section>
       {/* Fuera del aviso: el diálogo no hereda su color. */}
-      <Dialog open={asking && !!cryptoKey} onClose={() => setAsking(false)} title="Cifrar las contraseñas de la app anterior">
+      <Dialog open={asking && !!cryptoKey} onClose={() => setAsking(false)} title="Cifrar las contraseñas guardadas sin cifrar">
         {asking && cryptoKey && <MigrateDialog entries={entries} cryptoKey={cryptoKey} onDone={() => setAsking(false)} />}
       </Dialog>
     </>
@@ -429,13 +428,13 @@ function MigrateDialog({ entries, cryptoKey, onDone }: { entries: LegacyVaultEnt
       <p>Se hará en este orden:</p>
       <ol className="vault-steps">
         <li>Se cifran {entries.length === 1 ? 'la entrada' : `las ${entries.length} entradas`} en este dispositivo con tu contraseña maestra y se añaden a esta bóveda.</li>
-        <li>Se borra la lista sin cifrar de la app anterior.</li>
+        <li>Se borra la lista sin cifrar.</li>
       </ol>
       <div className="alert alert--warning" role="note">
-        <strong>Después, la bóveda de la app anterior aparecerá vacía.</strong> Tus contraseñas solo se verán aquí, con la contraseña maestra.
+        Tus contraseñas solo se verán aquí, con la contraseña maestra.
       </div>
       <p className="muted small">
-        Si otro navegador aún tiene abierta la app anterior con una copia vieja y la vuelve a subir, este aviso aparecerá de nuevo y podrás repetir el paso.
+        Si otro dispositivo vuelve a subir una copia vieja sin cifrar, este aviso aparecerá de nuevo y podrás repetir el paso.
       </p>
       <ul className="vault-migrate-list small" aria-label="Entradas que se cifrarán">
         {entries.slice(0, 8).map((e, i) => (

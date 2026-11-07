@@ -1,4 +1,4 @@
-import { WORK_BUCKETS, WORK_PROJECT_INFO, WORK_PROJECTS, WORK_STATUS_INFO, WORK_STATUSES, workBucketOf, workProjectOf, workStatusOf, type LegacyWorkItem, type WorkProject, type WorkStatus } from '@dyc/core';
+import { WORK_BUCKETS, WORK_PROJECTS, WORK_STATUS_INFO, WORK_STATUSES, workBucketOf, workProjectOptions, workProjectView, workStatusOf, type LegacyProject, type LegacyWorkItem, type WorkProject, type WorkStatus } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { Info, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
@@ -9,15 +9,17 @@ import { Button, Card, EmptyState, ErrorState, Field, Loading, Segmented, Sectio
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
 
-const PROJECT_OPTIONS = WORK_PROJECTS.map((p) => ({ value: p, label: WORK_PROJECT_INFO[p].label, color: WORK_PROJECT_INFO[p].color }));
+const projectChoices = (projects: LegacyProject[], current = '') => workProjectOptions(projects, current).map((o) => ({ value: o.id, label: o.label, color: o.color }));
 
 export default function Work() {
   const { colors } = useTheme();
   const legacy = useLegacyData();
   const items = useLegacyList(legacy.data?.data, 'workItems');
+  const projects = useLegacyList(legacy.data?.data, 'projects');
   const actions = useModule('workItems');
   const [title, setTitle] = useState('');
-  const [project, setProject] = useState<WorkProject>('p1');
+  const [project, setProject] = useState('');
+  const oldOnes = items.filter((w) => !workProjectView(w, projects).real && WORK_PROJECTS.includes(w.project as WorkProject)).length;
   const [editing, setEditing] = useState<LegacyWorkItem | null>(null);
   const done = items.filter((w) => w.done).length;
 
@@ -43,7 +45,7 @@ export default function Work() {
         <>
           <Card style={{ gap: space[3] }}>
             <Field label="Nueva tarea de trabajo" value={title} onChangeText={setTitle} maxLength={200} placeholder="Preparar la reunión del lunes…" returnKeyType="done" onSubmitEditing={add} />
-            <DotChoices legend="Proyecto de la tarea nueva" value={project} onChange={setProject} options={PROJECT_OPTIONS} />
+            <DotChoices legend="Proyecto de la tarea nueva" value={project} onChange={setProject} options={projectChoices(projects)} />
             <Button label="Añadir" icon={<Plus size={18} color={colors.onPrimary} />} onPress={add} disabled={!title.trim()} />
           </Card>
           {items.length === 0 ? (
@@ -59,7 +61,7 @@ export default function Work() {
                     {list.map((w, i) => (
                       <Fragment key={w.id}>
                         {i > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.line, marginLeft: 38 }} />}
-                        <WorkRow item={w} onEdit={() => setEditing(w)} />
+                        <WorkRow item={w} projects={projects} onEdit={() => setEditing(w)} />
                       </Fragment>
                     ))}
                   </Card>
@@ -70,22 +72,26 @@ export default function Work() {
           <Card tone="sunken" style={{ flexDirection: 'row', gap: space[3], alignItems: 'flex-start' }}>
             <Info size={18} color={colors.inkMuted} style={{ marginTop: 2 }} />
             <T v="small" tint="muted" style={{ flex: 1 }}>
-              Proyecto 1, 2 y 3 son los tres proyectos fijos de la app anterior. No están unidos a la sección Proyectos.
+              {projects.length === 0
+                ? 'Crea tus proyectos en la sección Proyectos para agrupar aquí sus tareas.'
+                : oldOnes > 0
+                  ? `${oldOnes === 1 ? 'Una tarea sigue' : `${oldOnes} tareas siguen`} en «Proyecto 1, 2 o 3». Edítalas para pasarlas a uno de tus proyectos.`
+                  : 'Cada tarea va con uno de tus proyectos de la sección Proyectos.'}
             </T>
           </Card>
         </>
       )}
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title="Editar tarea de trabajo">
-        {editing && <WorkForm item={editing} onDone={() => setEditing(null)} />}
+        {editing && <WorkForm item={editing} projects={projects} onDone={() => setEditing(null)} />}
       </Sheet>
     </ToolScreen>
   );
 }
 
-function WorkRow({ item: w, onEdit }: { item: LegacyWorkItem; onEdit: () => void }) {
+function WorkRow({ item: w, projects, onEdit }: { item: LegacyWorkItem; projects: LegacyProject[]; onEdit: () => void }) {
   const { colors } = useTheme();
   const actions = useModule('workItems');
-  const p = WORK_PROJECT_INFO[workProjectOf(w)];
+  const p = workProjectView(w, projects);
   const title = w.title || 'Sin título';
   return (
     <CheckRow
@@ -103,10 +109,10 @@ function WorkRow({ item: w, onEdit }: { item: LegacyWorkItem; onEdit: () => void
   );
 }
 
-function WorkForm({ item, onDone }: { item: LegacyWorkItem; onDone: () => void }) {
+function WorkForm({ item, projects, onDone }: { item: LegacyWorkItem; projects: LegacyProject[]; onDone: () => void }) {
   const actions = useModule('workItems');
   const [title, setTitle] = useState(item.title ?? '');
-  const [project, setProject] = useState<WorkProject>(workProjectOf(item));
+  const [project, setProject] = useState(workProjectView(item, projects).id);
   const [status, setStatus] = useState<WorkStatus>(workStatusOf(item));
   const [due, setDue] = useState(item.due ?? '');
   const submit = () => {
@@ -117,7 +123,7 @@ function WorkForm({ item, onDone }: { item: LegacyWorkItem; onDone: () => void }
   return (
     <ScrollView style={{ maxHeight: 560 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
       <Field label="Tarea" value={title} onChangeText={setTitle} maxLength={200} />
-      <DotChoices legend="Proyecto" value={project} onChange={setProject} options={PROJECT_OPTIONS} />
+      <DotChoices legend="Proyecto" value={project} onChange={setProject} options={projectChoices(projects, project)} />
       <View style={{ gap: space[2] }}>
         <T v="label">Estado</T>
         <Segmented label="Estado" value={status} onChange={setStatus} options={WORK_STATUSES.map((s) => ({ value: s, label: WORK_STATUS_INFO[s].label }))} />

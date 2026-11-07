@@ -42,7 +42,7 @@ export default function NoteScreen() {
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
           <EmptyState title="Esta nota ya no existe" action={<Button small variant="secondary" label="Ver tus notas" onPress={() => router.replace('/notas')} />}>
-            Puede que la hayas borrado aquí o en la app anterior.
+            Puede que la hayas borrado.
           </EmptyState>
         )}
       </ToolScreen>

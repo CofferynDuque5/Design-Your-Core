@@ -25,6 +25,7 @@ import { Sheet } from '../../components/Sheet';
 import { CheckInNote, DotChoices, FormActions, IconButton, Meter, Stepper, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../../lib/legacy';
+import { useSyncCheckIn } from '../../lib/checkinSync';
 import { useTheme } from '../../lib/theme';
 
 const WATER_COLOR = '#4F7CFF';
@@ -124,9 +125,9 @@ export default function Routine() {
               </View>
             )}
           </Card>
-          <CheckInNote>El check-in diario registra aparte tus vasos de agua y tu alimentación para el pilar Alimentación.</CheckInNote>
+          <CheckInNote>Los vasos de agua que sumes aquí cuentan en tu check-in del día (pilar Alimentación). No hace falta anotarlos dos veces.</CheckInNote>
           <T v="small" tint="muted">
-            Los avisos con sonido de la app anterior todavía no están en la app nueva: aquí organizas tus rutinas y ves qué toca cada día.
+            Aquí organizas tus rutinas y ves qué toca cada día. Para que suenen a su hora, activa las alarmas en Perfil.
           </T>
         </>
       )}
@@ -173,7 +174,12 @@ function WaterCard({ today }: { today: string }) {
   const water = waterToday(log, today);
   const goal = typeof log.waterGoal === 'number' && log.waterGoal >= 1 && log.waterGoal <= 40 ? log.waterGoal : WATER_GOAL_DEFAULT;
   // Si el registro es de otro día, empieza en 0 (como la app anterior en el primer cambio).
-  const set = (n: number) => actions.patch({ dateKey: today, water: Math.max(0, Math.min(40, n)) });
+  const sync = useSyncCheckIn();
+  const set = (n: number) => {
+    const water = Math.max(0, Math.min(40, n));
+    actions.patch({ dateKey: today, water });
+    sync(today, { water });
+  };
   const pct = Math.min(100, Math.round((water / goal) * 100));
   return (
     <Card>

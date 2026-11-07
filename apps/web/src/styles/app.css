@@ -409,6 +409,44 @@
     cursor: pointer;
   }
 
+  /* Texto visible al pasar el ratón por un botón de icono (el mismo nombre que oyen los lectores de pantalla). */
+  @media (hover: hover) and (pointer: fine) {
+    .icon-btn[aria-label] {
+      position: relative;
+    }
+
+    .icon-btn[aria-label]:hover::after,
+    .icon-btn[aria-label]:focus-visible::after {
+      content: attr(aria-label);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      right: 0;
+      z-index: 30;
+      width: max-content;
+      max-width: 260px;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      background: var(--color-ink);
+      color: var(--color-surface);
+      font-size: var(--text-small, 0.8125rem);
+      font-weight: var(--weight-medium);
+      line-height: 1.35;
+      white-space: normal;
+      text-align: left;
+      pointer-events: none;
+      animation: tip-in 120ms ease-out 400ms both;
+    }
+
+    @keyframes tip-in {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+  }
+
   .icon-btn:hover {
     background: var(--color-surface-sunken);
     color: var(--color-ink);
@@ -901,6 +939,22 @@
   }
 
   /* ---------- Check-in ---------- */
+
+  .checkin-more > summary {
+    list-style: none;
+    cursor: pointer;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .checkin-more > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .checkin-more__body {
+    margin-top: var(--space-4);
+  }
 
   .checkin-section__title {
     display: flex;
@@ -1626,6 +1680,11 @@
     text-overflow: ellipsis;
   }
 
+  .tl-block__time {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+  }
+
   .tl-block--short .tl-block__btn {
     justify-content: center;
     padding-block: 0;
@@ -1695,6 +1754,36 @@
 
   .add-task .chip-radio span {
     min-height: 44px;
+  }
+
+  .steps-list {
+    margin: 0;
+    padding-left: var(--space-5);
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .todo-view {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .check-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .todo-group + .todo-group {
+    margin-top: var(--space-4);
+  }
+
+  .todo-group .group-title {
+    padding: var(--space-2) var(--space-4) 0;
   }
 
   .group-title {

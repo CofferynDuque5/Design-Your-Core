@@ -254,8 +254,10 @@ describe('tanda 4: notas, trabajo, respiración y bóveda cifrada', () => {
   });
 
   it('trabajo y respiración: formatos de la app anterior', () => {
-    expect(legacyItemSchemas.workItems.parse({ id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: 'p1', status: 'todo', done: false, due: '' });
-    expect(legacyItemSchemas.workItems.safeParse({ id: 'w1', title: 'x', project: 'p4' }).success).toBe(false);
+    expect(legacyItemSchemas.workItems.parse({ id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: '', status: 'todo', done: false, due: '' });
+    // El proyecto puede ser el id de un proyecto real.
+    expect(legacyItemSchemas.workItems.safeParse({ id: 'w1', title: 'x', project: 'mabc123' }).success).toBe(true);
+    expect(legacyItemSchemas.workItems.safeParse({ id: 'w1', title: 'x', project: 'x'.repeat(81) }).success).toBe(false);
     expect(legacyItemSchemas.courses.parse({ id: 'c1', topic: ' Inglés ' })).toEqual({ id: 'c1', topic: 'Inglés', title: '', url: '', status: 'pendiente', notes: '' });
     expect(legacyItemSchemas.courses.parse({ id: 'c1', topic: 'x', url: 'https://youtu.be/a' }).url).toBe('https://youtu.be/a');
     for (const url of ['javascript:alert(1)', 'ftp://a.com/x', 'no es enlace']) expect(legacyItemSchemas.courses.safeParse({ id: 'c1', topic: 'x', url }).success).toBe(false);

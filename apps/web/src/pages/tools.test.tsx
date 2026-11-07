@@ -114,7 +114,9 @@ function withApi(extra: Record<string, Handler> = {}, seed?: (doc: Record<string
   return Object.assign(api, { doc });
 }
 
-const writes = (api: ReturnType<typeof withApi>) => api.calls.filter((c) => c.method !== 'GET');
+// Cambios de las herramientas (sin la copia al check-in del día, que se prueba aparte).
+const writes = (api: ReturnType<typeof withApi>) => api.calls.filter((c) => c.method !== 'GET' && !c.path.startsWith('/api/v2/checkins'));
+const checkInSyncs = (api: ReturnType<typeof withApi>) => api.calls.filter((c) => c.method === 'PUT' && c.path.startsWith('/api/v2/checkins'));
 
 // jsdom no implementa showModal: basta con abrir y cerrar el <dialog>.
 beforeAll(() => {
@@ -170,6 +172,29 @@ describe('Agenda', () => {
 });
 
 describe('Pendientes', () => {
+  it('agrupa por proyecto y oculta los hechos, y lo recuerda', async () => {
+    localStorage.removeItem('dyc-pendientes-vista');
+    withApi({}, (doc) => {
+      doc.todos = [
+        { id: 'a1', title: 'Login de NV Hotel', done: false },
+        { id: 'a2', title: 'Pagos de NV Streaming', done: false },
+        { id: 'a3', title: 'Menú de NV Hotel', done: true },
+        { id: 'a4', title: 'Banner de NV Streaming', done: false },
+        { id: 'a5', title: 'Comprar pan', done: false },
+      ];
+    });
+    renderAt('/pendientes');
+    await screen.findByText('Comprar pan');
+    await userEvent.click(screen.getByRole('button', { name: 'Por proyecto' }));
+    expect(screen.getByRole('heading', { level: 3, name: /NV Hotel/ })).toHaveTextContent('1 por hacer');
+    expect(screen.getByRole('heading', { level: 3, name: /NV Streaming/ })).toHaveTextContent('2 por hacer');
+    expect(screen.getByRole('heading', { level: 3, name: /Otros/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Ocultar los hechos (1)' }));
+    expect(screen.queryByText('Menú de NV Hotel')).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('dyc-pendientes-vista') ?? '{}')).toEqual({ group: true, hideDone: true });
+    localStorage.removeItem('dyc-pendientes-vista');
+  });
+
   it('añade, reordena y borra en cascada', async () => {
     const api = withApi();
     renderAt('/pendientes');
@@ -618,8 +643,8 @@ describe('Enfoque', () => {
     act(() => vi.advanceTimersByTime(3_000));
     await userEvent.click(screen.getAllByRole('link', { name: /^Hoy$/ })[0]);
     act(() => vi.advanceTimersByTime(60_000));
-    const chip = await screen.findByRole('link', { name: /Enfoque en marcha: quedan 23:57/ });
-    expect(document.title).toBe('23:57 · Enfoque');
+    const chip = await screen.findByRole('link', { name: /Concentración en marcha: quedan 23:57/ });
+    expect(document.title).toBe('23:57 · Concentración');
     await userEvent.click(chip);
     expect(await screen.findByRole('timer')).toHaveTextContent('23:57');
     expect(screen.getByRole('button', { name: 'Pausar' })).toBeInTheDocument();
@@ -634,7 +659,7 @@ describe('Enfoque', () => {
     act(() => vi.advanceTimersByTime(25 * 60_000 + 500));
     vi.useRealTimers();
     await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/focus')).toHaveLength(1));
-    expect(await screen.findByText(/Enfoque: ¡sesión terminada! Ahora toca descanso corto/)).toBeInTheDocument();
+    expect(await screen.findByText(/Concentración: ¡sesión terminada! Ahora toca descanso corto/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /en marcha/ })).not.toBeInTheDocument();
   });
 
@@ -648,7 +673,7 @@ describe('Enfoque', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Empezar' }));
     act(() => vi.advanceTimersByTime(61_000));
     expect(screen.getByRole('timer')).toHaveTextContent('23:59');
-    expect(document.title).toBe('23:59 · Enfoque');
+    expect(document.title).toBe('23:59 · Concentración');
 
     await userEvent.click(screen.getByRole('button', { name: 'Saltar' }));
     await waitFor(() => expect(writes(api)).toHaveLength(1));
@@ -656,7 +681,7 @@ describe('Enfoque', () => {
     expect(screen.getByRole('button', { name: 'Descanso corto' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('timer')).toHaveTextContent('05:00');
     expect(screen.getByText(/Ahora toca: descanso corto/)).toBeInTheDocument();
-    expect(document.title).toBe('Enfoque · Design Your Core');
+    expect(document.title).toBe('Pomodoro · Design Your Core');
   });
 
   it('al terminar un enfoque lo guarda completo y cuenta en las estadísticas', async () => {
@@ -698,7 +723,7 @@ describe('Más', () => {
     expect(within(tools).getByRole('link', { name: /Agenda.*4 elementos/ })).toHaveAttribute('href', '/agenda');
     expect(within(tools).getByRole('link', { name: /Pendientes.*2 por hacer/ })).toHaveAttribute('href', '/pendientes');
     expect(within(tools).getByRole('link', { name: /Horario.*1 clase/ })).toBeInTheDocument();
-    expect(within(tools).getByRole('link', { name: /Enfoque.*1 sesión/ })).toBeInTheDocument();
+    expect(within(tools).getByRole('link', { name: /Pomodoro.*1 sesión/ })).toBeInTheDocument();
     const study = within(tools).getByRole('list', { name: 'Estudio y trabajo' });
     expect(within(study).getByRole('link', { name: /Materias.*1 materia/ })).toHaveAttribute('href', '/materias');
     expect(within(study).getByRole('link', { name: /Proyectos.*1 activo/ })).toHaveAttribute('href', '/proyectos');
@@ -875,15 +900,15 @@ describe('Roadmaps', () => {
     const card = await screen.findByRole('article', { name: 'Ingeniería' });
     expect(within(card).getByText('Siguiente:').parentElement).toHaveTextContent('Cálculo II');
     expect(screen.getByText('1 de 3 completadas')).toBeInTheDocument();
-    expect(within(card).queryByRole('button', { name: 'Marcar «Ecuaciones» como completada' })).not.toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Marcar «Ecuaciones» como completado' })).not.toBeInTheDocument();
 
-    await userEvent.click(within(card).getByRole('button', { name: 'Marcar «Cálculo II» como completada' }));
+    await userEvent.click(within(card).getByRole('button', { name: 'Marcar «Cálculo II» como completado' }));
     expect(writes(api)[0]).toMatchObject({
       method: 'PATCH',
       path: '/api/v2/modules/roadmaps/rm1',
       body: { steps: [{ id: 'st1', done: true }, { id: 'st2', done: true }, { id: 'st3', done: false }] },
     });
-    expect(await within(card).findByRole('button', { name: 'Marcar «Ecuaciones» como completada' })).toBeInTheDocument();
+    expect(await within(card).findByRole('button', { name: 'Marcar «Ecuaciones» como completado' })).toBeInTheDocument();
     await userEvent.click(within(card).getByRole('button', { name: 'Reabrir «Cálculo I»' }));
     expect(writes(api)[1].body).toMatchObject({ steps: [{ done: false }, { done: true }, { done: false }] });
 
@@ -1323,6 +1348,8 @@ describe('Rutina', () => {
     expect(screen.getByRole('button', { name: 'Quitar un vaso' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Un vaso' }));
     expect(writes(api)[0]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/dayLog', body: { dateKey: utcDayKey(), water: 1 } });
+    // Una sola fuente: el vaso cuenta también en el check-in de hoy.
+    await waitFor(() => expect(checkInSyncs(api)[0]).toMatchObject({ path: `/api/v2/checkins/${utcDayKey()}`, body: { water: 1 } }));
     await userEvent.selectOptions(screen.getByLabelText('Meta diaria'), '10');
     expect(writes(api)[1]).toMatchObject({ body: { waterGoal: 10 } });
     expect(await screen.findByText('de 10 vasos')).toBeInTheDocument();
@@ -1450,7 +1477,7 @@ describe('Notas', () => {
 });
 
 describe('Trabajo', () => {
-  it('agrupa por estado, añade, marca y edita con los proyectos de la app anterior', async () => {
+  it('agrupa por estado, añade, marca y edita unida a tus proyectos', async () => {
     const api = withApi();
     renderAt('/trabajo');
     const doing = await screen.findByRole('region', { name: /En curso/ });
@@ -1458,12 +1485,15 @@ describe('Trabajo', () => {
     expect(within(doing).getByText('Hoy')).toBeInTheDocument();
     expect(screen.getByText('1/2 completadas')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Hecho/ })).toHaveTextContent('Revisar cambios');
-    expect(screen.getByText(/tres proyectos fijos de la app anterior/)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /Hecho/ })).toHaveTextContent('Maqueta del puente');
+    expect(screen.getByText(/Una tarea sigue en «Proyecto 1, 2 o 3»/)).toBeInTheDocument();
+    // Solo se ofrecen los proyectos sin entregar.
+    expect(within(screen.getByLabelText('Proyecto de la tarea nueva')).queryByRole('option', { name: 'Ensayo de Historia' })).not.toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Nueva tarea de trabajo'), 'Preparar reunión');
-    await userEvent.selectOptions(screen.getByLabelText('Proyecto de la tarea nueva'), 'p3');
+    await userEvent.selectOptions(screen.getByLabelText('Proyecto de la tarea nueva'), 'Maqueta del puente');
     await userEvent.click(screen.getByRole('button', { name: 'Añadir' }));
-    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/workItems', body: { item: { title: 'Preparar reunión', project: 'p3', status: 'todo', done: false, due: '' } } });
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', path: '/api/v2/modules/workItems', body: { item: { title: 'Preparar reunión', project: 'p1', status: 'todo', done: false, due: '' } } });
     const todo = await screen.findByRole('region', { name: /Por hacer/ });
     await userEvent.click(within(todo).getByRole('checkbox', { name: /Preparar reunión/ }));
     expect(writes(api)[1]).toMatchObject({ method: 'PATCH', body: { done: true } });
@@ -1472,8 +1502,9 @@ describe('Trabajo', () => {
     const dialog = screen.getByRole('dialog', { name: 'Editar tarea de trabajo' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Por hacer' }));
     await userEvent.clear(within(dialog).getByLabelText('Para cuándo (opcional)'));
+    await userEvent.selectOptions(within(dialog).getByLabelText('Proyecto'), 'Maqueta del puente');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
-    expect(writes(api)[2]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/workItems/wk1', body: { title: 'Informe mensual', project: 'p2', status: 'todo', due: '' } });
+    expect(writes(api)[2]).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/workItems/wk1', body: { title: 'Informe mensual', project: 'p1', status: 'todo', due: '' } });
   });
 });
 
@@ -1535,7 +1566,7 @@ describe('Bóveda', () => {
     expect(screen.getByText('ana@example.com')).toBeInTheDocument();
   });
 
-  it('cifra las contraseñas de la app anterior solo tras confirmarlo y no deja copias en claro', async () => {
+  it('cifra las contraseñas sin cifrar solo tras confirmarlo y no deja copias en claro', async () => {
     const api = withApi({}, (doc) => {
       doc.vault = [
         { id: 'v1', name: 'Banco Sol', mono: 'BS', user: 'ana.perez', pass: 'Clave-Plana-123' },
@@ -1543,14 +1574,14 @@ describe('Bóveda', () => {
       ];
     });
     renderAt('/boveda');
-    const notice = await screen.findByRole('region', { name: 'Hay 2 contraseñas de la app anterior guardadas sin cifrar' });
+    const notice = await screen.findByRole('region', { name: 'Hay 2 contraseñas guardadas sin cifrar' });
     expect(within(notice).getByText('Crea tu bóveda para cifrarlas.')).toBeInTheDocument();
     await create();
     expect(writes(api)).toHaveLength(1);
 
     await userEvent.click(within(notice).getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }));
-    const dialog = screen.getByRole('dialog', { name: 'Cifrar las contraseñas de la app anterior' });
-    expect(within(dialog).getByText(/la bóveda de la app anterior aparecerá vacía/)).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Cifrar las contraseñas guardadas sin cifrar' });
+    expect(within(dialog).getByText('Se borra la lista sin cifrar.')).toBeInTheDocument();
     expect(within(dialog).getByText('Banco Sol')).toBeInTheDocument();
     // Nada se escribe hasta confirmar.
     expect(writes(api)).toHaveLength(1);
@@ -1563,7 +1594,7 @@ describe('Bóveda', () => {
     expect((api.doc as unknown as { vaultSecure: { items: unknown[] } }).vaultSecure.items).toHaveLength(2);
     expect(JSON.stringify(api.doc)).not.toMatch(/Clave-Plana-123|otra-clave-456|Banco Sol/);
     expect(await screen.findByText('Banco Sol')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole('region', { name: /app anterior/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('region', { name: /guardadas sin cifrar/ })).not.toBeInTheDocument());
   });
 
   it('se bloquea sola tras 5 minutos sin actividad y al salir de la página', async () => {
@@ -1960,5 +1991,34 @@ describe('Buscadores', () => {
     await userEvent.clear(screen.getByLabelText('Buscar en tus ideas'));
     await userEvent.type(screen.getByLabelText('Buscar en tus ideas'), 'zzz');
     expect(screen.getByText('Nada coincide con «zzz».')).toBeInTheDocument();
+  });
+});
+
+describe('Check-in con lo que ya registraste', () => {
+  it('trae el agua y la gratitud de tus herramientas, pone tus pilares primero y pliega los demás', async () => {
+    const today = utcDayKey();
+    const api = withApi(
+      {
+        'GET /api/v2/checkins': () => ({ from: today, to: today, checkIns: [] }),
+        'PUT /api/v2/checkins/:date': (b) => ({ checkIn: { date: today, ...(b as object) } }),
+      },
+      (doc) => {
+        (doc as unknown as Record<string, unknown>).dayLog = { dateKey: today, water: 6, waterGoal: 8 };
+        doc.journal = [{ id: 'jj', date: today, mood: '', gratitude: 'El café de la mañana', note: '' }];
+      },
+    );
+    renderAt('/check-in');
+    const water = await screen.findByLabelText('Vasos de agua');
+    expect(water).toHaveValue(6);
+    expect(screen.getByText(/Ya registrado en Rutina/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Algo que agradeces')).toHaveValue('El café de la mañana');
+    // El perfil de prueba elige Descanso: va arriba; Pareja queda en «Otros pilares».
+    const more = screen.getByText(/Otros pilares/).closest('details') as HTMLDetailsElement;
+    expect(within(more).getByRole('group', { name: 'Conexión con tu pareja' })).toBeInTheDocument();
+    expect(more.querySelector('[data-pillar="descanso"]')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar check-in' }));
+    await waitFor(() => expect(checkInSyncs(api)[0]).toMatchObject({ body: { water: 6, gratitude: 'El café de la mañana' } }));
+    // Nada cambió en Rutina ni en el Diario: no se reescriben.
+    expect(writes(api)).toHaveLength(0);
   });
 });

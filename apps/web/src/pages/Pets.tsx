@@ -62,7 +62,7 @@ export function Pets() {
               </li>
             ))}
           </ul>
-          <p className="muted small">Los avisos con sonido de la app anterior todavía no están en la app nueva: aquí ves cuándo toca cada cuidado y lo marcas al hacerlo.</p>
+          <p className="muted small">Aquí ves cuándo toca cada cuidado y lo marcas al hacerlo. Los cuidados con hora suenan si activas las alarmas en Perfil.</p>
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nueva mascota' : 'Editar mascota'}>

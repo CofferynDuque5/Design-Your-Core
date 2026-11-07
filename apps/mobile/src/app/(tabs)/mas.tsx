@@ -18,7 +18,7 @@ export default function More() {
     <Screen refreshing={legacy.isRefetching} onRefresh={() => legacy.refetch()}>
       <PageHeader eyebrow="Más" title="Tus herramientas" />
       <T v="body" tint="muted" style={{ marginTop: -space[3] }}>
-        Todo lo de la app anterior, con tus datos: {NATIVE_TOOLS.size} herramientas en el móvil.
+        Todas tus herramientas, con tus datos: {NATIVE_TOOLS.size} en el móvil.
         {onWeb.length > 0 && ` ${listEs(onWeb)} se ${onWeb.length === 1 ? 'abre' : 'abren'} en la web: ${onWeb.length === 1 ? 'necesita' : 'necesitan'} el navegador para proteger tus claves.`}
       </T>
       {legacy.isPending ? (

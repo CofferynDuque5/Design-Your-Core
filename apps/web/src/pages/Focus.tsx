@@ -65,7 +65,7 @@ export function Focus() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Organización" title="Enfoque" />
+      <PageHeader eyebrow="Organización" title="Pomodoro" />
       <div className="focus-layout">
         <section className="card card--raised timer" aria-labelledby="timer-title">
           <h2 id="timer-title" className="visually-hidden">
@@ -115,7 +115,7 @@ export function Focus() {
 
         <section className="stack" aria-labelledby="focus-stats-title">
           <h2 id="focus-stats-title" className="section-title">
-            Tu enfoque
+            Tus sesiones
           </h2>
           {legacy.isPending ? (
             <Loading label="Cargando tus sesiones" />

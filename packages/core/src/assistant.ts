@@ -61,6 +61,22 @@ export const ASSISTANT_MODEL_NOTE: Record<AssistantModel, string> = {
   'gemini-pro-latest': 'más lento, piensa más',
 };
 
+/** Nombre sencillo de cada modelo para el selector (el nombre técnico no le dice nada a casi nadie). */
+export const ASSISTANT_MODEL_LABEL: Record<AssistantModel, string> = {
+  'gemini-flash-latest': 'Equilibrado (recomendado)',
+  'gemini-3.6-flash': 'Rápido',
+  'gemini-flash-lite-latest': 'Muy rápido',
+  'gemini-pro-latest': 'Profundo (más lento, piensa más)',
+};
+
+/** Pasos para conseguir la clave, para quien nunca ha usado Google AI Studio. */
+export const GEMINI_KEY_STEPS = [
+  'Abre Google AI Studio (aistudio.google.com/apikey) e inicia sesión con tu cuenta de Google.',
+  'Pulsa «Create API key» (Crear clave). Si te pide un proyecto, elige el que te ofrece.',
+  'Copia la clave que aparece: es un texto largo que empieza por «AIza».',
+  'Pégala aquí abajo y pulsa «Guardar». Es gratis para un uso normal.',
+] as const;
+
 export const isAssistantModel = (m: unknown): m is AssistantModel => typeof m === 'string' && (ASSISTANT_MODELS as readonly string[]).includes(m);
 
 /** Ajustes guardados (JSON) → ajustes válidos; lo que no sirve vuelve al valor por defecto. */

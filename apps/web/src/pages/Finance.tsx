@@ -311,7 +311,7 @@ function BudgetForm({ monthly, onDone }: { monthly: number; onDone: () => void }
         autoFocus
         hint={
           suggested
-            ? `La app anterior tenía ${money(suggested)} guardado en este navegador; lo hemos puesto como sugerencia.`
+            ? `Tenías ${money(suggested)} guardado en este navegador; lo hemos puesto como sugerencia.`
             : 'Vale para todos los meses y se guarda en tu cuenta, así lo ves en todos tus dispositivos.'
         }
       />

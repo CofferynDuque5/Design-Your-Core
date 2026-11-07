@@ -269,7 +269,7 @@ export function NotebookDetail() {
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
           <EmptyState title="Este cuaderno ya no existe" action={<Link to="/cuadernos" className="btn btn--secondary">Ver tus cuadernos</Link>}>
-            Puede que lo hayas borrado aquí o en la app anterior.
+            Puede que lo hayas borrado.
           </EmptyState>
         )}
       </div>

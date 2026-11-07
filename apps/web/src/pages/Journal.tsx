@@ -10,6 +10,7 @@ import { ErrorState, Loading } from '../components/States';
 import { CheckInNote, MoodPicker, Stats } from '../components/ToolParts';
 import { UiIcon } from '../components/UiIcon';
 import { useAutosave } from '../lib/tools';
+import { useSyncCheckIn } from '../lib/checkinSync';
 
 const HISTORY_MAX = 60;
 type Fields = Partial<Pick<LegacyJournal, 'mood' | 'gratitude' | 'note'>>;
@@ -29,7 +30,9 @@ export function Journal() {
   // La app anterior creaba la entrada al abrir la sección; aquí se crea con lo primero que escribes.
   const created = useRef(new Map<string, string>());
 
+  const sync = useSyncCheckIn();
   const save = (fields: Fields) => {
+    if (fields.gratitude !== undefined) sync(date, { gratitude: fields.gratitude.trim().slice(0, 1000) || null });
     const id = entry?.id ?? created.current.get(date);
     if (id) return actions.update(id, fields);
     const fresh = newId();
@@ -112,7 +115,7 @@ export function Journal() {
               )}
             </section>
           </div>
-          <CheckInNote>El check-in diario guarda aparte su propia reflexión y gratitud; tu diario no cambia aún tus pilares.</CheckInNote>
+          <CheckInNote>Lo que agradeces aquí también aparece en tu check-in del día. La reflexión del check-in y tus notas del diario siguen separadas.</CheckInNote>
         </div>
       )}
     </div>

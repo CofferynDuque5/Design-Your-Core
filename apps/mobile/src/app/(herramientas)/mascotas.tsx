@@ -76,7 +76,7 @@ export default function Pets() {
             <PetCard key={p.id} pet={p} cares={cares.filter((c) => c.petId === p.id)} today={today} now={now} onEdit={() => setEditing(p)} onCare={(c) => setCare({ pet: p, care: c })} />
           ))}
           <T v="small" tint="muted">
-            Los avisos con sonido de la app anterior todavía no están en la app nueva: aquí ves cuándo toca cada cuidado y lo marcas al hacerlo.
+            Aquí ves cuándo toca cada cuidado y lo marcas al hacerlo. Los cuidados con hora suenan si activas las alarmas en Perfil.
           </T>
         </>
       )}

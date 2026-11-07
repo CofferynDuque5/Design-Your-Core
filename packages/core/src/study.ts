@@ -192,11 +192,29 @@ export function formatLength(seconds: number): string {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
+/**
+ * Duración de un curso en segundos, de una sola fuente: si es un solo video y
+ * ya se reprodujo, la del reproductor (exacta); si no, la guardada.
+ */
+export function courseSeconds(c: Pick<LegacyCourse, 'url' | 'length' | 'duration' | 'lengthFrom'>): { seconds: number; exact: boolean } | null {
+  const single = !!c.url && !/[?&]list=/.test(c.url);
+  if (single && c.duration && c.duration > 0) return { seconds: c.duration, exact: true };
+  if (c.length && c.length > 0) return { seconds: c.length, exact: c.lengthFrom !== 'aprox' };
+  return null;
+}
+
+/** «4 h 14 min» o «unas 12 h»; vacío si no se sabe. */
+export function courseLengthLabel(c: Pick<LegacyCourse, 'url' | 'length' | 'duration' | 'lengthFrom'>): string {
+  const l = courseSeconds(c);
+  return l ? `${l.exact ? '' : 'unas '}${formatLength(l.seconds)}` : '';
+}
+
 /** Lo que falta por ver, en segundos (null si no se sabe cuánto dura). */
 export function courseRemaining(c: LegacyCourse): number | null {
   if (c.status === 'hecho') return 0;
-  if (!c.length) return null;
-  return Math.round(c.length * (1 - courseProgress(c) / 100));
+  const l = courseSeconds(c);
+  if (!l) return null;
+  return Math.round(l.seconds * (1 - courseProgress(c) / 100));
 }
 
 // ---------- Orden de los cursos de un tema (sin que la persona decida) ----------

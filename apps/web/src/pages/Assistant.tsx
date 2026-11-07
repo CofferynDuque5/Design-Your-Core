@@ -12,8 +12,9 @@ import { ProposalCard } from '../components/ProposalCard';
 import { errorMessage } from '../components/States';
 import { ConfirmDelete } from '../components/ToolParts';
 import {
-  ASSISTANT_MODEL_NOTE,
   ASSISTANT_MODELS,
+  ASSISTANT_MODEL_LABEL,
+  GEMINI_KEY_STEPS,
   AssistantError,
   attachmentProblem,
   buildContext,
@@ -129,6 +130,12 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
         </div>
       ) : (
         <form className="stack-sm" onSubmit={save}>
+          <p className="small">Para hablar con el Asistente necesitas una clave gratuita de Google. Se consigue en un par de minutos:</p>
+          <ol className="steps-list small">
+            {GEMINI_KEY_STEPS.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
           <TextField
             label="Clave de la API de Gemini"
             type="password"
@@ -163,7 +170,7 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
       <SelectField label="Modelo" value={settings.model} onChange={(e) => onChange({ ...settings, model: e.target.value as AssistantModel })}>
         {ASSISTANT_MODELS.map((m) => (
           <option key={m} value={m}>
-            {m} ({ASSISTANT_MODEL_NOTE[m]})
+            {ASSISTANT_MODEL_LABEL[m]}
           </option>
         ))}
       </SelectField>
