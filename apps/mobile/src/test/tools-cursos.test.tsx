@@ -185,13 +185,18 @@ describe('Cursos y Horario en el móvil', () => {
       }),
     );
     renderRouter('./src/app', { initialUrl: '/cursos' });
-    fireEvent.press(await screen.findByRole('button', { name: 'Lecciones de «React desde cero» (0 de 2)' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Unidades y lecciones de «React desde cero» (0 de 2 vistas)' }));
     expect(await screen.findByRole('header', { name: 'UNIDAD 1 · 0/2' })).toBeOnTheScreen();
     fireEvent.press(screen.getByRole('checkbox', { name: 'Instalación' }));
     await waitFor(() =>
       expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { progress: 50, status: 'curso', lessons: [{ id: 'l1', done: true }, { id: 'l2' }] } }),
     );
-    fireEvent.changeText(screen.getByLabelText('Unidad (opcional)'), 'Unidad 2');
+    fireEvent.changeText(screen.getByLabelText('Nueva unidad'), 'Unidad 2');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir unidad' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Unidad 2'] } }));
+    expect(await screen.findByRole('header', { name: 'UNIDAD 2 · 0/0' })).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir lección a «Unidad 2»' }));
+    expect(screen.getByLabelText('En la unidad (opcional)').props.value).toBe('Unidad 2');
     fireEvent.changeText(screen.getByLabelText('Lección o video'), 'useState');
     fireEvent.press(screen.getByRole('button', { name: 'Añadir lección' }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));

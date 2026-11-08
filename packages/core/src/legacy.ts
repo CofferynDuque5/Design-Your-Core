@@ -699,6 +699,8 @@ export interface LegacyCourse {
   lengthFrom?: CourseLengthFrom;
   /** Lecciones o videos del curso, en orden; `unit` las agrupa («Unidad 1»). */
   lessons?: CourseLesson[];
+  /** Unidades del curso en orden, también las que aún no tienen lecciones. */
+  units?: string[];
 }
 
 export interface CourseLesson {
@@ -715,6 +717,7 @@ export interface CourseLesson {
 
 /** Hasta cuántas lecciones guarda un curso. */
 export const COURSE_LESSONS_MAX = 500;
+export const COURSE_UNITS_MAX = 100;
 
 export const COURSE_LENGTH_FROM = ['enlace', 'aprox', 'manual'] as const;
 export type CourseLengthFrom = (typeof COURSE_LENGTH_FROM)[number];
@@ -1151,6 +1154,7 @@ const shapes = {
       )
       .max(COURSE_LESSONS_MAX, `Máximo ${COURSE_LESSONS_MAX} lecciones por curso`)
       .optional(),
+    units: z.array(z.string().trim().min(1, 'Escribe el nombre de la unidad').max(120)).max(COURSE_UNITS_MAX, `Máximo ${COURSE_UNITS_MAX} unidades por curso`).optional(),
   }),
   ventures: z.object({
     id: legacyIdSchema,

@@ -1,6 +1,6 @@
-import { formatLength, lessonsByUnit, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { addUnitPatch, courseUnits, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { useIsMutating } from '@tanstack/react-query';
-import { ExternalLink, ListVideo, Play, Plus, Trash2 } from 'lucide-react';
+import { Check, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, type ChangeOpts } from '../app/legacy';
 import { TextField } from '../components/Form';
@@ -17,10 +17,18 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const c = useLegacyList(legacy.data?.data, 'courses').find((x) => x.id === course.id) ?? course;
   // Lo último guardado desde aquí: dos cambios seguidos no se pisan aunque el curso aún no se haya recargado.
   const mine = useRef<CourseLesson[] | null>(null);
+  const mineUnits = useRef<string[] | null>(null);
   // Sin cambios en camino manda lo guardado (otro dispositivo, «Deshacer»…).
   const saving = useIsMutating({ mutationKey: ['legacy'] }) > 0;
-  if (!saving) mine.current = null;
+  if (!saving) {
+    mine.current = null;
+    mineUnits.current = null;
+  }
   const lessons = mine.current ?? c.lessons ?? [];
+  const created = mineUnits.current ?? c.units ?? [];
+  const titleRef = useRef<HTMLInputElement>(null);
+  const [newUnit, setNewUnit] = useState('');
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
   const unitList = useId();
   const [title, setTitle] = useState('');
   const [unit, setUnit] = useState(() => lessons.at(-1)?.unit ?? '');
@@ -32,10 +40,30 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const latest = useRef(c);
   latest.current = c;
   const current = () => mine.current ?? latest.current.lessons ?? [];
-  const save = (next: CourseLesson[], opts?: ChangeOpts) => {
-    const patch = lessonsPatch({ ...latest.current, lessons: current() }, next);
-    mine.current = next;
+  const now = (): LegacyCourse => ({ ...latest.current, lessons: current(), units: mineUnits.current ?? latest.current.units ?? [] });
+  const apply = (patch: Partial<LegacyCourse>, opts?: ChangeOpts) => {
+    if (patch.lessons) mine.current = patch.lessons;
+    if (patch.units) mineUnits.current = patch.units;
     update(latest.current, patch, opts);
+  };
+  const save = (next: CourseLesson[], opts?: ChangeOpts) => apply(lessonsPatch(now(), next), opts);
+  const addUnit = (e: FormEvent) => {
+    e.preventDefault();
+    const patch = addUnitPatch(now(), newUnit);
+    if (!patch) return setStatus(newUnit.trim() ? `Ya tienes una unidad llamada «${newUnit.trim()}».` : null);
+    apply(patch);
+    setUnit(newUnit.trim());
+    setStatus(`Añadida la unidad «${newUnit.trim()}». Ahora añádele lecciones.`);
+    setNewUnit('');
+  };
+  const rename = (e: FormEvent) => {
+    e.preventDefault();
+    if (!renaming) return;
+    const patch = renameUnitPatch(now(), renaming.from, renaming.to);
+    if (!patch) return setStatus(`Ya tienes una unidad llamada «${renaming.to.trim()}».`);
+    apply(patch);
+    if (unit.trim() === renaming.from) setUnit(renaming.to.trim());
+    setRenaming(null);
   };
   const toggle = (id: string, done?: boolean, opts?: ChangeOpts) => {
     const cur = current();
@@ -46,7 +74,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   };
   const link = normalizeCourseUrl(url);
   const badUrl = !!url.trim() && !validCourseUrl(link);
-  const units = [...new Set(lessons.map((l) => (l.unit ?? '').trim()).filter(Boolean))];
+  const units = courseUnits({ lessons, units: created });
   const done = lessons.filter((l) => l.done).length;
   const list = youtubeRef(c.url)?.list;
   const next = nextLesson(c);
@@ -113,13 +141,61 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
           <ListVideo size={16} aria-hidden="true" /> {busy ? 'Leyendo…' : lessons.length ? 'Traer los videos nuevos de la lista' : 'Traer los videos de la lista de YouTube'}
         </button>
       )}
-      {lessonsByUnit(lessons).map((g) => (
+      <form className="lessons__new-unit" onSubmit={addUnit}>
+        <TextField label="Nueva unidad" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} maxLength={120} placeholder="Unidad 1, Módulo 2…" />
+        <button type="submit" className="btn btn--secondary btn--sm" disabled={!newUnit.trim() || units.length >= 100}>
+          <FolderPlus size={16} aria-hidden="true" /> Añadir unidad
+        </button>
+      </form>
+      {lessonsByUnit(lessons, created).map((g) => (
         <section key={g.unit || '-'} className="lessons__unit" aria-label={g.unit || 'Lecciones'}>
-          {g.unit && (
-            <h3 className="course-sub__title">
-              {g.unit} <span className="numeric">· {g.items.filter((l) => l.done).length}/{g.items.length}</span>
-            </h3>
-          )}
+          {g.unit &&
+            (renaming?.from === g.unit ? (
+              <form className="lessons__unit-head" onSubmit={rename}>
+                <TextField label={`Nuevo nombre de «${g.unit}»`} value={renaming.to} onChange={(e) => setRenaming({ ...renaming, to: e.target.value })} maxLength={120} autoFocus />
+                <button type="submit" className="icon-btn" aria-label="Guardar el nombre" disabled={!renaming.to.trim()}>
+                  <Check size={18} aria-hidden="true" />
+                </button>
+                <button type="button" className="icon-btn" aria-label="Cancelar" onClick={() => setRenaming(null)}>
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </form>
+            ) : (
+              <div className="lessons__unit-head">
+                <h3 className="course-sub__title">
+                  {g.unit} <span className="numeric">· {g.items.filter((l) => l.done).length}/{g.items.length}</span>
+                </h3>
+                <span className="lessons__unit-actions">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => {
+                    setUnit(g.unit);
+                    titleRef.current?.focus();
+                  }}
+                  aria-label={`Añadir lección a «${g.unit}»`}
+                >
+                  <Plus size={16} aria-hidden="true" /> Lección
+                </button>
+                <button type="button" className="icon-btn" onClick={() => setRenaming({ from: g.unit, to: g.unit })} aria-label={`Cambiar el nombre de «${g.unit}»`}>
+                  <Pencil size={18} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => {
+                    apply(removeUnitPatch(now(), g.unit));
+                    if (unit.trim() === g.unit) setUnit('');
+                    setStatus(g.items.length ? `Quitaste «${g.unit}» y sus ${g.items.length} ${g.items.length === 1 ? 'lección' : 'lecciones'}.` : `Quitaste «${g.unit}».`);
+                  }}
+                  aria-label={`Quitar la unidad «${g.unit}»${g.items.length ? ` y sus lecciones` : ''}`}
+                >
+                  <Trash2 size={18} aria-hidden="true" />
+                </button>
+                </span>
+              </div>
+            ))}
+          {g.items.length === 0 && <p className="small muted">Sin lecciones todavía.</p>}
           <ul className="lessons__list">
             {g.items.map((l) => {
               const yt = l.url ? youtubeRef(l.url) : null;
@@ -161,8 +237,8 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
       <form className="stack lessons__add" onSubmit={add}>
         <h3 className="planner__title">Añadir lección</h3>
         <div className="grid-2">
-          <TextField label="Unidad (opcional)" value={unit} onChange={(e) => setUnit(e.target.value)} maxLength={120} placeholder="Unidad 1, Módulo 2…" list={units.length ? unitList : undefined} />
-          <TextField label="Lección o video" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="Introducción, Clase 3…" />
+          <TextField label="En la unidad (opcional)" value={unit} onChange={(e) => setUnit(e.target.value)} maxLength={120} placeholder="Unidad 1, Módulo 2…" list={units.length ? unitList : undefined} />
+          <TextField ref={titleRef} label="Lección o video" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="Introducción, Clase 3…" />
         </div>
         {units.length > 0 && (
           <datalist id={unitList}>

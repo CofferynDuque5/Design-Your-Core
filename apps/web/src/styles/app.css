@@ -5786,6 +5786,28 @@
     text-decoration: line-through;
   }
 
+  .lessons__new-unit,
+  .lessons__unit-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-2);
+  }
+
+  .lessons__new-unit .field,
+  .lessons__unit-head .field {
+    flex: 1 1 14rem;
+  }
+
+  .lessons__unit-head {
+    align-items: center;
+    padding-top: var(--space-2);
+  }
+
+  .lessons__unit-head .course-sub__title {
+    flex: 1 1 12rem;
+  }
+
   .lessons__add {
     padding-top: var(--space-3);
     border-top: 1px solid var(--color-line);
@@ -5836,6 +5858,20 @@
 
   /* En tarjetas angostas los botones bajan debajo del nombre, alineados a la derecha. */
   .course-row__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
+  }
+
+  .course-row__actions .btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .lessons__unit-actions {
     display: flex;
     align-items: center;
     gap: var(--space-1);

@@ -171,7 +171,7 @@ export default function Cursos() {
       <Sheet open={!!logged} onClose={() => setLogging(null)} title="¿Hasta dónde llegaste?">
         {logged && <ProgressForm course={logged} onDone={() => setLogging(null)} />}
       </Sheet>
-      <Sheet open={!!listed} onClose={() => setListing(null)} title={listed ? `Lecciones de «${courseName(listed)}»` : 'Lecciones'}>
+      <Sheet open={!!listed} onClose={() => setListing(null)} title={listed ? `Unidades y lecciones de «${courseName(listed)}»` : 'Unidades y lecciones'}>
         {listed && <CourseLessons course={listed} update={update} />}
       </Sheet>
       <Sheet open={planning} onClose={() => setPlanning(false)} title="Crear horario">
@@ -360,8 +360,8 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
         <Button
           small
           variant="ghost"
-          label={c.lessons?.length ? `Lecciones ${c.lessons.filter((l) => l.done).length}/${c.lessons.length}` : 'Lecciones'}
-          accessibilityLabel={`Lecciones de «${name}»${c.lessons?.length ? ` (${c.lessons.filter((l) => l.done).length} de ${c.lessons.length})` : ''}`}
+          label={c.lessons?.length ? `Unidades ${c.lessons.filter((l) => l.done).length}/${c.lessons.length}` : 'Unidades y lecciones'}
+          accessibilityLabel={`Unidades y lecciones de «${name}»${c.lessons?.length ? ` (${c.lessons.filter((l) => l.done).length} de ${c.lessons.length} vistas)` : ''}`}
           icon={<ListChecks size={16} color={colors.primary} />}
           onPress={() => onLessons(c)}
         />

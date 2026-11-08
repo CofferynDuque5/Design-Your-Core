@@ -202,7 +202,7 @@ export function Courses() {
       <Dialog open={planning} onClose={() => setPlanning(false)} title="Crear horario" wide>
         {planning && <StudyPlanner courses={courses} onDone={() => setPlanning(false)} />}
       </Dialog>
-      <Dialog open={!!listed} onClose={() => setListing(null)} title={listed ? `Lecciones de «${courseName(listed)}»` : 'Lecciones'} wide>
+      <Dialog open={!!listed} onClose={() => setListing(null)} title={listed ? `Unidades y lecciones de «${courseName(listed)}»` : 'Unidades y lecciones'} wide>
         {listed && <CourseLessons course={listed} update={update} />}
       </Dialog>
       <Dialog open={!!scheduled} onClose={() => setScheduling(null)} title="Agregar al horario">
@@ -351,8 +351,8 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
         >
           {COURSE_STATUS_INFO[status].short}
         </button>
-        <button type="button" className="icon-btn" onClick={() => onLessons(c)} aria-label={`Lecciones de «${name}»${c.lessons?.length ? ` (${c.lessons.filter((l) => l.done).length} de ${c.lessons.length})` : ''}`}>
-          <ListChecks size={18} aria-hidden="true" />
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => onLessons(c)} aria-label={`Unidades y lecciones de «${name}»${c.lessons?.length ? ` (${c.lessons.filter((l) => l.done).length} de ${c.lessons.length} vistas)` : ''}`}>
+          <ListChecks size={16} aria-hidden="true" /> {c.lessons?.length ? `Unidades ${c.lessons.filter((l) => l.done).length}/${c.lessons.length}` : 'Unidades'}
         </button>
         {!yt && !c.lessons?.length && (
           <button type="button" className="icon-btn" onClick={() => onLog(c)} aria-label={`Anotar avance de «${name}»`}>

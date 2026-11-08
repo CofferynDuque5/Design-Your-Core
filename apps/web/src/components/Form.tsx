@@ -1,6 +1,6 @@
 import type { PasswordCheck } from '@dyc/core';
 import { Circle, CircleAlert, CircleCheck, Eye, EyeOff } from 'lucide-react';
-import { useId, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { useId, useState, type InputHTMLAttributes, type Ref, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 interface FieldProps {
   label: string;
@@ -12,7 +12,7 @@ interface FieldProps {
  * Campo de texto. `suggestions`: valores que ya usaste (o habituales), que el
  * navegador ofrece mientras escribes (autocompletado).
  */
-export function TextField({ label, hint, error, valid, suggestions, ...input }: FieldProps & { valid?: boolean; suggestions?: readonly string[] } & InputHTMLAttributes<HTMLInputElement>) {
+export function TextField({ label, hint, error, valid, suggestions, ...input }: FieldProps & { valid?: boolean; suggestions?: readonly string[]; ref?: Ref<HTMLInputElement> } & InputHTMLAttributes<HTMLInputElement>) {
   const id = useId();
   const options = suggestions ? [...new Set(suggestions.map((v) => v.trim()).filter(Boolean))].slice(0, 50) : [];
   const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined;

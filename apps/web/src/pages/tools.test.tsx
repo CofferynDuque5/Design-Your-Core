@@ -580,19 +580,32 @@ describe('Cursos: progreso y horario', () => {
       ];
     });
     renderAt('/cursos');
-    await userEvent.click(await screen.findByRole('button', { name: 'Lecciones de «React desde cero» (0 de 2)' }));
-    const dialog = screen.getByRole('dialog', { name: 'Lecciones de «React desde cero»' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Unidades y lecciones de «React desde cero» (0 de 2 vistas)' }));
+    const dialog = screen.getByRole('dialog', { name: 'Unidades y lecciones de «React desde cero»' });
     expect(within(dialog).getByRole('heading', { name: /Unidad 1/ })).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Instalación' }));
     await waitFor(() =>
       expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { progress: 50, status: 'curso', lessons: [{ id: 'l1', done: true }, { id: 'l2' }] } }),
     );
-    await userEvent.clear(within(dialog).getByLabelText('Unidad (opcional)'));
-    await userEvent.type(within(dialog).getByLabelText('Unidad (opcional)'), 'Unidad 2');
+    await userEvent.type(within(dialog).getByLabelText('Nueva unidad'), 'Unidad 2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir unidad' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Unidad 2'] } }));
+    expect(await within(dialog).findByRole('heading', { name: /Unidad 2/ })).toBeInTheDocument();
+    expect(within(dialog).getByText('Sin lecciones todavía.')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir lección a «Unidad 2»' }));
+    expect(within(dialog).getByLabelText('Lección o video')).toHaveFocus();
+    expect(within(dialog).getByLabelText('En la unidad (opcional)')).toHaveValue('Unidad 2');
     await userEvent.type(within(dialog).getByLabelText('Lección o video'), 'useState');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir lección' }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { progress: 33, lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));
-    expect(await within(dialog).findByRole('heading', { name: /Unidad 2/ })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('heading', { name: /Unidad 2 · 0\/1/ })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cambiar el nombre de «Unidad 2»' }));
+    const nombre = within(dialog).getByLabelText('Nuevo nombre de «Unidad 2»');
+    await userEvent.clear(nombre);
+    await userEvent.type(nombre, 'Hooks');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar el nombre' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Hooks'], lessons: [{}, {}, { title: 'useState', unit: 'Hooks' }] } }));
+    expect(await within(dialog).findByRole('heading', { name: /Hooks/ })).toBeInTheDocument();
 
     readYouTubeLength.mockResolvedValueOnce({ seconds: 900, exact: true, videos: 2, items: [{ video: 'aaaaaaaaaaa', title: 'Clase 1', seconds: 300 }, { video: 'bbbbbbbbbbb', title: 'Clase 2', seconds: 600 }] });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Traer los videos nuevos de la lista' }));

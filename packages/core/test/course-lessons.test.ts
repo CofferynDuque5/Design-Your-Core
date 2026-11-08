@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { courseProgress, courseResume, legacyItemSchemas, lessonsByUnit, lessonsFromPlaylist, lessonsPatch, nextLesson, type LegacyCourse } from '../src/index.js';
+import { addUnitPatch, courseProgress, courseUnits, removeUnitPatch, renameUnitPatch, courseResume, legacyItemSchemas, lessonsByUnit, lessonsFromPlaylist, lessonsPatch, nextLesson, type LegacyCourse } from '../src/index.js';
 
 const base: LegacyCourse = { id: 'c1', topic: 'React', title: 'React', url: '', status: 'pendiente', notes: '' };
 const lessons = [
@@ -59,5 +59,31 @@ describe('Eventos del 29, 30 y 31', () => {
     expect(reminderFallsOn({ day: 31 }, '2026-12-30')).toBe(false);
     expect(reminderFallsOn({ day: 30 }, '2027-02-28')).toBe(true);
     expect(reminderFallsOn({ day: 15 }, '2027-02-15')).toBe(true);
+  });
+});
+
+describe('unidades del curso', () => {
+  const base: LegacyCourse = { id: 'c1', topic: 'React', title: 'Curso', url: '', status: 'pendiente', notes: '', units: ['Unidad 2'], lessons: [{ id: 'a', title: 'Intro', unit: 'Unidad 1', done: true }, { id: 'b', title: 'JSX', unit: 'Unidad 1' }] };
+
+  it('muestra las unidades vacías y las de las lecciones', () => {
+    expect(courseUnits(base)).toEqual(['Unidad 2', 'Unidad 1']);
+    expect(lessonsByUnit(base.lessons!, base.units).map((g) => [g.unit, g.items.length])).toEqual([
+      ['Unidad 2', 0],
+      ['Unidad 1', 2],
+    ]);
+  });
+
+  it('añade, renombra y quita unidades', () => {
+    expect(addUnitPatch(base, ' Unidad 3 ')).toEqual({ units: ['Unidad 2', 'Unidad 1', 'Unidad 3'] });
+    expect(addUnitPatch(base, 'unidad 1')).toBeNull();
+    const r = renameUnitPatch(base, 'Unidad 1', 'Módulo A')!;
+    expect(r.units).toEqual(['Unidad 2', 'Módulo A']);
+    expect(r.lessons!.map((l) => l.unit)).toEqual(['Módulo A', 'Módulo A']);
+    expect(renameUnitPatch(base, 'Unidad 1', 'Unidad 2')).toBeNull();
+    const d = removeUnitPatch(base, 'Unidad 1');
+    expect(d.units).toEqual(['Unidad 2']);
+    expect(d.lessons).toEqual([]);
+    expect(legacyItemSchemas.courses.safeParse({ ...base, units: ['Unidad 1', ''] }).success).toBe(false);
+    expect(legacyItemSchemas.courses.safeParse(base).success).toBe(true);
   });
 });

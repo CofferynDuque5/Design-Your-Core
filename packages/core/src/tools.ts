@@ -2,6 +2,7 @@ import { addDays, diffDays, isDay, periodRange, type Day } from './dates.js';
 import { daysLabel, plural, shortDay } from './format.js';
 import { moodIcon } from './icons.js';
 import {
+  COURSE_UNITS_MAX,
   BOX_COLORS,
   CARE_KIND_INFO,
   CARE_KINDS,
@@ -1120,15 +1121,52 @@ export function coursePlaybackPatch(c: LegacyCourse, at: { position: number; dur
 export const nextLesson = (c: Pick<LegacyCourse, 'lessons'>): CourseLesson | undefined => c.lessons?.find((l) => !l.done);
 
 /** Lecciones por unidad, en el orden en que aparece cada una (las sin unidad, donde caigan). */
-export function lessonsByUnit(lessons: CourseLesson[]): Array<{ unit: string; items: CourseLesson[] }> {
+export function lessonsByUnit(lessons: CourseLesson[], units: string[] = []): Array<{ unit: string; items: CourseLesson[] }> {
   const out: Array<{ unit: string; items: CourseLesson[] }> = [];
+  const find = (unit: string) => out.find((x) => sameUnit(x.unit, unit));
+  // Primero las unidades creadas (aunque estén vacías), en su orden.
+  for (const u of units) if (u.trim() && !find(u.trim())) out.push({ unit: u.trim(), items: [] });
   for (const l of lessons) {
     const unit = (l.unit ?? '').trim();
-    const g = out.find((x) => x.unit.toLocaleLowerCase('es') === unit.toLocaleLowerCase('es'));
+    const g = find(unit);
     if (g) g.items.push(l);
     else out.push({ unit, items: [l] });
   }
   return out;
+}
+
+const sameUnit = (a: string, b: string) => a.trim().toLocaleLowerCase('es') === b.trim().toLocaleLowerCase('es');
+
+/** Las unidades de un curso en orden: las creadas y las que solo aparecen en lecciones. */
+export function courseUnits(c: Pick<LegacyCourse, 'units' | 'lessons'>): string[] {
+  return lessonsByUnit(c.lessons ?? [], c.units ?? [])
+    .map((g) => g.unit)
+    .filter(Boolean);
+}
+
+/** Añade una unidad vacía al final (si no existe ya). */
+export function addUnitPatch(c: LegacyCourse, name: string): Partial<LegacyCourse> | null {
+  const unit = name.trim();
+  const units = courseUnits(c);
+  if (!unit || units.some((u) => sameUnit(u, unit)) || units.length >= COURSE_UNITS_MAX) return null;
+  return { units: [...units, unit] };
+}
+
+/** Cambia el nombre de una unidad, también en sus lecciones. */
+export function renameUnitPatch(c: LegacyCourse, from: string, to: string): Partial<LegacyCourse> | null {
+  const name = to.trim();
+  const units = courseUnits(c);
+  if (!name || units.some((u) => sameUnit(u, name) && !sameUnit(u, from))) return null;
+  return {
+    units: units.map((u) => (sameUnit(u, from) ? name : u)),
+    lessons: (c.lessons ?? []).map((l) => (l.unit && sameUnit(l.unit, from) ? { ...l, unit: name } : l)),
+  };
+}
+
+/** Quita una unidad con sus lecciones; el avance del curso se recalcula. */
+export function removeUnitPatch(c: LegacyCourse, unit: string, now = new Date()): Partial<LegacyCourse> {
+  const lessons = (c.lessons ?? []).filter((l) => !(l.unit && sameUnit(l.unit, unit)));
+  return { ...lessonsPatch(c, lessons, now), units: courseUnits(c).filter((u) => !sameUnit(u, unit)) };
 }
 
 /**
