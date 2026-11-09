@@ -1,5 +1,5 @@
 import type { Habit } from '@dyc/api-client';
-import { addDays, daysLabel, isScheduled, PILLAR_IDS, shortDay, WEEKDAYS, weekdayShort, type Day, type PillarId } from '@dyc/core';
+import { addDays, daysLabel, isScheduled, matchesSearch, PILLAR_IDS, PILLAR_NAMES, shortDay, WEEKDAYS, weekdayShort, type Day, type PillarId } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, Check, Pencil, Plus } from 'lucide-react-native';
@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { pillarShort, PillarTag } from '../../components/pillar';
 import { Sheet } from '../../components/Sheet';
-import { Toggle } from '../../components/tools';
+import { SearchBar, Toggle } from '../../components/tools';
 import { Button, Card, Chip, EmptyState, ErrorState, errorMessage, Field, Loading, PageHeader, Screen, T, fonts } from '../../components/ui';
 import { api } from '../../lib/api';
 import { keys, useHabits, useRefresh } from '../../lib/queries';
@@ -30,8 +30,10 @@ export default function Habits() {
   const [editing, setEditing] = useState<Habit | 'new' | null>(null);
 
   const list = habits.data?.habits ?? [];
-  const active = list.filter((h) => !h.archived);
-  const archived = list.filter((h) => h.archived);
+  const [q, setQ] = useState('');
+  const found = list.filter((h) => matchesSearch(q, h.title, PILLAR_NAMES[h.pillar]));
+  const active = found.filter((h) => !h.archived);
+  const archived = found.filter((h) => h.archived);
 
   return (
     <Screen refreshing={habits.isRefetching} onRefresh={() => habits.refetch()}>
@@ -44,9 +46,10 @@ export default function Habits() {
         <ErrorState error={habits.error} retry={() => habits.refetch()} />
       ) : (
         <>
+          {list.length > 0 && <SearchBar label="Buscar en tus hábitos" value={q} onChange={setQ} placeholder="Buscar por hábito o pilar…" count={active.length + (showArchived ? archived.length : 0)} />}
           {active.length ? (
             active.map((h) => <HabitCard key={h.id} h={h} today={habits.data.today} onEdit={() => setEditing(h)} />)
-          ) : (
+          ) : q.trim() && list.length ? null : (
             <EmptyState title="Aún no tienes hábitos">
               Empieza con uno tan pequeño que no puedas fallar. Algunas ideas: {IDEAS.map((i) => i.title.toLowerCase()).slice(0, 3).join(', ')}.
             </EmptyState>

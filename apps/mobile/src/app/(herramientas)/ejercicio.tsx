@@ -1,11 +1,11 @@
-import { byDateDesc, isDay, shortDay, utcDayKey, workoutRoutine, workoutStats, WORKOUT_PLANS, type Day, type LegacyWorkout } from '@dyc/core';
+import { matchesSearch, byDateDesc, isDay, shortDay, utcDayKey, workoutRoutine, workoutStats, WORKOUT_PLANS, type Day, type LegacyWorkout } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter } from 'expo-router';
 import { CalendarPlus, Check, Dumbbell, Plus, Trash2 } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckInNote, DayStepper, Dot, FormActions, IconButton, Pill, Stats, Suggestions, tint, ToolScreen } from '../../components/tools';
+import { CheckInNote, DayStepper, Dot, FormActions, IconButton, Pill, SearchBar, Stats, Suggestions, tint, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, SectionHeader, T } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useSyncCheckIn, workoutMinutes } from '../../lib/checkinSync';
@@ -29,6 +29,8 @@ export default function Exercise() {
   const stats = useMemo(() => workoutStats(workouts, today), [workouts, today]);
   const history = useMemo(() => workouts.filter((w) => isDay(w.date)).sort(byDateDesc), [workouts]);
   const [editing, setEditing] = useState<LegacyWorkout | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = history.filter((w) => matchesSearch(q, w.plan, shortDay(w.date), w.date));
   const doneToday = new Set(workouts.filter((w) => w.date === today).map((w) => w.plan));
 
   const sync = useSyncCheckIn();
@@ -106,11 +108,12 @@ export default function Exercise() {
           </View>
           <View style={{ gap: space[3] }}>
             <SectionHeader title="Historial" right={<Pill a11yLabel={`${stats.total} en total`}>{String(stats.total)}</Pill>} />
+            {history.length > 0 && <SearchBar label="Buscar en tus entrenos" value={q} onChange={setQ} placeholder="Buscar por entreno o fecha…" count={found.length} />}
             {history.length === 0 ? (
               <EmptyState title="Aún no hay entrenos">Marca un plan como hecho o registra tu propio entreno.</EmptyState>
-            ) : (
+            ) : found.length === 0 ? null : (
               <Card style={{ paddingVertical: space[1], gap: 0 }}>
-                {history.slice(0, HISTORY_MAX).map((w, i) => {
+                {found.slice(0, HISTORY_MAX).map((w, i) => {
                   const label = `${w.plan || 'Entreno'} del ${shortDay(w.date)}`;
                   return (
                     <Fragment key={w.id}>

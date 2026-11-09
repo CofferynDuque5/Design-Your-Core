@@ -1,4 +1,7 @@
 import {
+  matchesSearch,
+  addDays,
+  shiftMonth,
   reminderFallsOn,
   CALENDAR_MARKS,
   calendarCycleDays,
@@ -32,7 +35,7 @@ import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { Suggestions, ColorSwatches, Dot, IconButton, MonthNav, Stepper, Toggle, ToolScreen } from '../../components/tools';
+import { Suggestions, ColorSwatches, Dot, IconButton, MonthNav, SearchBar, Stepper, Toggle, ToolScreen } from '../../components/tools';
 import { Button, Card, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { UiIcon } from '../../components/UiIcon';
 import { useAuth } from '../../lib/api';
@@ -58,6 +61,9 @@ export default function Calendar() {
   const data = legacy.data?.data;
   const reminders = useLegacyList(data, 'reminders');
   const markColor = useMarkColors();
+  const [q, setQ] = useState('');
+  const found = q.trim() ? reminders.filter((r) => matchesSearch(q, displayTitle(r.title), r.when)).sort((a, b) => a.day - b.day) : [];
+  const monthLength = Number(addDays(shiftMonth(month, 1), -1).slice(8, 10));
 
   const cycleDays = useMemo(() => calendarCycleDays(data, month, today, showCycle), [data, month, today, showCycle]);
   const marks = useMemo(() => calendarMarks(data, month, cycleDays), [data, month, cycleDays]);
@@ -81,6 +87,20 @@ export default function Calendar() {
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
       ) : (
         <>
+          {reminders.length > 0 && <SearchBar label="Buscar en tus eventos" value={q} onChange={setQ} placeholder="Buscar un evento por nombre u hora…" count={q.trim() ? found.length : undefined} />}
+          {found.length > 0 && (
+            <Card style={{ paddingVertical: space[1], gap: 0 }}>
+              {found.slice(0, 30).map((r) => (
+                <Button
+                  key={r.id}
+                  small
+                  variant="ghost"
+                  label={`Día ${r.day} · ${displayTitle(r.title)}${r.when ? ` · ${r.when}` : ''}`}
+                  onPress={() => setSelected(addDays(month, Math.min(r.day, monthLength) - 1))}
+                />
+              ))}
+            </Card>
+          )}
           <Card style={{ paddingHorizontal: space[3] }}>
             <MonthNav month={month} current={today} onChange={go} />
             <View style={s.week} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>

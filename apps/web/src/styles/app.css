@@ -2821,6 +2821,16 @@
 
   .projects-toolbar {
     justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .project-mail__address {
+    overflow-wrap: anywhere;
+  }
+
+  .project-mail__actions {
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   .project-place {

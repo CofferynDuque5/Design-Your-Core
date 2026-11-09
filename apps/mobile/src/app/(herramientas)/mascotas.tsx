@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   CARE_KIND_INFO,
   CARE_KINDS,
   careKindOf,
@@ -23,7 +24,7 @@ import { Check, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { Suggestions, DotChoices, FormActions, IconButton, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { Suggestions, DotChoices, FormActions, IconButton, SearchBar, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T } from '../../components/ui';
 import { UiIcon } from '../../components/UiIcon';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
@@ -43,6 +44,8 @@ export default function Pets() {
   const [editing, setEditing] = useState<LegacyPet | 'new' | null>(null);
   const [care, setCare] = useState<{ pet: LegacyPet; care: LegacyPetCare | null } | null>(null);
   const known = new Set(pets.map((p) => p.id));
+  const [q, setQ] = useState('');
+  const shownPets = pets.filter((p) => matchesSearch(q, p.name, p.note, PET_SPECIES_INFO[petSpeciesOf(p)].label, ...cares.filter((c) => c.petId === p.id).map((c) => c.title)));
   const ownCares = cares.filter((c) => known.has(c.petId));
   const doneToday = ownCares.filter((c) => c.lastDone === today).length;
   const pendingToday = ownCares.filter((c) => nextDue(c, now)?.inDays === 0).length;
@@ -72,7 +75,8 @@ export default function Pets() {
               { value: String(doneToday), label: doneToday === 1 ? 'Hecho hoy' : 'Hechos hoy' },
             ]}
           />
-          {pets.map((p) => (
+          <SearchBar label="Buscar en tus mascotas" value={q} onChange={setQ} placeholder="Buscar una mascota o un cuidado…" count={shownPets.length} />
+          {shownPets.map((p) => (
             <PetCard key={p.id} pet={p} cares={cares.filter((c) => c.petId === p.id)} today={today} now={now} onEdit={() => setEditing(p)} onCare={(c) => setCare({ pet: p, care: c })} />
           ))}
           <T v="small" tint="muted">

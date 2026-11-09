@@ -1,9 +1,10 @@
-import { byDateDesc, isDay, shortDay, utcDayKey, workoutRoutine, workoutStats, WORKOUT_PLANS, type LegacyWorkout } from '@dyc/core';
+import { matchesSearch, byDateDesc, isDay, shortDay, utcDayKey, workoutRoutine, workoutStats, WORKOUT_PLANS, type LegacyWorkout } from '@dyc/core';
 import { CalendarPlus, Check, Dumbbell, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -23,6 +24,8 @@ export function Exercise() {
   const stats = useMemo(() => workoutStats(workouts, today), [workouts, today]);
   const history = useMemo(() => [...workouts].filter((w) => isDay(w.date)).sort(byDateDesc), [workouts]);
   const [editing, setEditing] = useState<LegacyWorkout | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = history.filter((w) => matchesSearch(q, w.plan, shortDay(w.date), w.date));
   const doneToday = new Set(workouts.filter((w) => w.date === today).map((w) => w.plan));
 
   const sync = useSyncCheckIn();
@@ -106,11 +109,12 @@ export function Exercise() {
             <h2 id="history-title" className="list-count">
               Historial <span className="chip small numeric">{stats.total}</span>
             </h2>
+            {history.length > 0 && <SearchBox label="Buscar en tus entrenos" value={q} onChange={setQ} placeholder="Buscar por entreno o fecha…" count={found.length} />}
             {history.length === 0 ? (
               <EmptyState title="Aún no hay entrenos">Marca un plan como hecho o registra tu propio entreno.</EmptyState>
             ) : (
               <ul className="day-items">
-                {history.slice(0, HISTORY_MAX).map((w) => {
+                {found.slice(0, HISTORY_MAX).map((w) => {
                   const label = `${w.plan || 'Entreno'} del ${shortDay(w.date)}`;
                   return (
                     <li key={w.id}>

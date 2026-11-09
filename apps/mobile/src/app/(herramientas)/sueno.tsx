@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   byDateDesc,
   isDay,
   minutesLabel,
@@ -16,7 +17,7 @@ import { Plus, Trash2 } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckInNote, DayStepper, FormActions, IconButton, Pill, tint, TimeField, ToolScreen } from '../../components/tools';
+import { CheckInNote, DayStepper, FormActions, IconButton, Pill, SearchBar, tint, TimeField, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, Scale, SectionHeader, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useSyncCheckIn } from '../../lib/checkinSync';
@@ -49,6 +50,8 @@ export default function Sleep() {
   const history = useMemo(() => nights.filter((n) => isDay(n.date)).sort(byDateDesc), [nights]);
   const chart = history.slice(0, CHART_NIGHTS).reverse();
   const [editing, setEditing] = useState<LegacySleep | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = history.filter((n) => matchesSearch(q, shortDay(n.date), n.date, n.note, sleepQualityLabel(n.quality)));
   const last = history[0];
   const lastMinutes = last ? sleepMinutes(last.bedtime, last.waketime) : null;
 
@@ -134,8 +137,9 @@ export default function Sleep() {
 
           <View style={{ gap: space[3] }}>
             <SectionHeader title="Historial" right={<Pill a11yLabel={`${history.length} noches`}>{String(history.length)}</Pill>} />
+            <SearchBar label="Buscar en tus noches" value={q} onChange={setQ} placeholder="Buscar por fecha, nota o calidad…" count={found.length} />
             <Card style={{ paddingVertical: space[1], gap: 0 }}>
-              {history.slice(0, HISTORY_MAX).map((n, i) => {
+              {found.slice(0, HISTORY_MAX).map((n, i) => {
                 const m = sleepMinutes(n.bedtime, n.waketime);
                 const label = `la noche del ${shortDay(n.date)}`;
                 return (

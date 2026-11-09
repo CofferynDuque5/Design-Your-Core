@@ -135,6 +135,28 @@ export const PROJECT_PRIORITY_INFO: Record<ProjectPriority, { label: string; ran
   baja: { label: 'Baja', rank: 2 },
 };
 
+/** Tipo de proyecto (campo nuevo y opcional). */
+export const PROJECT_CATEGORIES = ['web', 'app', 'automatizacion', 'tienda', 'diseno', 'contenido', 'estudio', 'otro'] as const;
+export type ProjectCategory = (typeof PROJECT_CATEGORIES)[number];
+export const PROJECT_CATEGORY_INFO: Record<ProjectCategory, { label: string }> = {
+  web: { label: 'Sitio web' },
+  app: { label: 'Aplicación' },
+  automatizacion: { label: 'Automatización' },
+  tienda: { label: 'Tienda en línea' },
+  diseno: { label: 'Diseño' },
+  contenido: { label: 'Contenido' },
+  estudio: { label: 'Trabajo de estudio' },
+  otro: { label: 'Otro' },
+};
+
+/** Lo que falta para terminar un proyecto, o una mejora para después. */
+export const PROJECT_TODO_KINDS = ['falta', 'mejora'] as const;
+export type ProjectTodoKind = (typeof PROJECT_TODO_KINDS)[number];
+export const PROJECT_TODO_KIND_INFO: Record<ProjectTodoKind, { label: string; noun: string }> = {
+  falta: { label: 'Falta por hacer', noun: 'pendiente' },
+  mejora: { label: 'Mejoras', noun: 'punto de mejora' },
+};
+
 export const CONTENT_STAGES = ['idea', 'guion', 'grabar', 'editar', 'publicado'] as const;
 export type ContentStage = (typeof CONTENT_STAGES)[number];
 export const CONTENT_STAGE_INFO: Record<ContentStage, { label: string }> = {
@@ -468,6 +490,18 @@ export interface LegacyProject {
   priority?: ProjectPriority;
   color: string;
   milestones: LegacyMilestone[];
+  /** Tipo de proyecto; falta en los proyectos antiguos y "" es «sin categoría». */
+  category?: ProjectCategory | '';
+  /** Correo del sitio o del proyecto (por ejemplo contacto@misitio.com). */
+  email?: string;
+  /** Enlace del webmail para abrir ese correo; si falta se usa https://dominio/webmail. */
+  mailUrl?: string;
+  /** Lo que falta para terminar y las mejoras pendientes. */
+  todos?: LegacyProjectTodo[];
+}
+
+export interface LegacyProjectTodo extends LegacyCheckItem {
+  kind: ProjectTodoKind;
 }
 
 export interface LegacyRoadmap {
@@ -978,6 +1012,10 @@ const shapes = {
     priority: z.enum(PROJECT_PRIORITIES).default('media'),
     color: hex.default(PROJECT_COLORS[0]),
     milestones: checkList(checkItem.extend({ date: z.string().max(60).default('') })),
+    category: z.union([z.literal(''), z.enum(PROJECT_CATEGORIES)]).optional(),
+    email: z.union([z.literal(''), z.string().trim().max(200).email('Correo no válido')]).optional(),
+    mailUrl: z.union([z.literal(''), z.string().trim().max(500).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).optional(),
+    todos: z.array(checkItem.extend({ kind: z.enum(PROJECT_TODO_KINDS).default('falta') })).max(1000).optional(),
   }),
   roadmaps: z.object({
     id: legacyIdSchema,
@@ -1424,7 +1462,16 @@ export function checkItems<T extends LegacyCheckItem>(list: unknown, makeId: () 
 
 /** Para enviar una lista anidada: solo los campos conocidos (el servidor conserva el resto por id). */
 export function checkItemsPayload<T extends LegacyCheckItem>(list: T[]): T[] {
-  return list.map((s) => ({ id: s.id, name: s.name, done: !!s.done, ...('date' in s ? { date: typeof s.date === 'string' ? s.date : '' } : {}) }) as T);
+  return list.map(
+    (s) =>
+      ({
+        id: s.id,
+        name: s.name,
+        done: !!s.done,
+        ...('date' in s ? { date: typeof s.date === 'string' ? s.date : '' } : {}),
+        ...('kind' in s ? { kind: s.kind === 'mejora' ? 'mejora' : 'falta' } : {}),
+      }) as T,
+  );
 }
 
 export const legacyReorderSchema = z.object({ ids: z.array(legacyIdSchema).max(5000) }).strict();

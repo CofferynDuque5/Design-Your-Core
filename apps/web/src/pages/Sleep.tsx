@@ -1,9 +1,10 @@
-import { byDateDesc, isDay, shortDay, sleepMinutes, sleepQualityLabel as qualityLabel, sleepStats, utcDayKey, type LegacySleep } from '@dyc/core';
+import { matchesSearch, byDateDesc, isDay, shortDay, sleepMinutes, sleepQualityLabel as qualityLabel, sleepStats, utcDayKey, type LegacySleep } from '@dyc/core';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { Scale, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -25,6 +26,8 @@ export function Sleep() {
   const history = useMemo(() => [...nights].filter((n) => isDay(n.date)).sort(byDateDesc), [nights]);
   const chart = history.slice(0, CHART_NIGHTS).reverse();
   const [editing, setEditing] = useState<LegacySleep | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = history.filter((n) => matchesSearch(q, shortDay(n.date), n.date, n.note, qualityLabel(n.quality)));
   const last = history[0];
   const lastMinutes = last ? sleepMinutes(last.bedtime, last.waketime) : null;
 
@@ -106,8 +109,9 @@ export function Sleep() {
             <h2 id="sleep-history" className="list-count">
               Historial <span className="chip small numeric">{history.length}</span>
             </h2>
+            <SearchBox label="Buscar en tus noches" value={q} onChange={setQ} placeholder="Buscar por fecha, nota o calidad…" count={found.length} />
             <ul className="day-items">
-              {history.slice(0, HISTORY_MAX).map((n) => {
+              {found.slice(0, HISTORY_MAX).map((n) => {
                 const m = sleepMinutes(n.bedtime, n.waketime);
                 const label = `la noche del ${shortDay(n.date)}`;
                 return (

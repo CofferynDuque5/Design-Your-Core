@@ -375,7 +375,9 @@ describe('Cursos', () => {
     renderAt('/cursos');
     await userEvent.click(await screen.findByRole('button', { name: 'Nuevo curso' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
-    await userEvent.type(within(dialog).getByLabelText('Tema'), 'Guitarra');
+    // Hay temas: se elige de la lista o «Otro tema…» y se escribe.
+    await userEvent.selectOptions(within(dialog).getByLabelText('Tema'), 'Otro tema…');
+    await userEvent.type(within(dialog).getByLabelText('Tema: escribe otro tema'), 'Guitarra');
     await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'youtu.be/xyz');
     expect(within(dialog).getByText('Se abrirá en YouTube.')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
@@ -629,7 +631,9 @@ describe('Cursos: progreso y horario', () => {
     expect(screen.getByText(/Platzi/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Añadir a React' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
-    await userEvent.type(within(dialog).getByLabelText('Subcategoría (opcional)'), 'Hooks');
+    expect(within(dialog).getByLabelText('Tema')).toHaveValue('React');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Subcategoría (opcional)'), 'Otra subcategoría…');
+    await userEvent.type(within(dialog).getByLabelText('Subcategoría (opcional): escribe otra subcategoría'), 'Hooks');
     await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://youtu.be/abcdefghijk');
     await userEvent.tab();
     expect(await within(dialog).findByText('Dura 1 h 30 min, de midudev, según la página.')).toBeInTheDocument();
@@ -903,6 +907,42 @@ describe('Proyectos', () => {
     await userEvent.click(screen.getByRole('button', { name: /Ordenar por prioridad/ }));
     expect(writes(api)[2]).toMatchObject({ method: 'PUT', path: '/api/v2/modules/projects/order' });
 
+  });
+
+  it('categoría, correo del sitio y la lista de lo que falta y las mejoras', async () => {
+    const api = withApi();
+    renderAt('/proyectos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo proyecto' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo proyecto' });
+    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Sitio de la tienda');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Categoría'), 'Sitio web');
+    await userEvent.type(within(dialog).getByLabelText('Correo del sitio (opcional)'), 'malo');
+    expect(within(dialog).getByRole('button', { name: 'Añadir proyecto' })).toBeDisabled();
+    await userEvent.clear(within(dialog).getByLabelText('Correo del sitio (opcional)'));
+    await userEvent.type(within(dialog).getByLabelText('Correo del sitio (opcional)'), 'hola@latienda.com');
+    expect(within(dialog).getByLabelText('Enlace para abrir el correo (opcional)')).toHaveAttribute('placeholder', 'https://latienda.com/webmail');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir proyecto' }));
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', body: { item: { title: 'Sitio de la tienda', category: 'web', email: 'hola@latienda.com', mailUrl: '', todos: [] } } });
+
+    const card = await screen.findByRole('article', { name: 'Sitio de la tienda' });
+    expect(within(card).getByText('Sitio web')).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: /Abrir el correo hola@latienda.com/ })).toHaveAttribute('href', 'https://latienda.com/webmail');
+    expect(within(card).getByRole('link', { name: 'Escribir a hola@latienda.com' })).toHaveAttribute('href', 'mailto:hola@latienda.com');
+
+    await userEvent.click(within(card).getByRole('button', { name: /Por terminar/ }));
+    await userEvent.type(within(card).getByPlaceholderText('Qué falta para terminar'), 'Página de pagos{Enter}');
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', body: { todos: [{ name: 'Página de pagos', done: false, kind: 'falta' }] } }));
+    await userEvent.click(within(within(card).getByRole('group', { name: 'Lista de «Sitio de la tienda»' })).getByRole('button', { name: 'Mejoras' }));
+    await userEvent.type(within(card).getByPlaceholderText('Qué se podría mejorar'), 'Modo oscuro{Enter}');
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { todos: [{ name: 'Página de pagos', kind: 'falta' }, { name: 'Modo oscuro', kind: 'mejora' }] } }));
+    expect(await within(card).findByRole('button', { name: /Por terminar · 1 falta · 1 mejora/ })).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText('Categoría'), 'Sitio web (1)');
+    expect(screen.queryByRole('article', { name: 'Maqueta del puente' })).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Categoría'), 'Todas las categorías');
+    await userEvent.type(screen.getByLabelText('Buscar en tus proyectos'), 'pagos');
+    expect(screen.getByRole('article', { name: 'Sitio de la tienda' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: 'Maqueta del puente' })).not.toBeInTheDocument();
   });
 });
 

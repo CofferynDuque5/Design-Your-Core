@@ -1,15 +1,19 @@
-import { toolStatus } from '@dyc/core';
+import { matchesSearch, toolStatus } from '@dyc/core';
+import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router';
 import { useLegacyData } from '../app/legacy';
 import { useSession } from '../app/session';
 import { TOOL_GROUPS, TOOLS } from '../app/tools';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { ErrorState, Loading } from '../components/States';
 
 export function More() {
   const legacy = useLegacyData();
   const { user } = useSession();
+  const [q, setQ] = useState('');
+  const found = TOOLS.filter((t) => matchesSearch(q, t.label, t.description));
 
   return (
     <div className="page page--narrow">
@@ -26,13 +30,14 @@ export function More() {
               <h2 id="tools-title" className="section-title">
                 Herramientas
               </h2>
-              {TOOL_GROUPS.map((g) => (
+              <SearchBox label="Buscar una herramienta" value={q} onChange={setQ} placeholder="Buscar una herramienta…" count={found.length} />
+              {TOOL_GROUPS.filter((g) => found.some((t) => t.group === g.id)).map((g) => (
                 <div key={g.id} className="stack-sm">
                   <h3 id={`tools-${g.id}`} className="group-title">
                     {g.label}
                   </h3>
                   <ul className="tool-links" aria-labelledby={`tools-${g.id}`}>
-                    {TOOLS.filter((t) => t.group === g.id).map((tool) => {
+                    {found.filter((t) => t.group === g.id).map((tool) => {
                       const { to, label, icon: Icon, description, optIn } = tool;
                       const status = toolStatus(tool, legacy.data.data);
                       return (

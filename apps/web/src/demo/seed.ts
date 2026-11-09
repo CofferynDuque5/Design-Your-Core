@@ -195,8 +195,9 @@ export function sampleLegacy(today: Day): Record<string, unknown> {
       { id: 'm3', name: 'Programación', teacher: 'Sra. Vidal', room: 'Laboratorio 3', color: '#8B5CF6', nextClass: 'Martes 9:00', topics: [{ id: 'tp6', name: 'Funciones', done: true }, { id: 'tp7', name: 'Recursión', done: false }] },
     ],
     projects: [
-      { id: 'pr1', title: 'App de apuntes', subject: 'Programación', deadline: '15 oct', status: 'curso', color: '#8B5CF6', milestones: [{ id: 'ms1', name: 'Bocetos', date: '', done: true }, { id: 'ms2', name: 'Pantalla de acceso', date: '', done: false }, { id: 'ms3', name: 'Pruebas con compañeros', date: '', done: false }] },
-      { id: 'pr2', title: 'Maqueta del puente', subject: 'Física', deadline: '2 oct', status: 'revision', color: '#0FA968', milestones: [{ id: 'ms4', name: 'Cálculos', date: '', done: true }, { id: 'ms5', name: 'Montaje', date: '', done: true }] },
+      { id: 'pr0', title: 'Tienda de velas Lumen', subject: '', deadline: '30 nov', status: 'curso', color: '#C6F432', priority: 'alta', category: 'tienda', email: 'hola@velaslumen.com', mailUrl: '', todos: [{ id: 'td1', name: 'Conectar el pago con tarjeta', done: false, kind: 'falta' }, { id: 'td2', name: 'Página de envíos y devoluciones', done: false, kind: 'falta' }, { id: 'td3', name: 'Fotos de producto', done: true, kind: 'falta' }, { id: 'td4', name: 'Que cargue más rápido en el teléfono', done: false, kind: 'mejora' }, { id: 'td5', name: 'Botón de WhatsApp', done: false, kind: 'mejora' }], milestones: [{ id: 'ms0', name: 'Catálogo listo', date: '', done: true }] },
+      { id: 'pr1', title: 'App de apuntes', subject: 'Programación', deadline: '15 oct', status: 'curso', color: '#8B5CF6', category: 'app', milestones: [{ id: 'ms1', name: 'Bocetos', date: '', done: true }, { id: 'ms2', name: 'Pantalla de acceso', date: '', done: false }, { id: 'ms3', name: 'Pruebas con compañeros', date: '', done: false }] },
+      { id: 'pr2', title: 'Maqueta del puente', subject: 'Física', category: 'estudio', deadline: '2 oct', status: 'revision', color: '#0FA968', milestones: [{ id: 'ms4', name: 'Cálculos', date: '', done: true }, { id: 'ms5', name: 'Montaje', date: '', done: true }] },
       { id: 'pr3', title: 'Ensayo de historia del arte', subject: '', deadline: '', status: 'entregado', color: '#EC6A9C', milestones: [] },
     ],
     roadmaps: [

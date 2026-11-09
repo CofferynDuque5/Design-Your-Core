@@ -3,6 +3,10 @@ import { daysLabel, plural, shortDay } from './format.js';
 import { moodIcon } from './icons.js';
 import {
   COURSE_UNITS_MAX,
+  PROJECT_CATEGORIES,
+  checkItems,
+  type LegacyProjectTodo,
+  type ProjectCategory,
   BOX_COLORS,
   CARE_KIND_INFO,
   CARE_KINDS,
@@ -694,6 +698,20 @@ export function projectIdsByPriority<T extends { id: string; status?: unknown; p
 
 /** El proyecto que toca terminar primero (el primero sin entregar), o undefined. */
 export const firstProject = <T extends { status?: unknown }>(list: readonly T[]): T | undefined => list.find((p) => projectStatusOf(p) !== 'entregado');
+
+export const projectCategoryOf = (p: { category?: unknown }): ProjectCategory | null => (PROJECT_CATEGORIES.includes(p.category as ProjectCategory) ? (p.category as ProjectCategory) : null);
+
+/** Lo que falta y las mejoras de un proyecto, con ids seguros. */
+export function projectTodos(p: { todos?: unknown }, makeId: () => string): LegacyProjectTodo[] {
+  return checkItems<LegacyProjectTodo>(p.todos, makeId).map((t) => ({ ...t, kind: t.kind === 'mejora' ? 'mejora' : 'falta' }));
+}
+
+/** El enlace para abrir el correo de un proyecto: el que se guardó o el webmail de su dominio (cPanel). */
+export function projectMailLink(p: { email?: unknown; mailUrl?: unknown }): string | null {
+  if (typeof p.mailUrl === 'string' && /^https?:\/\//i.test(p.mailUrl.trim())) return p.mailUrl.trim();
+  const domain = typeof p.email === 'string' ? p.email.trim().split('@')[1] : '';
+  return domain && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain) ? `https://${domain.toLowerCase()}/webmail` : null;
+}
 
 export const projectStatusOf = (p: { status?: unknown }): ProjectStatus => (PROJECT_STATUSES.includes(p.status as ProjectStatus) ? (p.status as ProjectStatus) : 'curso');
 export const contentPlatformOf = (c: Pick<LegacyContent, 'platform'>): ContentPlatform => (CONTENT_PLATFORMS.includes(c.platform) ? c.platform : 'otro');

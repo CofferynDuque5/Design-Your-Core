@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   byTime,
   daysLabel,
   displayTitle,
@@ -22,7 +23,7 @@ import { GlassWater, Minus, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckInNote, DotChoices, FormActions, IconButton, Meter, Stepper, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { CheckInNote, DotChoices, FormActions, IconButton, Meter, SearchBar, Stepper, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../../lib/legacy';
 import { useSyncCheckIn } from '../../lib/checkinSync';
@@ -40,7 +41,8 @@ export default function Routine() {
   const [meal, setMeal] = useState<LegacyMeal | 'new' | null>(null);
   // Comidas y agua van por día en UTC, como la app anterior.
   const today = utcDayKey();
-  const shown = useMemo(() => routines.filter((r) => day === 0 || onWeekday(r.days, day)).sort(byTime), [routines, day]);
+  const [q, setQ] = useState('');
+  const shown = useMemo(() => routines.filter((r) => (day === 0 || onWeekday(r.days, day)) && matchesSearch(q, displayTitle(r.title), r.time, daysLabel(r.days))).sort(byTime), [routines, day, q]);
   const todayMeals = useMemo(() => meals.filter((m) => m.dateKey === today).sort(byTime), [meals, today]);
   const filter = ROUTINE_DAY_FILTERS.find((f) => f.iso === day) ?? ROUTINE_DAY_FILTERS[0];
 
@@ -82,12 +84,13 @@ export default function Routine() {
               <T v="heading" accessibilityRole="header">
                 {day === 0 ? 'Todas tus rutinas' : `Rutinas del ${filter.long.toLowerCase()}${day === isoDay() ? ' (hoy)' : ''}`}
               </T>
+              {routines.length > 0 && <SearchBar label="Buscar en tus rutinas" value={q} onChange={setQ} placeholder="Buscar una rutina u hora…" count={shown.length} />}
               {routines.length === 0 ? (
                 <EmptyState title="Aún no tienes rutinas" action={<Button small variant="secondary" label="Crear la primera" icon={<Plus size={16} color={colors.primary} />} onPress={() => setEditing('new')} />}>
                   Tus hábitos con hora fija: despertar, tomar vitaminas, entrenar, leer antes de dormir.
                 </EmptyState>
               ) : shown.length === 0 ? (
-                <T v="body" tint="muted">
+                q.trim() ? null : <T v="body" tint="muted">
                   Nada este día.
                 </T>
               ) : (

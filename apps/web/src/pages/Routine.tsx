@@ -1,8 +1,9 @@
-import { byTime, daysLabel, displayTitle, MEAL_LABELS, onWeekday, ROUTINE_DAY_FILTERS as DAY_FILTERS, utcDayKey, waterToday, WATER_GOAL_DEFAULT, weekdaysOf as validDays, type LegacyMeal, type LegacyRoutine } from '@dyc/core';
+import { matchesSearch, byTime, daysLabel, displayTitle, MEAL_LABELS, onWeekday, ROUTINE_DAY_FILTERS as DAY_FILTERS, utcDayKey, waterToday, WATER_GOAL_DEFAULT, weekdaysOf as validDays, type LegacyMeal, type LegacyRoutine } from '@dyc/core';
 import { GlassWater, Minus, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -19,7 +20,8 @@ export function Routine() {
   const [meal, setMeal] = useState<LegacyMeal | 'new' | null>(null);
   // Comidas y agua van por día en UTC, como la app anterior.
   const today = utcDayKey();
-  const shown = useMemo(() => routines.filter((r) => day === 0 || onWeekday(r.days, day)).sort(byTime), [routines, day]);
+  const [q, setQ] = useState('');
+  const shown = useMemo(() => routines.filter((r) => (day === 0 || onWeekday(r.days, day)) && matchesSearch(q, displayTitle(r.title), r.time, daysLabel(r.days))).sort(byTime), [routines, day, q]);
   const todayMeals = useMemo(() => meals.filter((m) => m.dateKey === today).sort(byTime), [meals, today]);
   const filter = DAY_FILTERS.find((f) => f.iso === day) ?? DAY_FILTERS[0];
 
@@ -51,6 +53,7 @@ export function Routine() {
                   </button>
                 ))}
               </div>
+              {routines.length > 0 && <SearchBox label="Buscar en tus rutinas" value={q} onChange={setQ} placeholder="Buscar una rutina u hora…" count={shown.length} />}
               {routines.length === 0 ? (
                 <EmptyState
                   title="Aún no tienes rutinas"
@@ -63,7 +66,7 @@ export function Routine() {
                   Tus hábitos con hora fija: despertar, tomar vitaminas, entrenar, leer antes de dormir.
                 </EmptyState>
               ) : shown.length === 0 ? (
-                <p className="muted recent-empty">Nada este día.</p>
+                q.trim() ? null : <p className="muted recent-empty">Nada este día.</p>
               ) : (
                 <ul className="routine-list">
                   {shown.map((r) => (

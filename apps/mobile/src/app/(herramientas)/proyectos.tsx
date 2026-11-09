@@ -9,8 +9,15 @@ import {
   newLegacySubId,
   paletteWith,
   plural,
+  PROJECT_CATEGORIES,
+  PROJECT_CATEGORY_INFO,
   PROJECT_COLORS,
   PROJECT_PRIORITIES,
+  PROJECT_TODO_KIND_INFO,
+  PROJECT_TODO_KINDS,
+  projectCategoryOf,
+  projectMailLink,
+  projectTodos,
   PROJECT_PRIORITY_INFO,
   PROJECT_STATUS_INFO,
   PROJECT_STATUSES,
@@ -23,21 +30,26 @@ import {
   type LegacyClass,
   type LegacyMilestone,
   type LegacyProject,
+  type LegacyProjectTodo,
   type LegacySubject,
+  type ProjectCategory,
+  type ProjectTodoKind,
   type ProjectPriority,
   type ProjectStatus,
 } from '@dyc/core';
 import { space } from '@dyc/tokens';
-import { ArrowDownWideNarrow, CalendarClock, ChevronDown, ChevronUp, Clock, Flag, Pencil, Plus } from 'lucide-react-native';
+import { ArrowDownWideNarrow, CalendarClock, ChevronDown, ChevronUp, Clock, ExternalLink, Flag, Mail, Pencil, Plus, Send, Shapes } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
 import { SearchBar, CheckList, ColorSwatches, Disclosure, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
-import { Button, Card, EmptyState, ErrorState, Field, Loading, Segmented, T, fonts } from '../../components/ui';
+import { Button, Card, Chip, EmptyState, ErrorState, Field, Loading, Segmented, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
 
-type Project = LegacyProject & { milestones: LegacyMilestone[] };
+type Project = LegacyProject & { milestones: LegacyMilestone[]; todos: LegacyProjectTodo[] };
+type CategoryFilter = ProjectCategory | 'todas' | 'ninguna';
+const KIND_OPTIONS = PROJECT_TODO_KINDS.map((k) => ({ value: k, label: PROJECT_TODO_KIND_INFO[k].label }));
 type Filter = 'todos' | 'curso' | 'entregado';
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'todos', label: 'Todos' },
@@ -56,18 +68,24 @@ export default function Projects() {
   const subjects = useLegacyList(legacy.data?.data, 'subjects');
   const classes = useLegacyList(legacy.data?.data, 'classes');
   // Orden «terminar primero»: el de la lista guardada, con los entregados al final.
-  const projects = useMemo<Project[]>(() => projectsInOrder(raw.map((p) => ({ ...p, milestones: checkItems<LegacyMilestone>(p.milestones, newLegacySubId) }))), [raw]);
+  const projects = useMemo<Project[]>(() => projectsInOrder(raw.map((p) => ({ ...p, milestones: checkItems<LegacyMilestone>(p.milestones, newLegacySubId), todos: projectTodos(p, newLegacySubId) }))), [raw]);
   const actions = useModule('projects');
   const [filter, setFilter] = useState<Filter>('todos');
   const [q, setQ] = useState('');
+  const [category, setCategory] = useState<CategoryFilter>('todas');
   const [editing, setEditing] = useState<Project | 'new' | null>(null);
 
   const active = projects.filter((p) => projectStatusOf(p) !== 'entregado').length;
   const thisWeek = projects.filter((p) => dueThisWeek(p.deadline)).length;
   // Igual que la app anterior: «En curso» incluye los que están en revisión.
-  const shown = (filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? projectStatusOf(p) === 'entregado' : projectStatusOf(p) !== 'entregado'))).filter((p) =>
-    matchesSearch(q, p.title, p.subject, p.deadline, ...p.milestones.map((m) => m.name)),
-  );
+  const categories = PROJECT_CATEGORIES.filter((c) => projects.some((p) => projectCategoryOf(p) === c));
+  const uncategorized = projects.some((p) => !projectCategoryOf(p));
+  const shown = (filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? projectStatusOf(p) === 'entregado' : projectStatusOf(p) !== 'entregado')))
+    .filter((p) => category === 'todas' || (category === 'ninguna' ? !projectCategoryOf(p) : projectCategoryOf(p) === category))
+    .filter((p) => {
+      const cat = projectCategoryOf(p);
+      return matchesSearch(q, p.title, p.subject, p.deadline, cat ? PROJECT_CATEGORY_INFO[cat].label : '', p.email, ...p.milestones.map((m) => m.name), ...p.todos.map((t) => t.name));
+    });
   const open = projects.filter((p) => projectStatusOf(p) !== 'entregado');
 
   // Sube o baja un proyecto pendiente un puesto; los entregados quedan al final.
@@ -101,8 +119,17 @@ export default function Projects() {
               { value: String(thisWeek), label: thisWeek === 1 ? 'Entrega esta semana' : 'Entregas esta semana' },
             ]}
           />
-          <SearchBar label="Buscar en tus proyectos" value={q} onChange={setQ} placeholder="Buscar por nombre, materia o hito…" count={shown.length} />
+          <SearchBar label="Buscar en tus proyectos" value={q} onChange={setQ} placeholder="Buscar por nombre, categoría o pendiente…" count={shown.length} />
           <Segmented<Filter> label="Mostrar" options={FILTERS} value={filter} onChange={setFilter} />
+          {categories.length > 0 && (
+            <View style={st.chips} accessibilityLabel="Categoría">
+              <Chip label="Todas" selected={category === 'todas'} onPress={() => setCategory('todas')} />
+              {categories.map((c) => (
+                <Chip key={c} label={PROJECT_CATEGORY_INFO[c].label} selected={category === c} onPress={() => setCategory(c)} />
+              ))}
+              {uncategorized && <Chip label="Sin categoría" selected={category === 'ninguna'} onPress={() => setCategory('ninguna')} />}
+            </View>
+          )}
           {open.length > 1 && filter !== 'entregado' && (
             <View style={{ gap: space[2] }}>
               <Button
@@ -165,7 +192,13 @@ function ProjectCard({
   const { colors } = useTheme();
   const actions = useModule('projects');
   const [open, setOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [kind, setKind] = useState<ProjectTodoKind>('falta');
   const color = safeColor(p.color, PROJECT_COLORS[0]);
+  const category = projectCategoryOf(p);
+  const mailLink = projectMailLink(p);
+  const missing = p.todos.filter((t) => t.kind === 'falta' && !t.done).length;
+  const ideas = p.todos.filter((t) => t.kind === 'mejora' && !t.done).length;
   const title = p.title || 'Sin título';
   const status = projectStatusOf(p);
   const delivered = status === 'entregado';
@@ -207,6 +240,14 @@ function ProjectCard({
         </View>
       </View>
       <View style={{ gap: space[1], marginTop: -space[2] }}>
+        {category && (
+          <View style={st.meta} accessible accessibilityLabel={`Categoría: ${PROJECT_CATEGORY_INFO[category].label}`}>
+            <Shapes size={15} color={colors.inkSubtle} />
+            <T v="small" tint="muted">
+              {PROJECT_CATEGORY_INFO[category].label}
+            </T>
+          </View>
+        )}
         {p.subject ? (
           <View
             style={st.meta}
@@ -242,7 +283,30 @@ function ProjectCard({
             Entrega · {deadline}
           </T>
         </View>
+        {!!p.email && (
+          <View style={st.meta} accessible accessibilityLabel={`Correo: ${p.email}`}>
+            <Mail size={15} color={colors.inkSubtle} />
+            <T v="small" tint="muted" style={{ flexShrink: 1 }}>
+              {p.email}
+            </T>
+          </View>
+        )}
       </View>
+      {!!p.email && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+          {mailLink && (
+            <Button
+              small
+              variant="secondary"
+              label="Abrir el correo"
+              accessibilityLabel={`Abrir el correo ${p.email}`}
+              icon={<ExternalLink size={16} color={colors.primary} />}
+              onPress={() => Linking.openURL(mailLink).catch(() => undefined)}
+            />
+          )}
+          <Button small variant="ghost" label="Escribir" accessibilityLabel={`Escribir a ${p.email}`} icon={<Send size={16} color={colors.primary} />} onPress={() => Linking.openURL(`mailto:${p.email}`).catch(() => undefined)} />
+        </View>
+      )}
       <Segmented<ProjectStatus>
         label={`Estado de «${title}»`}
         options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: STATUS_SHORT[o.value], a11yLabel: o.label }))}
@@ -277,6 +341,28 @@ function ProjectCard({
           make={(name) => ({ id: newLegacySubId(), name, date: '', done: false })}
         />
       )}
+      <Disclosure
+        label="Por terminar"
+        count={missing || ideas ? `${missing} ${missing === 1 ? 'falta' : 'faltan'} · ${plural(ideas, 'mejora', 'mejoras')}` : undefined}
+        open={listOpen}
+        onToggle={() => setListOpen((o) => !o)}
+        a11yLabel={`Por terminar en «${title}»: ${missing} ${missing === 1 ? 'falta' : 'faltan'}, ${plural(ideas, 'mejora', 'mejoras')}`}
+      />
+      {listOpen && (
+        <View style={{ gap: space[2] }}>
+          <Segmented<ProjectTodoKind> label={`Lista de «${title}»`} options={KIND_OPTIONS} value={kind} onChange={setKind} />
+          <CheckList
+            items={p.todos.filter((t) => t.kind === kind)}
+            onChange={(next) => actions.update(p.id, { todos: checkItemsPayload([...p.todos.filter((t) => t.kind !== kind), ...next]) })}
+            owner={title}
+            noun={PROJECT_TODO_KIND_INFO[kind].noun}
+            listLabel={PROJECT_TODO_KIND_INFO[kind].label}
+            placeholder={kind === 'falta' ? 'Qué falta para terminar' : 'Qué se podría mejorar'}
+            color={color}
+            make={(name) => ({ id: newLegacySubId(), name, done: false, kind })}
+          />
+        </View>
+      )}
     </Card>
   );
 }
@@ -291,6 +377,11 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   const pendingMilestones = checkItems<LegacyMilestone>(project?.milestones, () => '').filter((m) => !m.done).length;
   const [priority, setPriority] = useState<ProjectPriority>(project ? projectPriorityOf(project) : 'media');
   const [color, setColor] = useState(safeColor(project?.color, PROJECT_COLORS[count % PROJECT_COLORS.length]));
+  const [category, setCategory] = useState<ProjectCategory | ''>(project ? (projectCategoryOf(project) ?? '') : '');
+  const [email, setEmail] = useState(project?.email ?? '');
+  const [mailUrl, setMailUrl] = useState(project?.mailUrl ?? '');
+  const badEmail = !!email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const badMailUrl = !!mailUrl.trim() && !/^https?:\/\/\S+\.\S+/i.test(mailUrl.trim());
   const named = subjects.filter((s): s is LegacySubject => typeof s.name === 'string' && !!s.name);
   const unknown = !!subject && !named.some((s) => s.name === subject);
 
@@ -302,9 +393,10 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   };
 
   const submit = () => {
-    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color };
+    if (badEmail || badMailUrl) return;
+    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color, category, email: email.trim(), mailUrl: mailUrl.trim() };
     if (project) actions.update(project.id, fields);
-    else actions.add({ id: newId(), ...fields, milestones: [] });
+    else actions.add({ id: newId(), ...fields, milestones: [], todos: [] });
     onDone();
   };
 
@@ -312,6 +404,15 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   return (
     <ScrollView style={{ maxHeight: 600 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
       <Field label="Nombre" value={title} onChangeText={setTitle} maxLength={200} placeholder="Ensayo de Historia" autoFocus={!project} />
+      <View style={{ gap: space[2] }}>
+        <T v="label">Categoría</T>
+        <View style={st.chips} accessibilityLabel="Categoría">
+          <Chip label="Sin categoría" selected={category === ''} onPress={() => setCategory('')} />
+          {PROJECT_CATEGORIES.map((c) => (
+            <Chip key={c} label={PROJECT_CATEGORY_INFO[c].label} selected={category === c} onPress={() => setCategory(c)} />
+          ))}
+        </View>
+      </View>
       <View style={{ gap: space[1] }}>
         <DotChoices
           legend="Materia"
@@ -359,11 +460,37 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
         <T v="label">Prioridad</T>
         <Segmented<ProjectPriority> label="Prioridad" options={PRIORITY_OPTIONS} value={priority} onChange={setPriority} />
       </View>
+      <Field
+        label="Correo del sitio (opcional)"
+        value={email}
+        onChangeText={setEmail}
+        maxLength={200}
+        placeholder="contacto@misitio.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        error={badEmail ? 'Escribe un correo completo, por ejemplo contacto@misitio.com' : null}
+        hint="Aparece en la tarjeta con «Abrir el correo» y «Escribir»."
+      />
+      {!!email.trim() && (
+        <Field
+          label="Enlace para abrir el correo (opcional)"
+          value={mailUrl}
+          onChangeText={setMailUrl}
+          maxLength={500}
+          placeholder={projectMailLink({ email }) ?? 'https://misitio.com/webmail'}
+          keyboardType="url"
+          autoCapitalize="none"
+          autoCorrect={false}
+          error={badMailUrl ? 'Pega un enlace completo, por ejemplo https://misitio.com/webmail' : null}
+          hint="Si lo dejas vacío se abre el webmail del dominio (cPanel). Pon otro si usas Gmail, Outlook o Zoho."
+        />
+      )}
       <ColorSwatches legend="Color" colors={paletteWith(PROJECT_COLORS, color)} value={color} onChange={setColor} />
       <FormActions
         submitLabel={project ? 'Guardar' : 'Añadir proyecto'}
         onSubmit={submit}
-        disabled={!title.trim()}
+        disabled={!title.trim() || badEmail || badMailUrl}
         onDelete={
           project
             ? () => {
@@ -383,4 +510,5 @@ const st = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
   place: { minWidth: 26, height: 26, paddingHorizontal: 6, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: -1 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: space[2], flexWrap: 'wrap' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
 });

@@ -1,9 +1,10 @@
-import { CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, scheduleHours, showableClasses, type LegacyClass } from '@dyc/core';
+import { matchesSearch, CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, scheduleHours, showableClasses, type LegacyClass } from '@dyc/core';
 import { Clock, MapPin, Play, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -37,6 +38,8 @@ export function Schedule() {
   const nowH = nowHours(now);
   const next = nextClass(classes, now);
   const describe = (c: LegacyClass) => `${classDescription(c)}. Editar`;
+  const [q, setQ] = useState('');
+  const shown = classes.filter((c) => matchesSearch(q, c.title, c.room, CLASS_DAY_NAMES[c.day - 1], c.start));
 
   return (
     <div className="page">
@@ -54,7 +57,8 @@ export function Schedule() {
           {classes.length === 0 && (
             <EmptyState title="Tu horario está vacío">Añade tus clases con «Nueva clase»: se repiten cada semana en el mismo día y hora.</EmptyState>
           )}
-          {next && (
+          {classes.length > 0 && <SearchBox label="Buscar en tu horario" value={q} onChange={setQ} placeholder="Buscar una clase, aula o día…" count={shown.length} />}
+          {next && !q.trim() && (
             <section className="card card--accent next-class" aria-labelledby="next-class-title" style={{ ['--c' as string]: next.c.color }}>
               <p id="next-class-title" className="eyebrow">
                 {next.ongoing ? 'Clase en curso' : 'Próxima clase'}
@@ -104,7 +108,7 @@ export function Schedule() {
               </div>
               {DAY_NAMES.map((name, i) => {
                 const day = i + 1;
-                const placed = layoutLanes(classes.filter((c) => c.day === day).map((c) => ({ item: c, start: hhmmToHours(c.start), end: hhmmToHours(c.end) })));
+                const placed = layoutLanes(shown.filter((c) => c.day === day).map((c) => ({ item: c, start: hhmmToHours(c.start), end: hhmmToHours(c.end) })));
                 return (
                   <div key={name} className={`week-grid__col${day === today ? ' week-grid__col--today' : ''}`} style={{ height: (to - from) * HOUR }}>
                     <ul aria-label={name}>
@@ -142,7 +146,7 @@ export function Schedule() {
           {/* Lista por días (teléfono, debajo de la cuadrícula) */}
           <div className="day-list stack">
             {DAY_NAMES.map((name, i) => {
-              const list = classes.filter((c) => c.day === i + 1).sort(byStart);
+              const list = shown.filter((c) => c.day === i + 1).sort(byStart);
               if (!list.length) return null;
               return (
                 <section key={name} className="card card--list" aria-labelledby={`day-${i}`}>

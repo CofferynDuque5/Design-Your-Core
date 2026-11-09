@@ -268,3 +268,71 @@ export function ColorPicker({
     </fieldset>
   );
 }
+
+const OTHER = '\u0000otra';
+
+/**
+ * Elegir de una lista (lo que ya usaste y valores habituales) o escribir otro:
+ * «Otra…» abre un campo de texto. Sin opciones es un campo de texto normal.
+ */
+export function ChoiceField({
+  label,
+  value,
+  onChange,
+  options,
+  emptyLabel,
+  otherLabel = 'Otra…',
+  placeholder,
+  maxLength,
+  required,
+  autoFocus,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly string[];
+  /** Si el campo es opcional: el texto de la opción vacía («Sin materia»). */
+  emptyLabel?: string;
+  otherLabel?: string;
+  placeholder?: string;
+  maxLength?: number;
+  required?: boolean;
+  autoFocus?: boolean;
+  hint?: ReactNode;
+}) {
+  const list = [...new Set(options.map((o) => o.trim()).filter(Boolean))];
+  const [typing, setTyping] = useState(() => !!value.trim() && !list.includes(value.trim()));
+  if (!list.length) return <TextField label={label} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} required={required} autoFocus={autoFocus} hint={hint} />;
+  const writing = typing || (!!value && !list.includes(value));
+  const selected = writing ? OTHER : value;
+  return (
+    <div className="stack-xs">
+      <SelectField
+        label={label}
+        value={selected}
+        required={required && !writing}
+        autoFocus={autoFocus}
+        hint={writing ? undefined : hint}
+        onChange={(e) => {
+          if (e.target.value === OTHER) {
+            setTyping(true);
+            onChange('');
+          } else {
+            setTyping(false);
+            onChange(e.target.value);
+          }
+        }}
+      >
+        {(emptyLabel !== undefined || !value) && <option value="">{emptyLabel ?? 'Elige una opción'}</option>}
+        {list.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        <option value={OTHER}>{otherLabel}</option>
+      </SelectField>
+      {writing && <TextField label={`${label}: escribe ${otherLabel.replace('…', '').toLowerCase()}`} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} required={required} autoFocus={typing} hint={hint} />}
+    </div>
+  );
+}

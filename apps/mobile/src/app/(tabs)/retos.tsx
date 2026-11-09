@@ -1,8 +1,9 @@
 import type { UserChallenge } from '@dyc/api-client';
-import { adjacentLevel, PILLAR_IDS, shortDay, type Challenge, type PillarId } from '@dyc/core';
+import { adjacentLevel, matchesSearch, PILLAR_IDS, PILLAR_NAMES, shortDay, type Challenge, type PillarId } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
+import { SearchBar } from '../../components/tools';
 import { ScrollView, View } from 'react-native';
 import { ChallengeCard } from '../../components/cards';
 import { pillarShort, PillarTag } from '../../components/pillar';
@@ -21,6 +22,7 @@ export default function Challenges() {
   const list = useChallenges();
   const catalog = useCatalog();
   const [filter, setFilter] = useState<PillarId | 'all'>('all');
+  const [q, setQ] = useState('');
 
   return (
     <Screen refreshing={list.isRefetching} onRefresh={() => list.refetch()}>
@@ -41,8 +43,15 @@ export default function Challenges() {
                 <Chip key={p} label={pillarShort(p)} selected={filter === p} onPress={() => setFilter(p)} />
               ))}
             </ScrollView>
+            <SearchBar
+              label="Buscar en el catálogo de retos"
+              value={q}
+              onChange={setQ}
+              placeholder="Buscar un reto…"
+              count={catalog.data.filter((c) => (filter === 'all' || c.pillar === filter) && matchesSearch(q, c.title, c.description, PILLAR_NAMES[c.pillar])).length}
+            />
             {catalog.data
-              .filter((c) => filter === 'all' || c.pillar === filter)
+              .filter((c) => (filter === 'all' || c.pillar === filter) && matchesSearch(q, c.title, c.description, PILLAR_NAMES[c.pillar]))
               .map((c) => (
                 <CatalogCard key={c.key} c={c} active={list.data.active} />
               ))}

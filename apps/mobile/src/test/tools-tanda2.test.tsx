@@ -1,7 +1,7 @@
 import type { LegacyData } from '@dyc/core';
 import { act, cleanup, fireEvent, renderRouter, screen, waitFor, within } from 'expo-router/testing-library';
 import * as SecureStore from 'expo-secure-store';
-import { Image, Share } from 'react-native';
+import { Image, Linking, Share } from 'react-native';
 import { auth } from '../lib/api';
 import { queryClient } from '../lib/queryClient';
 import { fakeModules, renderedText, tokens, type Handler } from './fakeApi';
@@ -191,13 +191,13 @@ describe('herramientas de la tanda 2 en el móvil', () => {
     fireEvent.press(await screen.findByRole('radio', { name: 'Física' }));
     fireEvent.changeText(screen.getByLabelText('Entrega (opcional)'), ' 3 oct ');
     fireEvent.press(screen.getByRole('button', { name: 'Guardar' }));
-    expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/projects/p2')).body).toEqual({ title: 'Maqueta', subject: 'Física', deadline: '3 oct', status: 'entregado', priority: 'media', color: '#0FA968' });
+    expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/projects/p2')).body).toEqual({ title: 'Maqueta', subject: 'Física', deadline: '3 oct', status: 'entregado', priority: 'media', color: '#0FA968', category: '', email: '', mailUrl: '' });
 
     // Nuevo: color cíclico de la paleta.
     fireEvent.press(screen.getByRole('button', { name: 'Nuevo proyecto' }));
     fireEvent.changeText(await screen.findByLabelText('Nombre'), 'Póster');
     fireEvent.press(screen.getByRole('button', { name: 'Añadir proyecto' }));
-    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/projects'))).toEqual({ id: expect.any(String), title: 'Póster', subject: '', deadline: '', status: 'curso', priority: 'media', color: '#E8912A', milestones: [] });
+    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/projects'))).toEqual({ id: expect.any(String), title: 'Póster', subject: '', deadline: '', status: 'curso', priority: 'media', color: '#E8912A', category: '', email: '', mailUrl: '', milestones: [], todos: [] });
 
     fireEvent.press(await screen.findByRole('button', { name: 'Editar «Póster»' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Borrar' }));
@@ -228,6 +228,37 @@ describe('herramientas de la tanda 2 en el móvil', () => {
 
     fireEvent.press(screen.getByRole('button', { name: 'Ordenar por prioridad' }));
     await waitFor(() => expect(writes(api).filter((w) => w.method === 'PUT')).toHaveLength(2));
+  });
+
+  it('Proyectos: categoría, correo del sitio y lista de lo que falta y las mejoras', async () => {
+    const api = setup();
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    await open('/proyectos', 'Ensayo de Historia');
+    fireEvent.press(screen.getByRole('button', { name: 'Nuevo proyecto' }));
+    fireEvent.changeText(await screen.findByLabelText('Nombre'), 'Sitio de la tienda');
+    fireEvent.press(within(screen.getByLabelText('Categoría')).getByRole('button', { name: 'Automatización' }));
+    fireEvent.changeText(screen.getByLabelText('Correo del sitio (opcional)'), 'hola@latienda.com');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir proyecto' }));
+    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/projects'))).toMatchObject({ title: 'Sitio de la tienda', category: 'automatizacion', email: 'hola@latienda.com', todos: [] });
+
+    expect(await screen.findByLabelText('Categoría: Automatización')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Abrir el correo hola@latienda.com' }));
+    expect(openURL).toHaveBeenCalledWith('https://latienda.com/webmail');
+    fireEvent.press(screen.getByRole('button', { name: 'Escribir a hola@latienda.com' }));
+    expect(openURL).toHaveBeenCalledWith('mailto:hola@latienda.com');
+
+    fireEvent.press(screen.getByRole('button', { name: /^Por terminar en «Sitio de la tienda»/ }));
+    fireEvent.changeText(await screen.findByLabelText('Nuevo pendiente de «Sitio de la tienda»'), 'Página de pagos');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', body: { todos: [{ name: 'Página de pagos', done: false, kind: 'falta' }] } }));
+    expect(await screen.findByRole('button', { name: 'Por terminar en «Sitio de la tienda»: 1 falta, 0 mejoras' })).toBeOnTheScreen();
+    fireEvent.press(within(screen.getByLabelText('Lista de «Sitio de la tienda»')).getByRole('radio', { name: 'Mejoras' }));
+    fireEvent.changeText(await screen.findByLabelText('Nuevo punto de mejora de «Sitio de la tienda»'), 'Modo oscuro');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { todos: [{ kind: 'falta' }, { name: 'Modo oscuro', kind: 'mejora' }] } }));
+
+    fireEvent.press(screen.getByRole('button', { name: 'Automatización' }));
+    await waitFor(() => expect(screen.queryByText('Ensayo de Historia')).toBeNull());
   });
 
   it('si la API falla, el estado del proyecto se deshace y avisa', async () => {

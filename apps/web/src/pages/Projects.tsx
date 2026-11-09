@@ -7,8 +7,15 @@ import {
   checkItemsPayload,
   COLOR_NAMES,
   dueThisWeek,
+  PROJECT_CATEGORIES,
+  PROJECT_CATEGORY_INFO,
   PROJECT_COLORS,
   PROJECT_PRIORITIES,
+  PROJECT_TODO_KIND_INFO,
+  PROJECT_TODO_KINDS,
+  projectCategoryOf,
+  projectMailLink,
+  projectTodos,
   PROJECT_PRIORITY_INFO,
   PROJECT_STATUS_INFO,
   PROJECT_STATUSES,
@@ -20,11 +27,14 @@ import {
   type LegacyClass,
   type LegacyMilestone,
   type LegacyProject,
+  type LegacyProjectTodo,
   type LegacySubject,
+  type ProjectCategory,
+  type ProjectTodoKind,
   type ProjectPriority,
   type ProjectStatus,
 } from '@dyc/core';
-import { ArrowDownWideNarrow, CalendarClock, ChevronDown, ChevronUp, Clock, Flag, Pencil, Plus } from 'lucide-react';
+import { ArrowDownWideNarrow, CalendarClock, ChevronDown, ChevronUp, Clock, ExternalLink, Flag, Mail, Pencil, Plus, Send, Shapes } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, newSubId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
@@ -35,7 +45,7 @@ import { EmptyState, ErrorState, Loading } from '../components/States';
 import { CheckList, FormActions, Meter, paletteWith, safeColor, Stats } from '../components/ToolParts';
 import { plural } from '../lib/format';
 
-type Project = LegacyProject & { milestones: LegacyMilestone[] };
+type Project = LegacyProject & { milestones: LegacyMilestone[]; todos: LegacyProjectTodo[] };
 type Filter = 'todos' | 'curso' | 'entregado';
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'todos', label: 'Todos' },
@@ -43,6 +53,7 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'entregado', label: 'Entregados' },
 ];
 const STATUS_OPTIONS = PROJECT_STATUSES.map((s) => ({ value: s, label: PROJECT_STATUS_INFO[s].label }));
+const KIND_OPTIONS = PROJECT_TODO_KINDS.map((k) => ({ value: k, label: PROJECT_TODO_KIND_INFO[k].label }));
 const PRIORITY_OPTIONS = PROJECT_PRIORITIES.map((p) => ({ value: p, label: PROJECT_PRIORITY_INFO[p].label }));
 /** Un estado desconocido se muestra como «En curso», sin cambiar el dato. */
 const statusOf = projectStatusOf;
@@ -53,18 +64,24 @@ export function Projects() {
   const subjects = useLegacyList(legacy.data?.data, 'subjects');
   const classes = useLegacyList(legacy.data?.data, 'classes');
   // Orden «terminar primero»: el de la lista guardada, con los entregados al final.
-  const projects = useMemo<Project[]>(() => projectsInOrder(raw.map((p) => ({ ...p, milestones: checkItems<LegacyMilestone>(p.milestones, newSubId) }))), [raw]);
+  const projects = useMemo<Project[]>(() => projectsInOrder(raw.map((p) => ({ ...p, milestones: checkItems<LegacyMilestone>(p.milestones, newSubId), todos: projectTodos(p, newSubId) }))), [raw]);
   const actions = useModule('projects');
   const [filter, setFilter] = useState<Filter>('todos');
   const [q, setQ] = useState('');
+  const [category, setCategory] = useState<ProjectCategory | 'todas' | 'ninguna'>('todas');
   const [editing, setEditing] = useState<Project | 'new' | null>(null);
 
   const active = projects.filter((p) => statusOf(p) !== 'entregado').length;
   const thisWeek = projects.filter((p) => dueThisWeek(p.deadline)).length;
   // Igual que la app anterior: «En curso» incluye los que están en revisión.
-  const shown = (filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? statusOf(p) === 'entregado' : statusOf(p) !== 'entregado'))).filter((p) =>
-    matchesSearch(q, p.title, p.subject, p.deadline, ...p.milestones.map((m) => m.name)),
-  );
+  const categories = PROJECT_CATEGORIES.filter((c) => projects.some((p) => projectCategoryOf(p) === c));
+  const uncategorized = projects.some((p) => !projectCategoryOf(p));
+  const shown = (filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? statusOf(p) === 'entregado' : statusOf(p) !== 'entregado')))
+    .filter((p) => category === 'todas' || (category === 'ninguna' ? !projectCategoryOf(p) : projectCategoryOf(p) === category))
+    .filter((p) => {
+      const cat = projectCategoryOf(p);
+      return matchesSearch(q, p.title, p.subject, p.deadline, cat ? PROJECT_CATEGORY_INFO[cat].label : '', p.email, ...p.milestones.map((m) => m.name), ...p.todos.map((t) => t.name));
+    });
   const open = projects.filter((p) => statusOf(p) !== 'entregado');
 
   // Sube o baja un proyecto pendiente un puesto; los entregados quedan al final.
@@ -98,9 +115,20 @@ export function Projects() {
               { value: thisWeek, label: thisWeek === 1 ? 'Entrega esta semana' : 'Entregas esta semana' },
             ]}
           />
-          <SearchBox label="Buscar en tus proyectos" value={q} onChange={setQ} placeholder="Buscar por nombre, materia o hito…" count={shown.length} />
+          <SearchBox label="Buscar en tus proyectos" value={q} onChange={setQ} placeholder="Buscar por nombre, categoría, hito o pendiente…" count={shown.length} />
           <div className="row projects-toolbar">
             <Segmented label="Mostrar" options={FILTERS} value={filter} onChange={setFilter} />
+            {categories.length > 0 && (
+              <SelectField label="Categoría" value={category} onChange={(e) => setCategory(e.target.value as ProjectCategory | 'todas' | 'ninguna')}>
+                <option value="todas">Todas las categorías</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {PROJECT_CATEGORY_INFO[c].label} ({projects.filter((p) => projectCategoryOf(p) === c).length})
+                  </option>
+                ))}
+                {uncategorized && <option value="ninguna">Sin categoría</option>}
+              </SelectField>
+            )}
             {open.length > 1 && (
               <button type="button" className="btn btn--ghost btn--sm" onClick={() => actions.reorder(projectIdsByPriority(projects))}>
                 <ArrowDownWideNarrow size={16} aria-hidden="true" /> Ordenar por prioridad
@@ -158,7 +186,14 @@ function ProjectCard({
 }) {
   const actions = useModule('projects');
   const [open, setOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [kind, setKind] = useState<ProjectTodoKind>('falta');
   const color = safeColor(p.color, PROJECT_COLORS[0]);
+  const category = projectCategoryOf(p);
+  const mailLink = projectMailLink(p);
+  const missing = p.todos.filter((t) => t.kind === 'falta' && !t.done).length;
+  const ideas = p.todos.filter((t) => t.kind === 'mejora' && !t.done).length;
+  const listId = `todos-${p.id}`;
   const title = p.title || 'Sin título';
   const status = statusOf(p);
   const priority = projectPriorityOf(p);
@@ -198,6 +233,13 @@ function ProjectCard({
         </div>
       </div>
       <ul className="meta-list">
+        {category && (
+          <li>
+            <Shapes size={15} aria-hidden="true" />
+            <span className="visually-hidden">Categoría: </span>
+            {PROJECT_CATEGORY_INFO[category].label}
+          </li>
+        )}
         {p.subject && (
           <li>
             <span className="swatch-dot" aria-hidden="true" />
@@ -219,7 +261,26 @@ function ProjectCard({
           <CalendarClock size={15} aria-hidden="true" />
           Entrega · {p.deadline?.trim() ? p.deadline : 'sin fecha'}
         </li>
+        {p.email && (
+          <li className="project-mail">
+            <Mail size={15} aria-hidden="true" />
+            <span className="visually-hidden">Correo: </span>
+            <span className="project-mail__address">{p.email}</span>
+          </li>
+        )}
       </ul>
+      {p.email && (
+        <div className="row project-mail__actions">
+          {mailLink && (
+            <a className="btn btn--secondary btn--sm" href={mailLink} target="_blank" rel="noopener noreferrer" aria-label={`Abrir el correo ${p.email} (se abre en otra pestaña)`}>
+              <ExternalLink size={16} aria-hidden="true" /> Abrir el correo
+            </a>
+          )}
+          <a className="btn btn--ghost btn--sm" href={`mailto:${p.email}`} aria-label={`Escribir a ${p.email}`}>
+            <Send size={16} aria-hidden="true" /> Escribir
+          </a>
+        </div>
+      )}
       <Segmented label={`Estado de «${title}»`} options={STATUS_OPTIONS} value={status} onChange={(s) => actions.update(p.id, { status: s })} />
       <div className="meter-row">
         <Meter value={pct} color={color} label={`Progreso de ${title}`} />
@@ -242,6 +303,25 @@ function ProjectCard({
           make={(name) => ({ id: newSubId(), name, date: '', done: false })}
         />
       )}
+      <button type="button" className="btn btn--ghost btn--sm disclosure" aria-expanded={listOpen} aria-controls={listOpen ? listId : undefined} onClick={() => setListOpen((o) => !o)}>
+        Por terminar{missing || ideas ? ` · ${missing} ${missing === 1 ? 'falta' : 'faltan'} · ${plural(ideas, 'mejora', 'mejoras')}` : ''}
+        <ChevronDown size={16} aria-hidden="true" />
+      </button>
+      {listOpen && (
+        <div className="stack-sm" id={listId}>
+          <Segmented label={`Lista de «${title}»`} options={KIND_OPTIONS} value={kind} onChange={setKind} />
+          <CheckList
+            id={`${listId}-${kind}`}
+            items={p.todos.filter((t) => t.kind === kind)}
+            onChange={(next) => actions.update(p.id, { todos: checkItemsPayload([...p.todos.filter((t) => t.kind !== kind), ...next]) })}
+            owner={title}
+            noun={PROJECT_TODO_KIND_INFO[kind].noun}
+            listLabel={PROJECT_TODO_KIND_INFO[kind].label}
+            placeholder={kind === 'falta' ? 'Qué falta para terminar' : 'Qué se podría mejorar'}
+            make={(name) => ({ id: newSubId(), name, done: false, kind })}
+          />
+        </div>
+      )}
     </article>
   );
 }
@@ -254,6 +334,11 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   const [status, setStatus] = useState<ProjectStatus>(project ? statusOf(project) : 'curso');
   const [priority, setPriority] = useState<ProjectPriority>(project ? projectPriorityOf(project) : 'media');
   const [color, setColor] = useState(safeColor(project?.color, PROJECT_COLORS[count % PROJECT_COLORS.length]));
+  const [category, setCategory] = useState<ProjectCategory | ''>(project ? (projectCategoryOf(project) ?? '') : '');
+  const [email, setEmail] = useState(project?.email ?? '');
+  const [mailUrl, setMailUrl] = useState(project?.mailUrl ?? '');
+  const badEmail = !!email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const badMailUrl = !!mailUrl.trim() && !/^https?:\/\/\S+\.\S+/i.test(mailUrl.trim());
   const names = subjects.map((s) => s.name).filter((n): n is string => typeof n === 'string' && !!n);
   const unknown = subject && !names.includes(subject);
 
@@ -266,9 +351,10 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color };
+    if (badEmail || badMailUrl) return;
+    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color, category, email: email.trim(), mailUrl: mailUrl.trim() };
     if (project) actions.update(project.id, fields);
-    else actions.add({ id: newId(), ...fields, milestones: [] });
+    else actions.add({ id: newId(), ...fields, milestones: [], todos: [] });
     onDone();
   };
 
@@ -277,6 +363,14 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   return (
     <form className="stack" onSubmit={submit}>
       <TextField label="Nombre" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus placeholder="Ensayo de Historia" />
+      <SelectField label="Categoría" value={category} onChange={(e) => setCategory(e.target.value as ProjectCategory | '')}>
+        <option value="">Sin categoría</option>
+        {PROJECT_CATEGORIES.map((c) => (
+          <option key={c} value={c}>
+            {PROJECT_CATEGORY_INFO[c].label}
+          </option>
+        ))}
+      </SelectField>
       <SelectField label="Materia" value={subject} onChange={(e) => pickSubject(e.target.value)} hint={unknown ? 'Esta materia ya no está en tu lista.' : undefined}>
         <option value="">Sin materia</option>
         {names.map((name) => (
@@ -307,10 +401,35 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
         ))}
       </SelectField>
       <Segmented label="Prioridad" options={PRIORITY_OPTIONS} value={priority} onChange={setPriority} />
+      <TextField
+        label="Correo del sitio (opcional)"
+        type="email"
+        inputMode="email"
+        autoComplete="off"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        maxLength={200}
+        placeholder="contacto@misitio.com"
+        error={badEmail ? 'Escribe un correo completo, por ejemplo contacto@misitio.com' : null}
+        hint="Aparece en la tarjeta con «Abrir el correo» y «Escribir»."
+      />
+      {email.trim() && (
+        <TextField
+          label="Enlace para abrir el correo (opcional)"
+          type="url"
+          inputMode="url"
+          value={mailUrl}
+          onChange={(e) => setMailUrl(e.target.value)}
+          maxLength={500}
+          placeholder={projectMailLink({ email }) ?? 'https://misitio.com/webmail'}
+          error={badMailUrl ? 'Pega un enlace completo, por ejemplo https://misitio.com/webmail' : null}
+          hint="Si lo dejas vacío se abre el webmail del dominio (cPanel). Pon otro si usas Gmail, Outlook o Zoho."
+        />
+      )}
       <ColorPicker legend="Color" colors={paletteWith(PROJECT_COLORS, color)} value={color} onChange={setColor} names={COLOR_NAMES} />
       <FormActions
         submitLabel={project ? 'Guardar' : 'Añadir proyecto'}
-        disabled={!title.trim()}
+        disabled={!title.trim() || badEmail || badMailUrl}
         onDelete={
           project
             ? () => {

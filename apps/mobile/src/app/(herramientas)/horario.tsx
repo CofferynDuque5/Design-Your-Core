@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   CLASS_COLORS,
   CLASS_DAY_NAMES,
   CLASS_DAYS,
@@ -21,7 +22,7 @@ import { useRouter } from 'expo-router';
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { Suggestions, ColorSwatches, DotChoices, ToolScreen } from '../../components/tools';
+import { Suggestions, ColorSwatches, DotChoices, SearchBar, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -48,6 +49,8 @@ export default function Schedule() {
   // Datos antiguos con «8:00» o el día como texto también se dibujan.
   const classes = showableClasses(all);
   const [editing, setEditing] = useState<LegacyClass | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const shown = classes.filter((c) => matchesSearch(q, c.title, c.room, CLASS_DAY_NAMES[c.day - 1], c.start));
   const now = useNow();
   const today = isoDay(now);
   const next = nextClass(classes, now);
@@ -93,10 +96,11 @@ export default function Schedule() {
             </Card>
           )}
 
-          <WeekGrid classes={classes} today={today} now={now} onOpen={setEditing} />
+          {classes.length > 0 && <SearchBar label="Buscar en tu horario" value={q} onChange={setQ} placeholder="Buscar una clase, aula o día…" count={shown.length} />}
+          <WeekGrid classes={shown} today={today} now={now} onOpen={setEditing} />
 
           {CLASS_DAY_NAMES.map((name, i) => {
-            const list = classes.filter((c) => c.day === i + 1).sort(byStart);
+            const list = shown.filter((c) => c.day === i + 1).sort(byStart);
             if (!list.length) return null;
             return (
               <View key={name} style={{ gap: space[2] }}>

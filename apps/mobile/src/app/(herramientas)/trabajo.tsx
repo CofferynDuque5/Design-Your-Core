@@ -1,10 +1,10 @@
-import { WORK_BUCKETS, WORK_PROJECTS, WORK_STATUS_INFO, WORK_STATUSES, workBucketOf, workProjectOptions, workProjectView, workStatusOf, type LegacyProject, type LegacyWorkItem, type WorkProject, type WorkStatus } from '@dyc/core';
+import { matchesSearch, WORK_BUCKETS, WORK_PROJECTS, WORK_STATUS_INFO, WORK_STATUSES, workBucketOf, workProjectOptions, workProjectView, workStatusOf, type LegacyProject, type LegacyWorkItem, type WorkProject, type WorkStatus } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { Info, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckRow, DotChoices, FormActions, IconButton, Pill, ToolScreen } from '../../components/tools';
+import { CheckRow, DotChoices, SearchBar, FormActions, IconButton, Pill, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, Segmented, SectionHeader, T } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -22,6 +22,8 @@ export default function Work() {
   const oldOnes = items.filter((w) => !workProjectView(w, projects).real && WORK_PROJECTS.includes(w.project as WorkProject)).length;
   const [editing, setEditing] = useState<LegacyWorkItem | null>(null);
   const done = items.filter((w) => w.done).length;
+  const [q, setQ] = useState('');
+  const found = items.filter((w) => matchesSearch(q, w.title, workProjectView(w, projects).label, w.due, WORK_STATUS_INFO[workStatusOf(w)].label));
 
   const add = () => {
     if (!title.trim()) return;
@@ -51,8 +53,10 @@ export default function Work() {
           {items.length === 0 ? (
             <EmptyState title="Sin tareas de trabajo">Anota lo que tienes pendiente en tus proyectos y márcalo al terminar.</EmptyState>
           ) : (
-            WORK_BUCKETS.map((b) => {
-              const list = items.filter((w) => workBucketOf(w) === b.id);
+            <>
+            <SearchBar label="Buscar en tus tareas de trabajo" value={q} onChange={setQ} placeholder="Buscar por tarea, proyecto o fecha…" count={found.length} />
+            {WORK_BUCKETS.map((b) => {
+              const list = found.filter((w) => workBucketOf(w) === b.id);
               if (!list.length) return null;
               return (
                 <View key={b.id} style={{ gap: space[3] }}>
@@ -67,7 +71,8 @@ export default function Work() {
                   </Card>
                 </View>
               );
-            })
+            })}
+            </>
           )}
           <Card tone="sunken" style={{ flexDirection: 'row', gap: space[3], alignItems: 'flex-start' }}>
             <Info size={18} color={colors.inkMuted} style={{ marginTop: 2 }} />

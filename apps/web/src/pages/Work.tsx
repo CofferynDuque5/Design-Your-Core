@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   WORK_BUCKETS as BUCKETS,
   WORK_PROJECTS,
   WORK_STATUS_INFO,
@@ -17,6 +18,7 @@ import { Link } from 'react-router';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { Segmented, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -33,6 +35,8 @@ export function Work() {
   const oldOnes = items.filter((w) => !workProjectView(w, projects).real && WORK_PROJECTS.includes(w.project as WorkProject)).length;
   const [editing, setEditing] = useState<LegacyWorkItem | null>(null);
   const done = items.filter((w) => w.done).length;
+  const [q, setQ] = useState('');
+  const found = items.filter((w) => matchesSearch(q, w.title, workProjectView(w, projects).label, w.due, WORK_STATUS_INFO[statusOf(w)].label));
 
   const add = (e: FormEvent) => {
     e.preventDefault();
@@ -78,8 +82,10 @@ export function Work() {
           {items.length === 0 ? (
             <EmptyState title="Sin tareas de trabajo">Anota lo que tienes pendiente en tus proyectos y márcalo al terminar.</EmptyState>
           ) : (
-            BUCKETS.map((b) => {
-              const list = items.filter((w) => bucketOf(w) === b.id);
+            <>
+            <SearchBox label="Buscar en tus tareas de trabajo" value={q} onChange={setQ} placeholder="Buscar por tarea, proyecto o fecha…" count={found.length} />
+            {BUCKETS.map((b) => {
+              const list = found.filter((w) => bucketOf(w) === b.id);
               if (!list.length) return null;
               return (
                 <section key={b.id} className="card card--list" aria-labelledby={`work-${b.id}`}>
@@ -93,7 +99,8 @@ export function Work() {
                   </ul>
                 </section>
               );
-            })
+            })}
+            </>
           )}
           <p className="checkin-note small">
             <Info size={16} aria-hidden="true" />

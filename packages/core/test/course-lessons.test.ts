@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addUnitPatch, courseProgress, courseUnits, removeUnitPatch, renameUnitPatch, courseResume, legacyItemSchemas, lessonsByUnit, lessonsFromPlaylist, lessonsPatch, nextLesson, type LegacyCourse } from '../src/index.js';
+import { addUnitPatch, checkItemsPayload, projectCategoryOf, projectMailLink, projectTodos, courseProgress, courseUnits, removeUnitPatch, renameUnitPatch, courseResume, legacyItemSchemas, lessonsByUnit, lessonsFromPlaylist, lessonsPatch, nextLesson, type LegacyCourse } from '../src/index.js';
 
 const base: LegacyCourse = { id: 'c1', topic: 'React', title: 'React', url: '', status: 'pendiente', notes: '' };
 const lessons = [
@@ -85,5 +85,24 @@ describe('unidades del curso', () => {
     expect(d.lessons).toEqual([]);
     expect(legacyItemSchemas.courses.safeParse({ ...base, units: ['Unidad 1', ''] }).success).toBe(false);
     expect(legacyItemSchemas.courses.safeParse(base).success).toBe(true);
+  });
+});
+
+describe('proyectos: categoría, correo y lista por terminar', () => {
+  it('lee la categoría y arma el enlace del correo', () => {
+    expect(projectCategoryOf({ category: 'web' })).toBe('web');
+    expect(projectCategoryOf({ category: 'nave' })).toBeNull();
+    expect(projectMailLink({ email: 'hola@MiSitio.com' })).toBe('https://misitio.com/webmail');
+    expect(projectMailLink({ email: 'hola@misitio.com', mailUrl: 'https://webmail.otro.com' })).toBe('https://webmail.otro.com');
+    expect(projectMailLink({ email: 'nada' })).toBeNull();
+  });
+
+  it('valida y conserva el tipo de cada pendiente', () => {
+    const p = { id: 'p1', title: 'Sitio', subject: '', deadline: '', status: 'curso', priority: 'media', color: '#0FA968', milestones: [], category: 'web', email: 'hola@misitio.com', todos: [{ id: 't1', name: 'Formulario', done: false, kind: 'mejora' }] };
+    expect(legacyItemSchemas.projects.safeParse(p).success).toBe(true);
+    expect(legacyItemSchemas.projects.safeParse({ ...p, email: 'no' }).success).toBe(false);
+    expect(legacyItemSchemas.projects.safeParse({ ...p, category: 'nave' }).success).toBe(false);
+    expect(projectTodos({ todos: [{ id: 't1', name: 'A', kind: 'raro' }] }, () => 'x')[0].kind).toBe('falta');
+    expect(checkItemsPayload(projectTodos(p, () => 'x'))).toEqual([{ id: 't1', name: 'Formulario', done: false, kind: 'mejora' }]);
   });
 });

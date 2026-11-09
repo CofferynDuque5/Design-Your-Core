@@ -42,7 +42,7 @@ import { newId, useLegacyData, useLegacyList, useModule, type ChangeOpts } from 
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
-import { SelectField, TextArea, TextField } from '../components/Form';
+import { ChoiceField, SelectField, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions, WeekdayPicker } from '../components/ToolParts';
 import { useToast } from '../app/toast';
@@ -505,8 +505,6 @@ function ScheduleForm({ course: c, count, onDone }: { course: LegacyCourse; coun
 
 function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { course: LegacyCourse | null; topic: string; topics: string[]; courses: LegacyCourse[]; onDone: () => void }) {
   const actions = useModule('courses');
-  const listId = useId();
-  const subListId = useId();
   const sourceListId = useId();
   const [topic, setTopic] = useState(course?.topic ?? initialTopic);
   const [subtopic, setSubtopic] = useState(course?.subtopic ?? '');
@@ -552,39 +550,18 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
 
   return (
     <form className="stack" onSubmit={submit}>
-      <TextField
-        label="Tema"
-        value={topic}
-        onChange={(e) => setTopic(e.target.value)}
-        maxLength={120}
-        required
-        autoFocus={!initialTopic}
-        placeholder="Inglés, React, Finanzas…"
-        list={topics.length ? listId : undefined}
-      />
-      {topics.length > 0 && (
-        <datalist id={listId}>
-          {topics.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
-      )}
-      <TextField
+      <ChoiceField label="Tema" value={topic} onChange={setTopic} options={topics} otherLabel="Otro tema…" maxLength={120} required autoFocus={!initialTopic} placeholder="Inglés, React, Finanzas…" />
+      <ChoiceField
         label="Subcategoría (opcional)"
         value={subtopic}
-        onChange={(e) => setSubtopic(e.target.value)}
+        onChange={setSubtopic}
+        options={subtopics}
+        emptyLabel="Sin subcategoría"
+        otherLabel="Otra subcategoría…"
         maxLength={120}
         placeholder="Hooks, Gramática, Ahorro…"
         hint="Agrupa los cursos dentro del tema."
-        list={subtopics.length ? subListId : undefined}
       />
-      {subtopics.length > 0 && (
-        <datalist id={subListId}>
-          {subtopics.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
-      )}
       <TextField
         label="Enlace (opcional)"
         type="url"

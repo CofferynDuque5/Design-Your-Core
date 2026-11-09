@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   reminderFallsOn,
   CALENDAR_MARKS,
   calendarCycleDays,
@@ -31,6 +32,7 @@ import { Link } from 'react-router';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
 import { ErrorState, Loading } from '../components/States';
@@ -77,6 +79,8 @@ export function Calendar() {
   };
 
   const describe = (d: Day) => describeCalendarDay(d, marks, reminders);
+  const [q, setQ] = useState('');
+  const found = q.trim() ? reminders.filter((r) => matchesSearch(q, displayTitle(r.title), r.when)).sort((a, b) => a.day - b.day) : [];
 
   return (
     <div className="page">
@@ -90,6 +94,27 @@ export function Calendar() {
       ) : legacy.isError ? (
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
       ) : (
+        <div className="stack-lg">
+        {reminders.length > 0 && (
+          <div className="stack-sm">
+            <SearchBox label="Buscar en tus eventos" value={q} onChange={setQ} placeholder="Buscar un evento por nombre u hora…" count={q.trim() ? found.length : undefined} />
+            {found.length > 0 && (
+              <ul className="card card--list day-items" aria-label="Eventos encontrados">
+                {found.slice(0, 30).map((r) => {
+                  const d = addDays(month, Math.min(r.day, n) - 1);
+                  return (
+                    <li key={r.id}>
+                      <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(d)}>
+                        Día {r.day} · {displayTitle(r.title)}
+                        {r.when ? ` · ${r.when}` : ''}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
         <div className="calendar-layout">
           <section className="card stack" aria-labelledby="month-title">
             <div className="month-nav">
@@ -164,6 +189,7 @@ export function Calendar() {
             </ul>
           </section>
           <DayPanel day={selected} data={data} reminders={reminders} onEdit={setEditing} cycle={showCycle ? { period: cycleDays.period.has(selected), predicted: cycleDays.predicted.has(selected) } : null} />
+        </div>
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo evento' : 'Editar evento'}>

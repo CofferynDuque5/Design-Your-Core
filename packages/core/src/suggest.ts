@@ -100,7 +100,7 @@ const FIELD_LABEL: Record<string, string> = {
   deadline: 'Fecha límite', status: 'Estado', milestones: 'Hitos', steps: 'Pasos', category: 'Categoría', body: 'Texto', text: 'Texto', stage: 'Etapa',
   platform: 'Plataforma', notes: 'Notas', script: 'Guion', due: 'Para', amount: 'Monto', type: 'Tipo', note: 'Nota', target: 'Objetivo', current: 'Llevas',
   unit: 'Unidad', species: 'Especie', days: 'Días', date: 'Fecha', minutes: 'Minutos', plan: 'Plan', url: 'Enlace', topic: 'Tema', description: 'Descripción',
-  project: 'Proyecto', color: 'Color', enabled: 'Activo', sound: 'Sonido', icon: 'Icono', dateKey: 'Fecha', lang: 'Lenguaje',
+  project: 'Proyecto', email: 'Correo', mailUrl: 'Enlace del correo', todos: 'Lista por terminar', color: 'Color', enabled: 'Activo', sound: 'Sonido', icon: 'Icono', dateKey: 'Fecha', lang: 'Lenguaje',
 };
 
 /** Pistas para los campos que no se entienden solo por el tipo. */

@@ -1,8 +1,9 @@
-import { CARE_KIND_INFO, CARE_KINDS, careKindOf as kindOf, careWhen, nextDue, PET_SPECIES, PET_SPECIES_INFO, petSpeciesOf as speciesOf, utcDayKey, weekdaysOf as validDays, type CareKind, type LegacyPet, type LegacyPetCare, type PetSpecies } from '@dyc/core';
+import { matchesSearch, CARE_KIND_INFO, CARE_KINDS, careKindOf as kindOf, careWhen, nextDue, PET_SPECIES, PET_SPECIES_INFO, petSpeciesOf as speciesOf, utcDayKey, weekdaysOf as validDays, type CareKind, type LegacyPet, type LegacyPetCare, type PetSpecies } from '@dyc/core';
 import { Pencil, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -23,6 +24,8 @@ export function Pets() {
   const ownCares = cares.filter((c) => known.has(c.petId));
   const doneToday = ownCares.filter((c) => c.lastDone === today).length;
   const pendingToday = ownCares.filter((c) => nextDue(c, now)?.inDays === 0).length;
+  const [q, setQ] = useState('');
+  const shownPets = pets.filter((p) => matchesSearch(q, p.name, p.note, PET_SPECIES_INFO[speciesOf(p)].label, ...cares.filter((c) => c.petId === p.id).map((c) => c.title)));
 
   return (
     <div className="page">
@@ -55,8 +58,9 @@ export function Pets() {
               { value: doneToday, label: doneToday === 1 ? 'Hecho hoy' : 'Hechos hoy' },
             ]}
           />
+          <SearchBox label="Buscar en tus mascotas" value={q} onChange={setQ} placeholder="Buscar una mascota o un cuidado…" count={shownPets.length} />
           <ul className="card-grid tool-grid tool-grid--wide" aria-label="Mascotas">
-            {pets.map((p) => (
+            {shownPets.map((p) => (
               <li key={p.id}>
                 <PetCard pet={p} cares={cares.filter((c) => c.petId === p.id)} today={today} now={now} onEdit={() => setEditing(p)} onCare={(c) => setCare({ pet: p, care: c })} />
               </li>

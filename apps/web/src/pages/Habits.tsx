@@ -1,5 +1,5 @@
 import type { Habit } from '@dyc/api-client';
-import { addDays, isScheduled, PILLAR_IDS, WEEKDAY_LONG_NAMES, type Day, type PillarId } from '@dyc/core';
+import { addDays, isScheduled, matchesSearch, PILLAR_IDS, PILLAR_NAMES, WEEKDAY_LONG_NAMES, type Day, type PillarId } from '@dyc/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, Check, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
@@ -7,6 +7,7 @@ import { api } from '../app/api';
 import { keys, useHabits, useRefresh } from '../app/queries';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { TextField } from '../components/Form';
 import { pillarName, pillarShort, PillarTag } from '../components/Pillar';
@@ -28,8 +29,10 @@ export function Habits() {
   const [editing, setEditing] = useState<Habit | 'new' | null>(null);
 
   const list = habits.data?.habits ?? [];
-  const active = list.filter((h) => !h.archived);
-  const archived = list.filter((h) => h.archived);
+  const [q, setQ] = useState('');
+  const found = list.filter((h) => matchesSearch(q, h.title, PILLAR_NAMES[h.pillar]));
+  const active = found.filter((h) => !h.archived);
+  const archived = found.filter((h) => h.archived);
 
   return (
     <div className="page">
@@ -45,13 +48,14 @@ export function Habits() {
         <ErrorState error={habits.error} retry={() => habits.refetch()} />
       ) : (
         <div className="stack-lg">
+          {list.length > 0 && <SearchBox label="Buscar en tus hábitos" value={q} onChange={setQ} placeholder="Buscar por hábito o pilar…" count={active.length + (showArchived ? archived.length : 0)} />}
           {active.length ? (
             <ul className="stack habit-list">
               {active.map((h) => (
                 <HabitRow key={h.id} h={h} today={habits.data.today} onEdit={() => setEditing(h)} />
               ))}
             </ul>
-          ) : (
+          ) : q.trim() && list.length ? null : (
             <EmptyState title="Aún no tienes hábitos">
               Empieza con uno tan pequeño que no puedas fallar. Algunas ideas: {IDEAS.map((i) => i.title.toLowerCase()).slice(0, 3).join(', ')}.
             </EmptyState>

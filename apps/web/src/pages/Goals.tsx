@@ -18,7 +18,7 @@ import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
-import { SelectField, TextField } from '../components/Form';
+import { ChoiceField, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions, Meter, Stats } from '../components/ToolParts';
 import { localDayKey } from '../lib/tools';
@@ -188,7 +188,7 @@ function GoalForm({ goal, category: initialCategory, onDone }: { goal: LegacyGoa
       <TextField label="Meta" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus placeholder="Publicar 8 videos" />
       <div className="grid-2">
         <TextField label="Objetivo" type="number" inputMode="numeric" min="1" step="1" value={target} onChange={(e) => setTarget(e.target.value)} required error={targetOk ? null : 'Un número entero, 1 o más.'} />
-        <TextField label="Unidad (opcional)" suggestions={[...units, 'videos', 'libros', 'kg', 'km', 'horas', 'páginas', 'clases']} value={unit} onChange={(e) => setUnit(e.target.value)} maxLength={40} placeholder="videos, kg, libros…" />
+        <ChoiceField label="Unidad (opcional)" options={[...units, 'videos', 'libros', 'kg', 'km', 'horas', 'páginas', 'clases']} value={unit} onChange={setUnit} emptyLabel="Sin unidad" otherLabel="Otra unidad…" maxLength={40} placeholder="videos, kg, libros…" />
       </div>
       <div className="grid-2">
         <TextField label="Llevas" type="number" inputMode="numeric" min="0" step="1" value={current} onChange={(e) => setCurrent(e.target.value)} required error={currentOk ? null : 'Un número entero, 0 o más.'} />

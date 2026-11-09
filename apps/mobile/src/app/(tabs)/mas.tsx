@@ -1,8 +1,9 @@
-import { TOOL_CATALOG, TOOL_GROUPS, toolStatus, type ToolInfo } from '@dyc/core';
+import { matchesSearch, TOOL_CATALOG, TOOL_GROUPS, toolStatus, type ToolInfo } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter, type Href } from 'expo-router';
 import { ChevronRight, ExternalLink } from 'lucide-react-native';
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
+import { SearchBar } from '../../components/tools';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Card, ErrorState, Loading, PageHeader, Screen, SectionHeader, T, fonts } from '../../components/ui';
 import { useLegacyData } from '../../lib/legacy';
@@ -13,6 +14,8 @@ import { openOnWeb } from '../../lib/web';
 export default function More() {
   const legacy = useLegacyData();
   const onWeb = TOOL_CATALOG.filter((t) => !NATIVE_TOOLS.has(t.id)).map((t) => t.label);
+  const [q, setQ] = useState('');
+  const found = TOOL_CATALOG.filter((t) => matchesSearch(q, t.label, t.description));
 
   return (
     <Screen refreshing={legacy.isRefetching} onRefresh={() => legacy.refetch()}>
@@ -26,11 +29,13 @@ export default function More() {
       ) : legacy.isError ? (
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
       ) : (
-        TOOL_GROUPS.map((g) => (
+        <>
+        <SearchBar label="Buscar una herramienta" value={q} onChange={setQ} placeholder="Buscar una herramienta…" count={found.length} />
+        {TOOL_GROUPS.filter((g) => found.some((t) => t.group === g.id)).map((g) => (
           <View key={g.id} style={{ gap: space[3] }}>
             <SectionHeader title={g.label} />
             <Card style={{ paddingVertical: space[1], gap: 0 }}>
-              {TOOL_CATALOG.filter((t) => t.group === g.id).map((t, i) => (
+              {found.filter((t) => t.group === g.id).map((t, i) => (
                 <Fragment key={t.id}>
                   {i > 0 && <Divider />}
                   <ToolRow tool={t} status={toolStatus(t, legacy.data.data)} />
@@ -38,7 +43,8 @@ export default function More() {
               ))}
             </Card>
           </View>
-        ))
+        ))}
+        </>
       )}
     </Screen>
   );

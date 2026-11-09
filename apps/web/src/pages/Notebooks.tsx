@@ -26,7 +26,7 @@ import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
-import { ColorPicker, SelectField, TextField } from '../components/Form';
+import { ChoiceField, ColorPicker, SelectField, TextField } from '../components/Form';
 import { NotebookCover } from '../components/NotebookCover';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions, optionsWith, paletteWith, safeColor } from '../components/ToolParts';
@@ -186,26 +186,11 @@ function NotebookForm({ notebook, all, subjects, boxCount = 0, onDone, onDeleted
   return (
     <form className="stack" onSubmit={submit}>
       <TextField label="Título" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} autoFocus placeholder="Cuaderno" />
-      <TextField label="Categoría" value={category} onChange={(e) => setCategory(e.target.value)} maxLength={60} placeholder="General" list={`${listId}-cat`} />
+      <ChoiceField label="Categoría" value={category} onChange={setCategory} options={uniq(['General', 'Universidad', ...all.map((n) => n.category)])} otherLabel="Otra categoría…" maxLength={60} placeholder="General" />
       <div className="grid-2">
-        <TextField label="Materia (opcional)" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={120} placeholder="Cálculo" list={`${listId}-sub`} />
-        <TextField label="Tema (opcional)" value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={120} placeholder="Derivadas" list={`${listId}-top`} />
+        <ChoiceField label="Materia (opcional)" value={subject} onChange={setSubject} options={uniq([...subjects, ...all.map((n) => n.subject)])} emptyLabel="Sin materia" otherLabel="Otra materia…" maxLength={120} placeholder="Cálculo" />
+        <ChoiceField label="Tema (opcional)" value={topic} onChange={setTopic} options={uniq(all.map((n) => n.topic))} emptyLabel="Sin tema" otherLabel="Otro tema…" maxLength={120} placeholder="Derivadas" />
       </div>
-      <datalist id={`${listId}-cat`}>
-        {uniq(['General', 'Universidad', ...all.map((n) => n.category)]).map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
-      <datalist id={`${listId}-sub`}>
-        {uniq([...subjects, ...all.map((n) => n.subject)]).map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
-      <datalist id={`${listId}-top`}>
-        {uniq(all.map((n) => n.topic)).map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
       <ColorPicker legend="Color" colors={paletteWith(NOTEBOOK_COLORS, color)} value={color} onChange={setColor} names={COLOR_NAMES} />
       <fieldset className="field">
         <legend className="field__label">Icono</legend>
