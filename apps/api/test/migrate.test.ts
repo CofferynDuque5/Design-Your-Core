@@ -54,7 +54,7 @@ describe('actualización de una base en producción', () => {
       await legacy.exec(`INSERT INTO "User" ("id","email","name","passwordHash") VALUES ('u1','ana@example.com','Ana','hash')`);
       await legacy.exec(`INSERT INTO "Blob" ("userId","data") VALUES ('u1','{"habits":[{"label":"Leer"}]}')`);
 
-      expect(await migrate(legacy)).toEqual(['001_base', '002_pillars', '003_sessions_devices', '004_web_push']);
+      expect(await migrate(legacy)).toEqual(['001_base', '002_pillars', '003_sessions_devices', '004_web_push', '005_payments']);
 
       const user = await legacy.row<{ email: string; data: unknown }>('SELECT u."email", b."data" FROM "User" u JOIN "Blob" b ON b."userId" = u."id" WHERE u."id" = \'u1\'');
       expect(user?.email).toBe('ana@example.com');

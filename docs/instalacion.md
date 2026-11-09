@@ -58,6 +58,7 @@ Para cambiar el esquema: edita `prisma/schema.prisma`, genera el SQL con `prisma
 | `PUBLIC_URL` | Recomendada | URL pública de la API; los enlaces de recuperación de contraseña apuntan aquí |
 | `ALLOWED_ROOT_DOMAINS` | No | Dominios propios cuyos subdominios pueden usar la API (por defecto `nvcorx.com`) |
 | `SMTP_*` | No | Correo de invitación y recuperación. Sin `SMTP_HOST` los enlaces solo se registran en el log |
+| `ADMIN_EMAILS` | Para cobrar | Correo(s) de las cuentas del panel que administran pagos (datos de cada método, precios y aprobación de comprobantes) |
 | `PORT` | No | Puerto o socket; cPanel lo define solo |
 
 ## Despliegue de la app web (estática)

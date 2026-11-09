@@ -1,6 +1,6 @@
-import { CONTACT_EMAIL, deviceTimeZone, PILLAR_IDS, type PillarId } from '@dyc/core';
+import { CONTACT_EMAIL, PLAN_NAME, deviceTimeZone, PILLAR_IDS, type PillarId } from '@dyc/core';
 import { space, touchTarget } from '@dyc/tokens';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { LogOut, Mail } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -16,6 +16,7 @@ import { keys, useProfile } from '../../lib/queries';
 import { useTheme, type ThemePreference } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
 import { useSignOut } from '../../lib/useSignOut';
+import { openOnWeb } from '../../lib/web';
 
 export default function ProfileScreen() {
   const session = useAuth();
@@ -32,6 +33,7 @@ export default function ProfileScreen() {
           {user.email}
         </T>
       )}
+      <PlanSection />
       <FocusSection />
       <PreferencesSection />
       {notificationsSupported && <ReminderSection />}
@@ -57,6 +59,30 @@ export default function ProfileScreen() {
         Design Your Core {Constants.expoConfig?.version ?? ''}
       </T>
     </Screen>
+  );
+}
+
+/** Tu plan. El pago se hace en el panel web (Planes), con los datos de cada método. */
+function PlanSection() {
+  const billing = useQuery({ queryKey: ['billing'], queryFn: api.billing.get });
+  const b = billing.data;
+  const pending = b?.requests.some((r) => r.status === 'pendiente');
+  const text = !b
+    ? 'Planes Pro, Pareja y Estudiante.'
+    : pending
+      ? 'Tu pago está en revisión. Cuando se apruebe, tu plan se activa solo.'
+      : b.plan === 'gratis'
+        ? 'Pásate a Pro para tener todas las herramientas sin límites.'
+        : `Activo hasta el ${new Date(b.planUntil ?? '').toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
+  return (
+    <Card>
+      <SectionHeader title={b ? `Tu plan: ${PLAN_NAME[b.plan]}` : 'Tu plan'} />
+      <T v="small" tint="muted">
+        {text}
+      </T>
+      <Button small label={b && b.plan !== 'gratis' ? 'Renovar o cambiar' : 'Ver planes y pagar'} onPress={() => void openOnWeb('/planes')} style={{ alignSelf: 'flex-start' }} />
+      {b?.admin && <Button small variant="secondary" label="Administrar pagos" onPress={() => void openOnWeb('/admin/pagos')} style={{ alignSelf: 'flex-start' }} />}
+    </Card>
   );
 }
 

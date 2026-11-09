@@ -1,4 +1,4 @@
-import { CLASS_LEADS, COMMON_TIMEZONES, CONTACT_EMAIL, PILLAR_IDS, type NotifyPrefs, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
+import { PLAN_NAME, CLASS_LEADS, COMMON_TIMEZONES, CONTACT_EMAIL, PILLAR_IDS, type NotifyPrefs, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, BellRing, Download, LogOut, Mail } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -25,6 +25,7 @@ export function Profile() {
       <PageHeader eyebrow="Perfil" title={user?.name || 'Tu perfil'} />
       <div className="stack-lg">
         {user && <p className="muted">{user.email}</p>}
+        <PlanSection />
         <FocusSection />
         <PreferencesSection />
         <AlarmsSection />
@@ -45,6 +46,39 @@ export function Profile() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Tu plan y el acceso a pagar (y a administrar pagos si eres administración). */
+function PlanSection() {
+  const billing = useQuery({ queryKey: ['billing'], queryFn: api.billing.get });
+  const b = billing.data;
+  const pending = b?.requests.some((r) => r.status === 'pendiente');
+  return (
+    <section className="card stack-sm" aria-labelledby="plan-title">
+      <h2 id="plan-title" className="section-title">
+        Tu plan{b ? `: ${PLAN_NAME[b.plan]}` : ''}
+      </h2>
+      <p className="muted small">
+        {!b
+          ? 'Planes Pro, Pareja y Estudiante.'
+          : pending
+            ? 'Tu pago está en revisión. Te avisamos en «Planes» cuando se apruebe.'
+            : b.plan === 'gratis'
+              ? 'Pásate a Pro para tener todas las herramientas sin límites.'
+              : `Activo hasta el ${new Date(b.planUntil ?? '').toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}.`}
+      </p>
+      <div className="row">
+        <Link to="/planes" className="btn btn--sm">
+          {b?.plan === 'gratis' || !b ? 'Ver planes' : 'Renovar o cambiar'}
+        </Link>
+        {b?.admin && (
+          <Link to="/admin/pagos" className="btn btn--secondary btn--sm">
+            Administrar pagos
+          </Link>
+        )}
+      </div>
+    </section>
   );
 }
 

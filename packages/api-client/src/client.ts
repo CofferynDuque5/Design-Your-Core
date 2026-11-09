@@ -1,4 +1,4 @@
-import type { CheckInInput, CourseLength, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
+import type { AccountPlan, PaymentRequest, PaymentRequestInput, PaymentSettings, PlanPrices, PaymentMethod, CheckInInput, CourseLength, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
@@ -221,6 +221,23 @@ export function createClient(opts: ClientOptions) {
         request<{ migrated: number; remaining: number; updatedAt: string }>('POST', '/api/v2/modules/vaultSecure/migrate', { items, legacyIds }),
     },
 
+    /** Planes y pagos manuales. */
+    billing: {
+      get: () => request<Billing>('GET', '/api/v2/billing'),
+      pay: (b: PaymentRequestInput) => request<{ request: PaymentRequest }>('POST', '/api/v2/billing/requests', b).then((r) => r.request),
+      cancel: (id: string) => request<{ ok: true }>('DELETE', `/api/v2/billing/requests/${encodeURIComponent(id)}`),
+    },
+
+    /** Administración de pagos (solo las cuentas de ADMIN_EMAILS). */
+    admin: {
+      settings: () => request<{ settings: PaymentSettings }>('GET', '/api/v2/admin/payments/settings').then((r) => r.settings),
+      saveSettings: (settings: PaymentSettings) => request<{ settings: PaymentSettings }>('PUT', '/api/v2/admin/payments/settings', { settings }).then((r) => r.settings),
+      requests: (status?: PaymentRequest['status']) => request<{ pending: number; requests: AdminPaymentRequest[] }>('GET', `/api/v2/admin/payments/requests${q({ status })}`),
+      proof: (id: string) => request<{ proof: string }>('GET', `/api/v2/admin/payments/requests/${encodeURIComponent(id)}/proof`).then((r) => r.proof),
+      approve: (id: string, note = '') => request<{ request: PaymentRequest }>('POST', `/api/v2/admin/payments/requests/${encodeURIComponent(id)}/approve`, { note }).then((r) => r.request),
+      reject: (id: string, note = '') => request<{ request: PaymentRequest }>('POST', `/api/v2/admin/payments/requests/${encodeURIComponent(id)}/reject`, { note }).then((r) => r.request),
+    },
+
     partner: {
       get: () => request<PartnerView>('GET', '/api/partner'),
       invite: () => request<{ code: string }>('POST', '/api/partner/invite'),
@@ -230,5 +247,16 @@ export function createClient(opts: ClientOptions) {
     },
   };
 }
+
+export interface Billing {
+  plan: AccountPlan;
+  planUntil: string | null;
+  admin: boolean;
+  prices: PlanPrices;
+  methods: PaymentMethod[];
+  requests: PaymentRequest[];
+}
+
+export type AdminPaymentRequest = PaymentRequest & { user: { name: string; email: string } };
 
 export type ApiClient = ReturnType<typeof createClient>;

@@ -51,6 +51,8 @@ const Subjects = page('Subjects', () => import('../pages/Subjects'));
 const Todos = page('Todos', () => import('../pages/Todos'));
 const Vault = page('Vault', () => import('../pages/Vault'));
 const Work = page('Work', () => import('../pages/Work'));
+const Plans = page('Plans', () => import('../pages/Plans'));
+const AdminPayments = page('AdminPayments', () => import('../pages/AdminPayments'));
 
 export function makeQueryClient() {
   return new QueryClient({
@@ -106,6 +108,8 @@ export function AppRoutes() {
         <Route path="retos" element={<Challenges />} />
         <Route path="habitos" element={<Habits />} />
         <Route path="perfil" element={<Profile />} />
+        <Route path="planes" element={<Plans />} />
+        <Route path="admin/pagos" element={<AdminPayments />} />
         <Route path="mas" element={<More />} />
         <Route path="agenda" element={<Agenda />} />
         <Route path="pendientes" element={<Todos />} />

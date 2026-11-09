@@ -33,6 +33,9 @@ model User {
   pushDevices    PushDevice[]
   webPushSubs    WebPushSubscription[]
   webPushAlarms  WebPushAlarm[]
+  plan           String          @default("gratis") // gratis | pro | pareja | estudiante
+  planUntil      DateTime?       @db.Timestamp(3)
+  payments       PaymentRequest[]
 }
 
 // Imágenes de los apuntes (sincronizadas entre dispositivos). Guardadas como
@@ -231,4 +234,36 @@ model WebPushAlarm {
 
   @@id([userId, id])
   @@index([at])
+}
+
+// Ajustes de la aplicación (precios y datos de los métodos de pago).
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @db.Timestamp(3)
+}
+
+// Pagos manuales enviados para revisión (con su comprobante).
+model PaymentRequest {
+  id         String    @id
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  plan       String
+  period     String
+  methodId   String
+  methodName String
+  currency   String
+  amount     Decimal   @db.Decimal(14, 2)
+  amountUsd  Decimal   @db.Decimal(10, 2)
+  reference  String
+  payerName  String
+  note       String    @default("")
+  proof      String?
+  status     String    @default("pendiente")
+  adminNote  String    @default("")
+  createdAt  DateTime  @default(now()) @db.Timestamp(3)
+  reviewedAt DateTime? @db.Timestamp(3)
+
+  @@index([userId])
+  @@index([status, createdAt])
 }
