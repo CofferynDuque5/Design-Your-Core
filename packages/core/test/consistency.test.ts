@@ -11,6 +11,9 @@ import {
   phraseOfDay,
   streakNudge,
   upcoming,
+  nextUnitNumber,
+  numberedUnit,
+  unitSummary,
   type ConsistencyDay,
 } from '../src/index.js';
 
@@ -102,5 +105,17 @@ describe('enfoque del día', () => {
     expect(dayFocus(tasks, [])?.title).toBe('Pagar luz');
     expect(dayFocus({} as never, [{ title: 'Caminar', done: true }, { title: 'Agua', done: false }])?.title).toBe('Agua');
     expect(dayFocus({} as never, [])).toBeNull();
+  });
+});
+
+describe('unidades numeradas', () => {
+  it('propone el número siguiente y arma el nombre', () => {
+    expect(nextUnitNumber([])).toBe(1);
+    expect(nextUnitNumber(['Unit 1: Computer Programming', 'Unit 5: Conditionals'])).toBe(6);
+    expect(nextUnitNumber(['Intro', 'Repaso'])).toBe(3);
+    expect(numberedUnit(6, 'Bucles')).toBe('Unidad 6: Bucles');
+    expect(numberedUnit(6, '  ')).toBe('Unidad 6');
+    expect(numberedUnit(6, 'Unidad 7: Arrays')).toBe('Unidad 7: Arrays');
+    expect(unitSummary({ units: ['Unidad 1'], lessons: [{ id: 'a', title: 'x', unit: 'Unidad 1', done: true }, { id: 'b', title: 'y', unit: 'Unidad 1', done: false }] as never })).toEqual([{ unit: 'Unidad 1', done: 1, total: 2 }]);
   });
 });

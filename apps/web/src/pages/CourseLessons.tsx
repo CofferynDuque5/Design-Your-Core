@@ -1,4 +1,4 @@
-import { addUnitPatch, courseUnits, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { useIsMutating } from '@tanstack/react-query';
 import { Check, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
@@ -30,6 +30,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const [newUnit, setNewUnit] = useState('');
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
   const unitList = useId();
+  const newUnitId = useId();
   const [title, setTitle] = useState('');
   const [unit, setUnit] = useState(() => lessons.at(-1)?.unit ?? '');
   const [url, setUrl] = useState('');
@@ -49,11 +50,12 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const save = (next: CourseLesson[], opts?: ChangeOpts) => apply(lessonsPatch(now(), next), opts);
   const addUnit = (e: FormEvent) => {
     e.preventDefault();
-    const patch = addUnitPatch(now(), newUnit);
-    if (!patch) return setStatus(newUnit.trim() ? `Ya tienes una unidad llamada «${newUnit.trim()}».` : null);
+    const name = numberedUnit(nextUnitNumber(courseUnits(now())), newUnit);
+    const patch = addUnitPatch(now(), name);
+    if (!patch) return setStatus(`Ya tienes una unidad llamada «${name}».`);
     apply(patch);
-    setUnit(newUnit.trim());
-    setStatus(`Añadida la unidad «${newUnit.trim()}». Ahora añádele lecciones.`);
+    setUnit(name);
+    setStatus(`Añadida «${name}». Ahora añádele lecciones.`);
     setNewUnit('');
   };
   const rename = (e: FormEvent) => {
@@ -75,6 +77,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const link = normalizeCourseUrl(url);
   const badUrl = !!url.trim() && !validCourseUrl(link);
   const units = courseUnits({ lessons, units: created });
+  const nextNumber = nextUnitNumber(units);
   const done = lessons.filter((l) => l.done).length;
   const list = youtubeRef(c.url)?.list;
   const next = nextLesson(c);
@@ -142,10 +145,31 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
         </button>
       )}
       <form className="lessons__new-unit" onSubmit={addUnit}>
-        <TextField label="Nueva unidad" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} maxLength={120} placeholder="Unidad 1, Módulo 2…" />
-        <button type="submit" className="btn btn--secondary btn--sm" disabled={!newUnit.trim() || units.length >= 100}>
-          <FolderPlus size={16} aria-hidden="true" /> Añadir unidad
-        </button>
+        <div className="field">
+          <label className="field__label" htmlFor={newUnitId}>
+            Nueva unidad
+          </label>
+          <div className="prefixed-input">
+            <span className="prefixed-input__prefix" aria-hidden="true">
+              Unidad {nextNumber}:
+            </span>
+            <input
+              id={newUnitId}
+              className="input"
+              value={newUnit}
+              onChange={(e) => setNewUnit(e.target.value)}
+              maxLength={110}
+              placeholder="Nombre de la unidad (opcional)"
+              aria-describedby={`${newUnitId}-hint`}
+            />
+            <button type="submit" className="btn btn--secondary btn--sm prefixed-input__action" disabled={units.length >= 100}>
+              <FolderPlus size={16} aria-hidden="true" /> Añadir unidad {nextNumber}
+            </button>
+          </div>
+          <p className="field__hint" id={`${newUnitId}-hint`}>
+            Se guarda como «{numberedUnit(nextNumber, newUnit)}».
+          </p>
+        </div>
       </form>
       {lessonsByUnit(lessons, created).map((g) => (
         <section key={g.unit || '-'} className="lessons__unit" aria-label={g.unit || 'Lecciones'}>

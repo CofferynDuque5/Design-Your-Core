@@ -593,8 +593,13 @@ describe('Cursos: progreso y horario', () => {
     await waitFor(() =>
       expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { progress: 50, status: 'curso', lessons: [{ id: 'l1', done: true }, { id: 'l2' }] } }),
     );
-    await userEvent.type(within(dialog).getByLabelText('Nueva unidad'), 'Unidad 2');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir unidad' }));
+    // El número va solo: sin nombre queda «Unidad 2»; con nombre, «Unidad 2: Hooks».
+    expect(within(dialog).getByText('Unidad 2:')).toBeInTheDocument();
+    expect(within(dialog).getByText('Se guarda como «Unidad 2».')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Nueva unidad'), 'Hooks');
+    expect(within(dialog).getByText('Se guarda como «Unidad 2: Hooks».')).toBeInTheDocument();
+    await userEvent.clear(within(dialog).getByLabelText('Nueva unidad'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir unidad 2' }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Unidad 2'] } }));
     expect(await within(dialog).findByRole('heading', { name: /Unidad 2/ })).toBeInTheDocument();
     expect(within(dialog).getByText('Sin lecciones todavía.')).toBeInTheDocument();
@@ -618,6 +623,29 @@ describe('Cursos: progreso y horario', () => {
     expect(await within(dialog).findByText('Listo: 2 lecciones nuevas de la lista.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Ver «Clase 2» aquí' })).toBeInTheDocument();
     expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{}, {}, {}, { title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabcdefghijk', seconds: 300 }, { title: 'Clase 2' }] } });
+  });
+
+  it('la tarjeta muestra las unidades y el idioma, que se elige al editar', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [
+        {
+          id: 'a', topic: 'Programación', title: 'Introduction to Programming I', url: '', status: 'pendiente', notes: '',
+          units: ['Unit 1: Computer Programming', 'Unit 2: Variables', 'Unit 3: Input', 'Unit 4: Methods', 'Unit 5: Logic'],
+          lessons: [{ id: 'l1', title: 'Qué es programar', unit: 'Unit 1: Computer Programming', done: true }],
+        },
+      ];
+    });
+    renderAt('/cursos');
+    const units = await screen.findByRole('list', { name: 'Unidades de «Introduction to Programming I»' });
+    expect(within(units).getByText('Unit 1: Computer Programming')).toBeInTheDocument();
+    expect(within(units).getByText('1/1')).toBeInTheDocument();
+    expect(within(units).getByRole('button', { name: 'Ver las 5 unidades' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Editar «Introduction to Programming I»' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Idioma del curso'), 'Inglés');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { language: 'en' } }));
+    expect(await screen.findByText(/Inglés/)).toBeInTheDocument();
   });
 
   it('subcategoría y canal: YouTube se lee aquí y llena el canal y el nombre', async () => {

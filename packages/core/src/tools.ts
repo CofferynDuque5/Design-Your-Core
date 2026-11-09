@@ -1206,6 +1206,28 @@ export function courseUnits(c: Pick<LegacyCourse, 'units' | 'lessons'>): string[
     .filter(Boolean);
 }
 
+const UNIT_NUMBER = /^\s*(?:unidad|unit|m[oó]dulo|module|tema|secci[oó]n|section)\s+(\d{1,3})\b/i;
+
+/** Número que le toca a la próxima unidad: uno más que la mayor ya numerada, o el siguiente en la lista. */
+export function nextUnitNumber(units: readonly string[]): number {
+  const nums = units.map((u) => Number(UNIT_NUMBER.exec(u)?.[1] ?? 0));
+  return Math.max(units.length, ...nums, 0) + 1;
+}
+
+/** «Unidad 3: Variables» (o solo «Unidad 3»); si ya se escribió con su número, se respeta. */
+export function numberedUnit(n: number, title: string): string {
+  const t = title.trim().replace(/^[:\-–\s]+/, '');
+  if (UNIT_NUMBER.test(t)) return t;
+  return t ? `Unidad ${n}: ${t}` : `Unidad ${n}`;
+}
+
+/** Para mostrar en la tarjeta: cada unidad con sus lecciones vistas. */
+export function unitSummary(c: Pick<LegacyCourse, 'units' | 'lessons'>): Array<{ unit: string; done: number; total: number }> {
+  return lessonsByUnit(c.lessons ?? [], c.units ?? [])
+    .filter((g) => g.unit)
+    .map((g) => ({ unit: g.unit, done: g.items.filter((l) => l.done).length, total: g.items.length }));
+}
+
 /** Añade una unidad vacía al final (si no existe ya). */
 export function addUnitPatch(c: LegacyCourse, name: string): Partial<LegacyCourse> | null {
   const unit = name.trim();

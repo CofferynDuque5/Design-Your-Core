@@ -739,6 +739,8 @@ export interface LegacyCourse {
   lessons?: CourseLesson[];
   /** Unidades del curso en orden, también las que aún no tienen lecciones. */
   units?: string[];
+  /** Idioma en que se dicta: español, inglés o sin indicar (""). */
+  language?: CourseLanguage | '';
 }
 
 export interface CourseLesson {
@@ -756,6 +758,10 @@ export interface CourseLesson {
 /** Hasta cuántas lecciones guarda un curso. */
 export const COURSE_LESSONS_MAX = 500;
 export const COURSE_UNITS_MAX = 100;
+
+export const COURSE_LANGUAGES = ['es', 'en'] as const;
+export type CourseLanguage = (typeof COURSE_LANGUAGES)[number];
+export const COURSE_LANGUAGE_LABEL: Record<CourseLanguage, string> = { es: 'Español', en: 'Inglés' };
 
 export const COURSE_LENGTH_FROM = ['enlace', 'aprox', 'manual'] as const;
 export type CourseLengthFrom = (typeof COURSE_LENGTH_FROM)[number];
@@ -1197,6 +1203,7 @@ const shapes = {
       )
       .max(COURSE_LESSONS_MAX, `Máximo ${COURSE_LESSONS_MAX} lecciones por curso`)
       .optional(),
+    language: z.enum(['', ...COURSE_LANGUAGES]).optional(),
     units: z.array(z.string().trim().min(1, 'Escribe el nombre de la unidad').max(120)).max(COURSE_UNITS_MAX, `Máximo ${COURSE_UNITS_MAX} unidades por curso`).optional(),
   }),
   ventures: z.object({

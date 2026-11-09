@@ -95,7 +95,7 @@ const KEY_NOUN: Partial<Record<LegacyKey, string>> = {
 };
 
 const FIELD_LABEL: Record<string, string> = {
-  title: 'Título', name: 'Nombre', label: 'Nombre', sub: 'Detalle', start: 'Inicio', dur: 'Duración', kind: 'Tipo', pri: 'Prioridad', time: 'Hora', done: 'Hecho',
+  title: 'Título', language: 'Idioma', units: 'Unidades', name: 'Nombre', label: 'Nombre', sub: 'Detalle', start: 'Inicio', dur: 'Duración', kind: 'Tipo', pri: 'Prioridad', time: 'Hora', done: 'Hecho',
   tags: 'Etiquetas', day: 'Día', when: 'Cuándo', end: 'Fin', room: 'Aula', teacher: 'Profesor', nextClass: 'Próxima clase', topics: 'Temas', subject: 'Materia',
   deadline: 'Fecha límite', status: 'Estado', milestones: 'Hitos', steps: 'Pasos', category: 'Categoría', body: 'Texto', text: 'Texto', stage: 'Etapa',
   platform: 'Plataforma', notes: 'Notas', script: 'Guion', due: 'Para', amount: 'Monto', type: 'Tipo', note: 'Nota', target: 'Objetivo', current: 'Llevas',

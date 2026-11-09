@@ -27,6 +27,10 @@ import {
   coursesBySubtopic,
   coursesByTopic,
   courseOrigin,
+  COURSE_LANGUAGE_LABEL,
+  COURSE_LANGUAGES,
+  unitSummary,
+  type CourseLanguage,
   courseSource,
   HHMM_RE,
   normalizeCourseUrl,
@@ -287,10 +291,11 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
   const status = statusOf(c);
   const watch = canWatch(c);
   const Icon = !source ? GraduationCap : source.video ? MonitorPlay : Link2;
-  const meta = [levelLabel(c), c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ');
+  const meta = [levelLabel(c), c.language ? COURSE_LANGUAGE_LABEL[c.language] : '', c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ');
   const pct = courseProgress(c);
   const resume = courseResume(c);
   const inSchedule = scheduleText(classes(c));
+  const units = unitSummary(c);
   const body = (
     <>
       <Icon size={18} color={colors.inkMuted} />
@@ -321,6 +326,25 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
             <T v="small" tint="muted" style={{ flexShrink: 1 }}>
               {resume || `${pct} %`}
             </T>
+          </View>
+        )}
+        {units.length > 0 && (
+          <View accessible accessibilityLabel={`Unidades de «${name}»: ${units.map((u) => u.unit).join(', ')}`} style={{ marginTop: 4, paddingLeft: space[2], borderLeftWidth: 2, borderLeftColor: colors.lineStrong, gap: 2 }}>
+            {units.slice(0, 4).map((u) => (
+              <View key={u.unit} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[2] }}>
+                <T v="small" numberOfLines={1} style={[{ flexShrink: 1 }, u.total > 0 && u.done === u.total && { color: colors.primary }]}>
+                  {u.unit}
+                </T>
+                <T v="small" tint="muted">
+                  {u.total ? `${u.done}/${u.total}` : 'sin lecciones'}
+                </T>
+              </View>
+            ))}
+            {units.length > 4 && (
+              <T v="small" tint="primary">
+                y {units.length - 4} más
+              </T>
+            )}
           </View>
         )}
       </View>
@@ -499,6 +523,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
   const [title, setTitle] = useState(course?.title ?? '');
   const [status, setStatus] = useState<CourseStatus>(course ? statusOf(course) : 'pendiente');
   const [notes, setNotes] = useState(course?.notes ?? '');
+  const [language, setLanguage] = useState<CourseLanguage | ''>(course?.language ?? '');
   const link = normalizeCourseUrl(url);
   const badUrl = !validCourseUrl(link);
   const source = !badUrl ? courseSource(link) : null;
@@ -521,6 +546,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
       title: title.trim(),
       status,
       notes,
+      language,
       ...length.fields(),
       ...(found?.length && list && !course?.lessons?.length ? { lessons: lessonsFromPlaylist(found, list, newId) } : {}),
     };
@@ -577,6 +603,12 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
       <Field label="Nombre (opcional)" value={title} onChangeText={setTitle} maxLength={200} placeholder="Curso completo de inglés básico" />
       <Field label="Canal de YouTube o academia (opcional)" value={origin} onChangeText={setOrigin} maxLength={120} placeholder="midudev, Platzi, EDteam…" hint="En YouTube se llena solo al leer el enlace." />
       <Suggestions field="Canal o academia" values={origins} current={origin} onPick={setOrigin} />
+      <DotChoices
+        legend="Idioma del curso"
+        value={language || 'ninguno'}
+        onChange={(v) => setLanguage(v === 'ninguno' ? '' : (v as CourseLanguage))}
+        options={[{ value: 'ninguno', label: 'Sin indicar' }, ...COURSE_LANGUAGES.map((l) => ({ value: l, label: COURSE_LANGUAGE_LABEL[l] }))]}
+      />
       <DotChoices legend="Estado" value={status} onChange={setStatus} options={COURSE_STATUSES.map((s) => ({ value: s, label: COURSE_STATUS_INFO[s].label }))} />
       <Field label="Notas (opcional)" value={notes} onChangeText={setNotes} maxLength={5000} multiline placeholder="Voy en la lección 4…" />
       <FormActions

@@ -34,6 +34,22 @@ describe('Cursos y Horario en el móvil', () => {
     queryClient.clear();
   });
 
+  it('Cursos: la tarjeta muestra unidades e idioma, que se elige al editar', async () => {
+    const api = fakeModules(
+      legacyDoc({
+        courses: [
+          { id: 'p1', topic: 'Programación', title: 'Intro', url: '', status: 'pendiente', notes: '', units: ['Unit 1: Basics', 'Unit 2: Variables'], lessons: [{ id: 'l1', title: 'Hola', unit: 'Unit 1: Basics', done: true }] },
+        ] as never,
+      }),
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByLabelText('Unidades de «Intro»: Unit 1: Basics, Unit 2: Variables')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Editar «Intro»' }));
+    fireEvent.press(await screen.findByRole('radio', { name: 'Inglés' }));
+    fireEvent.press(screen.getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/p1', body: { language: 'en' } }));
+  });
+
   it('Cursos: agrupa por tema, abre el enlace, cambia el estado y añade uno nuevo', async () => {
     const api = fakeModules(legacyDoc());
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
@@ -191,8 +207,11 @@ describe('Cursos y Horario en el móvil', () => {
     await waitFor(() =>
       expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { progress: 50, status: 'curso', lessons: [{ id: 'l1', done: true }, { id: 'l2' }] } }),
     );
-    fireEvent.changeText(screen.getByLabelText('Nueva unidad'), 'Unidad 2');
-    fireEvent.press(screen.getByRole('button', { name: 'Añadir unidad' }));
+    // El número va solo: sin nombre queda «Unidad 2».
+    fireEvent.changeText(screen.getByLabelText('Nueva unidad'), 'Hooks');
+    expect(screen.getByText('Se guarda como «Unidad 2: Hooks».')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByLabelText('Nueva unidad'), '');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir unidad 2' }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Unidad 2'] } }));
     expect(await screen.findByRole('header', { name: 'UNIDAD 2 · 0/0' })).toBeOnTheScreen();
     fireEvent.press(screen.getByRole('button', { name: 'Añadir lección a «Unidad 2»' }));

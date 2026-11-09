@@ -1,4 +1,4 @@
-import { addUnitPatch, courseUnits, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { useIsMutating } from '@tanstack/react-query';
 import { Check, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react-native';
@@ -51,11 +51,12 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   };
   const save = (next: CourseLesson[], opts?: ChangeOpts) => apply(lessonsPatch(now(), next), opts);
   const addUnit = () => {
-    const patch = addUnitPatch(now(), newUnit);
-    if (!patch) return setStatus(newUnit.trim() ? `Ya tienes una unidad llamada «${newUnit.trim()}».` : null);
+    const name = numberedUnit(nextUnitNumber(courseUnits(now())), newUnit);
+    const patch = addUnitPatch(now(), name);
+    if (!patch) return setStatus(`Ya tienes una unidad llamada «${name}».`);
     apply(patch);
-    setUnit(newUnit.trim());
-    setStatus(`Añadida la unidad «${newUnit.trim()}». Ahora añádele lecciones.`);
+    setUnit(name);
+    setStatus(`Añadida «${name}». Ahora añádele lecciones.`);
     setNewUnit('');
   };
   const rename = () => {
@@ -74,6 +75,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const link = normalizeCourseUrl(url);
   const badUrl = !!url.trim() && !validCourseUrl(link);
   const units = courseUnits({ lessons, units: created });
+  const nextNumber = nextUnitNumber(units);
   const done = lessons.filter((l) => l.done).length;
   const ref = youtubeRef(c.url);
   const list = ref?.list;
@@ -144,11 +146,18 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
         </View>
       )}
       {reading && ref && <YouTubeLengthReader video={ref.video} list={ref.list} onStep={(n, total) => setStatus(`Leyendo los videos de la lista: ${n} de ${total}…`)} onDone={imported} />}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space[2] }}>
-        <View style={{ flex: 1 }}>
-          <Field label="Nueva unidad" value={newUnit} onChangeText={setNewUnit} maxLength={120} placeholder="Unidad 1, Módulo 2…" onSubmitEditing={addUnit} returnKeyType="done" />
-        </View>
-        <Button small variant="secondary" label="Añadir unidad" icon={<FolderPlus size={16} color={colors.primary} />} onPress={addUnit} disabled={!newUnit.trim() || units.length >= 100} />
+      <View style={{ gap: space[2] }}>
+        <Field
+          label="Nueva unidad"
+          value={newUnit}
+          onChangeText={setNewUnit}
+          maxLength={110}
+          placeholder={`Unidad ${nextNumber}: nombre (opcional)`}
+          hint={`Se guarda como «${numberedUnit(nextNumber, newUnit)}».`}
+          onSubmitEditing={addUnit}
+          returnKeyType="done"
+        />
+        <Button small variant="secondary" label={`Añadir unidad ${nextNumber}`} icon={<FolderPlus size={16} color={colors.primary} />} onPress={addUnit} disabled={units.length >= 100} style={{ alignSelf: 'flex-start' }} />
       </View>
       {lessonsByUnit(lessons, created).map((g) => (
         <View key={g.unit || '-'}>

@@ -368,9 +368,19 @@ export function sampleLegacy(today: Day): Record<string, unknown> {
       { id: 'md4', date: day(-5), minutes: 3, kind: 'respiracion' },
     ],
     courses: [
-      { id: 'cr1', topic: 'Inglés', title: 'Inglés básico desde cero', url: 'https://www.youtube.com/playlist?list=PLinglesbasico', status: 'curso', notes: 'Voy en la lección 6' },
+      { id: 'cr1', topic: 'Inglés', title: 'Inglés básico desde cero', url: 'https://www.youtube.com/playlist?list=PLinglesbasico', status: 'curso', notes: 'Voy en la lección 6', language: 'en' },
       { id: 'cr2', topic: 'Inglés', title: 'Pronunciación en 30 días', url: 'https://www.udemy.com/course/pronunciacion-ingles/', status: 'pendiente', notes: '' },
-      { id: 'cr3', topic: 'Programación web', title: 'React desde cero', url: 'https://platzi.com/cursos/react/', status: 'pendiente', notes: '' },
+      {
+        id: 'cr3', topic: 'Programación web', title: 'React desde cero', url: 'https://platzi.com/cursos/react/', status: 'curso', notes: '', language: 'es',
+        units: ['Unidad 1: Fundamentos', 'Unidad 2: Componentes', 'Unidad 3: Hooks', 'Unidad 4: Rutas', 'Unidad 5: Proyecto final'],
+        lessons: [
+          { id: 'cr3l1', title: 'Qué es React', unit: 'Unidad 1: Fundamentos', done: true },
+          { id: 'cr3l2', title: 'JSX', unit: 'Unidad 1: Fundamentos', done: true },
+          { id: 'cr3l3', title: 'Props', unit: 'Unidad 2: Componentes', done: true },
+          { id: 'cr3l4', title: 'Estado', unit: 'Unidad 2: Componentes', done: false },
+          { id: 'cr3l5', title: 'useEffect', unit: 'Unidad 3: Hooks', done: false },
+        ],
+      },
       { id: 'cr4', topic: 'Programación web', title: 'CSS Grid en una hora', url: 'https://youtu.be/cssgrid', status: 'hecho', notes: '' },
       { id: 'cr5', topic: 'Finanzas personales', title: '', url: 'https://www.coursera.org/learn/finanzas-personales', status: 'pendiente', notes: '' },
     ],

@@ -16,6 +16,10 @@ import {
   coursesBySubtopic,
   coursesByTopic,
   courseOrigin,
+  COURSE_LANGUAGE_LABEL,
+  COURSE_LANGUAGES,
+  unitSummary,
+  type CourseLanguage,
   courseLevel,
   courseRemaining,
   courseRoute,
@@ -55,6 +59,8 @@ import { readYouTubeLength } from '../lib/youtubeLength';
 import { plural } from '../lib/format';
 
 type Filter = 'todos' | CourseStatus;
+/** Unidades que se ven en la tarjeta antes de «Ver las N unidades». */
+const UNITS_SHOWN = 4;
 const NEXT_STATUS: Record<CourseStatus, CourseStatus> = {
   pendiente: 'curso',
   curso: 'hecho',
@@ -310,6 +316,7 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
   const pct = courseProgress(c);
   const resume = courseResume(c);
   const inSchedule = scheduleText(classes(c));
+  const units = unitSummary(c);
   return (
     <li className={`course-row course-row--${status}`}>
       <Icon className="course-row__icon" size={18} aria-hidden="true" />
@@ -330,7 +337,7 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
         )}
         <span className="small muted course-row__meta">
           {next && <span className="course-row__next">Sigue</span>}
-          {[levelLabel(c), c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ')}
+          {[levelLabel(c), c.language ? COURSE_LANGUAGE_LABEL[c.language] : '', c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ')}
         </span>
         {(pct > 0 || resume) && status !== 'hecho' && (
           <span className="course-progress">
@@ -339,6 +346,23 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
             </span>
             <span className="small muted">{resume || `${pct} %`}</span>
           </span>
+        )}
+        {units.length > 0 && (
+          <ul className="course-units" aria-label={`Unidades de «${name}»`}>
+            {units.slice(0, UNITS_SHOWN).map((u) => (
+              <li key={u.unit} className={u.total && u.done === u.total ? 'is-done' : undefined}>
+                <span className="course-units__name">{u.unit}</span>
+                <span className="small muted numeric">{u.total ? `${u.done}/${u.total}` : 'sin lecciones'}</span>
+              </li>
+            ))}
+            {units.length > UNITS_SHOWN && (
+              <li>
+                <button type="button" className="course-units__more small" onClick={() => onLessons(c)}>
+                  Ver las {units.length} unidades
+                </button>
+              </li>
+            )}
+          </ul>
         )}
         {inSchedule && (
           <Link to="/horario" className="small course-row__when">
@@ -356,7 +380,7 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
           {COURSE_STATUS_INFO[status].short}
         </button>
         <button type="button" className="btn btn--ghost btn--sm" onClick={() => onLessons(c)} aria-label={`Unidades y lecciones de «${name}»${c.lessons?.length ? ` (${c.lessons.filter((l) => l.done).length} de ${c.lessons.length} vistas)` : ''}`}>
-          <ListChecks size={16} aria-hidden="true" /> {c.lessons?.length ? `Unidades ${c.lessons.filter((l) => l.done).length}/${c.lessons.length}` : 'Unidades'}
+          <ListChecks size={16} aria-hidden="true" /> {c.lessons?.length ? `Unidades ${c.lessons.filter((l) => l.done).length}/${c.lessons.length}` : units.length ? `Unidades (${units.length})` : 'Unidades'}
         </button>
         {!yt && !c.lessons?.length && (
           <button type="button" className="icon-btn" onClick={() => onLog(c)} aria-label={`Anotar avance de «${name}»`}>
@@ -521,6 +545,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
   const [title, setTitle] = useState(course?.title ?? '');
   const [status, setStatus] = useState<CourseStatus>(course ? statusOf(course) : 'pendiente');
   const [notes, setNotes] = useState(course?.notes ?? '');
+  const [language, setLanguage] = useState<CourseLanguage | ''>(course?.language ?? '');
   const link = normalizeCourseUrl(url);
   const badUrl = !validCourseUrl(link);
   const source = !badUrl ? courseSource(link) : null;
@@ -544,6 +569,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
       ...(found?.length && youtubeRef(link)?.list && !course?.lessons?.length ? { lessons: lessonsFromPlaylist(found, youtubeRef(link)!.list, newId) } : {}),
       status,
       notes,
+      language,
       ...length.fields(),
     };
     const id = course?.id ?? newId();
@@ -635,6 +661,14 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
           ))}
         </datalist>
       )}
+      <SelectField label="Idioma del curso" value={language} onChange={(e) => setLanguage(e.target.value as CourseLanguage | '')}>
+        <option value="">Sin indicar</option>
+        {COURSE_LANGUAGES.map((l) => (
+          <option key={l} value={l}>
+            {COURSE_LANGUAGE_LABEL[l]}
+          </option>
+        ))}
+      </SelectField>
       <SelectField label="Estado" value={status} onChange={(e) => setStatus(e.target.value as CourseStatus)}>
         {COURSE_STATUSES.map((s) => (
           <option key={s} value={s}>
