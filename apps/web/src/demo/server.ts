@@ -8,6 +8,8 @@ import {
   challengeStartSchema,
   CHALLENGES,
   checkInInputSchema,
+  consistencyDay,
+  consistencyRange,
   dayScores,
   daysIn,
   deriveLegacyPatch,
@@ -613,6 +615,7 @@ export function createDemoServer(opts: DemoServerOptions = {}) {
       challenges: activeChallenges(a, today),
       recommendations: recommendationsFor(a, today),
       onboarded: !!a.profile?.onboardedAt,
+      consistency: daysIn(consistencyRange(today)).map((d) => consistencyDay(d, habitsOn(a, d), !!a.checkIns[d])),
     };
   });
 

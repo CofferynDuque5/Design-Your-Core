@@ -1,7 +1,26 @@
 import type { CheckIn, Dashboard } from '@dyc/api-client';
 import { useMutation } from '@tanstack/react-query';
-import { firstProject, PROJECT_PRIORITY_INFO, projectPriorityOf, projectProgress } from '@dyc/core';
-import { ArrowRight, Flag, PenLine } from 'lucide-react';
+import {
+  consistencyGrid,
+  consistencyLevel,
+  consistencyStats,
+  DAY_PLAN_KIND_LABEL,
+  dayFocus,
+  dayPlan,
+  firstProject,
+  phraseOfDay,
+  PROJECT_PRIORITY_INFO,
+  projectPriorityOf,
+  projectProgress,
+  STREAK_MILESTONES,
+  streakNudge,
+  upcoming,
+  WEEKLY_TARGET,
+  type ConsistencyDay,
+  type ConsistencyStats,
+  type LegacyData,
+} from '@dyc/core';
+import { ArrowRight, Award, Crosshair, Flag, Flame, Lock, PenLine, Quote, Timer } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../app/api';
@@ -29,7 +48,7 @@ export function Today() {
     <div className="page">
       <PageHeader eyebrow={dash.data ? longDay(dash.data.today) : 'Hoy'} title={name ? `${greeting()}, ${name}` : greeting()} />
       {dash.isPending ? (
-        <div className="today-grid">
+        <div className="stack-lg">
           <Loading label="Cargando tu día" />
           <Loading />
         </div>
@@ -45,17 +64,23 @@ export function Today() {
 function TodayContent({ d }: { d: Dashboard }) {
   const toggleHabit = useToggleHabit();
   const toggleChallenge = useToggleChallenge();
+  const legacy = useLegacyData();
   const habits = d.todayStatus.habits;
   const doneHabits = habits.filter((h) => h.done).length;
-  // La tarjeta de check-in ya está arriba: no se repite como sugerencia.
+  // La tarjeta de check-in ya está en el mosaico: no se repite como sugerencia.
   const recs = d.recommendations.filter((r) => r.action?.type !== 'check-in');
+  const days = d.consistency ?? [];
+  const stats = consistencyStats(days, d.today);
 
   return (
-    <div className="today-grid">
-      <div className="stack-lg">
-        <CheckInCard today={d.today} checkIn={d.todayStatus.checkIn} />
+    <div className="stack-lg">
+      <FocusHero d={d} data={legacy.data?.data} streak={stats.streak} />
 
-        <section className="stack" aria-labelledby="habits-today">
+      <div className="bento">
+        <ConsistencyCard days={days} today={d.today} stats={stats} />
+        <ScoreCard d={d} />
+
+        <section className="card stack" aria-labelledby="habits-today">
           <div className="section-head">
             <h2 id="habits-today" className="section-title">
               Hábitos de hoy
@@ -67,7 +92,7 @@ function TodayContent({ d }: { d: Dashboard }) {
             )}
           </div>
           {habits.length ? (
-            <div className="card card--list">
+            <div className="card--list">
               {habits.map((h) => (
                 <HabitCheck key={h.id} title={h.title} pillar={h.pillar} done={h.done} onToggle={() => toggleHabit.mutate({ id: h.id, date: d.today, done: !h.done })} />
               ))}
@@ -86,7 +111,23 @@ function TodayContent({ d }: { d: Dashboard }) {
           )}
         </section>
 
-        <section className="stack" aria-labelledby="challenges-today">
+        <CheckInCard today={d.today} checkIn={d.todayStatus.checkIn} />
+        <DayPlanCard data={legacy.data?.data} />
+        <MilestonesCard stats={stats} />
+        <FirstProjectCard />
+        {recs.length > 0 && (
+          <section className="bento__item stack" aria-labelledby="recs">
+            <h2 id="recs" className="section-title">
+              Para ti
+            </h2>
+            {recs.map((r) => (
+              <RecommendationCard key={r.key} rec={r} />
+            ))}
+          </section>
+        )}
+        <PillarsCard d={d} />
+
+        <section className="card bento__full stack" aria-labelledby="challenges-today">
           <div className="section-head">
             <h2 id="challenges-today" className="section-title">
               Retos activos
@@ -114,23 +155,317 @@ function TodayContent({ d }: { d: Dashboard }) {
             </EmptyState>
           )}
         </section>
+
+      </div>
+    </div>
+  );
+}
+
+/** Portada: lo único importante de hoy, con un botón para empezar el foco. */
+function FocusHero({ d, data, streak }: { d: Dashboard; data: LegacyData | undefined; streak: number }) {
+  const habits = d.todayStatus.habits;
+  const focus = dayFocus(data, habits);
+  const todayItem = d.consistency?.find((c) => c.date === d.today);
+  const done = todayItem?.done ?? habits.filter((h) => h.done).length + (d.todayStatus.checkIn ? 1 : 0);
+  const total = todayItem?.total ?? habits.length + 1;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return (
+    <section className="card focus-hero" aria-labelledby="focus-title">
+      <p className="eyebrow focus-hero__eyebrow">
+        <Crosshair size={14} aria-hidden="true" className="inline-icon" /> Tu enfoque de hoy
+      </p>
+      <h2 id="focus-title" className="focus-hero__title">
+        {focus ? (
+          <>
+            Hoy, una cosa a la vez: <em>{focus.title}</em>
+          </>
+        ) : (
+          <>
+            Tu día está en orden. <em>Elige algo que te acerque a tus metas.</em>
+          </>
+        )}
+      </h2>
+      {focus && <p className="muted">{focus.detail}</p>}
+      <dl className="focus-hero__meta">
+        <div>
+          <dt>Puntuación de la semana</dt>
+          <dd className="numeric">{d.overall.score ?? '—'}</dd>
+        </div>
+        <div>
+          <dt>Días de racha</dt>
+          <dd className="numeric focus-hero__streak">{streak}</dd>
+        </div>
+        <div>
+          <dt>Hábitos hechos hoy</dt>
+          <dd className="numeric">
+            {habits.filter((h) => h.done).length}/{habits.length}
+          </dd>
+        </div>
+      </dl>
+      <div className="focus-hero__today">
+        <div className="focus-hero__bar" role="progressbar" aria-label="Lo de hoy" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-valuetext={`${done} de ${total}`}>
+          <span style={{ width: `${pct}%` }} />
+        </div>
+        <span className="small muted numeric">
+          Hoy llevas {done} de {total}
+        </span>
+      </div>
+      <div className="row">
+        <Link to="/enfoque" className="btn">
+          <Timer size={18} aria-hidden="true" /> Empezar 25 min de foco
+        </Link>
+        {focus && (
+          <Link to={focus.url} className="btn btn--ghost">
+            {focus.linkLabel}
+          </Link>
+        )}
+        {!d.todayStatus.checkIn && (
+          <Link to="/check-in" className="btn btn--ghost">
+            Check-in
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** El mapa de 12 semanas, la racha y lo que falta para la próxima meta. */
+function ConsistencyCard({ days, today, stats }: { days: ConsistencyDay[]; today: string; stats: ConsistencyStats }) {
+  const grid = consistencyGrid(days, today);
+  const next = stats.next;
+  const toNext = next ? Math.round(((next.target - next.left) / next.target) * 100) : 100;
+  return (
+    <section className="card bento__wide streak-card" aria-labelledby="streak-title">
+      <div className="streak-card__head">
+        <div className="stack-xs">
+          <h2 id="streak-title" className="section-title">
+            Constancia
+          </h2>
+          <p className="streak-card__nudge">{streakNudge(stats)}</p>
+        </div>
+        <div className={`streak-card__count${stats.todayDone ? ' is-lit' : ''}`}>
+          <Flame size={22} aria-hidden="true" />
+          <span className="numeric">{stats.streak}</span>
+          <span className="small">{stats.streak === 1 ? 'día seguido' : 'días seguidos'}</span>
+        </div>
       </div>
 
-      <aside className="stack-lg" aria-label="Resumen y sugerencias">
-        <FirstProjectCard />
-        <WeekCard d={d} />
-        {recs.length > 0 && (
-          <section className="stack" aria-labelledby="recs">
-            <h2 id="recs" className="section-title">
-              Para ti
-            </h2>
-            {recs.map((r) => (
-              <RecommendationCard key={r.key} rec={r} />
-            ))}
-          </section>
-        )}
-      </aside>
-    </div>
+      <div className="heatmap-wrap">
+        <div className="heatmap__days" aria-hidden="true">
+          {WEEKDAY_LETTERS.map((l, i) => (
+            <span key={i}>{i % 2 === 0 ? l : ''}</span>
+          ))}
+        </div>
+        <ol className="heatmap" aria-label="Días con algo hecho en las últimas 12 semanas">
+          {grid.flatMap((week, w) =>
+            week.map((c, i) =>
+              c ? (
+                <li key={c.date} className="heatmap__cell" data-level={consistencyLevel(c)} data-today={c.date === today || undefined} style={{ gridColumn: w + 1, gridRow: i + 1 }} title={cellLabel(c)}>
+                  <span className="visually-hidden">{cellLabel(c)}</span>
+                </li>
+              ) : (
+                <li key={`f${w}-${i}`} className="heatmap__cell heatmap__cell--future" aria-hidden="true" style={{ gridColumn: w + 1, gridRow: i + 1 }} />
+              ),
+            ),
+          )}
+        </ol>
+      </div>
+      <div className="heatmap__legend small muted" aria-hidden="true">
+        Menos
+        {[0, 1, 2, 3, 4].map((l) => (
+          <span key={l} className="heatmap__cell" data-level={l} />
+        ))}
+        Más
+      </div>
+
+      <dl className="streak-card__stats">
+        <div>
+          <dt>Mejor racha</dt>
+          <dd className="numeric">{plural(stats.best, 'día', 'días')}</dd>
+        </div>
+        <div>
+          <dt>Esta semana</dt>
+          <dd className="numeric">
+            {stats.weekActive} de {WEEKLY_TARGET} días
+          </dd>
+        </div>
+        <div>
+          <dt>Días completos</dt>
+          <dd className="numeric">{stats.perfectDays}</dd>
+        </div>
+      </dl>
+      {next && (
+        <div className="streak-card__next">
+          <div className="focus-hero__bar" role="progressbar" aria-label={`Hacia ${next.target} días seguidos`} aria-valuemin={0} aria-valuemax={next.target} aria-valuenow={next.target - next.left}>
+            <span style={{ width: `${toNext}%` }} />
+          </div>
+          <span className="small muted">
+            Próxima meta: {next.target} días seguidos. Te {next.left === 1 ? 'falta 1 día' : `faltan ${next.left} días`}.
+          </span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const WEEKDAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+function cellLabel(c: ConsistencyDay) {
+  const when = longDay(c.date);
+  if (c.done <= 0) return `${when}: sin actividad`;
+  return `${when}: ${c.done} de ${c.total} hecho${c.total === 1 ? '' : 's'}`;
+}
+
+/** Puntuación grande con la diferencia frente a la semana anterior y la frase del día. */
+function ScoreCard({ d }: { d: Dashboard }) {
+  const delta = d.overall.score !== null && d.overall.previous !== null ? d.overall.score - d.overall.previous : null;
+  return (
+    <section className="card stack score-card" aria-labelledby="week-title">
+      <div className="section-head">
+        <h2 id="week-title" className="section-title">
+          Tu semana
+        </h2>
+        <Link to="/progreso" className="section-link">
+          Progreso <ArrowRight size={16} aria-hidden="true" />
+        </Link>
+      </div>
+      <div className="week-summary">
+        <ScoreRing value={d.overall.score} size={96} label="Puntuación de la semana" />
+        <div className="stack-xs">
+          {delta !== null ? (
+            <span className={`score-card__delta numeric${delta < 0 ? ' is-down' : ''}`}>
+              {delta > 0 ? '+' : ''}
+              {delta} puntos
+            </span>
+          ) : (
+            <span className="muted">Primera semana con datos</span>
+          )}
+          <span className="muted small numeric">{d.habits.scheduled ? `${d.habits.done} de ${d.habits.scheduled} hábitos cumplidos` : 'Sin hábitos programados'}</span>
+          <span className="muted small numeric">{plural(d.checkIns.streak, 'día seguido', 'días seguidos')} con check-in</span>
+        </div>
+      </div>
+      <blockquote className="score-card__quote">
+        <Quote size={16} aria-hidden="true" />
+        <p>{phraseOfDay(d.today)}</p>
+      </blockquote>
+    </section>
+  );
+}
+
+/** Rachas conseguidas: se desbloquean al llegar a 3, 7, 14… días seguidos. */
+function MilestonesCard({ stats }: { stats: ConsistencyStats }) {
+  const shown = STREAK_MILESTONES.slice(0, 6);
+  return (
+    <section className="card stack" aria-labelledby="milestones-title">
+      <div className="section-head">
+        <h2 id="milestones-title" className="section-title">
+          Logros de constancia
+        </h2>
+        <span className="muted small numeric">
+          {stats.reached.length} de {STREAK_MILESTONES.length}
+        </span>
+      </div>
+      <ul className="milestones">
+        {shown.map((m) => {
+          const got = stats.reached.includes(m);
+          return (
+            <li key={m} className={`milestone${got ? ' is-got' : ''}`}>
+              <span className="milestone__icon">{got ? <Award size={20} aria-hidden="true" /> : <Lock size={16} aria-hidden="true" />}</span>
+              <span className="milestone__value numeric" aria-hidden="true">
+                {m}
+              </span>
+              <span className="milestone__unit" aria-hidden="true">
+                días
+              </span>
+              <span className="visually-hidden">{got ? `${m} días seguidos, conseguido` : `${m} días seguidos, por conseguir`}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="muted small">{stats.next ? `Tu mejor racha: ${plural(stats.best, 'día', 'días')}. La siguiente medalla llega a los ${stats.next.target}.` : 'Conseguiste todas las medallas. Ahora, a mantenerlo.'}</p>
+    </section>
+  );
+}
+
+/** Lo que tiene hora hoy: horario, cursos, rutinas y agenda. */
+function DayPlanCard({ data }: { data: LegacyData | undefined }) {
+  const items = upcoming(dayPlan(data));
+  return (
+    <section className="card stack" aria-labelledby="dayplan-title">
+      <div className="section-head">
+        <h2 id="dayplan-title" className="section-title">
+          Tu día
+        </h2>
+        <Link to="/horario" className="section-link">
+          Horario <ArrowRight size={16} aria-hidden="true" />
+        </Link>
+      </div>
+      {items.length ? (
+        <ol className="dayplan">
+          {items.map((i) => (
+            <li key={i.id} className={`dayplan__item${i.now ? ' is-now' : ''}`}>
+              <span className="dayplan__time numeric">{i.time}</span>
+              <Link to={i.url} className="dayplan__title">
+                {i.title}
+              </Link>
+              <span className="dayplan__kind small muted">
+                {i.now ? 'Ahora · ' : ''}
+                {DAY_PLAN_KIND_LABEL[i.kind]}
+                {i.end ? ` · hasta ${i.end}` : ''}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="muted">No queda nada con hora para hoy. Buen momento para una sesión de foco.</p>
+      )}
+    </section>
+  );
+}
+
+/** Cada pilar con su puntuación y su curva de la semana. */
+function PillarsCard({ d }: { d: Dashboard }) {
+  const withData = d.pillars.some((p) => p.score !== null);
+  return (
+    <section className="card bento__full stack" aria-labelledby="pillars-title">
+      <div className="section-head">
+        <h2 id="pillars-title" className="section-title">
+          Tus pilares
+        </h2>
+        <Link to="/progreso" className="section-link">
+          Ver evolución <ArrowRight size={16} aria-hidden="true" />
+        </Link>
+      </div>
+      {withData ? (
+        <ul className="pillar-tiles">
+          {d.pillars.map((p) => (
+            <li key={p.id} className="pillar-tile" data-pillar={p.id}>
+              <span className="pillar-tile__name">{pillarShort(p.id)}</span>
+              <span className="pillar-tile__score numeric">{p.score ?? '—'}</span>
+              <span className={`pillar-tile__delta small numeric${(p.delta ?? 0) < 0 ? ' is-down' : ''}`}>
+                {p.delta === null ? 'sin comparación' : `${p.delta > 0 ? '+' : ''}${p.delta} vs. semana anterior`}
+              </span>
+              <Sparkline values={d.series.map((s) => s.pillars?.[p.id] ?? null)} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">Tus pilares aparecerán aquí después de tu primer check-in.</p>
+      )}
+    </section>
+  );
+}
+
+function Sparkline({ values }: { values: Array<number | null> }) {
+  const pts = values.map((v, i) => (v === null ? null : { x: values.length > 1 ? (i / (values.length - 1)) * 100 : 50, y: 30 - (v / 100) * 26 }));
+  const known = pts.filter((p): p is { x: number; y: number } => p !== null);
+  if (known.length < 2) return <span className="pillar-tile__spark" aria-hidden="true" />;
+  const line = known.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  return (
+    <svg className="pillar-tile__spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+      <path d={`${line} L${known[known.length - 1].x.toFixed(1)} 32 L${known[0].x.toFixed(1)} 32 Z`} className="spark__area" />
+      <path d={line} className="spark__line" vectorEffect="non-scaling-stroke" />
+    </svg>
   );
 }
 
@@ -216,43 +551,6 @@ function FirstProjectCard() {
         <Flag size={14} aria-hidden="true" className="inline-icon" /> Prioridad {PROJECT_PRIORITY_INFO[priority].label.toLowerCase()}
         {p.deadline?.trim() ? ` · Entrega ${p.deadline}` : ''} · {pct} % hecho
       </p>
-    </section>
-  );
-}
-
-function WeekCard({ d }: { d: Dashboard }) {
-  const withData = d.pillars.filter((p) => p.score !== null);
-  return (
-    <section className="card stack" aria-labelledby="week-title">
-      <div className="card__header">
-        <h2 id="week-title" className="section-title">
-          Tu semana
-        </h2>
-        <Link to="/progreso" className="section-link">
-          Progreso <ArrowRight size={16} aria-hidden="true" />
-        </Link>
-      </div>
-      <div className="week-summary">
-        <ScoreRing value={d.overall.score} size={72} label="Puntuación de la semana" />
-        <div className="stack-xs">
-          <span className="numeric">{plural(d.checkIns.streak, 'día seguido', 'días seguidos')} con check-in</span>
-          <span className="muted numeric">
-            {d.habits.scheduled ? `${d.habits.done} de ${d.habits.scheduled} hábitos cumplidos` : 'Sin hábitos programados'}
-          </span>
-        </div>
-      </div>
-      {withData.length ? (
-        <ul className="pillar-rings">
-          {d.pillars.map((p) => (
-            <li key={p.id}>
-              <ScoreRing value={p.score} pillar={p.id} size={44} label={pillarShort(p.id)} />
-              <span className="pillar-rings__label">{pillarShort(p.id)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted">Tus pilares aparecerán aquí después de tu primer check-in.</p>
-      )}
     </section>
   );
 }

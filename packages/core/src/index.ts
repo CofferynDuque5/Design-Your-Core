@@ -3,6 +3,7 @@ export * from './attachments.js';
 export * from './challenges.js';
 export * from './contact.js';
 export * from './checkin.js';
+export * from './consistency.js';
 export * from './dates.js';
 export * from './format.js';
 export * from './icons.js';

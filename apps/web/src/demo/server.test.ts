@@ -31,11 +31,13 @@ describe('API falsa de la versión de prueba', () => {
     const { api } = setup();
     const d = await api.dashboard('week');
     expect(Object.keys(d).sort()).toEqual(
-      ['challenges', 'checkIns', 'date', 'habits', 'onboarded', 'overall', 'period', 'pillars', 'previousRange', 'range', 'recommendations', 'series', 'today', 'todayStatus'].sort(),
+      ['challenges', 'checkIns', 'consistency', 'date', 'habits', 'onboarded', 'overall', 'period', 'pillars', 'previousRange', 'range', 'recommendations', 'series', 'today', 'todayStatus'].sort(),
     );
     expect(d.today).toBe(today());
     expect(d.pillars.map((p) => p.id)).toEqual(['movimiento', 'descanso', 'alimentacion', 'enfoque', 'relaciones', 'proposito']);
     expect(d.series).toHaveLength(7);
+    expect(d.consistency?.at(-1)?.date).toBe(d.today);
+    expect(d.consistency?.some((c) => c.done > 0)).toBe(true);
     expect(d.previousRange.to).toBe(addDays(d.range.from, -1));
     expect(d.overall.score).toBeGreaterThan(0);
     expect(d.overall.previous).toBeGreaterThan(0);
