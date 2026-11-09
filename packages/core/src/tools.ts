@@ -4,6 +4,8 @@ import { moodIcon } from './icons.js';
 import {
   COURSE_UNITS_MAX,
   PROJECT_CATEGORIES,
+  PROJECT_CATEGORIES_MAX,
+  PROJECT_CATEGORY_INFO,
   checkItems,
   type LegacyProjectTodo,
   type ProjectCategory,
@@ -701,6 +703,48 @@ export const firstProject = <T extends { status?: unknown }>(list: readonly T[])
 
 export const projectCategoryOf = (p: { category?: unknown }): ProjectCategory | null => (PROJECT_CATEGORIES.includes(p.category as ProjectCategory) ? (p.category as ProjectCategory) : null);
 
+/**
+ * Las categorías de un proyecto: la lista nueva (`categories`) o, si es de antes,
+ * su única `category`. Sin repetir; las de la lista van con su clave.
+ */
+export function projectCategoriesOf(p: { category?: unknown; categories?: unknown }): string[] {
+  const raw = Array.isArray(p.categories) ? p.categories : projectCategoryOf(p) ? [p.category] : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of raw) {
+    if (typeof c !== 'string' || !c.trim()) continue;
+    const v = projectCategoryKey(c);
+    const k = v.toLocaleLowerCase('es');
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(v);
+    }
+  }
+  return out.slice(0, PROJECT_CATEGORIES_MAX);
+}
+
+/** Una categoría escrita a mano que coincide con una de la lista se guarda con su clave. */
+export function projectCategoryKey(c: string): string {
+  const t = c.trim().slice(0, 40);
+  const known = PROJECT_CATEGORIES.find((k) => k === t || PROJECT_CATEGORY_INFO[k].label.toLocaleLowerCase('es') === t.toLocaleLowerCase('es'));
+  return known ?? t;
+}
+
+/** Nombre visible de una categoría (la de la lista o la que escribió la persona). */
+export const projectCategoryLabel = (c: string): string => (PROJECT_CATEGORIES.includes(c as ProjectCategory) ? PROJECT_CATEGORY_INFO[c as ProjectCategory].label : c);
+
+/** Todas las categorías para elegir: las de la lista y las propias que ya usan tus proyectos. */
+export function projectCategoryChoices(projects: Array<{ category?: unknown; categories?: unknown }>): string[] {
+  const own = projects.flatMap((p) => projectCategoriesOf(p)).filter((c) => !PROJECT_CATEGORIES.includes(c as ProjectCategory));
+  return [...PROJECT_CATEGORIES, ...[...new Set(own)].sort((a, b) => a.localeCompare(b, 'es'))];
+}
+
+/** Lo que se guarda: la lista y, para lo que lee solo una, la primera de la lista conocida. */
+export function projectCategoriesPatch(list: string[]): { categories: string[]; category: ProjectCategory | '' } {
+  const categories = projectCategoriesOf({ categories: list });
+  return { categories, category: (categories.find((c) => PROJECT_CATEGORIES.includes(c as ProjectCategory)) as ProjectCategory | undefined) ?? '' };
+}
+
 /** Lo que falta y las mejoras de un proyecto, con ids seguros. */
 export function projectTodos(p: { todos?: unknown }, makeId: () => string): LegacyProjectTodo[] {
   return checkItems<LegacyProjectTodo>(p.todos, makeId).map((t) => ({ ...t, kind: t.kind === 'mejora' ? 'mejora' : 'falta' }));
@@ -1320,3 +1364,39 @@ export function todoGroups<T extends { title: string }>(todos: T[]): Array<{ lab
   if (rest.length) groups.push({ label: groups.length ? 'Otros' : 'Pendientes', items: rest });
   return groups;
 }
+
+// Duración de un curso en días, horas, minutos y segundos.
+export type LengthParts = { d: string; h: string; m: string; s: string };
+export const LENGTH_UNITS = [
+  { key: 'd', label: 'Días', seconds: 86400, max: 83 },
+  { key: 'h', label: 'Horas', seconds: 3600, max: 2000 },
+  { key: 'm', label: 'Minutos', seconds: 60, max: 59 },
+  { key: 's', label: 'Segundos', seconds: 1, max: 59 },
+] as const;
+export const LENGTH_MAX = 2000 * 3600;
+
+/** Segundos a días, horas, minutos y segundos (vacío lo que es cero). */
+export function lengthParts(total?: number): LengthParts {
+  if (!total || total <= 0) return { d: '', h: '', m: '', s: '' };
+  let rest = Math.round(total);
+  const out = { d: '', h: '', m: '', s: '' };
+  for (const u of LENGTH_UNITS) {
+    const n = Math.floor(rest / u.seconds);
+    rest -= n * u.seconds;
+    out[u.key] = n ? String(n) : '';
+  }
+  return out;
+}
+
+/** Lo escrito en días, horas, minutos y segundos a segundos; null si algo no es un entero válido o pasa de 2000 horas. */
+export function lengthFromParts(parts: LengthParts): number | null {
+  let total = 0;
+  for (const u of LENGTH_UNITS) {
+    const raw = parts[u.key].trim();
+    const n = raw === '' ? 0 : Number(raw);
+    if (!Number.isInteger(n) || n < 0) return null;
+    total += n * u.seconds;
+  }
+  return total > LENGTH_MAX ? null : total;
+}
+

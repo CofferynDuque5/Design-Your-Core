@@ -7,7 +7,7 @@ import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, Meter, paletteWith, safeColor } from '../components/ToolParts';
+import { FormActions, Meter, paletteWith, safeColor, RemoveButton } from '../components/ToolParts';
 import { plural } from '../lib/format';
 
 type Roadmap = LegacyRoadmap & { steps: LegacyCheckItem[] };
@@ -100,6 +100,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
         <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
           <Pencil size={18} aria-hidden="true" />
         </button>
+        <RemoveButton module="roadmaps" id={r.id} name={title} />
       </div>
       {r.steps.length > 0 && <Meter value={donePercent(r.steps)} color={color} label={`Avance de ${title}`} />}
       {r.steps.length === 0 ? null : (

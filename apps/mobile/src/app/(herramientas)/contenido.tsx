@@ -16,7 +16,7 @@ import { CalendarClock, Check, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { SearchBar, Dot, DotChoices, FormActions, IconButton, Pill, Stats, ToolScreen } from '../../components/tools';
+import { SearchBar, Dot, DotChoices, FormActions, IconButton, Pill, Stats, ToolScreen, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -188,6 +188,7 @@ function ContentRow({ item: c, onEdit }: { item: LegacyContent; onEdit: () => vo
       <IconButton label={`Editar «${title}»`} onPress={onEdit}>
         <Pencil size={18} color={colors.inkMuted} />
       </IconButton>
+      <RemoveButton module="content" id={c.id} name={title} />
     </View>
   );
 }

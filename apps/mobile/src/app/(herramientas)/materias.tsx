@@ -22,7 +22,7 @@ import { CalendarPlus, Clock, MapPin, Pencil, Plus, User } from 'lucide-react-na
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { Suggestions, SearchBar, CheckList, ColorSwatches, Disclosure, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
+import { Suggestions, SearchBar, CheckList, ColorSwatches, Disclosure, FormActions, IconButton, Meter, Stats, ToolScreen, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -117,6 +117,7 @@ function SubjectCard({ subject: s, classes, onEdit }: { subject: Subject; classe
         <IconButton label={`Editar «${name}»`} onPress={onEdit} style={{ marginRight: -space[2], marginTop: -space[2] }}>
           <Pencil size={18} color={colors.inkMuted} />
         </IconButton>
+        <RemoveButton module="subjects" id={s.id} name={name} style={{ marginRight: -space[2], marginTop: -space[2] }} />
       </View>
       {(s.teacher || s.room || s.nextClass) && (
         <View style={{ gap: space[1], marginTop: -space[2] }}>

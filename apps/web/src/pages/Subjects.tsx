@@ -9,7 +9,7 @@ import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { CheckList, FormActions, Meter, paletteWith, safeColor, Stats } from '../components/ToolParts';
+import { CheckList, FormActions, Meter, paletteWith, safeColor, Stats, RemoveButton } from '../components/ToolParts';
 import { plural } from '../lib/format';
 
 type Subject = LegacySubject & { topics: LegacyCheckItem[] };
@@ -96,6 +96,7 @@ function SubjectCard({ subject: s, classes, onEdit }: { subject: Subject; classe
         <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${name}»`}>
           <Pencil size={18} aria-hidden="true" />
         </button>
+        <RemoveButton module="subjects" id={s.id} name={name} />
       </div>
       {(s.teacher || s.room || s.nextClass) && (
         <ul className="meta-list">

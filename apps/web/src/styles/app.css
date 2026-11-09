@@ -409,6 +409,11 @@
     cursor: pointer;
   }
 
+  .icon-btn--danger:hover,
+  .icon-btn--danger:focus-visible {
+    color: var(--color-danger);
+  }
+
   /* Texto visible al pasar el ratón por un botón de icono (el mismo nombre que oyen los lectores de pantalla). */
   @media (hover: hover) and (pointer: fine) {
     .icon-btn[aria-label] {
@@ -1142,6 +1147,111 @@
     stroke: var(--pillar-chart, var(--color-primary));
     stroke-width: 2;
     vector-effect: non-scaling-stroke;
+  }
+
+  .trend__fill-top {
+    stop-color: var(--pillar-chart, var(--color-primary));
+    stop-opacity: 0.28;
+  }
+
+  .trend__fill-bottom {
+    stop-color: var(--pillar-chart, var(--color-primary));
+    stop-opacity: 0;
+  }
+
+  .trend__prev {
+    fill: none;
+    stroke: var(--color-ink-subtle);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .trend__prev-dot {
+    fill: var(--color-ink-subtle);
+  }
+
+  .trend__avg {
+    stroke: var(--pillar-chart, var(--color-primary));
+    stroke-opacity: 0.5;
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .trend__value {
+    fill: var(--color-ink);
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    font-family: var(--font-sans);
+  }
+
+  .trend__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin-top: var(--space-3);
+    color: var(--color-ink-muted);
+  }
+
+  .trend__key {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .trend__key::before {
+    content: '';
+    width: 18px;
+    border-top: 2.5px solid var(--pillar-chart, var(--color-primary));
+  }
+
+  .trend__key--prev::before {
+    border-top: 1.5px dashed var(--color-ink-subtle);
+  }
+
+  .trend__key--avg::before {
+    border-top: 1px dotted var(--pillar-chart, var(--color-primary));
+  }
+
+  /* Lo destacado del periodo en Progreso. */
+  .highlights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .highlight {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    padding: var(--space-4);
+  }
+
+  .highlight__icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+  }
+
+  .highlight__label {
+    display: block;
+    color: var(--color-ink-muted);
+    font-size: var(--text-small);
+  }
+
+  .highlight__value {
+    display: block;
+    color: var(--color-ink);
+    font-weight: var(--weight-semibold);
   }
 
   /* ---------- Acceso ---------- */
@@ -3104,6 +3214,29 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
     gap: var(--space-4);
+  }
+
+  .notebook-item {
+    position: relative;
+  }
+
+  .notebook-item__remove,
+  .tl-block__remove {
+    position: absolute;
+    top: var(--space-1);
+    right: var(--space-1);
+  }
+
+  .notebook-item__remove .icon-btn {
+    width: 36px;
+    height: 36px;
+    background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+  }
+
+  .tl-block__remove .icon-btn {
+    width: 28px;
+    height: 28px;
+    color: var(--color-ink);
   }
 
   .notebook-card {
@@ -5991,17 +6124,26 @@
   /* Duración: el campo y «Leer del enlace» en una fila; el botón baja si no cabe. */
   .course-length {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
   }
 
-  .course-length > .field {
-    flex: 1 1 14rem;
+  .course-length__parts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2);
+    width: 100%;
   }
 
-  .course-length > .btn {
-    margin-top: 1.9rem;
+  @media (max-width: 30rem) {
+    .course-length__parts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   .planner__courses {
@@ -6354,5 +6496,84 @@
 @layer dyc.app {
   .page-header__actions:empty {
     display: none;
+  }
+}
+
+@layer dyc.app {
+  .tag-picker {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  .tag-picker__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .tag-option {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-line-strong);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    cursor: pointer;
+  }
+
+  .tag-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .tag-option:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .tag-option--on {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+
+  .tag-option:has(input:disabled) {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .tag-picker__add {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  .tag-picker__add .input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@layer dyc.app {
+  /* Con subir, bajar, editar y eliminar, los botones de la tarjeta se juntan para dejar sitio al nombre. */
+  .tool-card__head > .row {
+    gap: 0;
+    flex: none;
+  }
+
+  .tool-card__head > .row .icon-btn {
+    width: 34px;
+  }
+
+  .course-row__actions .icon-btn--danger {
+    margin-left: calc(var(--space-2) * -1);
   }
 }

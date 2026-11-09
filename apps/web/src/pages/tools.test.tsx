@@ -496,7 +496,8 @@ describe('Cursos: progreso y horario', () => {
     await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
     await userEvent.tab();
     expect(await within(dialog).findByText('Dura 12 h 30 min (12 videos), según la página.')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Duración total en horas (opcional)')).toHaveValue(12.5);
+    expect(within(dialog).getByLabelText('Horas')).toHaveValue(12);
+    expect(within(dialog).getByLabelText('Minutos')).toHaveValue(30);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
     expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/courses', body: { item: { length: 45000, lengthFrom: 'enlace' } } });
     expect(await screen.findByText(/YouTube · 12 h 30 min/)).toBeInTheDocument();
@@ -506,9 +507,12 @@ describe('Cursos: progreso y horario', () => {
     await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://ejemplo.com/curso');
     await userEvent.tab();
     expect(await within(dialog).findByText('Esa página no dice cuánto dura. Escribe la duración a mano.')).toBeInTheDocument();
-    await userEvent.type(within(dialog).getByLabelText('Duración total en horas (opcional)'), '6');
+    await userEvent.type(within(dialog).getByLabelText('Días'), '1');
+    await userEvent.type(within(dialog).getByLabelText('Horas'), '6');
+    await userEvent.type(within(dialog).getByLabelText('Minutos'), '5');
+    await userEvent.type(within(dialog).getByLabelText('Segundos'), '9');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
-    expect(writes(api).at(-1)).toMatchObject({ body: { item: { url: 'https://ejemplo.com/curso', length: 21600, lengthFrom: 'manual' } } });
+    expect(writes(api).at(-1)).toMatchObject({ body: { item: { url: 'https://ejemplo.com/curso', length: 86400 + 6 * 3600 + 5 * 60 + 9, lengthFrom: 'manual' } } });
     expect(asked).toHaveLength(2);
   });
 
@@ -915,17 +919,23 @@ describe('Proyectos', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Nuevo proyecto' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo proyecto' });
     await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Sitio de la tienda');
-    await userEvent.selectOptions(within(dialog).getByLabelText('Categoría'), 'Sitio web');
+    // Varias categorías y una propia.
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Sitio web' }));
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Automatización' }));
+    await userEvent.type(within(dialog).getByLabelText('Agregar categoría'), 'Cliente Lumen{Enter}');
+    expect(within(dialog).getByRole('checkbox', { name: 'Cliente Lumen' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Automatización' }));
     await userEvent.type(within(dialog).getByLabelText('Correo del sitio (opcional)'), 'malo');
     expect(within(dialog).getByRole('button', { name: 'Añadir proyecto' })).toBeDisabled();
     await userEvent.clear(within(dialog).getByLabelText('Correo del sitio (opcional)'));
     await userEvent.type(within(dialog).getByLabelText('Correo del sitio (opcional)'), 'hola@latienda.com');
     expect(within(dialog).getByLabelText('Enlace para abrir el correo (opcional)')).toHaveAttribute('placeholder', 'https://latienda.com/webmail');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir proyecto' }));
-    expect(writes(api)[0]).toMatchObject({ method: 'POST', body: { item: { title: 'Sitio de la tienda', category: 'web', email: 'hola@latienda.com', mailUrl: '', todos: [] } } });
+    expect(writes(api)[0]).toMatchObject({ method: 'POST', body: { item: { title: 'Sitio de la tienda', category: 'web', categories: ['web', 'Cliente Lumen'], email: 'hola@latienda.com', mailUrl: '', todos: [] } } });
 
     const card = await screen.findByRole('article', { name: 'Sitio de la tienda' });
-    expect(within(card).getByText('Sitio web')).toBeInTheDocument();
+    expect(within(card).getByText('Sitio web · Cliente Lumen')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Eliminar «Sitio de la tienda»' })).toBeInTheDocument();
     expect(within(card).getByRole('link', { name: /Abrir el correo hola@latienda.com/ })).toHaveAttribute('href', 'https://latienda.com/webmail');
     expect(within(card).getByRole('link', { name: 'Escribir a hola@latienda.com' })).toHaveAttribute('href', 'mailto:hola@latienda.com');
 
@@ -937,12 +947,19 @@ describe('Proyectos', () => {
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { todos: [{ name: 'Página de pagos', kind: 'falta' }, { name: 'Modo oscuro', kind: 'mejora' }] } }));
     expect(await within(card).findByRole('button', { name: /Por terminar · 1 falta · 1 mejora/ })).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByLabelText('Categoría'), 'Sitio web (1)');
+    await userEvent.selectOptions(screen.getByLabelText('Categoría'), 'Cliente Lumen (1)');
     expect(screen.queryByRole('article', { name: 'Maqueta del puente' })).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Sitio de la tienda' })).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('Categoría'), 'Todas las categorías');
     await userEvent.type(screen.getByLabelText('Buscar en tus proyectos'), 'pagos');
     expect(screen.getByRole('article', { name: 'Sitio de la tienda' })).toBeInTheDocument();
     expect(screen.queryByRole('article', { name: 'Maqueta del puente' })).not.toBeInTheDocument();
+
+    // Papelera visible en la tarjeta, con «Deshacer».
+    await userEvent.click(screen.getByRole('button', { name: 'Eliminar «Sitio de la tienda»' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'DELETE' }));
+    expect(screen.queryByRole('article', { name: 'Sitio de la tienda' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Deshacer' })).toBeInTheDocument();
   });
 });
 

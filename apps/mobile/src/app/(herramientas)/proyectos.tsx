@@ -15,7 +15,12 @@ import {
   PROJECT_PRIORITIES,
   PROJECT_TODO_KIND_INFO,
   PROJECT_TODO_KINDS,
-  projectCategoryOf,
+  projectCategoriesOf,
+  projectCategoriesPatch,
+  projectCategoryChoices,
+  projectCategoryKey,
+  projectCategoryLabel,
+  PROJECT_CATEGORIES_MAX,
   projectMailLink,
   projectTodos,
   PROJECT_PRIORITY_INFO,
@@ -42,13 +47,13 @@ import { ArrowDownWideNarrow, CalendarClock, ChevronDown, ChevronUp, Clock, Exte
 import { useMemo, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { SearchBar, CheckList, ColorSwatches, Disclosure, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
+import { SearchBar, CheckList, ColorSwatches, Disclosure, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen, RemoveButton } from '../../components/tools';
 import { Button, Card, Chip, EmptyState, ErrorState, Field, Loading, Segmented, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
 
 type Project = LegacyProject & { milestones: LegacyMilestone[]; todos: LegacyProjectTodo[] };
-type CategoryFilter = ProjectCategory | 'todas' | 'ninguna';
+type CategoryFilter = string;
 const KIND_OPTIONS = PROJECT_TODO_KINDS.map((k) => ({ value: k, label: PROJECT_TODO_KIND_INFO[k].label }));
 type Filter = 'todos' | 'curso' | 'entregado';
 const FILTERS: Array<{ value: Filter; label: string }> = [
@@ -78,13 +83,12 @@ export default function Projects() {
   const active = projects.filter((p) => projectStatusOf(p) !== 'entregado').length;
   const thisWeek = projects.filter((p) => dueThisWeek(p.deadline)).length;
   // Igual que la app anterior: «En curso» incluye los que están en revisión.
-  const categories = PROJECT_CATEGORIES.filter((c) => projects.some((p) => projectCategoryOf(p) === c));
-  const uncategorized = projects.some((p) => !projectCategoryOf(p));
+  const categories = projectCategoryChoices(projects).filter((c) => projects.some((p) => projectCategoriesOf(p).includes(c)));
+  const uncategorized = projects.some((p) => !projectCategoriesOf(p).length);
   const shown = (filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? projectStatusOf(p) === 'entregado' : projectStatusOf(p) !== 'entregado')))
-    .filter((p) => category === 'todas' || (category === 'ninguna' ? !projectCategoryOf(p) : projectCategoryOf(p) === category))
+    .filter((p) => category === 'todas' || (category === 'ninguna' ? !projectCategoriesOf(p).length : projectCategoriesOf(p).includes(category)))
     .filter((p) => {
-      const cat = projectCategoryOf(p);
-      return matchesSearch(q, p.title, p.subject, p.deadline, cat ? PROJECT_CATEGORY_INFO[cat].label : '', p.email, ...p.milestones.map((m) => m.name), ...p.todos.map((t) => t.name));
+      return matchesSearch(q, p.title, p.subject, p.deadline, ...projectCategoriesOf(p).map(projectCategoryLabel), p.email, ...p.milestones.map((m) => m.name), ...p.todos.map((t) => t.name));
     });
   const open = projects.filter((p) => projectStatusOf(p) !== 'entregado');
 
@@ -125,7 +129,7 @@ export default function Projects() {
             <View style={st.chips} accessibilityLabel="Categoría">
               <Chip label="Todas" selected={category === 'todas'} onPress={() => setCategory('todas')} />
               {categories.map((c) => (
-                <Chip key={c} label={PROJECT_CATEGORY_INFO[c].label} selected={category === c} onPress={() => setCategory(c)} />
+                <Chip key={c} label={projectCategoryLabel(c)} selected={category === c} onPress={() => setCategory(c)} />
               ))}
               {uncategorized && <Chip label="Sin categoría" selected={category === 'ninguna'} onPress={() => setCategory('ninguna')} />}
             </View>
@@ -165,7 +169,7 @@ export default function Projects() {
         </>
       )}
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo proyecto' : 'Editar proyecto'}>
-        {editing !== null && <ProjectForm project={editing === 'new' ? null : editing} count={projects.length} subjects={subjects} onDone={() => setEditing(null)} />}
+        {editing !== null && <ProjectForm project={editing === 'new' ? null : editing} count={projects.length} subjects={subjects} all={projects} onDone={() => setEditing(null)} />}
       </Sheet>
     </ToolScreen>
   );
@@ -195,7 +199,7 @@ function ProjectCard({
   const [listOpen, setListOpen] = useState(false);
   const [kind, setKind] = useState<ProjectTodoKind>('falta');
   const color = safeColor(p.color, PROJECT_COLORS[0]);
-  const category = projectCategoryOf(p);
+  const cats = projectCategoriesOf(p).map(projectCategoryLabel);
   const mailLink = projectMailLink(p);
   const missing = p.todos.filter((t) => t.kind === 'falta' && !t.done).length;
   const ideas = p.todos.filter((t) => t.kind === 'mejora' && !t.done).length;
@@ -237,14 +241,15 @@ function ProjectCard({
           <IconButton label={`Editar «${title}»`} onPress={onEdit}>
             <Pencil size={18} color={colors.inkMuted} />
           </IconButton>
+          <RemoveButton module="projects" id={p.id} name={title} />
         </View>
       </View>
       <View style={{ gap: space[1], marginTop: -space[2] }}>
-        {category && (
-          <View style={st.meta} accessible accessibilityLabel={`Categoría: ${PROJECT_CATEGORY_INFO[category].label}`}>
+        {cats.length > 0 && (
+          <View style={st.meta} accessible accessibilityLabel={`${cats.length === 1 ? 'Categoría' : 'Categorías'}: ${cats.join(', ')}`}>
             <Shapes size={15} color={colors.inkSubtle} />
             <T v="small" tint="muted">
-              {PROJECT_CATEGORY_INFO[category].label}
+              {cats.join(' · ')}
             </T>
           </View>
         )}
@@ -367,7 +372,7 @@ function ProjectCard({
   );
 }
 
-function ProjectForm({ project, count, subjects, onDone }: { project: Project | null; count: number; subjects: LegacySubject[]; onDone: () => void }) {
+function ProjectForm({ project, count, subjects, all, onDone }: { project: Project | null; count: number; subjects: LegacySubject[]; all: Project[]; onDone: () => void }) {
   const { colors } = useTheme();
   const actions = useModule('projects');
   const [title, setTitle] = useState(project?.title ?? '');
@@ -377,7 +382,15 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   const pendingMilestones = checkItems<LegacyMilestone>(project?.milestones, () => '').filter((m) => !m.done).length;
   const [priority, setPriority] = useState<ProjectPriority>(project ? projectPriorityOf(project) : 'media');
   const [color, setColor] = useState(safeColor(project?.color, PROJECT_COLORS[count % PROJECT_COLORS.length]));
-  const [category, setCategory] = useState<ProjectCategory | ''>(project ? (projectCategoryOf(project) ?? '') : '');
+  const [cats, setCats] = useState<string[]>(project ? projectCategoriesOf(project) : []);
+  const [newCat, setNewCat] = useState('');
+  const choices = [...new Set([...projectCategoryChoices(all), ...cats])];
+  const toggleCat = (c: string) => setCats((list) => (list.includes(c) ? list.filter((x) => x !== c) : list.length >= PROJECT_CATEGORIES_MAX ? list : [...list, c]));
+  const addCat = () => {
+    const c = projectCategoryKey(newCat);
+    if (c && !cats.includes(c) && cats.length < PROJECT_CATEGORIES_MAX) setCats([...cats, c]);
+    setNewCat('');
+  };
   const [email, setEmail] = useState(project?.email ?? '');
   const [mailUrl, setMailUrl] = useState(project?.mailUrl ?? '');
   const badEmail = !!email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -394,7 +407,7 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
 
   const submit = () => {
     if (badEmail || badMailUrl) return;
-    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color, category, email: email.trim(), mailUrl: mailUrl.trim() };
+    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color, ...projectCategoriesPatch(cats), email: email.trim(), mailUrl: mailUrl.trim() };
     if (project) actions.update(project.id, fields);
     else actions.add({ id: newId(), ...fields, milestones: [], todos: [] });
     onDone();
@@ -405,12 +418,18 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
     <ScrollView style={{ maxHeight: 600 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
       <Field label="Nombre" value={title} onChangeText={setTitle} maxLength={200} placeholder="Ensayo de Historia" autoFocus={!project} />
       <View style={{ gap: space[2] }}>
-        <T v="label">Categoría</T>
-        <View style={st.chips} accessibilityLabel="Categoría">
-          <Chip label="Sin categoría" selected={category === ''} onPress={() => setCategory('')} />
-          {PROJECT_CATEGORIES.map((c) => (
-            <Chip key={c} label={PROJECT_CATEGORY_INFO[c].label} selected={category === c} onPress={() => setCategory(c)} />
+        <T v="label">Categorías</T>
+        <T v="small" tint="muted">Elige una o varias; puedes agregar las tuyas.</T>
+        <View style={st.chips} accessibilityLabel="Categorías">
+          {choices.map((c) => (
+            <Chip key={c} label={projectCategoryLabel(c)} selected={cats.includes(c)} onPress={() => toggleCat(c)} />
           ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-end' }}>
+          <View style={{ flex: 1 }}>
+            <Field label="Agregar categoría" value={newCat} onChangeText={setNewCat} maxLength={40} placeholder="Escribe una categoría nueva" onSubmitEditing={addCat} returnKeyType="done" />
+          </View>
+          <Button small variant="secondary" label="Agregar" onPress={addCat} disabled={!newCat.trim() || cats.length >= PROJECT_CATEGORIES_MAX} />
         </View>
       </View>
       <View style={{ gap: space[1] }}>

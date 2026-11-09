@@ -29,7 +29,7 @@ import { Dialog } from '../components/Dialog';
 import { ChoiceField, ColorPicker, SelectField, TextField } from '../components/Form';
 import { NotebookCover } from '../components/NotebookCover';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, optionsWith, paletteWith, safeColor } from '../components/ToolParts';
+import { FormActions, optionsWith, paletteWith, RemoveButton, safeColor } from '../components/ToolParts';
 import { UiIcon } from '../components/UiIcon';
 import { plural } from '../lib/format';
 import { useAutosave } from '../lib/tools';
@@ -128,7 +128,7 @@ export function Notebooks() {
               {shown.map((n) => {
                 const count = boxes.filter((b) => b.notebookId === n.id).length;
                 return (
-                  <li key={n.id}>
+                  <li key={n.id} className="notebook-item">
                     <Link to={`/cuadernos/${encodeURIComponent(n.id)}`} className="notebook-card" style={{ ['--c' as string]: safeColor(n.color, NOTEBOOK_COLORS[0]) }}>
                       <NotebookCover notebook={n} variant="card" />
                       <span className="notebook-card__body">
@@ -137,6 +137,9 @@ export function Notebooks() {
                         <span className="muted small">{plural(count, 'cajita', 'cajitas')}</span>
                       </span>
                     </Link>
+                    <span className="notebook-item__remove">
+                      <RemoveButton module="notebooks" id={n.id} name={n.title || 'Cuaderno'} size={16} />
+                    </span>
                   </li>
                 );
               })}

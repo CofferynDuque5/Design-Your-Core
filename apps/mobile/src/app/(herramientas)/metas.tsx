@@ -19,7 +19,7 @@ import { CalendarClock, Check, Minus, Pencil, Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { Suggestions, SearchBar, DayStepper, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
+import { Suggestions, SearchBar, DayStepper, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -111,6 +111,7 @@ function GoalCard({ goal: g, today, onEdit }: { goal: LegacyGoal; today: Day; on
         <IconButton label={`Editar «${title}»`} onPress={onEdit} style={{ marginRight: -space[2], marginTop: -space[2] }}>
           <Pencil size={18} color={colors.inkMuted} />
         </IconButton>
+        <RemoveButton module="goals" id={g.id} name={title} style={{ marginRight: -space[2], marginTop: -space[2] }} />
       </View>
       <T v="heading" accessibilityRole="header" style={[{ fontSize: 19, lineHeight: 24, marginTop: -space[3] }, g.done && { textDecorationLine: 'line-through', color: colors.inkMuted }]}>
         {title}

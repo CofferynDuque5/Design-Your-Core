@@ -8,7 +8,7 @@ import { Dialog } from '../components/Dialog';
 import { SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { useSyncCheckIn } from '../lib/checkinSync';
-import { CheckInNote, FormActions, Meter, optionsWith, WeekdayPicker } from '../components/ToolParts';
+import { CheckInNote, FormActions, Meter, optionsWith, WeekdayPicker, RemoveButton } from '../components/ToolParts';
 import { isoDay, localTime } from '../lib/tools';
 
 export function Routine() {
@@ -134,6 +134,7 @@ function RoutineRow({ routine: r, onEdit }: { routine: LegacyRoutine; onEdit: ()
       <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
         <Pencil size={18} aria-hidden="true" />
       </button>
+      <RemoveButton module="routines" id={r.id} name={title} />
     </li>
   );
 }
@@ -181,7 +182,6 @@ function WaterCard({ today }: { today: string }) {
   );
 }
 
-// En la columna lateral solo cabe un botón: borrar está en el diálogo de edición, con confirmación.
 function MealRow({ meal: m, onEdit }: { meal: LegacyMeal; onEdit: () => void }) {
   const label = `${m.label || 'Comida'}${m.time ? ` de las ${m.time}` : ''}`;
   return (
@@ -194,6 +194,7 @@ function MealRow({ meal: m, onEdit }: { meal: LegacyMeal; onEdit: () => void }) 
       <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar ${label}`}>
         <Pencil size={16} aria-hidden="true" />
       </button>
+      <RemoveButton module="meals" id={m.id} name={label} size={16} />
     </li>
   );
 }

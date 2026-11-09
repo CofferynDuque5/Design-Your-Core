@@ -19,7 +19,7 @@ import { ArrowRight, Check, Lock, Pencil, Plus, Sparkles, Trash2 } from 'lucide-
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { SearchBar, ColorSwatches, FormActions, IconButton, Meter, Pill, tint, ToolScreen } from '../../components/tools';
+import { SearchBar, ColorSwatches, FormActions, IconButton, Meter, Pill, tint, ToolScreen, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -110,6 +110,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
         <IconButton label={`Editar «${title}»`} onPress={onEdit} style={{ marginRight: -space[2], marginTop: -space[2] }}>
           <Pencil size={18} color={colors.inkMuted} />
         </IconButton>
+        <RemoveButton module="roadmaps" id={r.id} name={title} style={{ marginRight: -space[2], marginTop: -space[2] }} />
       </View>
       {r.steps.length > 0 && <Meter value={donePercent(r.steps)} color={color} label={`Avance de ${title}`} />}
       {r.steps.length === 0 ? null : (

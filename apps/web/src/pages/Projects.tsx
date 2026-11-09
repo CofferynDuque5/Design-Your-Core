@@ -7,13 +7,15 @@ import {
   checkItemsPayload,
   COLOR_NAMES,
   dueThisWeek,
-  PROJECT_CATEGORIES,
-  PROJECT_CATEGORY_INFO,
   PROJECT_COLORS,
   PROJECT_PRIORITIES,
   PROJECT_TODO_KIND_INFO,
   PROJECT_TODO_KINDS,
-  projectCategoryOf,
+  projectCategoriesOf,
+  projectCategoriesPatch,
+  projectCategoryChoices,
+  projectCategoryLabel,
+  PROJECT_CATEGORIES_MAX,
   projectMailLink,
   projectTodos,
   PROJECT_PRIORITY_INFO,
@@ -29,7 +31,6 @@ import {
   type LegacyProject,
   type LegacyProjectTodo,
   type LegacySubject,
-  type ProjectCategory,
   type ProjectTodoKind,
   type ProjectPriority,
   type ProjectStatus,
@@ -40,9 +41,9 @@ import { newId, newSubId, useLegacyData, useLegacyList, useModule } from '../app
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
-import { ColorPicker, Segmented, SelectField, TextField } from '../components/Form';
+import { ColorPicker, Segmented, SelectField, TagPicker, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { CheckList, FormActions, Meter, paletteWith, safeColor, Stats } from '../components/ToolParts';
+import { CheckList, FormActions, Meter, paletteWith, safeColor, Stats, RemoveButton } from '../components/ToolParts';
 import { plural } from '../lib/format';
 
 type Project = LegacyProject & { milestones: LegacyMilestone[]; todos: LegacyProjectTodo[] };
@@ -68,19 +69,18 @@ export function Projects() {
   const actions = useModule('projects');
   const [filter, setFilter] = useState<Filter>('todos');
   const [q, setQ] = useState('');
-  const [category, setCategory] = useState<ProjectCategory | 'todas' | 'ninguna'>('todas');
+  const [category, setCategory] = useState<string>('todas');
   const [editing, setEditing] = useState<Project | 'new' | null>(null);
 
   const active = projects.filter((p) => statusOf(p) !== 'entregado').length;
   const thisWeek = projects.filter((p) => dueThisWeek(p.deadline)).length;
   // Igual que la app anterior: «En curso» incluye los que están en revisión.
-  const categories = PROJECT_CATEGORIES.filter((c) => projects.some((p) => projectCategoryOf(p) === c));
-  const uncategorized = projects.some((p) => !projectCategoryOf(p));
+  const categories = projectCategoryChoices(projects).filter((c) => projects.some((p) => projectCategoriesOf(p).includes(c)));
+  const uncategorized = projects.some((p) => !projectCategoriesOf(p).length);
   const shown = (filter === 'todos' ? projects : projects.filter((p) => (filter === 'entregado' ? statusOf(p) === 'entregado' : statusOf(p) !== 'entregado')))
-    .filter((p) => category === 'todas' || (category === 'ninguna' ? !projectCategoryOf(p) : projectCategoryOf(p) === category))
+    .filter((p) => category === 'todas' || (category === 'ninguna' ? !projectCategoriesOf(p).length : projectCategoriesOf(p).includes(category)))
     .filter((p) => {
-      const cat = projectCategoryOf(p);
-      return matchesSearch(q, p.title, p.subject, p.deadline, cat ? PROJECT_CATEGORY_INFO[cat].label : '', p.email, ...p.milestones.map((m) => m.name), ...p.todos.map((t) => t.name));
+      return matchesSearch(q, p.title, p.subject, p.deadline, ...projectCategoriesOf(p).map(projectCategoryLabel), p.email, ...p.milestones.map((m) => m.name), ...p.todos.map((t) => t.name));
     });
   const open = projects.filter((p) => statusOf(p) !== 'entregado');
 
@@ -119,11 +119,11 @@ export function Projects() {
           <div className="row projects-toolbar">
             <Segmented label="Mostrar" options={FILTERS} value={filter} onChange={setFilter} />
             {categories.length > 0 && (
-              <SelectField label="Categoría" value={category} onChange={(e) => setCategory(e.target.value as ProjectCategory | 'todas' | 'ninguna')}>
+              <SelectField label="Categoría" value={category} onChange={(e) => setCategory(e.target.value)}>
                 <option value="todas">Todas las categorías</option>
                 {categories.map((c) => (
                   <option key={c} value={c}>
-                    {PROJECT_CATEGORY_INFO[c].label} ({projects.filter((p) => projectCategoryOf(p) === c).length})
+                    {projectCategoryLabel(c)} ({projects.filter((p) => projectCategoriesOf(p).includes(c)).length})
                   </option>
                 ))}
                 {uncategorized && <option value="ninguna">Sin categoría</option>}
@@ -160,7 +160,7 @@ export function Projects() {
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo proyecto' : 'Editar proyecto'}>
-        {editing !== null && <ProjectForm project={editing === 'new' ? null : editing} count={projects.length} subjects={subjects} onDone={() => setEditing(null)} />}
+        {editing !== null && <ProjectForm project={editing === 'new' ? null : editing} count={projects.length} subjects={subjects} all={projects} onDone={() => setEditing(null)} />}
       </Dialog>
     </div>
   );
@@ -189,7 +189,7 @@ function ProjectCard({
   const [listOpen, setListOpen] = useState(false);
   const [kind, setKind] = useState<ProjectTodoKind>('falta');
   const color = safeColor(p.color, PROJECT_COLORS[0]);
-  const category = projectCategoryOf(p);
+  const cats = projectCategoriesOf(p);
   const mailLink = projectMailLink(p);
   const missing = p.todos.filter((t) => t.kind === 'falta' && !t.done).length;
   const ideas = p.todos.filter((t) => t.kind === 'mejora' && !t.done).length;
@@ -230,14 +230,15 @@ function ProjectCard({
           <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
             <Pencil size={18} aria-hidden="true" />
           </button>
+          <RemoveButton module="projects" id={p.id} name={title} />
         </div>
       </div>
       <ul className="meta-list">
-        {category && (
+        {cats.length > 0 && (
           <li>
             <Shapes size={15} aria-hidden="true" />
-            <span className="visually-hidden">Categoría: </span>
-            {PROJECT_CATEGORY_INFO[category].label}
+            <span className="visually-hidden">{cats.length === 1 ? 'Categoría: ' : 'Categorías: '}</span>
+            {cats.map(projectCategoryLabel).join(' · ')}
           </li>
         )}
         {p.subject && (
@@ -326,7 +327,7 @@ function ProjectCard({
   );
 }
 
-function ProjectForm({ project, count, subjects, onDone }: { project: Project | null; count: number; subjects: LegacySubject[]; onDone: () => void }) {
+function ProjectForm({ project, count, subjects, all, onDone }: { project: Project | null; count: number; subjects: LegacySubject[]; all: Project[]; onDone: () => void }) {
   const actions = useModule('projects');
   const [title, setTitle] = useState(project?.title ?? '');
   const [subject, setSubject] = useState(project?.subject ?? '');
@@ -334,7 +335,7 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   const [status, setStatus] = useState<ProjectStatus>(project ? statusOf(project) : 'curso');
   const [priority, setPriority] = useState<ProjectPriority>(project ? projectPriorityOf(project) : 'media');
   const [color, setColor] = useState(safeColor(project?.color, PROJECT_COLORS[count % PROJECT_COLORS.length]));
-  const [category, setCategory] = useState<ProjectCategory | ''>(project ? (projectCategoryOf(project) ?? '') : '');
+  const [cats, setCats] = useState<string[]>(project ? projectCategoriesOf(project) : []);
   const [email, setEmail] = useState(project?.email ?? '');
   const [mailUrl, setMailUrl] = useState(project?.mailUrl ?? '');
   const badEmail = !!email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -352,7 +353,7 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (badEmail || badMailUrl) return;
-    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color, category, email: email.trim(), mailUrl: mailUrl.trim() };
+    const fields = { title: title.trim(), subject, deadline: deadline.trim(), status, priority, color, ...projectCategoriesPatch(cats), email: email.trim(), mailUrl: mailUrl.trim() };
     if (project) actions.update(project.id, fields);
     else actions.add({ id: newId(), ...fields, milestones: [], todos: [] });
     onDone();
@@ -363,14 +364,16 @@ function ProjectForm({ project, count, subjects, onDone }: { project: Project | 
   return (
     <form className="stack" onSubmit={submit}>
       <TextField label="Nombre" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus placeholder="Ensayo de Historia" />
-      <SelectField label="Categoría" value={category} onChange={(e) => setCategory(e.target.value as ProjectCategory | '')}>
-        <option value="">Sin categoría</option>
-        {PROJECT_CATEGORIES.map((c) => (
-          <option key={c} value={c}>
-            {PROJECT_CATEGORY_INFO[c].label}
-          </option>
-        ))}
-      </SelectField>
+      <TagPicker
+        legend="Categorías"
+        options={projectCategoryChoices(all).map((c) => ({ value: c, label: projectCategoryLabel(c) }))}
+        value={cats}
+        onChange={setCats}
+        addLabel="Agregar categoría"
+        addPlaceholder="Escribe una categoría nueva"
+        max={PROJECT_CATEGORIES_MAX}
+        hint="Elige una o varias; puedes agregar las tuyas."
+      />
       <SelectField label="Materia" value={subject} onChange={(e) => pickSubject(e.target.value)} hint={unknown ? 'Esta materia ya no está en tu lista.' : undefined}>
         <option value="">Sin materia</option>
         {names.map((name) => (

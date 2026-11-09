@@ -23,7 +23,7 @@ import { GlassWater, Minus, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckInNote, DotChoices, FormActions, IconButton, Meter, SearchBar, Stepper, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { CheckInNote, DotChoices, FormActions, IconButton, Meter, SearchBar, Stepper, TimeField, Toggle, ToolScreen, WeekdayPicker, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../../lib/legacy';
 import { useSyncCheckIn } from '../../lib/checkinSync';
@@ -165,6 +165,7 @@ function RoutineRow({ routine: r, onEdit }: { routine: LegacyRoutine; onEdit: ()
       <IconButton label={`Editar «${title}»`} onPress={onEdit} style={{ marginRight: -space[2] }}>
         <Pencil size={18} color={colors.inkMuted} />
       </IconButton>
+      <RemoveButton module="routines" id={r.id} name={title} style={{ marginRight: -space[2] }} />
     </View>
   );
 }

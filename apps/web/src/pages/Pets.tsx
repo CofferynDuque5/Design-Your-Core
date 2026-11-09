@@ -7,7 +7,7 @@ import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, IconChoices, Stats, WeekdayPicker } from '../components/ToolParts';
+import { FormActions, IconChoices, Stats, WeekdayPicker, RemoveButton } from '../components/ToolParts';
 import { UiIcon } from '../components/UiIcon';
 import { plural } from '../lib/format';
 import { useNow } from '../lib/tools';
@@ -105,6 +105,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
         <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar a ${name}`}>
           <Pencil size={18} aria-hidden="true" />
         </button>
+        <RemoveButton module="pets" id={p.id} name={name} />
       </div>
       {sorted.length === 0 ? (
         <p className="muted small">Sin cuidados todavía.</p>
@@ -137,6 +138,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
                 <button type="button" className="icon-btn" onClick={() => onCare(c)} aria-label={`Editar «${title}» de ${name}`}>
                   <Pencil size={16} aria-hidden="true" />
                 </button>
+                <RemoveButton module="petCares" id={c.id} name={`${title} de ${name}`} size={16} />
               </li>
             );
           })}

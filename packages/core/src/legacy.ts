@@ -136,6 +136,8 @@ export const PROJECT_PRIORITY_INFO: Record<ProjectPriority, { label: string; ran
 };
 
 /** Tipo de proyecto (campo nuevo y opcional). */
+/** Cuántas categorías puede llevar un proyecto. */
+export const PROJECT_CATEGORIES_MAX = 10;
 export const PROJECT_CATEGORIES = ['web', 'app', 'automatizacion', 'tienda', 'diseno', 'contenido', 'estudio', 'otro'] as const;
 export type ProjectCategory = (typeof PROJECT_CATEGORIES)[number];
 export const PROJECT_CATEGORY_INFO: Record<ProjectCategory, { label: string }> = {
@@ -492,6 +494,8 @@ export interface LegacyProject {
   milestones: LegacyMilestone[];
   /** Tipo de proyecto; falta en los proyectos antiguos y "" es «sin categoría». */
   category?: ProjectCategory | '';
+  /** Varias categorías: las de la lista (claves) y las que escribe la persona (texto). */
+  categories?: string[];
   /** Correo del sitio o del proyecto (por ejemplo contacto@misitio.com). */
   email?: string;
   /** Enlace del webmail para abrir ese correo; si falta se usa https://dominio/webmail. */
@@ -1013,6 +1017,7 @@ const shapes = {
     color: hex.default(PROJECT_COLORS[0]),
     milestones: checkList(checkItem.extend({ date: z.string().max(60).default('') })),
     category: z.union([z.literal(''), z.enum(PROJECT_CATEGORIES)]).optional(),
+    categories: z.array(z.string().trim().min(1).max(40)).max(PROJECT_CATEGORIES_MAX).optional(),
     email: z.union([z.literal(''), z.string().trim().max(200).email('Correo no válido')]).optional(),
     mailUrl: z.union([z.literal(''), z.string().trim().max(500).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).optional(),
     todos: z.array(checkItem.extend({ kind: z.enum(PROJECT_TODO_KINDS).default('falta') })).max(1000).optional(),

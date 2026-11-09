@@ -23,6 +23,8 @@ import { useRouter, type Href } from 'expo-router';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Minus, Plus, Search, Trash2, X } from 'lucide-react-native';
 import { useState, type ReactNode, type Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import type { LegacyKey } from '@dyc/core';
+import { useModule } from '../lib/legacy';
 import { useTheme } from '../lib/theme';
 import { Button, Card, Field, PageHeader, Screen, T, fonts, type as typo } from './ui';
 import { SuggestButton } from './SectionSuggestions';
@@ -98,6 +100,17 @@ export function IconButton({ label, onPress, disabled, children, style }: { labe
     >
       {children}
     </Pressable>
+  );
+}
+
+/** Papelera visible en cada tarjeta: borra al momento y sale «Deshacer» unos segundos. */
+export function RemoveButton<K extends LegacyKey>({ module, id, name, size = 18, style }: { module: K; id: string; name: string; size?: number; style?: StyleProp<ViewStyle> }) {
+  const actions = useModule(module);
+  const { colors } = useTheme();
+  return (
+    <IconButton label={`Eliminar «${name}»`} onPress={() => actions.remove(id)} style={style}>
+      <Trash2 size={size} color={colors.inkMuted} />
+    </IconButton>
   );
 }
 

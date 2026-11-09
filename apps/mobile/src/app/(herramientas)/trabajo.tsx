@@ -4,7 +4,7 @@ import { Info, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckRow, DotChoices, SearchBar, FormActions, IconButton, Pill, ToolScreen } from '../../components/tools';
+import { CheckRow, DotChoices, SearchBar, FormActions, IconButton, Pill, ToolScreen, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, Segmented, SectionHeader, T } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -106,9 +106,12 @@ function WorkRow({ item: w, projects, onEdit }: { item: LegacyWorkItem; projects
       meta={[p.label, !w.done && w.due ? w.due : ''].filter(Boolean).join(' · ')}
       onToggle={() => actions.update(w.id, { done: !w.done })}
       trailing={
-        <IconButton label={`Editar «${title}»`} onPress={onEdit} style={{ marginRight: -space[2] }}>
-          <Pencil size={18} color={colors.inkMuted} />
-        </IconButton>
+        <View style={{ flexDirection: 'row' }}>
+          <IconButton label={`Editar «${title}»`} onPress={onEdit}>
+            <Pencil size={18} color={colors.inkMuted} />
+          </IconButton>
+          <RemoveButton module="workItems" id={w.id} name={title} style={{ marginRight: -space[2] }} />
+        </View>
       }
     />
   );

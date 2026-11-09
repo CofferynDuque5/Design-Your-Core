@@ -1,5 +1,5 @@
 import type { PasswordCheck } from '@dyc/core';
-import { Circle, CircleAlert, CircleCheck, Eye, EyeOff } from 'lucide-react';
+import { Check, Circle, CircleAlert, CircleCheck, Eye, EyeOff, Plus } from 'lucide-react';
 import { useId, useState, type InputHTMLAttributes, type Ref, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 interface FieldProps {
@@ -334,5 +334,90 @@ export function ChoiceField({
       </SelectField>
       {writing && <TextField label={`${label}: escribe ${otherLabel.replace('…', '').toLowerCase()}`} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} required={required} autoFocus={typing} hint={hint} />}
     </div>
+  );
+}
+
+/**
+ * Elegir varias opciones a la vez (casillas con forma de etiqueta) y agregar
+ * una nueva escribiéndola. `value` guarda los valores; `options` trae su nombre.
+ */
+export function TagPicker({
+  legend,
+  options,
+  value,
+  onChange,
+  addLabel = 'Agregar',
+  addPlaceholder,
+  max = 10,
+  hint,
+}: {
+  legend: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  value: readonly string[];
+  onChange: (next: string[]) => void;
+  addLabel?: string;
+  addPlaceholder?: string;
+  max?: number;
+  hint?: ReactNode;
+}) {
+  const id = useId();
+  const [draft, setDraft] = useState('');
+  const chosen = new Set(value.map((v) => v.toLocaleLowerCase('es')));
+  const full = value.length >= max;
+  // Las que ya están elegidas pero no en la lista (de otro dispositivo) también se ven.
+  const all = [...options, ...value.filter((v) => !options.some((o) => o.value.toLocaleLowerCase('es') === v.toLocaleLowerCase('es'))).map((v) => ({ value: v, label: v }))];
+  const toggle = (v: string) => (chosen.has(v.toLocaleLowerCase('es')) ? onChange(value.filter((x) => x.toLocaleLowerCase('es') !== v.toLocaleLowerCase('es'))) : full ? undefined : onChange([...value, v]));
+  const add = () => {
+    const t = draft.trim().slice(0, 40);
+    if (!t) return;
+    const match = all.find((o) => o.label.toLocaleLowerCase('es') === t.toLocaleLowerCase('es') || o.value.toLocaleLowerCase('es') === t.toLocaleLowerCase('es'));
+    const v = match ? match.value : t;
+    if (!chosen.has(v.toLocaleLowerCase('es')) && !full) onChange([...value, v]);
+    setDraft('');
+  };
+  return (
+    <fieldset className="field tag-picker" aria-describedby={hint ? `${id}-hint` : undefined}>
+      <legend className="field__label">{legend}</legend>
+      <div className="tag-picker__options">
+        {all.map((o) => {
+          const on = chosen.has(o.value.toLocaleLowerCase('es'));
+          return (
+            <label key={o.value} className={`tag-option${on ? ' tag-option--on' : ''}`}>
+              <input type="checkbox" checked={on} disabled={!on && full} onChange={() => toggle(o.value)} />
+              {on && <Check size={14} aria-hidden="true" />}
+              {o.label}
+            </label>
+          );
+        })}
+      </div>
+      <div className="tag-picker__add">
+        <label className="visually-hidden" htmlFor={`${id}-new`}>
+          {addLabel}
+        </label>
+        <input
+          id={`${id}-new`}
+          className="input"
+          value={draft}
+          maxLength={40}
+          placeholder={addPlaceholder ?? addLabel}
+          disabled={full}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              add();
+            }
+          }}
+        />
+        <button type="button" className="btn btn--secondary btn--sm" onClick={add} disabled={!draft.trim() || full}>
+          <Plus size={16} aria-hidden="true" /> {addLabel}
+        </button>
+      </div>
+      {(hint || full) && (
+        <span className="field__hint" id={`${id}-hint`}>
+          {full ? `Puedes elegir hasta ${max}.` : hint}
+        </span>
+      )}
+    </fieldset>
   );
 }

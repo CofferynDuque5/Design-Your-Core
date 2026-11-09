@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Info, Trash2 } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { UiIcon } from './UiIcon';
+import type { LegacyKey } from '@dyc/core';
+import { useModule } from '../app/legacy';
 
 // Piezas comunes de las herramientas de la tanda 2 (Materias, Proyectos,
 // Roadmaps, Cuadernos, Contenido e Ideas).
@@ -246,5 +248,26 @@ export function MonthNav({ month, onChange, current, titleId }: { month: string;
         <ChevronRight size={20} aria-hidden="true" />
       </button>
     </div>
+  );
+}
+
+/**
+ * Papelera visible en cada tarjeta o fila: borra al momento y sale «Deshacer»
+ * unos segundos (lo da useModule), así no hace falta abrir el formulario.
+ */
+export function RemoveButton<K extends LegacyKey>({ module, id, name, size = 18, onRemoved }: { module: K; id: string; name: string; size?: number; onRemoved?: () => void }) {
+  const actions = useModule(module);
+  return (
+    <button
+      type="button"
+      className="icon-btn icon-btn--danger"
+      onClick={() => {
+        actions.remove(id);
+        onRemoved?.();
+      }}
+      aria-label={`Eliminar «${name}»`}
+    >
+      <Trash2 size={size} aria-hidden="true" />
+    </button>
   );
 }

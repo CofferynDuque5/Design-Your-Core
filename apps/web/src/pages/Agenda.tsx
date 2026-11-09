@@ -6,6 +6,7 @@ import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
+import { RemoveButton } from '../components/ToolParts';
 import { Segmented, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { durationLabel, layoutLanes, nowHours, useNow } from '../lib/tools';
@@ -116,6 +117,9 @@ function DayView({ data }: { data: Record<string, unknown> }) {
                         </span>
                       )}
                     </button>
+                    <span className="tl-block__remove">
+                      <RemoveButton module="blocks" id={b.id} name={b.label} size={14} />
+                    </span>
                   </li>
                 );
               })}

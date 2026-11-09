@@ -24,7 +24,7 @@ import { Check, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { Suggestions, DotChoices, FormActions, IconButton, SearchBar, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { Suggestions, DotChoices, FormActions, IconButton, SearchBar, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T } from '../../components/ui';
 import { UiIcon } from '../../components/UiIcon';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
@@ -117,6 +117,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
         <IconButton label={`Editar a ${name}`} onPress={onEdit} style={{ marginRight: -space[2] }}>
           <Pencil size={18} color={colors.inkMuted} />
         </IconButton>
+        <RemoveButton module="pets" id={p.id} name={name} style={{ marginRight: -space[2] }} />
       </View>
       {sorted.length === 0 ? (
         <T v="small" tint="muted">
@@ -169,6 +170,7 @@ function CareRow({ care: c, petName, today, now, onEdit }: { care: LegacyPetCare
       <IconButton label={`Editar «${title}» de ${petName}`} onPress={onEdit} style={{ marginRight: -space[2] }}>
         <Pencil size={16} color={colors.inkMuted} />
       </IconButton>
+      <RemoveButton module="petCares" id={c.id} name={`${title} de ${petName}`} style={{ marginRight: -space[2] }} />
     </View>
   );
 }

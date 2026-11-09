@@ -22,7 +22,7 @@ import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { Segmented, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions } from '../components/ToolParts';
+import { FormActions, RemoveButton } from '../components/ToolParts';
 
 export function Work() {
   const legacy = useLegacyData();
@@ -149,6 +149,7 @@ function WorkRow({ item: w, projects, onEdit }: { item: LegacyWorkItem; projects
       <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
         <Pencil size={18} aria-hidden="true" />
       </button>
+      <RemoveButton module="workItems" id={w.id} name={title} />
     </li>
   );
 }

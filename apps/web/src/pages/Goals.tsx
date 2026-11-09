@@ -20,7 +20,7 @@ import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ChoiceField, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, Meter, Stats } from '../components/ToolParts';
+import { FormActions, Meter, Stats, RemoveButton } from '../components/ToolParts';
 import { localDayKey } from '../lib/tools';
 
 type Filter = 'todas' | GoalCategory;
@@ -121,6 +121,7 @@ function GoalCard({ goal: g, today, onEdit }: { goal: LegacyGoal; today: string;
         <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
           <Pencil size={18} aria-hidden="true" />
         </button>
+        <RemoveButton module="goals" id={g.id} name={title} />
       </div>
       <h2 id={titleId} className="tool-card__title">
         {title}

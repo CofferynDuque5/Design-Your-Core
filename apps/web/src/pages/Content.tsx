@@ -7,7 +7,7 @@ import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, Stats } from '../components/ToolParts';
+import { FormActions, Stats, RemoveButton } from '../components/ToolParts';
 
 /** Valores desconocidos se muestran como los de por defecto, sin cambiar el dato. */
 const platformOf = contentPlatformOf;
@@ -145,6 +145,7 @@ function ContentRow({ item: c, onEdit }: { item: LegacyContent; onEdit: () => vo
       <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
         <Pencil size={18} aria-hidden="true" />
       </button>
+      <RemoveButton module="content" id={c.id} name={title} />
     </li>
   );
 }

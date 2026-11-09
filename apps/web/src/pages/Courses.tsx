@@ -1,5 +1,9 @@
 import {
   matchesSearch,
+  LENGTH_UNITS,
+  lengthFromParts,
+  lengthParts,
+  type LengthParts,
   CLASS_COLORS,
   CLASS_DAY_NAMES,
   COURSE_STATUSES,
@@ -44,7 +48,7 @@ import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ChoiceField, SelectField, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, WeekdayPicker } from '../components/ToolParts';
+import { FormActions, WeekdayPicker, RemoveButton } from '../components/ToolParts';
 import { useToast } from '../app/toast';
 import { YouTubePlayer } from '../components/YouTubePlayer';
 import { readYouTubeLength } from '../lib/youtubeLength';
@@ -365,6 +369,7 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
         <button type="button" className="icon-btn" onClick={() => onEdit(c)} aria-label={`Editar «${name}»`}>
           <Pencil size={18} aria-hidden="true" />
         </button>
+        <RemoveButton module="courses" id={c.id} name={name} />
       </div>
     </li>
   );
@@ -582,24 +587,37 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
         error={url.trim() && badUrl ? 'Pega un enlace completo, por ejemplo https://youtube.com/watch?v=…' : null}
         hint={source ? `Se abrirá en ${source.label}.` : 'De YouTube, Udemy, Coursera, Platzi o cualquier página.'}
       />
-      <div className="course-length">
-        <TextField
-          label="Duración total en horas (opcional)"
-          type="number"
-          inputMode="decimal"
-          min={0}
-          max={2000}
-          step="any"
-          value={length.hours}
-          onChange={(e) => length.type(e.target.value)}
-          placeholder="12.5"
-          hint={length.message && found?.length && !course?.lessons?.length ? `${length.message} Sus ${found.length} videos quedan como lecciones.` : length.message}
-          error={length.bad ? 'Escribe un número de horas, por ejemplo 12.5.' : null}
-        />
+      <fieldset className="field course-length">
+        <legend className="field__label">Duración total (opcional)</legend>
+        <div className="course-length__parts">
+          {LENGTH_UNITS.map((u) => (
+            <TextField
+              key={u.key}
+              label={u.label}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={u.max}
+              step={1}
+              value={length.parts[u.key]}
+              onChange={(e) => length.type(u.key, e.target.value)}
+              placeholder="0"
+            />
+          ))}
+        </div>
+        {length.bad ? (
+          <p className="field__error" role="alert">
+            Escribe números enteros (sin decimales), hasta 2000 horas en total.
+          </p>
+        ) : (
+          (length.message || '') && (
+            <p className="field__hint">{length.message && found?.length && !course?.lessons?.length ? `${length.message} Sus ${found.length} videos quedan como lecciones.` : length.message}</p>
+          )
+        )}
         <button type="button" className="btn btn--secondary btn--sm" onClick={() => length.lookup(link, true)} disabled={!link || badUrl || length.busy}>
           {length.busy ? 'Buscando…' : 'Leer del enlace'}
         </button>
-      </div>
+      </fieldset>
       <TextField label="Nombre (opcional)" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="Curso completo de inglés básico" />
       <TextField
         label="Canal de YouTube o academia (opcional)"
@@ -648,8 +666,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
  * salvo que pulse «Leer del enlace».
  */
 function useCourseLength(course: LegacyCourse | null, onFound?: (r: CourseLength) => void) {
-  const initial = course?.length ? String(Math.round((course.length / 3600) * 100) / 100) : '';
-  const [hours, setHours] = useState(initial);
+  const [parts, setParts] = useState<LengthParts>(() => lengthParts(course?.length));
   const [from, setFrom] = useState<CourseLengthFrom | undefined>(course?.lengthFrom);
   const [message, setMessage] = useState<string | undefined>(course?.length ? undefined : 'Se busca sola al pegar el enlace, si la página la dice.');
   const [busy, setBusy] = useState(false);
@@ -673,29 +690,31 @@ function useCourseLength(course: LegacyCourse | null, onFound?: (r: CourseLength
     }
     return p;
   };
-  const value = hours.trim() === '' ? 0 : Number(hours.replace(',', '.'));
-  const bad = hours.trim() !== '' && !(Number.isFinite(value) && value >= 0 && value <= 2000);
+  const empty = LENGTH_UNITS.every((u) => !parts[u.key].trim());
+  const total = lengthFromParts(parts);
+  const value = total ?? 0;
+  const bad = total === null;
   const lookup = async (url: string, force: boolean) => {
-    if (busy || (!force && (hours.trim() || asked.current.has(url)))) return;
+    if (busy || (!force && (!empty || asked.current.has(url)))) return;
     if (force) asked.current.delete(url);
     setBusy(true);
     setMessage('Buscando cuánto dura…');
     const r = await ask(url);
     setBusy(false);
     if (!r) return;
-    setHours(String(Math.round((r.seconds / 3600) * 100) / 100));
+    setParts(lengthParts(r.seconds));
     setFrom(r.exact ? 'enlace' : 'aprox');
     setMessage(`${r.exact ? 'Dura' : 'Dura unas'} ${formatLength(r.seconds)}${r.videos ? ` (${r.videos} videos)` : ''}${r.author ? `, de ${r.author}` : ''}, según la página.`);
     found.current?.(r);
   };
   return {
-    hours,
+    parts,
     busy,
     bad,
     message,
     lookup,
-    type: (v: string) => {
-      setHours(v);
+    type: (key: keyof LengthParts, v: string) => {
+      setParts((p) => ({ ...p, [key]: v }));
       setFrom('manual');
       setMessage(undefined);
     },
@@ -703,7 +722,7 @@ function useCourseLength(course: LegacyCourse | null, onFound?: (r: CourseLength
     fields: (): Partial<LegacyCourse> => {
       if (bad) return {};
       if (!value) return course?.length ? { length: 0 } : {};
-      return { length: Math.round(value * 3600), lengthFrom: from ?? 'manual' };
+      return { length: value, lengthFrom: from ?? 'manual' };
     },
     /** Guardado sin duración pero con enlace: se busca después y se completa sola. */
     later: (id: string, url: string, save: (id: string, patch: Partial<LegacyCourse>) => void, empty: { source: boolean }) => {
