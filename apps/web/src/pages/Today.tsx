@@ -77,57 +77,62 @@ function TodayContent({ d }: { d: Dashboard }) {
       <FocusHero d={d} data={legacy.data?.data} streak={stats.streak} />
 
       <div className="bento">
-        <ConsistencyCard days={days} today={d.today} stats={stats} />
-        <ScoreCard d={d} />
-
-        <section className="card stack" aria-labelledby="habits-today">
-          <div className="section-head">
-            <h2 id="habits-today" className="section-title">
-              Hábitos de hoy
-            </h2>
-            {habits.length > 0 && (
-              <span className="muted numeric">
-                {doneHabits} de {habits.length}
-              </span>
-            )}
+        <div className="bento__main">
+          <ConsistencyCard days={days} today={d.today} stats={stats} />
+          <div className="bento__duo">
+            <section className="card stack" aria-labelledby="habits-today">
+              <div className="section-head">
+                <h2 id="habits-today" className="section-title">
+                  Hábitos de hoy
+                </h2>
+                {habits.length > 0 && (
+                  <span className="muted numeric">
+                    {doneHabits} de {habits.length}
+                  </span>
+                )}
+              </div>
+              {habits.length ? (
+                <div className="card--list">
+                  {habits.map((h) => (
+                    <HabitCheck key={h.id} title={h.title} pillar={h.pillar} done={h.done} onToggle={() => toggleHabit.mutate({ id: h.id, date: d.today, done: !h.done })} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="Sin hábitos para hoy"
+                  action={
+                    <Link className="btn btn--secondary btn--sm" to="/habitos">
+                      Crear un hábito
+                    </Link>
+                  }
+                >
+                  Un hábito es algo pequeño que repites: beber agua al despertar, caminar diez minutos, escribir una línea antes de dormir.
+                </EmptyState>
+              )}
+            </section>
+            <CheckInCard today={d.today} checkIn={d.todayStatus.checkIn} />
           </div>
-          {habits.length ? (
-            <div className="card--list">
-              {habits.map((h) => (
-                <HabitCheck key={h.id} title={h.title} pillar={h.pillar} done={h.done} onToggle={() => toggleHabit.mutate({ id: h.id, date: d.today, done: !h.done })} />
+          <div className="bento__duo">
+            <MilestonesCard stats={stats} />
+            <FirstProjectCard />
+          </div>
+        </div>
+        <div className="bento__side">
+          <ScoreCard d={d} />
+          <DayPlanCard data={legacy.data?.data} />
+          {recs.length > 0 && (
+            <section className="stack" aria-labelledby="recs">
+              <h2 id="recs" className="section-title">
+                Para ti
+              </h2>
+              {recs.map((r) => (
+                <RecommendationCard key={r.key} rec={r} />
               ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="Sin hábitos para hoy"
-              action={
-                <Link className="btn btn--secondary btn--sm" to="/habitos">
-                  Crear un hábito
-                </Link>
-              }
-            >
-              Un hábito es algo pequeño que repites: beber agua al despertar, caminar diez minutos, escribir una línea antes de dormir.
-            </EmptyState>
+            </section>
           )}
-        </section>
-
-        <CheckInCard today={d.today} checkIn={d.todayStatus.checkIn} />
-        <DayPlanCard data={legacy.data?.data} />
-        <MilestonesCard stats={stats} />
-        <FirstProjectCard />
-        {recs.length > 0 && (
-          <section className="bento__item stack" aria-labelledby="recs">
-            <h2 id="recs" className="section-title">
-              Para ti
-            </h2>
-            {recs.map((r) => (
-              <RecommendationCard key={r.key} rec={r} />
-            ))}
-          </section>
-        )}
+        </div>
         <PillarsCard d={d} />
-
-        <section className="card bento__full stack" aria-labelledby="challenges-today">
+        <section className="card stack" aria-labelledby="challenges-today">
           <div className="section-head">
             <h2 id="challenges-today" className="section-title">
               Retos activos
@@ -155,7 +160,6 @@ function TodayContent({ d }: { d: Dashboard }) {
             </EmptyState>
           )}
         </section>
-
       </div>
     </div>
   );
@@ -235,7 +239,7 @@ function ConsistencyCard({ days, today, stats }: { days: ConsistencyDay[]; today
   const next = stats.next;
   const toNext = next ? Math.round(((next.target - next.left) / next.target) * 100) : 100;
   return (
-    <section className="card bento__wide streak-card" aria-labelledby="streak-title">
+    <section className="card streak-card" aria-labelledby="streak-title">
       <div className="streak-card__head">
         <div className="stack-xs">
           <h2 id="streak-title" className="section-title">
@@ -250,6 +254,8 @@ function ConsistencyCard({ days, today, stats }: { days: ConsistencyDay[]; today
         </div>
       </div>
 
+      <div className="streak-card__body">
+      <div className="streak-card__map">
       <div className="heatmap-wrap">
         <div className="heatmap__days" aria-hidden="true">
           {WEEKDAY_LETTERS.map((l, i) => (
@@ -277,6 +283,7 @@ function ConsistencyCard({ days, today, stats }: { days: ConsistencyDay[]; today
         ))}
         Más
       </div>
+      </div>
 
       <dl className="streak-card__stats">
         <div>
@@ -294,6 +301,7 @@ function ConsistencyCard({ days, today, stats }: { days: ConsistencyDay[]; today
           <dd className="numeric">{stats.perfectDays}</dd>
         </div>
       </dl>
+      </div>
       {next && (
         <div className="streak-card__next">
           <div className="focus-hero__bar" role="progressbar" aria-label={`Hacia ${next.target} días seguidos`} aria-valuemin={0} aria-valuemax={next.target} aria-valuenow={next.target - next.left}>
@@ -427,7 +435,7 @@ function DayPlanCard({ data }: { data: LegacyData | undefined }) {
 function PillarsCard({ d }: { d: Dashboard }) {
   const withData = d.pillars.some((p) => p.score !== null);
   return (
-    <section className="card bento__full stack" aria-labelledby="pillars-title">
+    <section className="card stack" aria-labelledby="pillars-title">
       <div className="section-head">
         <h2 id="pillars-title" className="section-title">
           Tus pilares
