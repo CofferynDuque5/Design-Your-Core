@@ -1,4 +1,4 @@
-import { addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { useIsMutating } from '@tanstack/react-query';
 import { Check, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react-native';
@@ -51,7 +51,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   };
   const save = (next: CourseLesson[], opts?: ChangeOpts) => apply(lessonsPatch(now(), next), opts);
   const addUnit = () => {
-    const name = numberedUnit(nextUnitNumber(courseUnits(now())), newUnit);
+    const name = numberedUnit(nextUnitNumber(courseUnits(now())), newUnit, now().language);
     const patch = addUnitPatch(now(), name);
     if (!patch) return setStatus(`Ya tienes una unidad llamada «${name}».`);
     apply(patch);
@@ -152,8 +152,8 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
           value={newUnit}
           onChangeText={setNewUnit}
           maxLength={110}
-          placeholder={`Unidad ${nextNumber}: nombre (opcional)`}
-          hint={`Se guarda como «${numberedUnit(nextNumber, newUnit)}».`}
+          placeholder={`${unitWord(c.language)} ${nextNumber}: nombre (opcional)`}
+          hint={`Se guarda como «${numberedUnit(nextNumber, newUnit, c.language)}».`}
           onSubmitEditing={addUnit}
           returnKeyType="done"
         />
@@ -249,7 +249,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
         <T v="label" accessibilityRole="header">
           Añadir lección
         </T>
-        <Field label="En la unidad (opcional)" value={unit} onChangeText={setUnit} maxLength={120} placeholder="Unidad 1, Módulo 2…" />
+        <Field label="En la unidad (opcional)" value={unit} onChangeText={setUnit} maxLength={120} placeholder={`${unitWord(c.language)} 1, ${c.language === 'en' ? 'Module' : 'Módulo'} 2…`} />
         <Suggestions field="Unidad" values={units} current={unit} onPick={setUnit} />
         <Field ref={titleRef} label="Lección o video" value={title} onChangeText={setTitle} maxLength={200} placeholder="Introducción, Clase 3…" />
         <Field

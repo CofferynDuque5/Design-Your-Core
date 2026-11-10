@@ -119,3 +119,14 @@ describe('unidades numeradas', () => {
     expect(unitSummary({ units: ['Unidad 1'], lessons: [{ id: 'a', title: 'x', unit: 'Unidad 1', done: true }, { id: 'b', title: 'y', unit: 'Unidad 1', done: false }] as never })).toEqual([{ unit: 'Unidad 1', done: 1, total: 2 }]);
   });
 });
+
+describe('unidades en inglés', () => {
+  it('un curso en inglés numera «Unit N:»', async () => {
+    const { numberedUnit, unitWord } = await import('../src/tools.js');
+    expect(unitWord('en')).toBe('Unit');
+    expect(numberedUnit(2, 'Variables', 'en')).toBe('Unit 2: Variables');
+    expect(numberedUnit(2, '', 'en')).toBe('Unit 2');
+    expect(numberedUnit(2, 'Variables', 'es')).toBe('Unidad 2: Variables');
+    expect(numberedUnit(2, 'Variables')).toBe('Unidad 2: Variables');
+  });
+});

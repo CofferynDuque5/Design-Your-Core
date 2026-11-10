@@ -1214,11 +1214,17 @@ export function nextUnitNumber(units: readonly string[]): number {
   return Math.max(units.length, ...nums, 0) + 1;
 }
 
-/** «Unidad 3: Variables» (o solo «Unidad 3»); si ya se escribió con su número, se respeta. */
-export function numberedUnit(n: number, title: string): string {
+/** Palabra para «unidad» según el idioma del curso: «Unit» en los cursos en inglés. */
+export function unitWord(language?: string | null): string {
+  return language === 'en' ? 'Unit' : 'Unidad';
+}
+
+/** «Unidad 3: Variables» (o «Unit 3: Variables» en un curso en inglés); si ya se escribió con su número, se respeta. */
+export function numberedUnit(n: number, title: string, language?: string | null): string {
   const t = title.trim().replace(/^[:\-–\s]+/, '');
   if (UNIT_NUMBER.test(t)) return t;
-  return t ? `Unidad ${n}: ${t}` : `Unidad ${n}`;
+  const w = unitWord(language);
+  return t ? `${w} ${n}: ${t}` : `${w} ${n}`;
 }
 
 /** Para mostrar en la tarjeta: cada unidad con sus lecciones vistas. */

@@ -1,4 +1,4 @@
-import { addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { useIsMutating } from '@tanstack/react-query';
 import { Check, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
@@ -50,7 +50,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const save = (next: CourseLesson[], opts?: ChangeOpts) => apply(lessonsPatch(now(), next), opts);
   const addUnit = (e: FormEvent) => {
     e.preventDefault();
-    const name = numberedUnit(nextUnitNumber(courseUnits(now())), newUnit);
+    const name = numberedUnit(nextUnitNumber(courseUnits(now())), newUnit, now().language);
     const patch = addUnitPatch(now(), name);
     if (!patch) return setStatus(`Ya tienes una unidad llamada «${name}».`);
     apply(patch);
@@ -151,7 +151,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
           </label>
           <div className="prefixed-input">
             <span className="prefixed-input__prefix" aria-hidden="true">
-              Unidad {nextNumber}:
+              {unitWord(c.language)} {nextNumber}:
             </span>
             <input
               id={newUnitId}
@@ -167,7 +167,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
             </button>
           </div>
           <p className="field__hint" id={`${newUnitId}-hint`}>
-            Se guarda como «{numberedUnit(nextNumber, newUnit)}».
+            Se guarda como «{numberedUnit(nextNumber, newUnit, c.language)}».
           </p>
         </div>
       </form>
@@ -261,7 +261,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
       <form className="stack lessons__add" onSubmit={add}>
         <h3 className="planner__title">Añadir lección</h3>
         <div className="grid-2">
-          <TextField label="En la unidad (opcional)" value={unit} onChange={(e) => setUnit(e.target.value)} maxLength={120} placeholder="Unidad 1, Módulo 2…" list={units.length ? unitList : undefined} />
+          <TextField label="En la unidad (opcional)" value={unit} onChange={(e) => setUnit(e.target.value)} maxLength={120} placeholder={`${unitWord(c.language)} 1, ${c.language === 'en' ? 'Module' : 'Módulo'} 2…`} list={units.length ? unitList : undefined} />
           <TextField ref={titleRef} label="Lección o video" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="Introducción, Clase 3…" />
         </div>
         {units.length > 0 && (
