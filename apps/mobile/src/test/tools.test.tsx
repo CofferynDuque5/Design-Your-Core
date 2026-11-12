@@ -73,7 +73,7 @@ describe('herramientas en el móvil', () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     await open('/mas', 'Tus herramientas');
     for (const g of ['Organización', 'Estudio y trabajo', 'Conocimiento', 'Vida personal', 'Salud']) expect(await screen.findByText(g)).toBeOnTheScreen();
-    expect(screen.getByText('Todas tus herramientas, con tus datos: 25 en el móvil.')).toBeOnTheScreen();
+    expect(screen.getByText('Todas tus herramientas, con tus datos: 26 en el móvil.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Agenda, 4 elementos' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Pendientes, 2 por hacer' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Pomodoro, 1 sesión' })).toBeOnTheScreen();

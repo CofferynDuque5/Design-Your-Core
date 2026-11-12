@@ -31,6 +31,7 @@ export const tokens = (n = 1): TokenPair => ({ accessToken: `acceso-${n}`, refre
 export const profile = (over: Partial<Profile> = {}): Profile => ({
   focusPillars: ['descanso'],
   intention: null,
+  avatar: '',
   energyLevel: 3,
   activityLevel: 'ligera',
   wakeTime: '07:00',

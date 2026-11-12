@@ -20,7 +20,7 @@ import {
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter, type Href } from 'expo-router';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Minus, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Minus, Pencil, Plus, Search, Trash2, X } from 'lucide-react-native';
 import { useState, type ReactNode, type Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { LegacyKey } from '@dyc/core';
@@ -508,6 +508,173 @@ export function Suggestions({ field, values, current, onPick }: { field: string;
         </Pressable>
       ))}
     </ScrollView>
+  );
+}
+
+/**
+ * Elegir una opción tocando su ficha o escribir una nueva en el mismo campo.
+ * Con `onRename` y `onRemove` se pueden cambiar de nombre o borrar las que
+ * ya usas (un tema, una academia…), con cuántas veces se usa cada una.
+ */
+export function OptionPicker({
+  label,
+  value,
+  onChange,
+  options,
+  counts,
+  placeholder,
+  maxLength,
+  hint,
+  newLabel = 'Nueva',
+  countLabel = ['uso', 'usos'],
+  onRename,
+  onRemove,
+  autoFocus,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly string[];
+  counts?: Record<string, number>;
+  placeholder?: string;
+  maxLength?: number;
+  hint?: string;
+  newLabel?: string;
+  countLabel?: [string, string];
+  onRename?: (from: string, to: string) => void;
+  onRemove?: (option: string) => void;
+  autoFocus?: boolean;
+}) {
+  const { colors } = useTheme();
+  const [managing, setManaging] = useState(false);
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const list = [...new Map(options.map((o) => o.trim()).filter(Boolean).map((o) => [o.toLocaleLowerCase('es'), o])).values()];
+  const typed = value.trim();
+  const exact = list.find((o) => o.toLocaleLowerCase('es') === typed.toLocaleLowerCase('es'));
+  const shown = !typed || exact ? list : list.filter((o) => o.toLocaleLowerCase('es').includes(typed.toLocaleLowerCase('es')));
+  const managed = counts ? list.filter((o) => (counts[o] ?? 0) > 0) : list;
+  const n = (o: string) => counts?.[o] ?? 0;
+  const many = (o: string) => `${n(o)} ${n(o) === 1 ? countLabel[0] : countLabel[1]}`;
+  const editable = !!(onRename || onRemove) && managed.length > 0;
+  return (
+    <View style={{ gap: space[2] }}>
+      <Field label={label} value={value} onChangeText={onChange} placeholder={placeholder} maxLength={maxLength} hint={hint} autoFocus={autoFocus} />
+      {!managing && (shown.length > 0 || (typed && !exact)) && (
+        <View accessibilityLabel={`Opciones de ${label}`} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+          {shown.map((o) => {
+            const on = exact === o;
+            return (
+              <Pressable
+                key={o}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`${label}: ${o}`}
+                onPress={() => onChange(on ? '' : o)}
+                style={[s.dotChip, { minHeight: 36, borderColor: on ? colors.primary : colors.lineStrong, backgroundColor: on ? colors.primary : colors.surface }]}
+              >
+                {on && <Check size={14} color={colors.onPrimary} />}
+                <T v="small" style={{ fontFamily: fonts.medium, color: on ? colors.onPrimary : colors.ink }}>
+                  {o}
+                </T>
+              </Pressable>
+            );
+          })}
+          {typed && !exact ? (
+            <View style={[s.dotChip, { minHeight: 36, borderStyle: 'dashed', borderColor: colors.lineStrong }]}>
+              <Plus size={14} color={colors.inkMuted} />
+              <T v="small" tint="muted">
+                {newLabel}: «{typed}»
+              </T>
+            </View>
+          ) : null}
+        </View>
+      )}
+      {editable && (
+        <Pressable accessibilityRole="button" onPress={() => setManaging((v) => !v)} style={s.disclosure} hitSlop={4}>
+          {managing ? <Check size={16} color={colors.primary} /> : <Pencil size={16} color={colors.inkMuted} />}
+          <T v="small" style={{ fontFamily: fonts.medium, color: managing ? colors.primary : colors.inkMuted }}>
+            {managing ? 'Listo' : `Editar opciones de ${label.replace(/ \(opcional\)$/, '').toLowerCase()}`}
+          </T>
+        </Pressable>
+      )}
+      {managing && (
+        <View style={[s.confirm, { borderColor: colors.line, backgroundColor: colors.surfaceSunken, gap: space[1], padding: space[2] }]}>
+          {managed.map((o) =>
+            renaming?.from === o ? (
+              <View key={o} style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+                <TextInput
+                  accessibilityLabel={`Nuevo nombre de «${o}»`}
+                  value={renaming.to}
+                  onChangeText={(to) => setRenaming({ from: o, to })}
+                  maxLength={maxLength}
+                  autoFocus
+                  onSubmitEditing={() => {
+                    if (!renaming.to.trim()) return;
+                    onRename?.(o, renaming.to.trim());
+                    if (exact === o) onChange(renaming.to.trim());
+                    setRenaming(null);
+                  }}
+                  style={[typo.body, { flex: 1, minHeight: touchTarget, paddingHorizontal: space[3], borderWidth: 1, borderRadius: radius.md, borderColor: colors.lineStrong, color: colors.ink, backgroundColor: colors.surface }]}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Guardar el nombre"
+                  disabled={!renaming.to.trim()}
+                  onPress={() => {
+                    onRename?.(o, renaming.to.trim());
+                    if (exact === o) onChange(renaming.to.trim());
+                    setRenaming(null);
+                  }}
+                  style={s.iconBtn}
+                >
+                  <Check size={20} color={colors.primary} />
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Cancelar" onPress={() => setRenaming(null)} style={s.iconBtn}>
+                  <X size={20} color={colors.inkMuted} />
+                </Pressable>
+              </View>
+            ) : removing === o ? (
+              <View key={o} accessibilityRole="alert" style={{ gap: space[2], padding: space[2] }}>
+                <T v="small">
+                  ¿Borrar «{o}»?{n(o) ? ` Se quita de ${many(o)}.` : ''}
+                </T>
+                <View style={{ flexDirection: 'row', gap: space[2] }}>
+                  <Button
+                    small
+                    variant="danger"
+                    label="Borrar"
+                    onPress={() => {
+                      onRemove?.(o);
+                      if (exact === o) onChange('');
+                      setRemoving(null);
+                    }}
+                  />
+                  <Button small variant="ghost" label="Cancelar" onPress={() => setRemoving(null)} />
+                </View>
+              </View>
+            ) : (
+              <View key={o} style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], minHeight: touchTarget, paddingLeft: space[2] }}>
+                <T v="small" style={{ flex: 1 }}>
+                  {o}
+                  {counts ? <T v="small" tint="muted">{` · ${many(o)}`}</T> : null}
+                </T>
+                {onRename && (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Cambiar el nombre de «${o}»`} onPress={() => setRenaming({ from: o, to: o })} style={s.iconBtn}>
+                    <Pencil size={18} color={colors.inkMuted} />
+                  </Pressable>
+                )}
+                {onRemove && (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Borrar «${o}»`} onPress={() => setRemoving(o)} style={s.iconBtn}>
+                    <Trash2 size={18} color={colors.inkMuted} />
+                  </Pressable>
+                )}
+              </View>
+            ),
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 

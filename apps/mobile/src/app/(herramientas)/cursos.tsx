@@ -42,15 +42,22 @@ import {
   type CourseLengthFrom,
   type CourseStatus,
   type LegacyCourse,
+  COURSE_ACADEMIES,
+  courseLanguageLabel,
+  courseLanguageValue,
+  detectLanguage,
+  duplicateCourseGroups,
+  findDuplicateCourse,
+  isCourseLanguage,
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarClock, CalendarPlus, ExternalLink, Gauge, GraduationCap, Link2, ListChecks, MonitorPlay, Pencil, Play, Plus } from 'lucide-react-native';
+import { CalendarClock, CalendarPlus, CopyCheck, ExternalLink, Gauge, GraduationCap, Link2, ListChecks, MonitorPlay, Pencil, Play, Plus } from 'lucide-react-native';
 import { CourseLessons } from '../../components/CourseLessons';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { SearchBar, DotChoices, FormActions, IconButton, Pill, Suggestions, TimeField, Toggle, ToolScreen, WeekdayPicker, RemoveButton } from '../../components/tools';
+import { SearchBar, DotChoices, FormActions, IconButton, OptionPicker, Pill, Suggestions, TimeField, Toggle, ToolScreen, WeekdayPicker, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { YouTubeLengthReader, YouTubeView, type LengthFound, type YouTubeViewHandle } from '../../components/YouTubeView';
 import { api } from '../../lib/api';
@@ -77,6 +84,7 @@ export default function Cursos() {
   const groups = coursesByTopic(shown);
   const topics = coursesByTopic(courses).map((g) => g.topic);
   const pending = courses.filter((c) => statusOf(c) !== 'hecho').length;
+  const dups = duplicateCourseGroups(courses);
   const [watching, setWatching] = useState<string | null>(null);
   const [logging, setLogging] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
@@ -148,6 +156,21 @@ export default function Cursos() {
           </View>
           <SearchBar label="Buscar en tus cursos" value={q} onChange={setQ} placeholder="Buscar por curso, tema, canal o lección…" count={shown.length} />
           <DotChoices legend="Estado" hideLegend value={filter} onChange={setFilter} options={FILTER_OPTIONS} />
+          {dups.length > 0 && (
+            <View accessibilityRole="alert" style={{ flexDirection: 'row', gap: space[2], padding: space[3], borderRadius: 12, borderWidth: 1, borderColor: '#E5A23A99', backgroundColor: '#E5A23A1A' }}>
+              <CopyCheck size={18} color="#E5A23A" />
+              <View style={{ flex: 1, gap: space[1] }}>
+                <T v="small" style={{ fontFamily: fonts.medium }}>
+                  {dups.length === 1 ? 'Tienes un curso repetido' : `Tienes ${dups.length} cursos repetidos`}
+                </T>
+                {dups.map((g) => (
+                  <T key={g.map((c) => c.id).join('-')} v="small" tint="muted">
+                    «{courseName(g[0])}» en {g.map((c) => c.topic || 'Sin tema').join(' y ')}
+                  </T>
+                ))}
+              </View>
+            </View>
+          )}
           {groups.length === 0 ? (
             q.trim() ? null : (
               <EmptyState title={`Nada en «${COURSE_STATUS_INFO[filter as CourseStatus].label}»`}>Cambia el estado de un curso con el botón que tiene al lado.</EmptyState>
@@ -291,7 +314,7 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
   const status = statusOf(c);
   const watch = canWatch(c);
   const Icon = !source ? GraduationCap : source.video ? MonitorPlay : Link2;
-  const meta = [levelLabel(c), c.language ? COURSE_LANGUAGE_LABEL[c.language] : '', c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ');
+  const meta = [levelLabel(c), courseLanguageLabel(c.language), c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ');
   const pct = courseProgress(c);
   const resume = courseResume(c);
   const inSchedule = scheduleText(classes(c));
@@ -523,7 +546,27 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
   const [title, setTitle] = useState(course?.title ?? '');
   const [status, setStatus] = useState<CourseStatus>(course ? statusOf(course) : 'pendiente');
   const [notes, setNotes] = useState(course?.notes ?? '');
-  const [language, setLanguage] = useState<CourseLanguage | ''>(course?.language ?? '');
+  const [language, setLanguage] = useState<string>(course?.language ?? '');
+  // Sin idioma elegido, se detecta del nombre mientras se escribe.
+  const [langAuto, setLangAuto] = useState(!course?.language);
+  const [otherLang, setOtherLang] = useState(() => !!course?.language && !isCourseLanguage(course.language));
+  const guessLanguage = (text: string) => {
+    if (langAuto) setLanguage(detectLanguage(text) ?? '');
+  };
+  const duplicate = findDuplicateCourse(courses, { url: normalizeCourseUrl(url), title }, course?.id);
+  const count = (pick: (c: LegacyCourse) => string | undefined, list: LegacyCourse[] = courses) => {
+    const out: Record<string, number> = {};
+    for (const c of list) {
+      const v = pick(c)?.trim();
+      if (v) out[v] = (out[v] ?? 0) + 1;
+    }
+    return out;
+  };
+  const academies = [...origins, ...COURSE_ACADEMIES.filter((a: string) => !origins.some((o) => sameText(o, a)))];
+  /** Cambia un campo en todos los cursos que cumplen `match` (renombrar o quitar una opción). */
+  const bulk = (match: (c: LegacyCourse) => boolean, patch: Partial<LegacyCourse>) => {
+    for (const c of courses.filter(match)) actions.update(c.id, patch, { undo: false });
+  };
   const link = normalizeCourseUrl(url);
   const badUrl = !validCourseUrl(link);
   const source = !badUrl ? courseSource(link) : null;
@@ -533,7 +576,12 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
     if (r.items?.length && !course?.lessons?.length) setFound(r.items);
     // Lo que diga YouTube solo llena lo que está vacío.
     if (r.author) setOrigin((v) => v || r.author!.slice(0, 120));
-    if (r.title && !r.videos) setTitle((v) => v || r.title!.slice(0, 200));
+    if (r.title && !r.videos)
+      setTitle((v) => {
+        if (v) return v;
+        guessLanguage(r.title!);
+        return r.title!.slice(0, 200);
+      });
   });
 
   const submit = () => {
@@ -546,7 +594,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
       title: title.trim(),
       status,
       notes,
-      language,
+      language: courseLanguageValue(language),
       ...length.fields(),
       ...(found?.length && list && !course?.lessons?.length ? { lessons: lessonsFromPlaylist(found, list, newId) } : {}),
     };
@@ -559,10 +607,34 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
 
   return (
     <ScrollView style={{ maxHeight: 560 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
-      <Field label="Tema" value={topic} onChangeText={setTopic} maxLength={120} placeholder="Inglés, React, Finanzas…" autoFocus={!initialTopic && !course} />
-      <Suggestions field="Tema" values={topics} current={topic} onPick={setTopic} />
-      <Field label="Subcategoría (opcional)" value={subtopic} onChangeText={setSubtopic} maxLength={120} placeholder="Hooks, Gramática, Ahorro…" hint="Agrupa los cursos dentro del tema." />
-      <Suggestions field="Subcategoría" values={subtopics} current={subtopic} onPick={setSubtopic} />
+      <OptionPicker
+        label="Tema"
+        value={topic}
+        onChange={setTopic}
+        options={topics}
+        counts={count((c) => c.topic)}
+        newLabel="Tema nuevo"
+        countLabel={['curso', 'cursos']}
+        maxLength={120}
+        placeholder="Escribe o elige: Inglés, React…"
+        autoFocus={!initialTopic && !course}
+        onRename={(from, to) => bulk((c) => sameText(c.topic, from), { topic: to })}
+        onRemove={(o) => bulk((c) => sameText(c.topic, o), { topic: 'Sin tema' })}
+      />
+      <OptionPicker
+        label="Subcategoría (opcional)"
+        value={subtopic}
+        onChange={setSubtopic}
+        options={subtopics}
+        counts={count((c) => c.subtopic, courses.filter((c) => sameText(c.topic, topic)))}
+        newLabel="Subcategoría nueva"
+        countLabel={['curso', 'cursos']}
+        maxLength={120}
+        placeholder="Hooks, Gramática, Ahorro…"
+        hint="Agrupa los cursos dentro del tema."
+        onRename={(from, to) => bulk((c) => sameText(c.topic, topic) && sameText(c.subtopic, from), { subtopic: to })}
+        onRemove={(o) => bulk((c) => sameText(c.topic, topic) && sameText(c.subtopic, o), { subtopic: '' })}
+      />
       <Field
         label="Enlace (opcional)"
         value={url}
@@ -600,15 +672,56 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
       ) : null}
       <Button small variant="secondary" label={length.busy ? 'Buscando…' : 'Leer del enlace'} onPress={() => length.lookup(link, true)} disabled={!link || badUrl || length.busy} />
       {length.reader}
-      <Field label="Nombre (opcional)" value={title} onChangeText={setTitle} maxLength={200} placeholder="Curso completo de inglés básico" />
-      <Field label="Canal de YouTube o academia (opcional)" value={origin} onChangeText={setOrigin} maxLength={120} placeholder="midudev, Platzi, EDteam…" hint="En YouTube se llena solo al leer el enlace." />
-      <Suggestions field="Canal o academia" values={origins} current={origin} onPick={setOrigin} />
+      <Field
+        label="Nombre (opcional)"
+        value={title}
+        onChangeText={(v) => {
+          setTitle(v);
+          guessLanguage(v);
+        }}
+        maxLength={200}
+        placeholder="Curso completo de inglés básico"
+      />
+      {duplicate && (
+        <View accessibilityRole="alert" style={{ flexDirection: 'row', gap: space[2], padding: space[3], borderRadius: 12, borderWidth: 1, borderColor: '#E5A23A99', backgroundColor: '#E5A23A1A' }}>
+          <CopyCheck size={18} color="#E5A23A" />
+          <T v="small" style={{ flex: 1 }}>
+            Ya tienes este curso ({duplicate.by === 'enlace' ? 'mismo enlace' : 'mismo nombre'}): «{courseName(duplicate.course)}», en {duplicate.course.topic || 'Sin tema'}
+            {statusOf(duplicate.course) === 'hecho' ? ', y ya lo terminaste' : statusOf(duplicate.course) === 'curso' ? ', y lo estás viendo' : ''}. Puedes guardarlo igual si es otro.
+          </T>
+        </View>
+      )}
+      <OptionPicker
+        label="Canal de YouTube o academia (opcional)"
+        value={origin}
+        onChange={setOrigin}
+        options={academies}
+        counts={count((c) => c.source)}
+        newLabel="Academia nueva"
+        countLabel={['curso', 'cursos']}
+        maxLength={120}
+        placeholder="Escribe o elige: midudev, Platzi…"
+        hint="En YouTube se llena solo al leer el enlace."
+        onRename={(from, to) => bulk((c) => sameText(c.source, from), { source: to })}
+        onRemove={(o) => bulk((c) => sameText(c.source, o), { source: '' })}
+      />
       <DotChoices
         legend="Idioma del curso"
-        value={language || 'ninguno'}
-        onChange={(v) => setLanguage(v === 'ninguno' ? '' : (v as CourseLanguage))}
-        options={[{ value: 'ninguno', label: 'Sin indicar' }, ...COURSE_LANGUAGES.map((l) => ({ value: l, label: COURSE_LANGUAGE_LABEL[l] }))]}
+        value={otherLang ? 'otro' : isCourseLanguage(language) ? language : language ? 'otro' : 'ninguno'}
+        onChange={(v) => {
+          setLangAuto(false);
+          setOtherLang(v === 'otro');
+          setLanguage(v === 'ninguno' || v === 'otro' ? '' : v);
+        }}
+        options={[{ value: 'ninguno', label: 'Sin indicar' }, ...COURSE_LANGUAGES.map((l) => ({ value: l as string, label: COURSE_LANGUAGE_LABEL[l] })), { value: 'otro', label: 'Otro idioma…' }]}
       />
+      {otherLang ? (
+        <Field label="Otro idioma" value={language} onChangeText={setLanguage} maxLength={40} placeholder="Catalán, Neerlandés, Lengua de señas…" autoFocus />
+      ) : (
+        <T v="small" tint="muted" style={{ marginTop: -space[2] }}>
+          {langAuto && language ? `Detectado por el nombre: ${courseLanguageLabel(language)}. Tócalo para cambiarlo.` : 'Se detecta solo mientras escribes el nombre.'}
+        </T>
+      )}
       <DotChoices legend="Estado" value={status} onChange={setStatus} options={COURSE_STATUSES.map((s) => ({ value: s, label: COURSE_STATUS_INFO[s].label }))} />
       <Field label="Notas (opcional)" value={notes} onChangeText={setNotes} maxLength={5000} multiline placeholder="Voy en la lección 4…" />
       <FormActions
@@ -862,3 +975,6 @@ const st = StyleSheet.create({
   next: { paddingHorizontal: 8, paddingVertical: 1, borderRadius: radius.pill },
   status: { minWidth: 64, minHeight: 32, paddingHorizontal: space[3], borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });
+
+/** Mismo texto sin importar mayúsculas ni espacios de más. */
+const sameText = (a: string | undefined, b: string | undefined) => (a ?? '').trim().toLocaleLowerCase('es') === (b ?? '').trim().toLocaleLowerCase('es');

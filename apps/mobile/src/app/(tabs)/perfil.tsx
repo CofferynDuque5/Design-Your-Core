@@ -1,14 +1,15 @@
-import { CONTACT_EMAIL, PLAN_NAME, deviceTimeZone, PILLAR_IDS, type PillarId } from '@dyc/core';
+import { AVATARS, avatarById, HHMM_RE, MEALS, MEAL_LABEL, normalizeHHMM, positiveMessage, WATER_EVERY, waterTimes, CONTACT_EMAIL, PLAN_NAME, deviceTimeZone, PILLAR_IDS, type PillarId } from '@dyc/core';
 import { space, touchTarget } from '@dyc/tokens';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
-import { LogOut, Mail } from 'lucide-react-native';
+import { LogOut, Mail, Pencil } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
+import { AvatarArt, UserAvatar } from '../../components/Avatar';
 import { pillarShort } from '../../components/pillar';
 import { Sheet } from '../../components/Sheet';
-import { Toggle } from '../../components/tools';
-import { Button, Card, Chip, ErrorState, errorMessage, Field, Loading, PageHeader, Screen, Segmented, SectionHeader, T } from '../../components/ui';
+import { TimeField, Toggle } from '../../components/tools';
+import { Button, Card, Chip, ErrorState, errorMessage, Field, Loading, PageHeader, Screen, Segmented, SectionHeader, T, fonts } from '../../components/ui';
 import { api, useAuth } from '../../lib/api';
 import { CLASS_LEADS, DEFAULT_NOTIFY, type NotifyPrefs } from '@dyc/core';
 import { DEFAULT_REMINDER, notificationsSupported, onNotifyChange, readNotify, readReminder, REMINDER_TIMES, setReminder, setToolNotifications, type ReminderPrefs } from '../../lib/notifications';
@@ -27,12 +28,8 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <PageHeader eyebrow="Perfil" title={user?.name || 'Tu perfil'} />
-      {user && (
-        <T v="body" tint="muted" style={{ marginTop: -space[4] }}>
-          {user.email}
-        </T>
-      )}
+      <PageHeader eyebrow="Perfil" title="Tu perfil" />
+      <ProfileHero name={user?.name ?? ''} email={user?.email ?? ''} />
       <PlanSection />
       <FocusSection />
       <PreferencesSection />
@@ -59,6 +56,70 @@ export default function ProfileScreen() {
         Design Your Core {Constants.expoConfig?.version ?? ''}
       </T>
     </Screen>
+  );
+}
+
+/** Tu personaje (foto de perfil dibujada) y tu nombre. */
+function ProfileHero({ name, email }: { name: string; email: string }) {
+  const { colors } = useTheme();
+  const profile = useProfile();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const current = profile.data?.avatar ?? '';
+  const save = useMutation({
+    mutationFn: (avatar: string) => api.profile.update({ avatar }),
+    onSuccess: (p) => {
+      qc.setQueryData(keys.profile, p);
+      const a = avatarById(p.avatar);
+      toast(a ? `Ahora eres ${a.name}.` : 'Vuelves a tus iniciales.');
+    },
+    onError: (e) => toast(errorMessage(e), { tone: 'error' }),
+  });
+  const shown = save.isPending ? (save.variables ?? current) : current;
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Cambiar tu personaje" onPress={() => setOpen((v) => !v)} style={{ borderRadius: 60, borderWidth: 3, borderColor: colors.primary, padding: 2 }}>
+          <UserAvatar avatar={shown} name={name} size={92} />
+          <View style={{ position: 'absolute', right: 0, bottom: 0, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.surface }}>
+            <Pencil size={13} color={colors.onPrimary} />
+          </View>
+        </Pressable>
+        <View style={{ flex: 1, gap: space[1] }}>
+          <T v="title" style={{ fontSize: 24, lineHeight: 28 }}>
+            {name || 'Tu perfil'}
+          </T>
+          <T v="small" tint="muted">
+            {email}
+          </T>
+          <Button small variant="secondary" label={avatarById(shown) ? 'Cambiar personaje' : 'Elegir personaje'} onPress={() => setOpen((v) => !v)} />
+        </View>
+      </View>
+      {open && (
+        <View accessibilityRole="radiogroup" accessibilityLabel="Elige tu personaje" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2], paddingTop: space[3], borderTopWidth: 1, borderTopColor: colors.line }}>
+          {[...AVATARS.map((a) => ({ id: a.id, name: a.name, art: <AvatarArt avatar={a} size={60} /> })), { id: '', name: 'Iniciales', art: <UserAvatar name={name} size={60} /> }].map((a) => {
+            const on = a.id === '' ? !avatarById(shown) : shown === a.id;
+            return (
+              <Pressable
+                key={a.id || 'ini'}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                accessibilityLabel={a.name}
+                disabled={save.isPending}
+                onPress={() => save.mutate(a.id)}
+                style={{ width: '30%', flexGrow: 1, alignItems: 'center', gap: space[1], padding: space[2], borderRadius: 14, borderWidth: 2, borderColor: on ? colors.primary : 'transparent', backgroundColor: on ? colors.primarySoft : 'transparent' }}
+              >
+                {a.art}
+                <T v="small" style={{ fontFamily: on ? fonts.medium : undefined }}>
+                  {a.name}
+                </T>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </Card>
   );
 }
 
@@ -273,9 +334,72 @@ function ToolNotifySection() {
           <ToggleRow label="Recordatorios del Calendario" value={prefs.reminders} disabled={busy} onChange={(reminders) => apply({ ...prefs, reminders })} />
           <ToggleRow label="Tareas de la Agenda con aviso" value={prefs.tasks} disabled={busy} onChange={(tasks) => apply({ ...prefs, tasks })} />
           <ToggleRow label="Rutinas y cuidados de mascotas" value={prefs.routines} disabled={busy} onChange={(routines) => apply({ ...prefs, routines })} />
+          <T v="label" accessibilityRole="header" style={{ marginTop: space[2] }}>
+            Cuidarte
+          </T>
+          <ToggleRow label="Recordarme comer a mis horas" value={prefs.meals} disabled={busy} onChange={(meals) => apply({ ...prefs, meals })} />
+          {prefs.meals && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+              {MEALS.map((m) => (
+                <View key={m} style={{ flexBasis: '45%', flexGrow: 1 }}>
+                  <CareTime label={MEAL_LABEL[m]} value={prefs.mealTimes[m]} optional onCommit={(v) => apply({ ...prefs, mealTimes: { ...prefs.mealTimes, [m]: v } })} />
+                </View>
+              ))}
+            </View>
+          )}
+          <ToggleRow label="Recordarme tomar agua" value={prefs.water} disabled={busy} onChange={(water) => apply({ ...prefs, water })} />
+          {prefs.water && (
+            <View style={{ gap: space[2] }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }} accessibilityLabel="Cada cuánto tomar agua">
+                {WATER_EVERY.map((h) => (
+                  <Chip key={h} label={h === 1 ? 'Cada hora' : `Cada ${h} horas`} selected={prefs.waterEvery === h} onPress={() => apply({ ...prefs, waterEvery: h })} />
+                ))}
+              </View>
+              <View style={{ flexDirection: 'row', gap: space[2] }}>
+                <View style={{ flex: 1 }}>
+                  <CareTime label="Desde" value={prefs.waterFrom} onCommit={(waterFrom) => waterFrom && apply({ ...prefs, waterFrom })} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <CareTime label="Hasta" value={prefs.waterTo} onCommit={(waterTo) => waterTo && apply({ ...prefs, waterTo })} />
+                </View>
+              </View>
+              <T v="small" tint="muted">
+                {waterTimes(prefs.waterFrom, prefs.waterTo, prefs.waterEvery).join(' · ') || 'Elige un «Hasta» después del «Desde».'}
+              </T>
+            </View>
+          )}
+          <ToggleRow label="Un mensaje positivo cada día" value={prefs.cheers} disabled={busy} onChange={(cheers) => apply({ ...prefs, cheers })} />
+          {prefs.cheers && (
+            <View style={{ gap: space[1] }}>
+              <CareTime label="A qué hora" value={prefs.cheerTime} onCommit={(cheerTime) => cheerTime && apply({ ...prefs, cheerTime })} />
+              <T v="small" tint="muted">
+                Hoy: «{positiveMessage()}»
+              </T>
+            </View>
+          )}
         </View>
       )}
     </Card>
+  );
+}
+
+/** Una hora de aviso: se guarda al quedar completa (HH:MM), no con cada tecla. Vacía, si es opcional, apaga ese aviso. */
+function CareTime({ label, value, optional, onCommit }: { label: string; value: string; optional?: boolean; onCommit: (v: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <TimeField
+      label={label}
+      value={draft}
+      optional={optional}
+      hint={optional && !draft ? 'Sin aviso' : undefined}
+      onChange={(v) => {
+        setDraft(v);
+        const t = normalizeHHMM(v);
+        if (HHMM_RE.test(t) && t !== value) onCommit(t);
+        else if (optional && !v.trim() && value) onCommit('');
+      }}
+    />
   );
 }
 

@@ -160,6 +160,7 @@ async function clearToolNotifications(): Promise<void> {
 function triggerOf(p: PlannedNotification): Notifications.NotificationTriggerInput {
   const t = p.trigger;
   const channelId = TOOL_CHANNEL;
+  if (t.kind === 'daily') return { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: t.hour, minute: t.minute, channelId };
   if (t.kind === 'weekly') return { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: (t.weekday % 7) + 1, hour: t.hour, minute: t.minute, channelId };
   if (t.kind === 'monthly') return { type: Notifications.SchedulableTriggerInputTypes.MONTHLY, day: t.day, hour: t.hour, minute: t.minute, channelId };
   return { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(t.at), channelId };
