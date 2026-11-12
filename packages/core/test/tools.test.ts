@@ -341,7 +341,7 @@ describe('Avisos de rutinas y mascotas', () => {
       pets: [{ id: 'p', name: 'Luna', species: 'perro', note: '' }],
       petCares: [{ id: 'c', petId: 'p', kind: 'comida', title: 'Comer', time: '19:00', days: '', sound: true, enabled: true, lastDone: '' }],
     };
-    const plan = notificationPlan(data as never, { ...DEFAULT_NOTIFY, enabled: true });
+    const plan = notificationPlan(data as never, { ...DEFAULT_NOTIFY, enabled: true, meals: false, water: false, cheers: false });
     expect(plan.filter((x) => x.id.startsWith('routine-')).map((x) => x.trigger)).toEqual([
       { kind: 'weekly', weekday: 1, hour: 8, minute: 30 },
       { kind: 'weekly', weekday: 5, hour: 8, minute: 30 },

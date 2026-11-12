@@ -62,7 +62,7 @@ describe('avisos del teléfono', () => {
   });
 
   it('programa clases (antes de empezar), cursos del horario, recordatorios y tareas de hoy', () => {
-    const plan = notificationPlan(data, { ...DEFAULT_NOTIFY, enabled: true }, now);
+    const plan = notificationPlan(data, { ...DEFAULT_NOTIFY, enabled: true, meals: false, water: false, cheers: false }, now);
     expect(plan.map((p) => p.id)).toEqual(['task-t1', 'class-k1', 'class-k2', 'class-k3', 'rem-r1']);
     expect(plan.find((p) => p.id === 'class-k1')).toMatchObject({ title: 'Física en 10 min', body: 'De 08:05 a 09:00 · B-3', trigger: { kind: 'weekly', weekday: 1, hour: 7, minute: 55 } });
     // 10 minutos antes de las 00:05 del lunes es el domingo.
@@ -70,7 +70,7 @@ describe('avisos del teléfono', () => {
     expect(plan.find((p) => p.id === 'class-k3')).toMatchObject({ title: 'Curso en 10 min: Inglés básico', url: '/cursos?abrir=c1' });
     expect(plan.find((p) => p.id === 'rem-r1')?.trigger).toEqual({ kind: 'monthly', day: 14, hour: 16, minute: 30 });
     expect(plan.find((p) => p.id === 'task-t1')?.trigger).toEqual({ kind: 'date', at: new Date(2026, 9, 31, 17, 30).toISOString() });
-    expect(notificationPlan(data, { ...DEFAULT_NOTIFY, enabled: true, classes: false, tasks: false }, now).map((p) => p.id)).toEqual(['rem-r1']);
+    expect(notificationPlan(data, { ...DEFAULT_NOTIFY, enabled: true, classes: false, tasks: false, meals: false, water: false, cheers: false }, now).map((p) => p.id)).toEqual(['rem-r1']);
   });
 
   it('lee preferencias y horas sueltas con cuidado', () => {

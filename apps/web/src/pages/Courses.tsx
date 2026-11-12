@@ -18,8 +18,13 @@ import {
   courseOrigin,
   COURSE_LANGUAGE_LABEL,
   COURSE_LANGUAGES,
+  COURSE_ACADEMIES,
+  courseLanguageLabel,
+  courseLanguageValue,
+  detectLanguage,
+  duplicateCourseGroups,
+  findDuplicateCourse,
   unitSummary,
-  type CourseLanguage,
   courseLevel,
   courseRemaining,
   courseRoute,
@@ -41,16 +46,17 @@ import {
   type CourseStatus,
   type LegacyCourse,
 } from '@dyc/core';
-import { CalendarClock, CalendarPlus, ExternalLink, Gauge, GraduationCap, Link2, ListChecks, MonitorPlay, Pencil, Play, Plus } from 'lucide-react';
+import { CalendarClock, CalendarPlus, CopyCheck, Languages, ExternalLink, Gauge, GraduationCap, Link2, ListChecks, MonitorPlay, Pencil, Play, Plus } from 'lucide-react';
 import { CourseLessons } from './CourseLessons';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api } from '../app/api';
 import { newId, useLegacyData, useLegacyList, useModule, type ChangeOpts } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
-import { ChoiceField, SelectField, TextArea, TextField } from '../components/Form';
+import { SelectField, TextArea, TextField } from '../components/Form';
+import { ChipChoice, OptionPicker } from '../components/OptionPicker';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { FormActions, WeekdayPicker, RemoveButton } from '../components/ToolParts';
 import { useToast } from '../app/toast';
@@ -80,6 +86,7 @@ export function Courses() {
   const groups = coursesByTopic(shown);
   const topics = coursesByTopic(courses).map((g) => g.topic);
   const pending = courses.filter((c) => statusOf(c) !== 'hecho').length;
+  const dups = duplicateCourseGroups(courses);
   const [watching, setWatching] = useState<string | null>(null);
   const [logging, setLogging] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
@@ -174,6 +181,27 @@ export function Courses() {
             <span className="chip numeric">{plural(pending, 'por ver', 'por ver')}</span>
           </div>
           <SearchBox label="Buscar en tus cursos" value={q} onChange={setQ} placeholder="Buscar por curso, tema, canal o lección…" count={shown.length} />
+          {dups.length > 0 && (
+            <div className="dup-note" role="status">
+              <CopyCheck size={18} aria-hidden="true" />
+              <div className="stack-xs">
+                <p className="small">
+                  <strong>{dups.length === 1 ? 'Tienes un curso repetido' : `Tienes ${dups.length} cursos repetidos`}</strong> (mismo enlace o mismo nombre). Ábrelo para revisarlo o bórralo si sobra.
+                </p>
+                <ul className="small dup-note__list">
+                  {dups.map((g) => (
+                    <li key={g.map((c) => c.id).join('-')}>
+                      «{courseName(g[0])}»: {g.map((c) => (
+                        <button key={c.id} type="button" className="link-btn" onClick={() => setEditing(c)}>
+                          en {c.topic || 'Sin tema'}
+                        </button>
+                      )).reduce<ReactNode[]>((acc, el, i) => (i ? [...acc, ' y ', el] : [el]), [])}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
           {groups.length === 0 ? (
             q.trim() ? null : (
               <EmptyState title={`Nada en «${COURSE_STATUS_INFO[filter as CourseStatus].label}»`}>Cambia el estado de un curso con el botón que tiene al lado.</EmptyState>
@@ -337,7 +365,7 @@ function CourseRow({ course: c, next, onEdit, onStatus, onOpen, onLog, onSchedul
         )}
         <span className="small muted course-row__meta">
           {next && <span className="course-row__next">Sigue</span>}
-          {[levelLabel(c), c.language ? COURSE_LANGUAGE_LABEL[c.language] : '', c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ')}
+          {[levelLabel(c), courseLanguageLabel(c.language), c.source?.trim(), source?.label, lengthLabel(c), c.notes.split('\n')[0]].filter(Boolean).join(' · ')}
         </span>
         {(pct > 0 || resume) && status !== 'hecho' && (
           <span className="course-progress">
@@ -534,7 +562,6 @@ function ScheduleForm({ course: c, count, onDone }: { course: LegacyCourse; coun
 
 function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { course: LegacyCourse | null; topic: string; topics: string[]; courses: LegacyCourse[]; onDone: () => void }) {
   const actions = useModule('courses');
-  const sourceListId = useId();
   const [topic, setTopic] = useState(course?.topic ?? initialTopic);
   const [subtopic, setSubtopic] = useState(course?.subtopic ?? '');
   const [origin, setOrigin] = useState(course?.source ?? '');
@@ -545,7 +572,33 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
   const [title, setTitle] = useState(course?.title ?? '');
   const [status, setStatus] = useState<CourseStatus>(course ? statusOf(course) : 'pendiente');
   const [notes, setNotes] = useState(course?.notes ?? '');
-  const [language, setLanguage] = useState<CourseLanguage | ''>(course?.language ?? '');
+  const [language, setLanguage] = useState<string>(course?.language ?? '');
+  // Sin idioma elegido, se detecta del nombre mientras se escribe.
+  const [langAuto, setLangAuto] = useState(!course?.language);
+  const guessLanguage = (text: string) => {
+    if (!langAuto) return;
+    setLanguage(detectLanguage(text) ?? '');
+  };
+  const duplicate = findDuplicateCourse(courses, { url: normalizeCourseUrl(url), title }, course?.id);
+  const count = (pick: (c: LegacyCourse) => string | undefined, list: LegacyCourse[] = courses) => {
+    const out: Record<string, number> = {};
+    for (const c of list) {
+      const v = pick(c)?.trim();
+      if (v) out[v] = (out[v] ?? 0) + 1;
+    }
+    return out;
+  };
+  const topicCounts = count((c) => c.topic);
+  const subtopicCounts = count((c) => c.subtopic, courses.filter((c) => sameText(c.topic, topic)));
+  const originCounts = count((c) => c.source);
+  const academies = [...origins, ...COURSE_ACADEMIES.filter((a: string) => !origins.some((o) => sameText(o, a)))];
+  const toast = useToast();
+  /** Cambia un campo en todos los cursos que cumplen `match` (renombrar o quitar una opción). */
+  const bulk = (match: (c: LegacyCourse) => boolean, patch: Partial<LegacyCourse>, done: string) => {
+    const hits = courses.filter(match);
+    for (const c of hits) actions.update(c.id, patch, { undo: false });
+    toast(hits.length ? `${done} (${plural(hits.length, 'curso', 'cursos')})` : done);
+  };
   const link = normalizeCourseUrl(url);
   const badUrl = !validCourseUrl(link);
   const source = !badUrl ? courseSource(link) : null;
@@ -555,7 +608,12 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
     if (r.items?.length && !course?.lessons?.length) setFound(r.items);
     // Lo que diga YouTube solo llena lo que está vacío.
     if (r.author) setOrigin((v) => v || r.author!.slice(0, 120));
-    if (r.title && !r.videos) setTitle((v) => v || r.title!.slice(0, 200));
+    if (r.title && !r.videos)
+      setTitle((v) => {
+        if (v) return v;
+        guessLanguage(r.title!);
+        return r.title!.slice(0, 200);
+      });
   });
 
   const submit = (e: FormEvent) => {
@@ -569,7 +627,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
       ...(found?.length && youtubeRef(link)?.list && !course?.lessons?.length ? { lessons: lessonsFromPlaylist(found, youtubeRef(link)!.list, newId) } : {}),
       status,
       notes,
-      language,
+      language: courseLanguageValue(language),
       ...length.fields(),
     };
     const id = course?.id ?? newId();
@@ -581,17 +639,34 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
 
   return (
     <form className="stack" onSubmit={submit}>
-      <ChoiceField label="Tema" value={topic} onChange={setTopic} options={topics} otherLabel="Otro tema…" maxLength={120} required autoFocus={!initialTopic} placeholder="Inglés, React, Finanzas…" />
-      <ChoiceField
+      <OptionPicker
+        label="Tema"
+        value={topic}
+        onChange={setTopic}
+        options={topics}
+        counts={topicCounts}
+        newLabel="Tema nuevo"
+        countLabel={['curso', 'cursos']}
+        maxLength={120}
+        required
+        autoFocus={!initialTopic}
+        placeholder="Escribe o elige: Inglés, React, Finanzas…"
+        onRename={(from, to) => bulk((c) => sameText(c.topic, from), { topic: to }, `Ahora el tema se llama «${to}».`)}
+        onRemove={(o) => bulk((c) => sameText(c.topic, o), { topic: 'Sin tema' }, `Quitaste el tema «${o}». Sus cursos quedan en «Sin tema».`)}
+      />
+      <OptionPicker
         label="Subcategoría (opcional)"
         value={subtopic}
         onChange={setSubtopic}
         options={subtopics}
-        emptyLabel="Sin subcategoría"
-        otherLabel="Otra subcategoría…"
+        counts={subtopicCounts}
+        newLabel="Subcategoría nueva"
+        countLabel={['curso', 'cursos']}
         maxLength={120}
         placeholder="Hooks, Gramática, Ahorro…"
         hint="Agrupa los cursos dentro del tema."
+        onRename={(from, to) => bulk((c) => sameText(c.topic, topic) && sameText(c.subtopic, from), { subtopic: to }, `Ahora la subcategoría se llama «${to}».`)}
+        onRemove={(o) => bulk((c) => sameText(c.topic, topic) && sameText(c.subtopic, o), { subtopic: '' }, `Quitaste la subcategoría «${o}».`)}
       />
       <TextField
         label="Enlace (opcional)"
@@ -644,31 +719,58 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
           {length.busy ? 'Buscando…' : 'Leer del enlace'}
         </button>
       </fieldset>
-      <TextField label="Nombre (opcional)" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="Curso completo de inglés básico" />
       <TextField
+        label="Nombre (opcional)"
+        value={title}
+        onChange={(e) => {
+          setTitle(e.target.value);
+          guessLanguage(e.target.value);
+        }}
+        maxLength={200}
+        placeholder="Curso completo de inglés básico"
+      />
+      {duplicate && (
+        <div className="dup-note" role="status">
+          <CopyCheck size={18} aria-hidden="true" />
+          <p className="small">
+            <strong>Ya tienes este curso</strong> ({duplicate.by === 'enlace' ? 'mismo enlace' : 'mismo nombre'}): «{courseName(duplicate.course)}», en {duplicate.course.topic || 'Sin tema'}
+            {statusOf(duplicate.course) === 'hecho' ? ', y ya lo terminaste' : statusOf(duplicate.course) === 'curso' ? ', y lo estás viendo' : ''}. Puedes guardarlo igual si es otro.
+          </p>
+        </div>
+      )}
+      <OptionPicker
         label="Canal de YouTube o academia (opcional)"
         value={origin}
-        onChange={(e) => setOrigin(e.target.value)}
+        onChange={setOrigin}
+        options={academies}
+        counts={originCounts}
+        newLabel="Academia nueva"
+        countLabel={['curso', 'cursos']}
         maxLength={120}
-        placeholder="midudev, Platzi, EDteam…"
+        placeholder="Escribe o elige: midudev, Platzi, EDteam…"
         hint={length.busy ? undefined : 'En YouTube se llena solo al leer el enlace.'}
-        list={origins.length ? sourceListId : undefined}
+        onRename={(from, to) => bulk((c) => sameText(c.source, from), { source: to }, `Ahora se llama «${to}» en tus cursos.`)}
+        onRemove={(o) => bulk((c) => sameText(c.source, o), { source: '' }, `Quitaste «${o}» de tus cursos.`)}
       />
-      {origins.length > 0 && (
-        <datalist id={sourceListId}>
-          {origins.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
-      )}
-      <SelectField label="Idioma del curso" value={language} onChange={(e) => setLanguage(e.target.value as CourseLanguage | '')}>
-        <option value="">Sin indicar</option>
-        {COURSE_LANGUAGES.map((l) => (
-          <option key={l} value={l}>
-            {COURSE_LANGUAGE_LABEL[l]}
-          </option>
-        ))}
-      </SelectField>
+      <ChipChoice
+        label="Idioma del curso"
+        value={language}
+        onChange={(v) => {
+          setLanguage(v);
+          setLangAuto(false);
+        }}
+        options={[{ value: '', label: 'Sin indicar' }, ...COURSE_LANGUAGES.map((l) => ({ value: l, label: COURSE_LANGUAGE_LABEL[l] }))]}
+        other={{ label: 'Otro idioma…', placeholder: 'Catalán, Neerlandés, Lengua de señas…', maxLength: 40 }}
+        hint={
+          langAuto && language ? (
+            <span className="lang-detected">
+              <Languages size={14} aria-hidden="true" /> Detectado por el nombre: {courseLanguageLabel(language)}. Tócalo para cambiarlo.
+            </span>
+          ) : (
+            'Se detecta solo mientras escribes el nombre.'
+          )
+        }
+      />
       <SelectField label="Estado" value={status} onChange={(e) => setStatus(e.target.value as CourseStatus)}>
         {COURSE_STATUSES.map((s) => (
           <option key={s} value={s}>
@@ -904,3 +1006,6 @@ function StudyPlanner({ courses, onDone }: { courses: LegacyCourse[]; onDone: ()
     </form>
   );
 }
+
+/** Mismo texto sin importar mayúsculas ni espacios de más. */
+const sameText = (a: string | undefined, b: string | undefined) => (a ?? '').trim().toLocaleLowerCase('es') === (b ?? '').trim().toLocaleLowerCase('es');

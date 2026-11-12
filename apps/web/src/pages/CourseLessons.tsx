@@ -1,6 +1,6 @@
-import { unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { useIsMutating } from '@tanstack/react-query';
-import { Check, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react';
+import { BookOpen, Check, Circle, CircleHelp, CirclePlay, ExternalLink, FileCheck, FolderKanban, FolderPlus, Hammer, ListVideo, PenLine, Pencil, Play, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, type ChangeOpts } from '../app/legacy';
 import { TextField } from '../components/Form';
@@ -35,6 +35,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const [unit, setUnit] = useState(() => lessons.at(-1)?.unit ?? '');
   const [url, setUrl] = useState('');
   const [playing, setPlaying] = useState<string | null>(null);
+  const [editingLesson, setEditingLesson] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // El curso cambia con cada guardado: se usa siempre el último.
@@ -230,8 +231,17 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
                     <span>
                       {l.title}
                       {l.seconds ? <span className="small muted"> · {formatLength(l.seconds)}</span> : null}
+                      {l.activities?.length ? (
+                        <span className="small muted lessons__acts">
+                          {' · '}
+                          {activityCount(l).done}/{activityCount(l).total} {activityCount(l).total === 1 ? 'actividad' : 'actividades'}
+                        </span>
+                      ) : null}
                     </span>
                   </label>
+                  <button type="button" className="icon-btn" onClick={() => setEditingLesson(editingLesson === l.id ? null : l.id)} aria-label={`Editar «${l.title}» y sus actividades`} aria-expanded={editingLesson === l.id}>
+                    <Pencil size={18} aria-hidden="true" />
+                  </button>
                   {yt ? (
                     <button type="button" className="icon-btn" onClick={() => setPlaying(l.id)} aria-label={`Ver «${l.title}» aquí`} aria-pressed={playing === l.id}>
                       <Play size={18} aria-hidden="true" />
@@ -252,6 +262,14 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
                   >
                     <Trash2 size={18} aria-hidden="true" />
                   </button>
+                  {editingLesson === l.id && (
+                    <LessonEditor
+                      lesson={l}
+                      units={units}
+                      onSave={(patch) => save(current().map((x) => (x.id === l.id ? { ...x, ...patch } : x)))}
+                      onClose={() => setEditingLesson(null)}
+                    />
+                  )}
                 </li>
               );
             })}
@@ -289,3 +307,147 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
     </div>
   );
 }
+
+export const ACTIVITY_ICON: Record<ActivityKind, LucideIcon> = {
+  video: CirclePlay,
+  lectura: BookOpen,
+  cuestionario: CircleHelp,
+  examen: FileCheck,
+  tarea: PenLine,
+  practica: Hammer,
+  proyecto: FolderKanban,
+  otro: Circle,
+};
+
+/**
+ * Editar una lección: su nombre, unidad y enlace, y lo que hay que hacer
+ * dentro (videos, lecturas, cuestionarios, exámenes…). Al marcar todas las
+ * actividades, la lección queda vista.
+ */
+function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson; units: string[]; onSave: (patch: Partial<CourseLesson>) => void; onClose: () => void }) {
+  const [name, setName] = useState(lesson.title);
+  const [unit, setUnit] = useState(lesson.unit ?? '');
+  const [url, setUrl] = useState(lesson.url ?? '');
+  const [kind, setKind] = useState<ActivityKind>('video');
+  const [what, setWhat] = useState('');
+  const unitList = useId();
+  const link = normalizeCourseUrl(url);
+  const badUrl = !!url.trim() && !validCourseUrl(link);
+  const acts = lesson.activities ?? [];
+  const changed = name.trim() !== lesson.title || unit.trim() !== (lesson.unit ?? '') || link !== (lesson.url ?? '');
+  const saveActs = (next: LessonActivity[]) => {
+    const all = next.length > 0 && next.every((a) => a.done);
+    onSave({ activities: next, ...(next.length ? { done: all } : {}) });
+  };
+  const addActivity = () => {
+    if (!what.trim() || acts.length >= 60) return;
+    saveActs([...acts, { id: newId(), kind, title: what.trim() }]);
+    setWhat('');
+  };
+  return (
+    <div className="lesson-editor stack-sm" role="region" aria-label={`Editar «${lesson.title}»`}>
+      <div className="grid-2">
+        <TextField label="Nombre de la lección" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} autoFocus />
+        <TextField label="Unidad" value={unit} onChange={(e) => setUnit(e.target.value)} maxLength={120} list={units.length ? unitList : undefined} placeholder="Sin unidad" />
+      </div>
+      {units.length > 0 && (
+        <datalist id={unitList}>
+          {units.map((u) => (
+            <option key={u} value={u} />
+          ))}
+        </datalist>
+      )}
+      <TextField
+        label="Enlace (opcional)"
+        type="url"
+        inputMode="url"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onBlur={() => setUrl(link)}
+        maxLength={2000}
+        error={badUrl ? 'Pega un enlace completo, por ejemplo https://youtube.com/watch?v=…' : null}
+      />
+      <div className="row wrap">
+        <button
+          type="button"
+          className="btn btn--sm"
+          disabled={!changed || !name.trim() || badUrl}
+          onClick={() => {
+            onSave({ title: name.trim(), unit: unit.trim() || undefined, url: link || undefined });
+          }}
+        >
+          <Check size={16} aria-hidden="true" /> Guardar cambios
+        </button>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>
+          Cerrar
+        </button>
+      </div>
+
+      <h4 className="lesson-editor__title">Actividades de la lección</h4>
+      {acts.length === 0 ? (
+        <p className="small muted">Anota todo lo que hay que hacer: ver el video, leer, responder el cuestionario, presentar el examen…</p>
+      ) : (
+        <ul className="lesson-acts" aria-label={`Actividades de «${lesson.title}»`}>
+          {acts.map((a) => {
+            const Icon = ACTIVITY_ICON[a.kind] ?? Circle;
+            return (
+              <li key={a.id} className={`lesson-act${a.done ? ' is-done' : ''}`}>
+                <label className="lesson-act__label">
+                  <input type="checkbox" checked={!!a.done} onChange={() => saveActs(acts.map((x) => (x.id === a.id ? { ...x, done: !x.done } : x)))} />
+                  <span className={`act-kind act-kind--${a.kind}`}>
+                    <Icon size={14} aria-hidden="true" /> {ACTIVITY_KIND_LABEL[a.kind]}
+                  </span>
+                  <span className="lesson-act__name">{a.title}</span>
+                </label>
+                <button type="button" className="icon-btn" onClick={() => saveActs(acts.filter((x) => x.id !== a.id))} aria-label={`Quitar la actividad «${a.title}»`}>
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="lesson-editor__add stack-sm">
+        <div className="opt-picker__chips" role="group" aria-label="Tipo de actividad">
+          {ACTIVITY_KINDS.map((k) => {
+            const Icon = ACTIVITY_ICON[k];
+            return (
+              <button key={k} type="button" className={`opt-chip${kind === k ? ' is-on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
+                <Icon size={14} aria-hidden="true" /> {ACTIVITY_KIND_LABEL[k]}
+              </button>
+            );
+          })}
+        </div>
+        <div className="lesson-editor__add-row">
+          <TextField
+            label="Qué hay que hacer"
+            value={what}
+            onChange={(e) => setWhat(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addActivity();
+              }
+            }}
+            maxLength={200}
+            placeholder={ACTIVITY_PLACEHOLDER[kind]}
+          />
+          <button type="button" className="btn btn--secondary btn--sm" onClick={addActivity} disabled={!what.trim() || acts.length >= 60}>
+            <Plus size={16} aria-hidden="true" /> Añadir {ACTIVITY_KIND_LABEL[kind].toLowerCase()}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ACTIVITY_PLACEHOLDER: Record<ActivityKind, string> = {
+  video: 'Ver el video de la clase',
+  lectura: 'Leer el capítulo 2',
+  cuestionario: 'Cuestionario de repaso',
+  examen: 'Examen de la unidad',
+  tarea: 'Entregar el ejercicio 3',
+  practica: 'Practicar con el ejemplo',
+  proyecto: 'Proyecto final',
+  otro: 'Otra cosa por hacer',
+};

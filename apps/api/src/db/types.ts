@@ -38,6 +38,7 @@ export interface Profile {
   bedTime: string | null;
   timezone: string;
   baseline: unknown;
+  avatar: string | null;
   onboardedAt: Date | null;
   updatedAt: Date;
 }

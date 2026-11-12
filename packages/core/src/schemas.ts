@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AVATAR_IDS } from './avatars.js';
 import { isDay, isValidTimeZone } from './dates.js';
 import { ACTIVITY_LEVELS, PILLAR_IDS } from './pillars.js';
 
@@ -26,6 +27,8 @@ export const profileInputSchema = z
     timezone: z.string().refine(isValidTimeZone, 'Zona horaria no válida'),
     /** Autoevaluación inicial de cada pilar, 1 a 5. */
     baseline: z.object(Object.fromEntries(PILLAR_IDS.map((p) => [p, scale.optional()])) as Record<(typeof PILLAR_IDS)[number], z.ZodOptional<typeof scale>>),
+    /** Personaje de la foto de perfil (AVATARS) o "" para las iniciales. */
+    avatar: z.union([z.literal(''), z.enum(AVATAR_IDS as [string, ...string[]])]),
     /** true cuando la persona termina el onboarding. */
     completeOnboarding: z.boolean(),
   })

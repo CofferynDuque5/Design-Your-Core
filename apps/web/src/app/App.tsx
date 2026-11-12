@@ -32,6 +32,7 @@ const Finance = page('Finance', () => import('../pages/Finance'));
 const Goals = page('Goals', () => import('../pages/Goals'));
 const Journal = page('Journal', () => import('../pages/Journal'));
 const Pets = page('Pets', () => import('../pages/Pets'));
+const Couple = page('Couple', () => import('../pages/Couple'));
 const Routine = page('Routine', () => import('../pages/Routine'));
 const Sleep = page('Sleep', () => import('../pages/Sleep'));
 const Focus = page('Focus', () => import('../pages/Focus'));
@@ -129,6 +130,7 @@ export function AppRoutes() {
         <Route path="finanzas" element={<Finance />} />
         <Route path="metas" element={<Goals />} />
         <Route path="mascotas" element={<Pets />} />
+        <Route path="pareja" element={<Couple />} />
         <Route path="ciclo" element={<Cycle />} />
         <Route path="ejercicio" element={<Exercise />} />
         <Route path="sueno" element={<Sleep />} />

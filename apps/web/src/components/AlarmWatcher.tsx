@@ -3,6 +3,7 @@ import { BellRing } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useLegacyData } from '../app/legacy';
+import { useToast } from '../app/toast';
 import { onAlarmPrefs, playAlarm, pushSupported, readAlarmPrefs, syncServerAlarms, unlockAudio, upcomingAlarms } from '../lib/alarms';
 
 /** Una alarma que el panel encontró con más retraso que esto ya no suena (estuvo cerrado o dormido). */
@@ -22,6 +23,7 @@ export function AlarmWatcher() {
   const stop = useRef<(() => void) | null>(null);
   const rung = useRef(new Set<string>());
   const data = legacy.data?.data;
+  const toast = useToast();
 
   useEffect(() => onAlarmPrefs(setPrefs), []);
 
@@ -54,6 +56,14 @@ export function AlarmWatcher() {
     (a: Pick<AlarmAt, 'id' | 'title' | 'body' | 'url'>) => {
       if (rung.current.has(a.id)) return;
       rung.current.add(a.id);
+      // Comidas, agua y mensajes positivos: un aviso suave, sin alarma larga.
+      const gentle = /^(meal|water|cheer)-/.test(a.id);
+      if (gentle && document.visibilityState === 'visible') {
+        stop.current?.();
+        stop.current = playAlarm(2);
+        toast(`${a.title}. ${a.body}`, { key: 'cuidarte' });
+        return;
+      }
       if (document.visibilityState === 'visible') {
         stop.current?.();
         stop.current = playAlarm(60);
@@ -72,7 +82,7 @@ export function AlarmWatcher() {
         })
         .catch(() => undefined);
     },
-    [pushOn],
+    [pushOn, toast],
   );
 
   // Cada 10 s: ¿llegó la hora de alguna?

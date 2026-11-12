@@ -36,6 +36,7 @@ model User {
   plan           String          @default("gratis") // gratis | pro | pareja | estudiante
   planUntil      DateTime?       @db.Timestamp(3)
   payments       PaymentRequest[]
+  coupleItems    CoupleItem[]
 }
 
 // Imágenes de los apuntes (sincronizadas entre dispositivos). Guardadas como
@@ -73,6 +74,7 @@ model Profile {
   bedTime       String?
   timezone      String    @default("UTC")
   baseline      Json      @default("{}")
+  avatar        String?
   onboardedAt   DateTime?
   updatedAt     DateTime  @updatedAt
 }
@@ -266,4 +268,20 @@ model PaymentRequest {
 
   @@index([userId])
   @@index([status, createdAt])
+}
+
+// Espacio en pareja: fotos, metas y emprendimientos que comparten las dos personas vinculadas.
+model CoupleItem {
+  id        String   @id
+  pairKey   String
+  kind      String
+  data      Json     @default("{}")
+  image     String?
+  thumb     String?
+  createdBy String?
+  creator   User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+  updatedAt DateTime @default(now()) @db.Timestamp(3)
+
+  @@index([pairKey, kind])
 }

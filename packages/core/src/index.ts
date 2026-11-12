@@ -21,3 +21,5 @@ export * from './scoring.js';
 export * from './suggest.js';
 export * from './tools.js';
 export * from './vault.js';
+export * from './avatars.js';
+export * from './couple.js';

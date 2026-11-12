@@ -1,6 +1,9 @@
 import type { CheckIn, Habit, PartnerView, UserChallenge } from '@dyc/api-client';
 import {
   DEFAULT_PAYMENT_SETTINGS,
+  coupleCreateInput,
+  coupleDataSchemas,
+  type CoupleItem,
   effectivePlan,
   extendPlan,
   localAmount,
@@ -133,6 +136,7 @@ function publicProfile(a: DemoAccount) {
     bedTime: p?.bedTime ?? null,
     timezone: p?.timezone ?? 'UTC',
     baseline: p?.baseline ?? {},
+    avatar: p?.avatar ?? '',
     onboarded: !!p?.onboardedAt,
     onboardedAt: p?.onboardedAt ?? null,
   };
@@ -983,6 +987,54 @@ export function createDemoServer(opts: DemoServerOptions = {}) {
     return { ok: true };
   });
 
+  // Espacio en pareja: en la prueba se guarda en la cuenta (con ejemplos al vincularse).
+  const coupleOf = (a: DemoAccount) => {
+    if (!a.partner) fail(409, 'Vincúlate con tu pareja en Perfil para usar el espacio compartido.');
+    a.couple ??= demoCoupleItems();
+    return a.couple;
+  };
+  const coupleOut = ({ image: _i, ...item }: CoupleItem & { image?: string }): CoupleItem => item;
+  on('GET', '/api/v2/couple', ({ token }) => {
+    const a = account(token);
+    if (!a.partner) return { partner: null, items: [] };
+    return { partner: a.partner, items: coupleOf(a).map(coupleOut) };
+  });
+  on('POST', '/api/v2/couple/items', ({ token, body }) => {
+    const list = coupleOf(account(token));
+    const input = parse(coupleCreateInput, body);
+    const item: CoupleItem & { image?: string } = {
+      id: demoId(),
+      kind: input.kind,
+      data: input.data,
+      byMe: true,
+      createdAt: stamp(),
+      updatedAt: stamp(),
+      ...(input.kind === 'foto' ? { thumb: input.thumb, image: input.image } : {}),
+    };
+    list.unshift(item);
+    return created({ item: coupleOut(item) });
+  });
+  on('PATCH', '/api/v2/couple/items/:id', ({ token, params, body }) => {
+    const item = coupleOf(account(token)).find((x) => x.id === params[0]);
+    if (!item) fail(404, 'Ya no existe.');
+    const it = item!;
+    it.data = parse(coupleDataSchemas[it.kind] as typeof coupleDataSchemas.meta, { ...it.data, ...(isObj(body.data) ? body.data : {}) }) as CoupleItem['data'];
+    it.updatedAt = stamp();
+    return { item: coupleOut(it) };
+  });
+  on('DELETE', '/api/v2/couple/items/:id', ({ token, params }) => {
+    const list = coupleOf(account(token));
+    const i = list.findIndex((x) => x.id === params[0]);
+    if (i < 0) fail(404, 'Ya no existe.');
+    list.splice(i, 1);
+    return { ok: true };
+  });
+  on('GET', '/api/v2/couple/items/:id/image', ({ token, params }) => {
+    const item = coupleOf(account(token)).find((x) => x.id === params[0]);
+    if (!item?.image && !item?.thumb) fail(404, 'No hay foto');
+    return { image: item!.image ?? item!.thumb };
+  });
+
   /** Atiende una petición y devuelve [estado, cuerpo]. */
   function handle(method: string, path: string, query: URLSearchParams, body: unknown, token: string | null): Result {
     const matches = routes.map((r) => ({ r, m: path.match(r.re) })).filter((x) => x.m);
@@ -1076,3 +1128,43 @@ function demoPaymentSettings(): PaymentSettings {
 
 /** Un comprobante de ejemplo (dibujado, no es un pago real). */
 const DEMO_PROOF = `data:image/svg+xml;base64,${typeof btoa === 'function' ? btoa('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="520"><rect width="360" height="520" rx="24" fill="#f4f5f0"/><text x="180" y="90" font-family="sans-serif" font-size="22" text-anchor="middle" fill="#222">Pago exitoso</text><text x="180" y="150" font-family="sans-serif" font-size="34" text-anchor="middle" fill="#111">Bs 943,64</text><text x="40" y="230" font-family="sans-serif" font-size="16" fill="#555">Referencia</text><text x="320" y="230" font-family="sans-serif" font-size="16" text-anchor="end" fill="#111">004512889</text><text x="40" y="270" font-family="sans-serif" font-size="16" fill="#555">Banco</text><text x="320" y="270" font-family="sans-serif" font-size="16" text-anchor="end" fill="#111">Ejemplo</text><text x="180" y="470" font-family="sans-serif" font-size="13" text-anchor="middle" fill="#888">Comprobante de demostración</text></svg>') : ''}`;
+
+/** Ejemplos del espacio en pareja para la prueba: paisajes dibujados como «fotos». */
+function demoCoupleItems(): Array<CoupleItem & { image?: string }> {
+  const scene = (sky: [string, string], sun: string, ground: string, extra = '') =>
+    `data:image/svg+xml;utf8,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs><rect width="400" height="400" fill="url(#s)"/><circle cx="270" cy="190" r="56" fill="${sun}"/>${extra}<path d="M0 290 Q100 240 200 280 T400 270 V400 H0Z" fill="${ground}"/></svg>`,
+    )}`;
+  const now = new Date().toISOString();
+  const photo = (id: string, caption: string, takenOn: string, src: string, byMe: boolean) => ({ id, kind: 'foto' as const, data: { caption, takenOn }, thumb: src, image: src, byMe, createdAt: now, updatedAt: now });
+  return [
+    photo('f1', 'Atardecer en la playa', '2026-10-18', scene(['#F7B267', '#F25C54'], '#FFE29A', '#2B2E29', '<path d="M0 300 H400 V320 H0Z" fill="#4C8DAE" opacity=".7"/>'), true),
+    photo('f2', 'Subida al Ávila', '2026-09-27', scene(['#9EC9E8', '#E8F1F7'], '#FFFFFF', '#3E5C3A', '<path d="M40 300 L150 150 L260 300Z M180 300 L290 120 L400 300Z" fill="#567D46"/>'), false),
+    photo('f3', 'Noche de pelis', '2026-11-02', scene(['#151714', '#2B2E29'], '#F2E3B3', '#1F2712', '<circle cx="80" cy="80" r="3" fill="#C8F23A"/><circle cx="140" cy="120" r="2" fill="#C8F23A"/><circle cx="330" cy="70" r="2.5" fill="#C8F23A"/>'), true),
+    photo('f4', 'Café de los domingos', '2026-11-09', scene(['#E8C9A0', '#F3F4EF'], '#D9825B', '#7A5A43'), false),
+    {
+      id: 'm1',
+      kind: 'meta',
+      data: { title: 'Viajar a Mérida en diciembre', note: 'Ahorrar entre los dos y reservar la posada.', deadline: '2026-12-15', done: false, steps: [{ id: 's1', name: 'Ahorrar $300', done: true }, { id: 's2', name: 'Reservar la posada', done: true }, { id: 's3', name: 'Comprar los pasajes', done: false }] },
+      byMe: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'm2',
+      kind: 'meta',
+      data: { title: 'Leer un libro juntos al mes', note: '', deadline: '', done: false, steps: [{ id: 's4', name: 'Elegir el de noviembre', done: true }, { id: 's5', name: 'Terminarlo', done: false }] },
+      byMe: false,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'e1',
+      kind: 'emprendimiento',
+      data: { name: 'Velas artesanales', description: 'Velas de soya con aromas. Ella diseña las etiquetas y él lleva las ventas por Instagram.', stage: 'en-marcha', tasks: [{ id: 't1', name: 'Logo y etiquetas', done: true }, { id: 't2', name: 'Fotos del catálogo', done: true }, { id: 't3', name: 'Precios y combos', done: false }, { id: 't4', name: 'Primera feria', done: false }] },
+      byMe: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+}

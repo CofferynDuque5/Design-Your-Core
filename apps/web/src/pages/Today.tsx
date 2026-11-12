@@ -18,9 +18,8 @@ import {
   WEEKLY_TARGET,
   type ConsistencyDay,
   type ConsistencyStats,
-  type LegacyData,
-} from '@dyc/core';
-import { ArrowRight, Award, Crosshair, Flag, Flame, Lock, PenLine, Quote, Timer } from 'lucide-react';
+  type LegacyData, positiveMessage } from '@dyc/core';
+import { ArrowRight, Award, Crosshair, Flag, Flame, Lock, PenLine, Quote, Timer, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../app/api';
@@ -190,6 +189,9 @@ function FocusHero({ d, data, streak }: { d: Dashboard; data: LegacyData | undef
         )}
       </h2>
       {focus && <p className="muted">{focus.detail}</p>}
+      <p className="focus-hero__cheer">
+        <Sparkles size={16} aria-hidden="true" /> {positiveMessage()}
+      </p>
       <dl className="focus-hero__meta">
         <div>
           <dt>Puntuación de la semana</dt>

@@ -1,6 +1,8 @@
 import { matchesSearch, CARE_KIND_INFO, CARE_KINDS, careKindOf as kindOf, careWhen, nextDue, PET_SPECIES, PET_SPECIES_INFO, petSpeciesOf as speciesOf, utcDayKey, weekdaysOf as validDays, type CareKind, type LegacyPet, type LegacyPetCare, type PetSpecies } from '@dyc/core';
-import { Pencil, Plus } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { Camera, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useId, useState, type FormEvent } from 'react';
+import { api } from '../app/api';
+import { compressImage, uploadImage, useCoreImages } from '../app/images';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
@@ -89,9 +91,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
     <article className="card tool-card pet-card" style={{ ['--c' as string]: '#E8912A' }} aria-labelledby={titleId}>
       <div className="tool-card__head">
         <div className="pet-card__who">
-          <span className="pet-card__avatar" aria-hidden="true">
-            <UiIcon name={species.icon} size={24} />
-          </span>
+          <PetPhoto pet={p} size={56} />
           <div>
             <h2 id={titleId} className="tool-card__title">
               {name}
@@ -159,22 +159,75 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
   const [name, setName] = useState(pet?.name ?? '');
   const [species, setSpecies] = useState<PetSpecies>(pet ? speciesOf(pet) : 'dog');
   const [note, setNote] = useState(pet?.note ?? '');
+  const [photo, setPhoto] = useState(pet?.photo ?? '');
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileId = useId();
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      // Pequeña y cuadrada de sobra para la tarjeta: sube rápido y ocupa poco.
+      setPhoto(await uploadImage(await compressImage(file, 480, 0.8)));
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'No se pudo subir la foto.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const fields = { name: name.trim(), species, note: note.trim() };
+    const fields = { name: name.trim(), species, note: note.trim(), photo };
+    // La foto anterior ya no se usa: se borra de la nube.
+    if (pet?.photo && pet.photo !== photo) void api.legacy.deleteImages([pet.photo]).catch(() => undefined);
     if (pet) actions.update(pet.id, fields);
     else actions.add({ id: newId(), ...fields });
     onDone();
   };
   return (
     <form className="stack" onSubmit={submit}>
+      <div className="pet-photo-field">
+        <PetPhoto pet={{ species, photo, name }} size={88} />
+        <div className="stack-xs">
+          <span className="field__label">Foto de perfil</span>
+          <div className="row wrap">
+            <label htmlFor={fileId} className={`btn btn--secondary btn--sm${photoBusy ? ' is-disabled' : ''}`}>
+              <Camera size={16} aria-hidden="true" /> {photoBusy ? 'Subiendo…' : photo ? 'Cambiar foto' : 'Subir foto'}
+            </label>
+            <input
+              id={fileId}
+              type="file"
+              accept="image/*"
+              className="visually-hidden"
+              disabled={photoBusy}
+              onChange={(e) => {
+                void pick(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+            {photo && (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPhoto('')}>
+                <Trash2 size={16} aria-hidden="true" /> Quitar
+              </button>
+            )}
+          </div>
+          {photoError ? (
+            <p className="field__error" role="alert">
+              {photoError}
+            </p>
+          ) : (
+            <p className="field__hint">Una foto de tu mascota para su tarjeta.</p>
+          )}
+        </div>
+      </div>
       <TextField label="Nombre" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required autoFocus placeholder="Luna" />
       <IconChoices legend="Especie" value={species} onChange={setSpecies} options={PET_SPECIES.map((s) => ({ value: s, ...PET_SPECIES_INFO[s] }))} />
       <TextField label="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Raza, edad…" />
       <FormActions
         submitLabel={pet ? 'Guardar' : 'Añadir mascota'}
-        disabled={!name.trim()}
+        disabled={!name.trim() || photoBusy}
         onDelete={
           pet
             ? () => {
@@ -226,5 +279,18 @@ function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare |
         confirm={`Se borrará «${care?.title || 'este cuidado'}».`}
       />
     </form>
+  );
+}
+
+/** Foto de la mascota (guardada en la nube) o el dibujo de su especie. */
+function PetPhoto({ pet, size }: { pet: Pick<LegacyPet, 'species' | 'photo' | 'name'>; size: number }) {
+  const ref = pet.photo ? `coreimg:${pet.photo}` : '';
+  const resolve = useCoreImages(ref);
+  const src = ref ? resolve(ref) : null;
+  const species = PET_SPECIES_INFO[speciesOf(pet as LegacyPet)];
+  return (
+    <span className={`pet-card__avatar${src ? ' has-photo' : ''}`} style={{ width: size, height: size }} aria-hidden={!src}>
+      {src ? <img src={src} alt={`Foto de ${pet.name || 'tu mascota'}`} /> : <UiIcon name={species.icon} size={Math.round(size * 0.42)} />}
+    </span>
   );
 }

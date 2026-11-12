@@ -18,14 +18,91 @@ export interface NotifyPrefs {
   tasks: boolean;
   /** Rutinas y cuidados de mascotas con hora y días. */
   routines: boolean;
+  /** Recordatorio de cada comida a su hora. */
+  meals: boolean;
+  mealTimes: Record<MealId, string>;
+  /** Tomar agua cada `waterEvery` horas entre `waterFrom` y `waterTo`. */
+  water: boolean;
+  waterEvery: number;
+  waterFrom: string;
+  waterTo: string;
+  /** Un mensaje positivo cada día a `cheerTime`. */
+  cheers: boolean;
+  cheerTime: string;
 }
 
-export const DEFAULT_NOTIFY: NotifyPrefs = { enabled: false, classes: true, classLead: 10, reminders: true, tasks: true, routines: true };
+export const MEALS = ['desayuno', 'almuerzo', 'merienda', 'cena'] as const;
+export type MealId = (typeof MEALS)[number];
+export const MEAL_LABEL: Record<MealId, string> = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', merienda: 'Merienda', cena: 'Cena' };
+/** Hora vacía = esa comida no avisa. */
+export const DEFAULT_MEAL_TIMES: Record<MealId, string> = { desayuno: '08:00', almuerzo: '12:30', merienda: '', cena: '19:30' };
+const MEAL_TITLE: Record<MealId, string> = { desayuno: 'Hora del desayuno', almuerzo: 'Hora del almuerzo', merienda: 'Hora de la merienda', cena: 'Hora de la cena' };
+export const WATER_EVERY = [1, 2, 3] as const;
+
+export const DEFAULT_NOTIFY: NotifyPrefs = {
+  enabled: false,
+  classes: true,
+  classLead: 10,
+  reminders: true,
+  tasks: true,
+  routines: true,
+  meals: true,
+  mealTimes: DEFAULT_MEAL_TIMES,
+  water: true,
+  waterEvery: 2,
+  waterFrom: '08:00',
+  waterTo: '20:00',
+  cheers: true,
+  cheerTime: '10:00',
+};
+
+/**
+ * Mensajes positivos: uno distinto cada día de la semana en los avisos y en
+ * el panel. Cortos, cálidos y sin exigir nada.
+ */
+export const POSITIVE_MESSAGES: readonly string[] = [
+  'Vas mejor de lo que crees. Un paso pequeño hoy también cuenta.',
+  'Lo estás haciendo bien. Respira, toma agua y sigue a tu ritmo.',
+  'Hoy no tienes que hacerlo perfecto, solo empezar.',
+  'Eres constante, y eso se nota. Sigue así.',
+  'Date crédito por todo lo que ya lograste esta semana.',
+  'Tu esfuerzo de hoy es el orgullo de mañana.',
+  'Descansar también es avanzar. Cuídate.',
+  'Cada día que vuelves aquí es un día que eliges crecer.',
+  'Eres capaz de cosas grandes, una tarea a la vez.',
+  'Celebra lo pequeño: también es progreso.',
+  'Hoy es un buen día para ser amable contigo.',
+  'Confía en el proceso. Lo que siembras, florece.',
+  'No compares tu camino. El tuyo va a su ritmo y va bien.',
+  'Que tu energía de hoy sea para lo que de verdad importa.',
+];
+
+/** El mensaje positivo de un día (el mismo en todo el día). */
+export function positiveMessage(date: Date = new Date(), offset = 0): string {
+  const start = new Date(date.getFullYear(), 0, 0).getTime();
+  const dayOfYear = Math.floor((date.getTime() - start) / 86_400_000);
+  return POSITIVE_MESSAGES[(dayOfYear + offset) % POSITIVE_MESSAGES.length];
+}
+
+/** Horas de agua entre `from` y `to` cada `every` horas («08:00», «10:00»…). */
+export function waterTimes(from: string, to: string, every: number): string[] {
+  const parse = (v: string) => {
+    const m = /^(\d{2}):(\d{2})$/.exec(v);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const a = parse(from);
+  const b = parse(to);
+  if (a === null || b === null || b <= a || every < 1) return [];
+  const out: string[] = [];
+  for (let t = a; t <= b && out.length < 16; t += every * 60) out.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+  return out;
+}
 export const CLASS_LEADS = [0, 5, 10, 15, 30] as const;
 /** iOS guarda como mucho 64 avisos programados; dejamos sitio al del check-in. */
 export const NOTIFY_MAX = 60;
 
 export type NotifyTrigger =
+  | { kind: 'daily'; hour: number; minute: number }
   | { kind: 'weekly'; /** 1 = lunes … 7 = domingo */ weekday: number; hour: number; minute: number }
   | { kind: 'monthly'; day: number; hour: number; minute: number }
   | { kind: 'date'; at: string };
@@ -49,8 +126,24 @@ export function parseNotifyPrefs(v: unknown): NotifyPrefs {
     reminders: bool(o.reminders, DEFAULT_NOTIFY.reminders),
     tasks: bool(o.tasks, DEFAULT_NOTIFY.tasks),
     routines: bool(o.routines, DEFAULT_NOTIFY.routines),
+    meals: bool(o.meals, DEFAULT_NOTIFY.meals),
+    mealTimes: Object.fromEntries(
+      MEALS.map((m) => {
+        const v = (o.mealTimes as Record<string, unknown> | undefined)?.[m];
+        return [m, typeof v === 'string' && (v === '' || HHMM.test(v)) ? v : DEFAULT_MEAL_TIMES[m]];
+      }),
+    ) as Record<MealId, string>,
+    water: bool(o.water, DEFAULT_NOTIFY.water),
+    waterEvery: (WATER_EVERY as readonly number[]).includes(o.waterEvery as number) ? (o.waterEvery as number) : DEFAULT_NOTIFY.waterEvery,
+    waterFrom: typeof o.waterFrom === 'string' && HHMM.test(o.waterFrom) ? o.waterFrom : DEFAULT_NOTIFY.waterFrom,
+    waterTo: typeof o.waterTo === 'string' && HHMM.test(o.waterTo) ? o.waterTo : DEFAULT_NOTIFY.waterTo,
+    cheers: bool(o.cheers, DEFAULT_NOTIFY.cheers),
+    cheerTime: typeof o.cheerTime === 'string' && HHMM.test(o.cheerTime) ? o.cheerTime : DEFAULT_NOTIFY.cheerTime,
   };
 }
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const hm = (v: string) => ({ hour: Number(v.slice(0, 2)), minute: Number(v.slice(3, 5)) });
 
 /** «14:00», «2:30 pm», «9h» → { hour, minute }; si no hay hora, null. */
 export function parseLooseTime(v: string): { hour: number; minute: number } | null {
@@ -123,7 +216,19 @@ export function notificationPlan(data: LegacyData | null | undefined, prefs: Not
     }
   }
 
-  return out.slice(0, NOTIFY_MAX);
+  // Cuidarte: comidas, agua y un mensaje positivo. Van primero para que nunca se queden fuera.
+  const care: PlannedNotification[] = [];
+  if (prefs.meals)
+    for (const m of MEALS) {
+      const t = prefs.mealTimes[m];
+      if (t && HHMM.test(t)) care.push({ id: `meal-${m}`, title: MEAL_TITLE[m], body: 'Haz una pausa y come con calma. Tu cuerpo te lo agradece.', url: '/', trigger: { kind: 'daily', ...hm(t) } });
+    }
+  if (prefs.water)
+    for (const t of waterTimes(prefs.waterFrom, prefs.waterTo, prefs.waterEvery)) care.push({ id: `water-${t}`, title: 'Toma agua', body: 'Un vaso ahora. Anótalo en tu check-in de hoy.', url: '/check-in', trigger: { kind: 'daily', ...hm(t) } });
+  if (prefs.cheers)
+    for (let d = 1; d <= 7; d++) care.push({ id: `cheer-${d}`, title: 'Un mensaje para ti', body: POSITIVE_MESSAGES[(d * 2) % POSITIVE_MESSAGES.length], url: '/', trigger: { kind: 'weekly', weekday: d, ...hm(prefs.cheerTime) } });
+
+  return [...care, ...out].slice(0, NOTIFY_MAX);
 }
 
 /** Una alarma con fecha y hora exactas (para el panel web y su servidor de avisos). */

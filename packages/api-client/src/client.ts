@@ -1,4 +1,4 @@
-import type { AccountPlan, PaymentRequest, PaymentRequestInput, PaymentSettings, PlanPrices, PaymentMethod, CheckInInput, CourseLength, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
+import type { CoupleCreateInput, CoupleData, CoupleItem, CoupleKind, CoupleSpace, AccountPlan, PaymentRequest, PaymentRequestInput, PaymentSettings, PlanPrices, PaymentMethod, CheckInInput, CourseLength, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
@@ -244,6 +244,15 @@ export function createClient(opts: ClientOptions) {
       inviteByEmail: (email: string, appUrl: string) => request<{ ok: true; code: string; sent: boolean }>('POST', '/api/partner/invite/email', { email, appUrl }),
       accept: (code: string) => request<{ ok: true; partner: { name: string } }>('POST', '/api/partner/accept', { code }),
       remove: () => request<{ ok: true }>('DELETE', '/api/partner'),
+    },
+
+    /** Espacio en pareja: fotos, metas y emprendimientos compartidos (hace falta pareja vinculada). */
+    couple: {
+      get: () => request<CoupleSpace>('GET', '/api/v2/couple'),
+      add: (input: CoupleCreateInput) => request<{ item: CoupleItem }>('POST', '/api/v2/couple/items', input).then((r) => r.item),
+      update: <K extends CoupleKind>(id: string, data: Partial<CoupleData[K]>) => request<{ item: CoupleItem }>('PATCH', `/api/v2/couple/items/${encodeURIComponent(id)}`, { data }).then((r) => r.item),
+      remove: (id: string) => request<{ ok: true }>('DELETE', `/api/v2/couple/items/${encodeURIComponent(id)}`),
+      image: (id: string) => request<{ image: string }>('GET', `/api/v2/couple/items/${encodeURIComponent(id)}/image`).then((r) => r.image),
     },
   };
 }

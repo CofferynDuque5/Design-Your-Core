@@ -33,6 +33,8 @@ export interface Profile {
   bedTime: string | null;
   timezone: string;
   baseline: Partial<Record<PillarId, number>>;
+  /** Personaje de la foto de perfil, o "" (iniciales). */
+  avatar: string;
   onboarded: boolean;
   onboardedAt: string | null;
 }

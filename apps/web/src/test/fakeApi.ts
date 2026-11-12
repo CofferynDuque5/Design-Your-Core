@@ -31,6 +31,7 @@ export const USER = { id: 'u1', email: 'ana@example.com', name: 'Ana Pérez', ge
 export const profile = (over: Partial<Profile> = {}): Profile => ({
   focusPillars: ['descanso'],
   intention: null,
+  avatar: '',
   energyLevel: 3,
   activityLevel: 'ligera',
   wakeTime: '07:00',

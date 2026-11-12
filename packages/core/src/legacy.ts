@@ -585,6 +585,8 @@ export interface LegacyPet {
   name: string;
   species: PetSpecies;
   note: string;
+  /** Foto de perfil: id en /api/images, o "" sin foto. */
+  photo?: string;
 }
 
 export interface LegacyPetCare {
@@ -739,8 +741,11 @@ export interface LegacyCourse {
   lessons?: CourseLesson[];
   /** Unidades del curso en orden, también las que aún no tienen lecciones. */
   units?: string[];
-  /** Idioma en que se dicta: español, inglés o sin indicar (""). */
-  language?: CourseLanguage | '';
+  /**
+   * Idioma en que se dicta: un código de COURSE_LANGUAGES («es», «en», «pt»…),
+   * otro escrito por la persona («Catalán») o sin indicar ("").
+   */
+  language?: string;
 }
 
 export interface CourseLesson {
@@ -753,15 +758,61 @@ export interface CourseLesson {
   done?: boolean;
   /** Duración en segundos, si se sabe. */
   seconds?: number;
+  /** Lo que hay que hacer dentro de la lección: videos, lecturas, cuestionarios, exámenes… */
+  activities?: LessonActivity[];
+}
+
+export const ACTIVITY_KINDS = ['video', 'lectura', 'cuestionario', 'examen', 'tarea', 'practica', 'proyecto', 'otro'] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+export const ACTIVITY_KIND_LABEL: Record<ActivityKind, string> = {
+  video: 'Video',
+  lectura: 'Lectura',
+  cuestionario: 'Cuestionario',
+  examen: 'Examen',
+  tarea: 'Tarea',
+  practica: 'Práctica',
+  proyecto: 'Proyecto',
+  otro: 'Otra',
+};
+export const ACTIVITIES_MAX = 60;
+
+export interface LessonActivity {
+  id: string;
+  kind: ActivityKind;
+  title: string;
+  done?: boolean;
+  url?: string;
 }
 
 /** Hasta cuántas lecciones guarda un curso. */
 export const COURSE_LESSONS_MAX = 500;
 export const COURSE_UNITS_MAX = 100;
 
-export const COURSE_LANGUAGES = ['es', 'en'] as const;
+export const COURSE_LANGUAGES = ['es', 'en', 'pt', 'fr', 'it', 'de', 'ja', 'ko', 'zh', 'ru', 'ar'] as const;
 export type CourseLanguage = (typeof COURSE_LANGUAGES)[number];
-export const COURSE_LANGUAGE_LABEL: Record<CourseLanguage, string> = { es: 'Español', en: 'Inglés' };
+export const COURSE_LANGUAGE_LABEL: Record<CourseLanguage, string> = {
+  es: 'Español',
+  en: 'Inglés',
+  pt: 'Portugués',
+  fr: 'Francés',
+  it: 'Italiano',
+  de: 'Alemán',
+  ja: 'Japonés',
+  ko: 'Coreano',
+  zh: 'Chino',
+  ru: 'Ruso',
+  ar: 'Árabe',
+};
+export const isCourseLanguage = (v: unknown): v is CourseLanguage => (COURSE_LANGUAGES as readonly unknown[]).includes(v);
+/** Nombre del idioma de un curso: el de la lista o el que escribió la persona. */
+export const courseLanguageLabel = (v: string | undefined | null): string => (!v ? '' : isCourseLanguage(v) ? COURSE_LANGUAGE_LABEL[v] : v);
+/** Lo escrito como idioma, como código si es uno de la lista («inglés» → «en»). */
+export function courseLanguageValue(v: string): string {
+  const t = v.trim();
+  const key = t.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const known = COURSE_LANGUAGES.find((l) => l === key || COURSE_LANGUAGE_LABEL[l].toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '') === key);
+  return known ?? t.slice(0, 40);
+}
 
 export const COURSE_LENGTH_FROM = ['enlace', 'aprox', 'manual'] as const;
 export type CourseLengthFrom = (typeof COURSE_LENGTH_FROM)[number];
@@ -1091,6 +1142,7 @@ const shapes = {
     name: named(80),
     species: z.enum(PET_SPECIES).default('dog'),
     note: line(300),
+    photo: z.union([z.literal(''), fileRef]).optional(),
   }),
   petCares: z.object({
     id: legacyIdSchema,
@@ -1199,11 +1251,23 @@ const shapes = {
           url: z.union([z.literal(''), z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).optional(),
           done: z.boolean().optional(),
           seconds: z.number().int().min(0).max(1e6).optional(),
+          activities: z
+            .array(
+              z.object({
+                id: legacyIdSchema,
+                kind: z.enum(ACTIVITY_KINDS).default('otro'),
+                title: z.string().trim().min(1, 'Escribe qué hay que hacer').max(200),
+                done: z.boolean().optional(),
+                url: z.union([z.literal(''), httpUrl]).optional(),
+              }),
+            )
+            .max(ACTIVITIES_MAX, `Máximo ${ACTIVITIES_MAX} actividades por lección`)
+            .optional(),
         }),
       )
       .max(COURSE_LESSONS_MAX, `Máximo ${COURSE_LESSONS_MAX} lecciones por curso`)
       .optional(),
-    language: z.enum(['', ...COURSE_LANGUAGES]).optional(),
+    language: z.string().trim().max(40).optional(),
     units: z.array(z.string().trim().min(1, 'Escribe el nombre de la unidad').max(120)).max(COURSE_UNITS_MAX, `Máximo ${COURSE_UNITS_MAX} unidades por curso`).optional(),
   }),
   ventures: z.object({

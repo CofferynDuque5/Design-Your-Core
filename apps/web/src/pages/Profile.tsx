@@ -1,6 +1,7 @@
-import { PLAN_NAME, CLASS_LEADS, COMMON_TIMEZONES, CONTACT_EMAIL, PILLAR_IDS, type NotifyPrefs, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
+import { AVATARS, avatarById, MEALS, MEAL_LABEL, WATER_EVERY, waterTimes, positiveMessage, PLAN_NAME, CLASS_LEADS, COMMON_TIMEZONES, CONTACT_EMAIL, PILLAR_IDS, type NotifyPrefs, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, BellRing, Download, LogOut, Mail } from 'lucide-react';
+import { ArrowRight, BellRing, Download, LogOut, Mail, Pencil } from 'lucide-react';
+import { AvatarArt, UserAvatar } from '../components/Avatar';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { api } from '../app/api';
@@ -22,9 +23,9 @@ export function Profile() {
 
   return (
     <div className="page page--narrow">
-      <PageHeader eyebrow="Perfil" title={user?.name || 'Tu perfil'} />
+      <PageHeader eyebrow="Perfil" title="Tu perfil" />
       <div className="stack-lg">
-        {user && <p className="muted">{user.email}</p>}
+        <ProfileHero name={user?.name ?? ''} email={user?.email ?? ''} />
         <PlanSection />
         <FocusSection />
         <PreferencesSection />
@@ -46,6 +47,58 @@ export function Profile() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Tu personaje (foto de perfil dibujada) y tu nombre; se cambia tocándolo. */
+function ProfileHero({ name, email }: { name: string; email: string }) {
+  const profile = useProfile();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const current = profile.data?.avatar ?? '';
+  const save = useMutation({
+    mutationFn: (avatar: string) => api.profile.update({ avatar }),
+    onSuccess: (p) => {
+      qc.setQueryData(keys.profile, p);
+      const a = avatarById(p.avatar);
+      toast(a ? `Ahora eres ${a.name}.` : 'Vuelves a tus iniciales.');
+    },
+    onError: (e) => toast(errorMessage(e), { tone: 'error' }),
+  });
+  const shown = save.isPending ? (save.variables ?? current) : current;
+  return (
+    <section className="card profile-hero" aria-labelledby="hero-name">
+      <button type="button" className="profile-hero__art" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="avatar-picker" aria-label="Cambiar tu personaje">
+        <UserAvatar avatar={shown} name={name} size={112} />
+        <span className="profile-hero__edit" aria-hidden="true">
+          <Pencil size={14} />
+        </span>
+      </button>
+      <div className="profile-hero__who">
+        <h2 id="hero-name" className="profile-hero__name">
+          {name || 'Tu perfil'}
+        </h2>
+        <p className="muted small">{email}</p>
+        <button type="button" className="btn btn--secondary btn--sm" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="avatar-picker">
+          {avatarById(shown) ? 'Cambiar personaje' : 'Elegir personaje'}
+        </button>
+      </div>
+      {open && (
+        <div id="avatar-picker" className="avatar-picker" role="radiogroup" aria-label="Elige tu personaje">
+          {AVATARS.map((a) => (
+            <button key={a.id} type="button" role="radio" aria-checked={shown === a.id} className={`avatar-picker__item${shown === a.id ? ' is-on' : ''}`} onClick={() => save.mutate(a.id)} disabled={save.isPending}>
+              <AvatarArt avatar={a} size={72} />
+              <span>{a.name}</span>
+            </button>
+          ))}
+          <button type="button" role="radio" aria-checked={!avatarById(shown)} className={`avatar-picker__item${!avatarById(shown) ? ' is-on' : ''}`} onClick={() => save.mutate('')} disabled={save.isPending}>
+            <UserAvatar name={name} size={72} />
+            <span>Iniciales</span>
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -304,7 +357,7 @@ function AlarmsSection() {
       <h2 id="alarms-title" className="section-title">
         Alarmas
       </h2>
-      <p className="muted small">Suenan a la hora de tus clases y cursos del Horario, los recordatorios del Calendario y las tareas de la Agenda con aviso. En el teléfono se activan en su app, en Perfil.</p>
+      <p className="muted small">Suenan a la hora de tus clases y cursos del Horario, los recordatorios del Calendario y las tareas de la Agenda con aviso. También te recuerdan comer, tomar agua y te dejan un mensaje positivo cada día. En el teléfono se activan en su app, en Perfil.</p>
       {row('Alarmas en este navegador', prefs.enabled, (v) => void toggle(v))}
       {note && (
         <p className="small muted" role="status">
@@ -331,6 +384,47 @@ function AlarmsSection() {
           {row('Recordatorios del Calendario', prefs.reminders, (reminders) => apply({ ...prefs, reminders }))}
           {row('Tareas de la Agenda con aviso', prefs.tasks, (tasks) => apply({ ...prefs, tasks }))}
           {row('Rutinas y cuidados de mascotas', prefs.routines, (routines) => apply({ ...prefs, routines }))}
+          <h3 className="planner__title">Cuidarte</h3>
+          {row('Recordarme comer a mis horas', prefs.meals, (meals) => apply({ ...prefs, meals }))}
+          {prefs.meals && (
+            <div className="care-times">
+              {MEALS.map((m) => (
+                <TextField
+                  key={m}
+                  label={MEAL_LABEL[m]}
+                  type="time"
+                  value={prefs.mealTimes[m]}
+                  onChange={(e) => apply({ ...prefs, mealTimes: { ...prefs.mealTimes, [m]: e.target.value } })}
+                  hint={prefs.mealTimes[m] ? undefined : 'Sin aviso'}
+                />
+              ))}
+            </div>
+          )}
+          {row('Recordarme tomar agua', prefs.water, (water) => apply({ ...prefs, water }))}
+          {prefs.water && (
+            <div className="stack-sm">
+              <div className="field">
+                <span className="field__label">Cada cuánto</span>
+                <Segmented<string>
+                  label="Cada cuánto tomar agua"
+                  value={String(prefs.waterEvery)}
+                  onChange={(v) => apply({ ...prefs, waterEvery: Number(v) })}
+                  options={WATER_EVERY.map((h) => ({ value: String(h), label: h === 1 ? 'Cada hora' : `Cada ${h} horas` }))}
+                />
+              </div>
+              <div className="care-times">
+                <TextField label="Desde" type="time" value={prefs.waterFrom} onChange={(e) => e.target.value && apply({ ...prefs, waterFrom: e.target.value })} />
+                <TextField label="Hasta" type="time" value={prefs.waterTo} onChange={(e) => e.target.value && apply({ ...prefs, waterTo: e.target.value })} />
+              </div>
+              <p className="small muted">{waterTimes(prefs.waterFrom, prefs.waterTo, prefs.waterEvery).join(' · ') || 'Elige un «Hasta» después del «Desde».'}</p>
+            </div>
+          )}
+          {row('Un mensaje positivo cada día', prefs.cheers, (cheers) => apply({ ...prefs, cheers }))}
+          {prefs.cheers && (
+            <div className="care-times">
+              <TextField label="A qué hora" type="time" value={prefs.cheerTime} onChange={(e) => e.target.value && apply({ ...prefs, cheerTime: e.target.value })} hint={`Hoy: «${positiveMessage()}»`} />
+            </div>
+          )}
           <div>
             <button type="button" className="btn btn--secondary btn--sm" onClick={test}>
               <BellRing size={16} aria-hidden="true" /> Probar el sonido
@@ -402,7 +496,10 @@ function PartnerSection() {
             Vinculada/o con <strong>{partner.data.partner.name}</strong>
             {partner.data.total ? ` · hoy cumplió ${partner.data.doneToday} de ${partner.data.total} hábitos` : ''}.
           </p>
-          <div>
+          <div className="row wrap">
+            <Link to="/pareja" className="btn btn--sm">
+              Abrir su espacio en pareja <ArrowRight size={16} aria-hidden="true" />
+            </Link>
             <button type="button" className="btn btn--ghost btn--sm danger-text" onClick={() => unlink.mutate()} disabled={unlink.isPending}>
               Desvincular
             </button>

@@ -2,6 +2,7 @@ import { addDays, diffDays, isDay, periodRange, type Day } from './dates.js';
 import { daysLabel, plural, shortDay } from './format.js';
 import { moodIcon } from './icons.js';
 import {
+  type CourseLanguage,
   COURSE_UNITS_MAX,
   PROJECT_CATEGORIES,
   PROJECT_CATEGORIES_MAX,
@@ -112,6 +113,7 @@ export type ToolId =
   | 'finanzas'
   | 'metas'
   | 'mascotas'
+  | 'pareja'
   | 'ejercicio'
   | 'sueno'
   | 'diario'
@@ -313,6 +315,14 @@ export const TOOL_CATALOG: ToolInfo[] = [
     description: 'Tus mascotas y sus cuidados de cada día',
     count: (d) => legacyList(d, 'pets').length,
     unit: ['mascota', 'mascotas'],
+  },
+  {
+    id: 'pareja',
+    path: '/pareja',
+    label: 'En pareja',
+    group: 'personal',
+    description: 'Fotos, metas y emprendimientos que comparten',
+    note: 'Con tu pareja vinculada',
   },
   {
     id: 'ejercicio',
@@ -1064,6 +1074,9 @@ export function courseSource(url: string): { label: string; video: boolean } | n
   }
 }
 
+/** Academias y plataformas habituales, para elegirlas sin escribir. */
+export const COURSE_ACADEMIES = ['YouTube', 'Platzi', 'Udemy', 'Coursera', 'EDteam', 'Domestika', 'Crehana', 'freeCodeCamp', 'LinkedIn Learning', 'edX', 'Khan Academy', 'Google'] as const;
+
 /** Nombre que se muestra: el título, o la plataforma si solo hay enlace. */
 export const courseName = (c: { title?: string; url?: string; topic?: string }) => c.title?.trim() || (c.url ? `Curso en ${courseSource(c.url)?.label ?? 'internet'}` : (c.topic ?? 'Curso'));
 
@@ -1206,7 +1219,7 @@ export function courseUnits(c: Pick<LegacyCourse, 'units' | 'lessons'>): string[
     .filter(Boolean);
 }
 
-const UNIT_NUMBER = /^\s*(?:unidad|unit|m[oó]dulo|module|tema|secci[oó]n|section)\s+(\d{1,3})\b/i;
+const UNIT_NUMBER = /^\s*(?:unidad|unit|unidade|unit[eé]|unit[aà]|einheit|m[oó]dulo|module|modul|tema|secci[oó]n|section)\s+(\d{1,3})\b/i;
 
 /** Número que le toca a la próxima unidad: uno más que la mayor ya numerada, o el siguiente en la lista. */
 export function nextUnitNumber(units: readonly string[]): number {
@@ -1214,9 +1227,119 @@ export function nextUnitNumber(units: readonly string[]): number {
   return Math.max(units.length, ...nums, 0) + 1;
 }
 
-/** Palabra para «unidad» según el idioma del curso: «Unit» en los cursos en inglés. */
+const UNIT_WORDS: Record<string, string> = { en: 'Unit', pt: 'Unidade', fr: 'Unité', it: 'Unità', de: 'Einheit' };
+
+/** Palabra para «unidad» según el idioma del curso: «Unit» en inglés, «Unidade» en portugués… */
 export function unitWord(language?: string | null): string {
-  return language === 'en' ? 'Unit' : 'Unidad';
+  return (language && UNIT_WORDS[language]) || 'Unidad';
+}
+
+// ---- Idioma de un texto ----
+
+const STOPWORDS: Record<'es' | 'en' | 'pt' | 'fr' | 'it' | 'de', string[]> = {
+  es: ['el', 'la', 'los', 'las', 'de', 'del', 'y', 'en', 'con', 'para', 'por', 'una', 'un', 'curso', 'desde', 'cero', 'aprende', 'completo', 'qué', 'cómo', 'básico', 'introducción', 'es', 'al', 'tu', 'como', 'que', 'clase', 'nivel'],
+  en: ['the', 'and', 'of', 'to', 'in', 'for', 'with', 'how', 'learn', 'course', 'beginners', 'beginner', 'complete', 'guide', 'your', 'from', 'scratch', 'what', 'is', 'an', 'a', 'full', 'tutorial', 'introduction', 'class', 'level', 'english'],
+  pt: ['o', 'os', 'do', 'da', 'dos', 'das', 'e', 'em', 'com', 'para', 'por', 'uma', 'um', 'curso', 'aprenda', 'completo', 'não', 'você', 'como', 'que', 'aula', 'iniciantes', 'nível'],
+  fr: ['le', 'la', 'les', 'de', 'des', 'du', 'et', 'en', 'avec', 'pour', 'une', 'un', 'cours', 'apprendre', 'complet', 'débutants', 'comment', 'est', 'au', 'aux', 'leçon', 'niveau'],
+  it: ['il', 'lo', 'la', 'gli', 'le', 'di', 'del', 'della', 'e', 'in', 'con', 'per', 'una', 'un', 'corso', 'impara', 'completo', 'principianti', 'come', 'che', 'lezione', 'livello'],
+  de: ['der', 'die', 'das', 'und', 'in', 'mit', 'für', 'ein', 'eine', 'kurs', 'lernen', 'anfänger', 'wie', 'ist', 'zu', 'den', 'von', 'auf', 'deutsch', 'stufe'],
+};
+
+/**
+ * Adivina el idioma de un título mientras se escribe: por el alfabeto (japonés,
+ * coreano, chino, ruso, árabe) o por las palabras más comunes (español, inglés,
+ * portugués, francés, italiano, alemán). Devuelve null si no está claro.
+ */
+export function detectLanguage(text: string): CourseLanguage | null {
+  const t = (text ?? '').trim();
+  if (t.length < 3) return null;
+  if (/[\u3040-\u30ff]/.test(t)) return 'ja';
+  if (/[\uac00-\ud7af]/.test(t)) return 'ko';
+  if (/[\u4e00-\u9fff]/.test(t)) return 'zh';
+  if (/[\u0400-\u04ff]/.test(t)) return 'ru';
+  if (/[\u0600-\u06ff]/.test(t)) return 'ar';
+  const words = t.toLocaleLowerCase().match(/[\p{L}']+/gu) ?? [];
+  if (!words.length) return null;
+  const score: Record<string, number> = { es: 0, en: 0, pt: 0, fr: 0, it: 0, de: 0 };
+  for (const [lang, list] of Object.entries(STOPWORDS)) {
+    const set = new Set(list);
+    for (const w of words) if (set.has(w)) score[lang] += 1;
+  }
+  // Letras que delatan el idioma.
+  if (/ñ|¿|¡/.test(t)) score.es += 2;
+  if (/[ãõ]|ção|ções/.test(t)) score.pt += 2;
+  if (/[èêëœ]|ç(?!ão)/.test(t)) score.fr += 1.5;
+  if (/[äöüß]/.test(t)) score.de += 2;
+  if (/\b\w+'s\b|ing\b/.test(t)) score.en += 1;
+  if (/ción\b|ciones\b|idad\b/.test(t)) score.es += 1;
+  const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  const [best, second] = ranked;
+  if (best[1] < 1 || best[1] === second[1]) return null;
+  return best[0] as CourseLanguage;
+}
+
+// ---- Cursos repetidos ----
+
+const plainTitle = (s: string) =>
+  s
+    .toLocaleLowerCase('es')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/** Clave de un enlace para comparar: el video o la lista de YouTube, o el enlace sin «www», «#» ni «/» final. */
+function urlKey(url: string | undefined): string {
+  if (!url) return '';
+  const yt = youtubeRef(url);
+  if (yt) return yt.list ? `yt-list:${yt.list}` : `yt:${yt.video}`;
+  try {
+    const u = new URL(url);
+    return `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/+$/, '')}${u.search}`.toLowerCase();
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
+
+/** El curso que ya tienes con el mismo enlace o el mismo nombre (sin contar `exceptId`). */
+export function findDuplicateCourse<T extends { id: string; url?: string; title?: string }>(courses: readonly T[], candidate: { url?: string; title?: string }, exceptId?: string): { course: T; by: 'enlace' | 'nombre' } | null {
+  const key = urlKey(candidate.url);
+  const name = plainTitle(candidate.title ?? '');
+  for (const c of courses) {
+    if (c.id === exceptId) continue;
+    if (key && urlKey(c.url) === key) return { course: c, by: 'enlace' };
+  }
+  if (name.length >= 4)
+    for (const c of courses) {
+      if (c.id === exceptId) continue;
+      if (plainTitle(c.title ?? '') === name) return { course: c, by: 'nombre' };
+    }
+  return null;
+}
+
+/** Grupos de cursos repetidos (mismo enlace o mismo nombre), para avisar en la lista. */
+export function duplicateCourseGroups<T extends { id: string; url?: string; title?: string }>(courses: readonly T[]): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const c of courses) {
+    const keys = [urlKey(c.url) && `u:${urlKey(c.url)}`, plainTitle(c.title ?? '').length >= 4 && `t:${plainTitle(c.title ?? '')}`].filter(Boolean) as string[];
+    for (const k of keys) groups.set(k, [...(groups.get(k) ?? []), c]);
+  }
+  const seen = new Set<string>();
+  const out: T[][] = [];
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const sig = g.map((c) => c.id).sort().join('|');
+    if (seen.has(sig) || g.every((c) => out.some((o) => o.includes(c)))) continue;
+    seen.add(sig);
+    out.push(g);
+  }
+  return out;
+}
+
+/** Actividades de una lección hechas y en total. */
+export function activityCount(l: { activities?: Array<{ done?: boolean }> }): { done: number; total: number } {
+  const list = l.activities ?? [];
+  return { done: list.filter((a) => a.done).length, total: list.length };
 }
 
 /** «Unidad 3: Variables» (o «Unit 3: Variables» en un curso en inglés); si ya se escribió con su número, se respeta. */

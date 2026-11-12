@@ -11,6 +11,7 @@ import { databaseProblem } from './lib/safeMode.js';
 import { authRoutes } from './routes/auth.js';
 import { imageRoutes } from './routes/images.js';
 import { paymentRoutes } from './routes/payments.js';
+import { coupleRoutes } from './routes/couple.js';
 import { pushRoutes } from './routes/push.js';
 import { partnerRoutes } from './routes/partner.js';
 import { resetRoutes } from './routes/reset.js';
@@ -77,6 +78,7 @@ export function createApp({ db, config, mailer, limits = { general: 600, strict:
   app.use('/api', partnerRoutes({ db, requireAuth, strict, mailer, config }));
   app.use('/api/v2', v2Routes({ db, auth, requireAuth, strict }));
   app.use('/api/v2', paymentRoutes({ db, requireAuth, strict, config }));
+  app.use('/api/v2', coupleRoutes({ db, requireAuth }));
   // Lee páginas de fuera: límite propio para que no sirva de proxy.
   const lengthLimit = rateLimit({ windowMs: window, max: Math.max(limits.strict * 3, 60), standardHeaders: true, legacyHeaders: false, message: { error: 'Demasiadas consultas de duración. Espera unos minutos.' } });
   app.use('/api/v2', courseLengthRoutes({ requireAuth, limit: lengthLimit, fetchPage }));

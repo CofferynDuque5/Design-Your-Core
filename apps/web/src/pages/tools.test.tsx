@@ -375,9 +375,10 @@ describe('Cursos', () => {
     renderAt('/cursos');
     await userEvent.click(await screen.findByRole('button', { name: 'Nuevo curso' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
-    // Hay temas: se elige de la lista o «Otro tema…» y se escribe.
-    await userEvent.selectOptions(within(dialog).getByLabelText('Tema'), 'Otro tema…');
-    await userEvent.type(within(dialog).getByLabelText('Tema: escribe otro tema'), 'Guitarra');
+    // Hay temas: se tocan como etiquetas o se escribe uno nuevo en el mismo campo.
+    expect(within(dialog).getByRole('group', { name: 'Opciones de Tema' })).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Tema'), 'Guitarra');
+    expect(within(dialog).getByText(/Tema nuevo: «Guitarra»/)).toBeInTheDocument();
     await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'youtu.be/xyz');
     expect(within(dialog).getByText('Se abrirá en YouTube.')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
@@ -642,7 +643,7 @@ describe('Cursos: progreso y horario', () => {
     expect(within(units).getByRole('button', { name: 'Ver las 5 unidades' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Editar «Introduction to Programming I»' }));
     const dialog = screen.getByRole('dialog');
-    await userEvent.selectOptions(within(dialog).getByLabelText('Idioma del curso'), 'Inglés');
+    await userEvent.click(within(within(dialog).getByRole('group', { name: 'Idioma del curso' })).getByRole('button', { name: 'Inglés' }));
     await userEvent.click(within(dialog).getByRole('button', { name: /Guardar/ }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { language: 'en' } }));
     expect(await screen.findByText(/Inglés/)).toBeInTheDocument();
@@ -664,8 +665,8 @@ describe('Cursos: progreso y horario', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Añadir a React' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
     expect(within(dialog).getByLabelText('Tema')).toHaveValue('React');
-    await userEvent.selectOptions(within(dialog).getByLabelText('Subcategoría (opcional)'), 'Otra subcategoría…');
-    await userEvent.type(within(dialog).getByLabelText('Subcategoría (opcional): escribe otra subcategoría'), 'Hooks');
+    expect(within(dialog).getByRole('button', { name: 'Bases' })).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Subcategoría (opcional)'), 'Hooks');
     await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://youtu.be/abcdefghijk');
     await userEvent.tab();
     expect(await within(dialog).findByText('Dura 1 h 30 min, de midudev, según la página.')).toBeInTheDocument();
@@ -678,6 +679,96 @@ describe('Cursos: progreso y horario', () => {
       body: { item: { topic: 'React', subtopic: 'Hooks', source: 'midudev', title: 'Hooks en React', length: 5400, lengthFrom: 'enlace' } },
     });
     expect(await screen.findByRole('heading', { name: 'Hooks', level: 3 })).toBeInTheDocument();
+  });
+});
+
+describe('Cursos: editar lecciones y sus actividades', () => {
+  it('cambia el nombre de una lección y le añade actividades por tipo; al marcarlas todas queda vista', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [{ id: 'a', topic: 'React', title: 'React desde cero', url: '', status: 'pendiente', notes: '', lessons: [{ id: 'l1', title: 'Instalacion', unit: 'Unidad 1' }] }];
+    });
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: /Unidades y lecciones de «React desde cero»/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Unidades y lecciones de «React desde cero»' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Editar «Instalacion» y sus actividades' }));
+    const editor = within(dialog).getByRole('region', { name: 'Editar «Instalacion»' });
+    const name = within(editor).getByLabelText('Nombre de la lección');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Instalación de Node');
+    await userEvent.click(within(editor).getByRole('button', { name: /Guardar cambios/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1', title: 'Instalación de Node', unit: 'Unidad 1' }] } }));
+
+    const types = within(editor).getByRole('group', { name: 'Tipo de actividad' });
+    await userEvent.type(within(editor).getByLabelText('Qué hay que hacer'), 'Ver el video{Enter}');
+    await userEvent.click(within(types).getByRole('button', { name: /Examen/ }));
+    await userEvent.type(within(editor).getByLabelText('Qué hay que hacer'), 'Examen corto');
+    await userEvent.click(within(editor).getByRole('button', { name: /Añadir examen/ }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1', done: false, activities: [{ kind: 'video', title: 'Ver el video' }, { kind: 'examen', title: 'Examen corto' }] }] } }),
+    );
+    const acts = within(editor).getByRole('list', { name: /Actividades de/ });
+    await userEvent.click(within(acts).getByRole('checkbox', { name: /Ver el video/ }));
+    await userEvent.click(within(acts).getByRole('checkbox', { name: /Examen corto/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1', done: true }] } }));
+    expect(within(dialog).getByText(/2\/2 actividades/)).toBeInTheDocument();
+  });
+});
+
+describe('Cursos: opciones, idioma y repetidos', () => {
+  it('cambia el nombre de un tema y borra una academia en todos sus cursos', async () => {
+    const api = withApi(undefined, (doc) => {
+      doc.courses = [
+        { id: 'a', topic: 'React', title: 'React desde cero', url: '', status: 'curso', notes: '', source: 'Platzi' },
+        { id: 'b', topic: 'React', title: 'Hooks', url: '', status: 'pendiente', notes: '', source: 'Platzi' },
+      ];
+    });
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo curso' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    const tema = within(dialog).getByLabelText('Tema').closest('.opt-picker') as HTMLElement;
+    await userEvent.click(within(tema).getByRole('button', { name: 'Editar opciones' }));
+    expect(within(tema).getByText(/2 cursos/)).toBeInTheDocument();
+    await userEvent.click(within(tema).getByRole('button', { name: 'Cambiar el nombre de «React»' }));
+    const name = within(tema).getByLabelText('Nuevo nombre de «React»');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'React y Next{Enter}');
+    await waitFor(() => expect(writes(api).filter((c) => c.method === 'PATCH').map((c) => c.body)).toEqual([{ topic: 'React y Next' }, { topic: 'React y Next' }]));
+
+    const academia = within(screen.getByRole('dialog')).getByLabelText('Canal de YouTube o academia (opcional)').closest('.opt-picker') as HTMLElement;
+    // Las academias habituales salen como etiquetas aunque no las uses.
+    expect(within(academia).getByRole('button', { name: 'Udemy' })).toBeInTheDocument();
+    await userEvent.click(within(academia).getByRole('button', { name: 'Editar opciones' }));
+    await userEvent.click(within(academia).getByRole('button', { name: 'Borrar «Platzi»' }));
+    expect(within(academia).getByText(/Se quita de 2 cursos/)).toBeInTheDocument();
+    await userEvent.click(within(academia).getByRole('button', { name: 'Borrar' }));
+    await waitFor(() => expect(writes(api).filter((c) => c.method === 'PATCH').slice(-2).map((c) => c.body)).toEqual([{ source: '' }, { source: '' }]));
+  });
+
+  it('detecta el idioma al escribir el nombre, acepta otro idioma y avisa si el curso está repetido', async () => {
+    const api = withApi(undefined, (doc) => {
+      doc.courses = [{ id: 'a', topic: 'React', title: 'React desde cero', url: 'https://www.youtube.com/watch?v=abcdefghijk', status: 'hecho', notes: '' }];
+    });
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo curso' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
+    await userEvent.type(within(dialog).getByLabelText('Tema'), 'Inglés');
+    await userEvent.type(within(dialog).getByLabelText('Nombre (opcional)'), 'Learn English from scratch');
+    const idioma = within(dialog).getByRole('group', { name: 'Idioma del curso' });
+    expect(within(idioma).getByRole('button', { name: 'Inglés' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dialog).getByText(/Detectado por el nombre: Inglés/)).toBeInTheDocument();
+
+    // Otro idioma escrito a mano.
+    await userEvent.click(within(idioma).getByRole('button', { name: 'Otro idioma…' }));
+    await userEvent.type(within(idioma).getByLabelText('Otro idioma…'), 'Catalán');
+
+    // El mismo video que otro curso.
+    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://youtu.be/abcdefghijk');
+    expect(within(dialog).getByText(/Ya tienes este curso/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/ya lo terminaste/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
+    expect(writes(api).at(-1)).toMatchObject({ path: '/api/v2/modules/courses', body: { item: { title: 'Learn English from scratch', language: 'Catalán' } } });
+    // En la lista también se avisa.
+    expect(await screen.findByText('Tienes un curso repetido')).toBeInTheDocument();
   });
 });
 
@@ -1180,7 +1271,7 @@ describe('Barra lateral', () => {
     const personal = within(nav).getByRole('button', { name: 'Vida personal' });
     expect(personal).toHaveAttribute('aria-expanded', 'true');
     expect(within(within(nav).getByRole('list', { name: 'Vida personal' })).getByRole('link', { name: 'Finanzas' })).toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(24);
+    expect(within(nav).getAllByRole('link')).toHaveLength(25);
     await userEvent.click(personal);
     expect(personal).toHaveAttribute('aria-expanded', 'false');
     expect(within(nav).queryByRole('list', { name: 'Vida personal' })).not.toBeInTheDocument();
