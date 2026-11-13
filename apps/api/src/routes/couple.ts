@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import { COUPLE_ITEMS_MAX, coupleCreateInput, coupleDataSchemas, pairKey, type CoupleItem, type CoupleKind } from '@dyc/core';
 import { Router, type RequestHandler, type Request } from 'express';
 import { newId, type Db } from '../db/db.js';
@@ -73,7 +74,7 @@ export function coupleRoutes({ db, requireAuth }: { db: Db; requireAuth: Request
     if (!p) return res.status(409).json(noPartner);
     const cur = await db.row<Row>(`SELECT ${COLS} FROM "CoupleItem" WHERE "id" = $1 AND "pairKey" = $2`, [req.params.id, p.key]);
     if (!cur) return res.status(404).json({ error: 'Ya no existe. Puede que tu pareja lo haya borrado.' });
-    const schema = coupleDataSchemas[cur.kind as CoupleKind];
+    const schema = coupleDataSchemas[cur.kind as CoupleKind] as z.ZodType<unknown> | undefined;
     if (!schema) return res.status(400).json({ error: 'Tipo no válido' });
     const data = parse(schema, { ...(cur.data as object), ...(req.body?.data ?? {}) }, res);
     if (!data) return;
