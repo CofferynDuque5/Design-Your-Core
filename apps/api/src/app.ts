@@ -10,11 +10,16 @@ import { isLocalOrigin, isTrustedOrigin } from './lib/origins.js';
 import { databaseProblem } from './lib/safeMode.js';
 import { authRoutes } from './routes/auth.js';
 import { imageRoutes } from './routes/images.js';
+import { paymentRoutes } from './routes/payments.js';
+import { coupleRoutes } from './routes/couple.js';
+import { pushRoutes } from './routes/push.js';
 import { partnerRoutes } from './routes/partner.js';
 import { resetRoutes } from './routes/reset.js';
 import { syncRoutes } from './routes/sync.js';
 import { v2Routes } from './v2/index.js';
 import { webRoutes } from './routes/web.js';
+import { courseLengthRoutes } from './routes/courseLength.js';
+import { fetchPublicPage, type FetchPage } from './lib/fetchPage.js';
 
 export interface AppDeps {
   db: Db;
@@ -24,9 +29,11 @@ export interface AppDeps {
   limits?: { general: number; strict: number };
   /** Carpeta con la app web compilada, si se sirve en el mismo dominio que la API. */
   webRoot?: string;
+  /** Cómo se descargan páginas de cursos (las pruebas lo cambian). */
+  fetchPage?: FetchPage;
 }
 
-export function createApp({ db, config, mailer, limits = { general: 600, strict: 20 }, webRoot }: AppDeps) {
+export function createApp({ db, config, mailer, limits = { general: 600, strict: 20 }, webRoot, fetchPage = fetchPublicPage }: AppDeps) {
   const app = express();
   app.set('trust proxy', 1);
   app.use(helmet());
@@ -67,8 +74,14 @@ export function createApp({ db, config, mailer, limits = { general: 600, strict:
   app.use('/api', authRoutes({ db, auth, mailer, config, strict }));
   app.use('/api', syncRoutes({ db, requireAuth }));
   app.use('/api', imageRoutes({ db, requireAuth }));
+  app.use('/api', pushRoutes({ db, requireAuth }));
   app.use('/api', partnerRoutes({ db, requireAuth, strict, mailer, config }));
   app.use('/api/v2', v2Routes({ db, auth, requireAuth, strict }));
+  app.use('/api/v2', paymentRoutes({ db, requireAuth, strict, config }));
+  app.use('/api/v2', coupleRoutes({ db, requireAuth }));
+  // Lee páginas de fuera: límite propio para que no sirva de proxy.
+  const lengthLimit = rateLimit({ windowMs: window, max: Math.max(limits.strict * 3, 60), standardHeaders: true, legacyHeaders: false, message: { error: 'Demasiadas consultas de duración. Espera unos minutos.' } });
+  app.use('/api/v2', courseLengthRoutes({ requireAuth, limit: lengthLimit, fetchPage }));
   app.use(resetRoutes({ db, strict }));
 
   // fallback 404 para /api

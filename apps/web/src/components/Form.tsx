@@ -1,6 +1,6 @@
 import type { PasswordCheck } from '@dyc/core';
-import { Circle, CircleAlert, CircleCheck, Eye, EyeOff } from 'lucide-react';
-import { useId, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { Check, Circle, CircleAlert, CircleCheck, Eye, EyeOff, Plus } from 'lucide-react';
+import { useId, useState, type InputHTMLAttributes, type Ref, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 interface FieldProps {
   label: string;
@@ -8,8 +8,13 @@ interface FieldProps {
   error?: string | null;
 }
 
-export function TextField({ label, hint, error, valid, ...input }: FieldProps & { valid?: boolean } & InputHTMLAttributes<HTMLInputElement>) {
+/**
+ * Campo de texto. `suggestions`: valores que ya usaste (o habituales), que el
+ * navegador ofrece mientras escribes (autocompletado).
+ */
+export function TextField({ label, hint, error, valid, suggestions, ...input }: FieldProps & { valid?: boolean; suggestions?: readonly string[]; ref?: Ref<HTMLInputElement> } & InputHTMLAttributes<HTMLInputElement>) {
   const id = useId();
+  const options = suggestions ? [...new Set(suggestions.map((v) => v.trim()).filter(Boolean))].slice(0, 50) : [];
   const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined;
   const status = error ? 'invalid' : valid ? 'valid' : null;
   return (
@@ -18,9 +23,16 @@ export function TextField({ label, hint, error, valid, ...input }: FieldProps & 
         {label}
       </label>
       <div className={`input-wrap${status ? ` input-wrap--${status}` : ''}`}>
-        <input id={id} className="input" aria-invalid={error ? true : undefined} aria-describedby={describedBy} {...input} />
+        <input id={id} className="input" aria-invalid={error ? true : undefined} aria-describedby={describedBy} list={options.length ? `${id}-list` : undefined} {...input} />
         <FieldStatus status={status} />
       </div>
+      {options.length > 0 && (
+        <datalist id={`${id}-list`}>
+          {options.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
+      )}
       <FieldNotes id={id} hint={hint} error={error} valid={valid} />
     </div>
   );
@@ -253,6 +265,159 @@ export function ColorPicker({
           </label>
         ))}
       </div>
+    </fieldset>
+  );
+}
+
+const OTHER = '\u0000otra';
+
+/**
+ * Elegir de una lista (lo que ya usaste y valores habituales) o escribir otro:
+ * «Otra…» abre un campo de texto. Sin opciones es un campo de texto normal.
+ */
+export function ChoiceField({
+  label,
+  value,
+  onChange,
+  options,
+  emptyLabel,
+  otherLabel = 'Otra…',
+  placeholder,
+  maxLength,
+  required,
+  autoFocus,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly string[];
+  /** Si el campo es opcional: el texto de la opción vacía («Sin materia»). */
+  emptyLabel?: string;
+  otherLabel?: string;
+  placeholder?: string;
+  maxLength?: number;
+  required?: boolean;
+  autoFocus?: boolean;
+  hint?: ReactNode;
+}) {
+  const list = [...new Set(options.map((o) => o.trim()).filter(Boolean))];
+  const [typing, setTyping] = useState(() => !!value.trim() && !list.includes(value.trim()));
+  if (!list.length) return <TextField label={label} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} required={required} autoFocus={autoFocus} hint={hint} />;
+  const writing = typing || (!!value && !list.includes(value));
+  const selected = writing ? OTHER : value;
+  return (
+    <div className="stack-xs">
+      <SelectField
+        label={label}
+        value={selected}
+        required={required && !writing}
+        autoFocus={autoFocus}
+        hint={writing ? undefined : hint}
+        onChange={(e) => {
+          if (e.target.value === OTHER) {
+            setTyping(true);
+            onChange('');
+          } else {
+            setTyping(false);
+            onChange(e.target.value);
+          }
+        }}
+      >
+        {(emptyLabel !== undefined || !value) && <option value="">{emptyLabel ?? 'Elige una opción'}</option>}
+        {list.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        <option value={OTHER}>{otherLabel}</option>
+      </SelectField>
+      {writing && <TextField label={`${label}: escribe ${otherLabel.replace('…', '').toLowerCase()}`} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} required={required} autoFocus={typing} hint={hint} />}
+    </div>
+  );
+}
+
+/**
+ * Elegir varias opciones a la vez (casillas con forma de etiqueta) y agregar
+ * una nueva escribiéndola. `value` guarda los valores; `options` trae su nombre.
+ */
+export function TagPicker({
+  legend,
+  options,
+  value,
+  onChange,
+  addLabel = 'Agregar',
+  addPlaceholder,
+  max = 10,
+  hint,
+}: {
+  legend: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  value: readonly string[];
+  onChange: (next: string[]) => void;
+  addLabel?: string;
+  addPlaceholder?: string;
+  max?: number;
+  hint?: ReactNode;
+}) {
+  const id = useId();
+  const [draft, setDraft] = useState('');
+  const chosen = new Set(value.map((v) => v.toLocaleLowerCase('es')));
+  const full = value.length >= max;
+  // Las que ya están elegidas pero no en la lista (de otro dispositivo) también se ven.
+  const all = [...options, ...value.filter((v) => !options.some((o) => o.value.toLocaleLowerCase('es') === v.toLocaleLowerCase('es'))).map((v) => ({ value: v, label: v }))];
+  const toggle = (v: string) => (chosen.has(v.toLocaleLowerCase('es')) ? onChange(value.filter((x) => x.toLocaleLowerCase('es') !== v.toLocaleLowerCase('es'))) : full ? undefined : onChange([...value, v]));
+  const add = () => {
+    const t = draft.trim().slice(0, 40);
+    if (!t) return;
+    const match = all.find((o) => o.label.toLocaleLowerCase('es') === t.toLocaleLowerCase('es') || o.value.toLocaleLowerCase('es') === t.toLocaleLowerCase('es'));
+    const v = match ? match.value : t;
+    if (!chosen.has(v.toLocaleLowerCase('es')) && !full) onChange([...value, v]);
+    setDraft('');
+  };
+  return (
+    <fieldset className="field tag-picker" aria-describedby={hint ? `${id}-hint` : undefined}>
+      <legend className="field__label">{legend}</legend>
+      <div className="tag-picker__options">
+        {all.map((o) => {
+          const on = chosen.has(o.value.toLocaleLowerCase('es'));
+          return (
+            <label key={o.value} className={`tag-option${on ? ' tag-option--on' : ''}`}>
+              <input type="checkbox" checked={on} disabled={!on && full} onChange={() => toggle(o.value)} />
+              {on && <Check size={14} aria-hidden="true" />}
+              {o.label}
+            </label>
+          );
+        })}
+      </div>
+      <div className="tag-picker__add">
+        <label className="visually-hidden" htmlFor={`${id}-new`}>
+          {addLabel}
+        </label>
+        <input
+          id={`${id}-new`}
+          className="input"
+          value={draft}
+          maxLength={40}
+          placeholder={addPlaceholder ?? addLabel}
+          disabled={full}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              add();
+            }
+          }}
+        />
+        <button type="button" className="btn btn--secondary btn--sm" onClick={add} disabled={!draft.trim() || full}>
+          <Plus size={16} aria-hidden="true" /> {addLabel}
+        </button>
+      </div>
+      {(hint || full) && (
+        <span className="field__hint" id={`${id}-hint`}>
+          {full ? `Puedes elegir hasta ${max}.` : hint}
+        </span>
+      )}
     </fieldset>
   );
 }

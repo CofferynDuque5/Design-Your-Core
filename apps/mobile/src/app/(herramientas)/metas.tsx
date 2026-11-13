@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   GOAL_CATEGORIES,
   GOAL_CATEGORY_INFO,
   goalCategoryOf,
@@ -18,7 +19,7 @@ import { CalendarClock, Check, Minus, Pencil, Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { DayStepper, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen } from '../../components/tools';
+import { Suggestions, SearchBar, DayStepper, Dot, DotChoices, FormActions, IconButton, Meter, Stats, ToolScreen, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -35,12 +36,13 @@ export default function Goals() {
   const legacy = useLegacyData();
   const goals = useLegacyList(legacy.data?.data, 'goals');
   const [filter, setFilter] = useState<Filter>('todas');
+  const [q, setQ] = useState('');
   const [editing, setEditing] = useState<LegacyGoal | 'new' | null>(null);
   // Las fechas límite son fechas de calendario, en hora local (como la web).
   const today = localDayKey(new Date());
   const done = goals.filter((g) => g.done).length;
   const next = goals.filter((g) => !g.done && isDay(g.deadline) && g.deadline >= today).sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
-  const shown = goals.filter((g) => filter === 'todas' || goalCategoryOf(g) === filter);
+  const shown = goals.filter((g) => (filter === 'todas' || goalCategoryOf(g) === filter) && matchesSearch(q, g.title, g.unit, GOAL_CATEGORY_INFO[goalCategoryOf(g)].label));
   // Primero las que están en curso; las logradas, al final.
   const ordered = [...shown.filter((g) => !g.done), ...shown.filter((g) => g.done)];
 
@@ -76,12 +78,9 @@ export default function Goals() {
               </T>
             </View>
           )}
+          <SearchBar label="Buscar en tus metas" value={q} onChange={setQ} placeholder="Buscar por nombre o unidad…" count={ordered.length} />
           <DotChoices legend="Categoría" hideLegend value={filter} onChange={setFilter} options={FILTERS} />
-          {ordered.length === 0 ? (
-            <EmptyState title="Nada por aquí con este filtro" />
-          ) : (
-            ordered.map((g) => <GoalCard key={g.id} goal={g} today={today} onEdit={() => setEditing(g)} />)
-          )}
+          {ordered.length === 0 ? q.trim() ? null : <EmptyState title="Nada por aquí con este filtro" /> : ordered.map((g) => <GoalCard key={g.id} goal={g} today={today} onEdit={() => setEditing(g)} />)}
         </>
       )}
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nueva meta' : 'Editar meta'}>
@@ -112,6 +111,7 @@ function GoalCard({ goal: g, today, onEdit }: { goal: LegacyGoal; today: Day; on
         <IconButton label={`Editar «${title}»`} onPress={onEdit} style={{ marginRight: -space[2], marginTop: -space[2] }}>
           <Pencil size={18} color={colors.inkMuted} />
         </IconButton>
+        <RemoveButton module="goals" id={g.id} name={title} style={{ marginRight: -space[2], marginTop: -space[2] }} />
       </View>
       <T v="heading" accessibilityRole="header" style={[{ fontSize: 19, lineHeight: 24, marginTop: -space[3] }, g.done && { textDecorationLine: 'line-through', color: colors.inkMuted }]}>
         {title}
@@ -164,6 +164,8 @@ function GoalCard({ goal: g, today, onEdit }: { goal: LegacyGoal; today: Day; on
 }
 
 function GoalForm({ goal, today, category: initialCategory, onDone }: { goal: LegacyGoal | null; today: Day; category: GoalCategory; onDone: () => void }) {
+  const saved = useLegacyData().data?.data;
+  const units = useLegacyList(saved, 'goals').map((g) => g.unit ?? '');
   const actions = useModule('goals');
   const [title, setTitle] = useState(goal?.title ?? '');
   const [target, setTarget] = useState(String(goal ? num(goal.target, 10) : 10));
@@ -194,6 +196,7 @@ function GoalForm({ goal, today, category: initialCategory, onDone }: { goal: Le
         </View>
         <View style={{ flex: 1 }}>
           <Field label="Unidad (opcional)" value={unit} onChangeText={setUnit} maxLength={40} placeholder="videos, kg…" />
+          <Suggestions field="Unidad" values={[...units, 'videos', 'libros', 'kg', 'km', 'horas', 'páginas', 'clases']} current={unit} onPick={setUnit} />
         </View>
       </View>
       <Field label="Llevas" value={current} onChangeText={setCurrent} keyboardType="number-pad" maxLength={10} error={currentOk ? null : 'Un número entero, 0 o más.'} />

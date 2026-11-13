@@ -12,7 +12,7 @@ Son las únicas cosas que el código no puede decidir. Mientras no se decidan, s
 | Dominio de la app web y de la API | `https://designyourcorepanel.nvcorx.com`: la app Node sirve las dos (el ZIP de la API trae la web) | `DYC_API_URL` al empaquetar, `CLIENT_ORIGIN` y `PUBLIC_URL` (API) |
 | Dominio que usan la app publicada y la móvil | `https://designyourcorebackend.nvcorx.com` | `eas.json` (móvil). Debe llevar a la misma app Node para que sigan funcionando |
 | Identificador de la app en las tiendas | `com.nvcorx.designyourcore` | `apps/mobile/app.json`. **No se puede cambiar después de publicar** |
-| Correo de contacto en la página de privacidad | ninguno | `PUBLIC_CONTACT_EMAIL` (sitio) |
+| Correo de contacto (sitio, panel y app) | designyourcore@nvcorx.com (`CONTACT_EMAIL` en packages/core) | `PUBLIC_CONTACT_EMAIL` (solo sitio) |
 | Bóveda de contraseñas de la app anterior | la app nueva no la muestra, pero sus datos siguen guardados en la cuenta | Guardaba contraseñas en texto plano: se recomienda borrar esos datos |
 | Texto de privacidad | borrador que describe lo que la app guarda hoy | `apps/site/src/pages/privacidad.astro`. Conviene una revisión legal |
 

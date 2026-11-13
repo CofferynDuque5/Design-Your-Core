@@ -1,3 +1,4 @@
+import type { CoupleItem } from '@dyc/core';
 import type { CheckIn, User } from '@dyc/api-client';
 import { addDays, diffDays, isDay, type Day, type PillarId } from '@dyc/core';
 
@@ -41,6 +42,7 @@ export interface DemoProfile {
   bedTime: string | null;
   timezone: string;
   baseline: Partial<Record<PillarId, number>>;
+  avatar?: string;
   onboardedAt: string | null;
 }
 
@@ -57,6 +59,8 @@ export interface DemoAccount {
   images: Record<string, string>;
   inviteCode: string | null;
   partner: { name: string } | null;
+  /** Espacio en pareja (fotos con su imagen completa aparte). */
+  couple?: Array<CoupleItem & { image?: string }>;
 }
 
 export interface DemoDb {

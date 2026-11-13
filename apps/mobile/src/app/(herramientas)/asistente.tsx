@@ -1,93 +1,85 @@
 import {
+  ASSISTANT_MODEL_LABEL,
+  GEMINI_KEY_STEPS,
   ASSISTANT_MODELS,
   AssistantError,
+  attachmentProblem,
   buildContext,
   chat,
-  DEFAULT_MODEL,
+  chatAttachmentRefs,
+  chatCards,
+  chatWhen,
+  formatBytes,
   maskKey,
-  parseAssistantSettings,
   planTool,
+  storedChat,
   testConnection,
-  waterPatch,
+  withAttachmentData,
+  ATTACH_MAX_FILES,
   type AssistantModel,
   type AssistantSettings,
+  type CardStatus,
+  type ChatAttachment,
+  type ChatCard,
   type ChatMessage,
-  type LegacyData,
-  type Plan,
-  type Proposal,
+  type LegacyChat,
 } from '@dyc/core';
 import { radius, space } from '@dyc/tokens';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ExternalLink, KeyRound, MessageSquarePlus, Send, ShieldCheck, Sparkles, X } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
+import { Check, ExternalLink, FileText, History, ImagePlus, KeyRound, MessageSquarePlus, Paperclip, Send, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Markdown } from '../../components/markdown';
-import { Disclosure, Pill, Toggle, ToolScreen } from '../../components/tools';
+import { ProposalView } from '../../components/ProposalView';
+import { Sheet } from '../../components/Sheet';
+import { ConfirmDelete, Disclosure, IconButton, Toggle, ToolScreen } from '../../components/tools';
 import { Button, Card, Chip, Field, T, errorMessage, fonts, type as typo } from '../../components/ui';
 import { api } from '../../lib/api';
-import { LEGACY_QUERY, newId, useLegacyData } from '../../lib/legacy';
+import { useAssistantSettings } from '../../lib/assistant';
+import { deleteFiles, documentAttachment, pickDocuments, pickImages, uploadFile } from '../../lib/files';
+import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
+import { useRunPlan } from '../../lib/plan';
 import { keys } from '../../lib/queries';
-import { storage } from '../../lib/storage';
 import { useTheme } from '../../lib/theme';
 
 /**
  * Asistente en el móvil, con la misma lógica que la web (@dyc/core). La clave
  * de Gemini se guarda en el llavero del teléfono (expo-secure-store), no en tu
  * cuenta ni en nuestro servidor, y cada mensaje va directamente del teléfono a
- * Google. Las acciones solo se hacen si pulsas «Hacer».
+ * Google. Las acciones solo se hacen si pulsas «Hacer». Las conversaciones se
+ * guardan en tu cuenta (Historial) y se pueden adjuntar fotos y archivos.
  */
 
-/** Misma clave que en la web, pero en el llavero de este teléfono. */
-const ASSISTANT_STORAGE_KEY = 'dyc.assistant';
-
-type Status = 'pending' | 'running' | 'done' | 'discarded' | 'invalid';
-type ProposalCard = Proposal & { status: Status; error?: string };
+type Card = ChatCard;
 
 const SUGGESTIONS = ['Añade «comprar pan» a mis pendientes', 'Anota 2 vasos de agua', 'Ayúdame a planear mi tarde de estudio'];
 const errText = (e: unknown) => (e instanceof AssistantError ? e.message : 'Algo salió mal. Inténtalo de nuevo.');
 /** Los enlaces de las respuestas no tienen imágenes de notas. */
 const noImages = () => null;
 
-function useAssistantSettings() {
-  const [settings, setSettings] = useState<AssistantSettings | null>(null);
-  const [memoryOnly, setMemoryOnly] = useState(false);
-  useEffect(() => {
-    let live = true;
-    storage
-      .get(ASSISTANT_STORAGE_KEY)
-      .then((raw) => (raw ? parseAssistantSettings(JSON.parse(raw)) : parseAssistantSettings({})))
-      .catch(() => parseAssistantSettings({}))
-      .then((s) => live && setSettings(s));
-    return () => {
-      live = false;
-    };
-  }, []);
-  const update = (next: AssistantSettings) => {
-    setSettings(next);
-    setMemoryOnly(false);
-    storage.set(ASSISTANT_STORAGE_KEY, JSON.stringify(next)).catch(() => setMemoryOnly(true));
-  };
-  const remove = () => {
-    // Borra lo guardado en el teléfono; el modelo elegido sigue en pantalla.
-    setSettings((s) => ({ apiKey: '', model: s?.model ?? DEFAULT_MODEL, seenPrivacy: s?.seenPrivacy ?? false }));
-    setMemoryOnly(false);
-    void storage.set(ASSISTANT_STORAGE_KEY, null).catch(() => undefined);
-  };
-  return { settings, memoryOnly, update, remove };
-}
-
 export default function Assistant() {
   const { settings, memoryOnly, update, remove } = useAssistantSettings();
   const ready = !!settings?.apiKey && !!settings.seenPrivacy;
+  const [session, setSession] = useState<{ n: number; chat: LegacyChat | null }>({ n: 0, chat: null });
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const open = (c: LegacyChat | null) => {
+    setSession((s) => ({ n: s.n + 1, chat: c }));
+    setCurrentId(c?.id ?? null);
+    setShowHistory(false);
+  };
   return (
     <ToolScreen title="Asistente" eyebrow="Conocimiento">
       {settings && (
         <>
           <KeyCard settings={settings} memoryOnly={memoryOnly} onChange={update} onRemove={remove} />
           <PrivacyCard seen={settings.seenPrivacy} onSeen={() => update({ ...settings, seenPrivacy: true })} />
-          <Conversation settings={settings} ready={ready} />
+          <Conversation key={session.n} initial={session.chat} settings={settings} ready={ready} onSaved={setCurrentId} onNew={() => open(null)} onHistory={() => setShowHistory(true)} />
         </>
       )}
+      <Sheet open={showHistory} onClose={() => setShowHistory(false)} title="Historial">
+        {showHistory && <HistoryList currentId={currentId} onOpen={open} />}
+      </Sheet>
     </ToolScreen>
   );
 }
@@ -147,6 +139,10 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
         </View>
       ) : (
         <View style={{ gap: space[3] }}>
+          <T v="small">Para hablar con el Asistente necesitas una clave gratuita de Google. Se consigue en un par de minutos:</T>
+          {GEMINI_KEY_STEPS.map((step, i) => (
+            <T key={step} v="small" tint="muted">{`${i + 1}. ${step}`}</T>
+          ))}
           <Field
             label="Clave de la API de Gemini"
             value={draft}
@@ -177,7 +173,7 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
         <T v="label">Modelo</T>
         <View accessibilityRole="radiogroup" accessibilityLabel="Modelo" style={st.chips}>
           {ASSISTANT_MODELS.map((m) => (
-            <Chip key={m} label={m === DEFAULT_MODEL ? `${m} (recomendado)` : m} selected={settings.model === m} onPress={() => onChange({ ...settings, model: m as AssistantModel })} />
+            <Chip key={m} label={ASSISTANT_MODEL_LABEL[m]} selected={settings.model === m} onPress={() => onChange({ ...settings, model: m as AssistantModel })} />
           ))}
         </View>
       </View>
@@ -196,11 +192,11 @@ function KeyCard({ settings, memoryOnly, onChange, onRemove }: { settings: Assis
 // ---------- Privacidad ----------
 
 const PRIVACY = [
-  'Siempre: lo que escribes en esta conversación, las respuestas anteriores de la misma conversación, la fecha de hoy y la lista de acciones que puede proponer.',
+  'Siempre: lo que escribes en esta conversación (y las fotos o archivos que adjuntes), las respuestas anteriores de la misma conversación, la fecha de hoy y la lista de acciones que puede proponer.',
   'Solo con «Incluir un resumen de mis datos» activado: pendientes y tareas sin hacer, rutina de hoy, metas en curso, totales de finanzas del mes, agua, última noche de sueño, entrenos de la semana, si ya escribiste en el diario hoy y las puntuaciones y hábitos de tu panel.',
   'Nunca: tu Bóveda, tus notas, el texto de tu diario ni tu contraseña.',
   'Google trata estos datos según las condiciones de tu clave de Gemini.',
-  'La conversación solo vive en esta pantalla: se borra al salir, y no se guarda en tu cuenta.',
+  'Tus conversaciones y sus archivos se guardan en tu cuenta para verlas en «Historial» (también en la web). Puedes borrar cada una cuando quieras.',
   'Las acciones que proponga (añadir un pendiente, registrar agua…) solo se hacen si pulsas «Hacer».',
 ];
 
@@ -237,9 +233,79 @@ function PrivacyCard({ seen, onSeen }: { seen: boolean; onSeen: () => void }) {
   );
 }
 
+// ---------- Historial ----------
+
+function HistoryList({ currentId, onOpen }: { currentId: string | null; onOpen: (c: LegacyChat | null) => void }) {
+  const { colors } = useTheme();
+  const legacy = useLegacyData();
+  const chats = useLegacyList(legacy.data?.data, 'chats');
+  const actions = useModule('chats', { undo: false });
+  const [asking, setAsking] = useState<string | null>(null);
+  if (!chats.length)
+    return (
+      <T v="small" tint="muted">
+        Tus conversaciones aparecerán aquí para que puedas volver a ellas desde el móvil o la web.
+      </T>
+    );
+  return (
+    <View accessibilityLabel="Conversaciones guardadas" style={{ gap: space[2] }}>
+      {chats.map((c) =>
+        asking === c.id ? (
+          <ConfirmDelete
+            key={c.id}
+            onConfirm={() => {
+              actions.remove(c.id);
+              void deleteFiles(chatAttachmentRefs(c.messages ?? []));
+              setAsking(null);
+              if (c.id === currentId) onOpen(null);
+            }}
+            onCancel={() => setAsking(null)}
+          >
+            {`Se borrará «${c.title}» con sus archivos.`}
+          </ConfirmDelete>
+        ) : (
+          <View key={c.id} style={[st.historyRow, { borderColor: c.id === currentId ? colors.primary : colors.line, backgroundColor: c.id === currentId ? colors.primarySoft : 'transparent' }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${c.title}, ${chatWhen(c.updatedAt)}`}
+              accessibilityState={{ selected: c.id === currentId }}
+              onPress={() => onOpen(c)}
+              style={({ pressed }) => [{ flex: 1, gap: 2, paddingVertical: space[2] }, pressed && { opacity: 0.7 }]}
+            >
+              <T v="label" numberOfLines={1}>
+                {c.title}
+              </T>
+              <T v="small" tint="muted">
+                {chatWhen(c.updatedAt)}
+              </T>
+            </Pressable>
+            <IconButton label={`Borrar «${c.title}»`} onPress={() => setAsking(c.id)}>
+              <Trash2 size={18} color={colors.inkMuted} />
+            </IconButton>
+          </View>
+        ),
+      )}
+    </View>
+  );
+}
+
 // ---------- Conversación ----------
 
-function Conversation({ settings, ready }: { settings: AssistantSettings; ready: boolean }) {
+function Conversation({
+  initial,
+  settings,
+  ready,
+  onSaved,
+  onNew,
+  onHistory,
+}: {
+  initial: LegacyChat | null;
+  settings: AssistantSettings;
+  ready: boolean;
+  onSaved: (id: string) => void;
+  onNew: () => void;
+  onHistory: () => void;
+}) {
   const { colors } = useTheme();
   const legacy = useLegacyData();
   const [includeData, setIncludeData] = useState(false);
@@ -247,9 +313,10 @@ function Conversation({ settings, ready }: { settings: AssistantSettings; ready:
   const dashboard = useQuery({ queryKey: keys.dashboard('week'), queryFn: () => api.dashboard('week'), enabled: includeData });
   const context = useMemo(() => (includeData ? buildContext(legacy.data?.data, dashboard.data) : null), [includeData, legacy.data, dashboard.data]);
 
-  // Solo en memoria: nada de la conversación se guarda.
-  const [history, setHistory] = useState<ChatMessage[]>([]);
-  const [cards, setCards] = useState<Record<string, ProposalCard>>({});
+  const [history, setHistory] = useState<ChatMessage[]>(() => initial?.messages ?? []);
+  const [cards, setCards] = useState<Record<string, Card>>(() => (initial ? chatCards(initial) : {}));
+  const [files, setFiles] = useState<ChatAttachment[]>([]);
+  const [reading, setReading] = useState(false);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -257,60 +324,119 @@ function Conversation({ settings, ready }: { settings: AssistantSettings; ready:
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
 
+  // Al abrir una conversación guardada, se vuelven a descargar sus fotos y PDF.
+  useEffect(() => {
+    const refs = initial ? chatAttachmentRefs(initial.messages ?? []) : [];
+    if (!refs.length) return;
+    let live = true;
+    api.legacy
+      .images(refs.slice(0, 100))
+      .then((r) => live && setHistory((h) => withAttachmentData(h, r.images)))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [initial]);
+
+  // Guardar en tu cuenta: la primera vez se crea, luego se actualiza.
+  const chats = useModule('chats', { undo: false });
+  const chatId = useRef<string | null>(initial?.id ?? null);
+  const dirty = useRef(false);
+  useEffect(() => {
+    if (busy || !dirty.current || !history.length) return;
+    dirty.current = false;
+    if (chatId.current) {
+      const { id: _id, ...patch } = storedChat(chatId.current, settings.model, history, cards);
+      chats.update(chatId.current, patch);
+    } else {
+      chatId.current = newId();
+      chats.add(storedChat(chatId.current, settings.model, history, cards));
+      onSaved(chatId.current);
+    }
+  }, [busy, history, cards, chats, settings.model, onSaved]);
+
   const pending = Object.values(cards).some((c) => c.status === 'pending' || c.status === 'running');
-  const canSend = ready && !busy && !pending && !!text.trim();
+  const canSend = ready && !busy && !pending && !reading && (!!text.trim() || files.length > 0);
+  const room = ATTACH_MAX_FILES - files.length;
+
+  const attach = async (from: 'photos' | 'files') => {
+    setError(null);
+    if (room <= 0) return setError(`Puedes adjuntar hasta ${ATTACH_MAX_FILES} archivos por mensaje.`);
+    setReading(true);
+    const added: ChatAttachment[] = [];
+    try {
+      if (from === 'photos') {
+        for (const p of await pickImages(room)) added.push({ name: p.name, mime: p.mime, kind: 'image', size: p.size, ref: '', data: p.data });
+      } else {
+        for (const a of await pickDocuments()) {
+          const problem = attachmentProblem({ name: a.name, mime: a.mimeType ?? '', size: a.size ?? 0 }, files.length + added.length);
+          if (problem) {
+            setError(problem);
+            break;
+          }
+          added.push(await documentAttachment(a));
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo leer el archivo.');
+    } finally {
+      setFiles((x) => [...x, ...added]);
+      setReading(false);
+    }
+  };
 
   const send = async () => {
     if (!canSend) return;
     const message = text.trim();
+    const attachments = files;
     const before = history;
-    const next: ChatMessage[] = [...history, { role: 'user', content: message }];
+    const userMsg: ChatMessage = attachments.length ? { role: 'user', content: message, attachments } : { role: 'user', content: message };
+    const next: ChatMessage[] = [...history, userMsg];
     setHistory(next);
     setText('');
+    setFiles([]);
     setBusy(true);
     setError(null);
     setNote(null);
     const ctrl = new AbortController();
     abort.current = ctrl;
+    // Los archivos se guardan en tu cuenta mientras Gemini responde.
+    const uploads = Promise.all(attachments.map(async (a) => (a.data ? { ...a, ref: await uploadFile(a.data, 'ai').catch(() => '') } : a)));
     try {
       const reply = await chat({ apiKey: settings.apiKey, model: settings.model, history: next, context, signal: ctrl.signal });
       const added: ChatMessage[] = [reply.message];
-      const newCards: Record<string, ProposalCard> = {};
+      const newCards: Record<string, Card> = {};
       for (const call of reply.message.tool_calls ?? []) {
         const p = planTool(call, legacy.data?.data, { newId });
         newCards[call.id] = { ...p, status: p.plan ? 'pending' : 'invalid' };
         // Lo que no se puede hacer se le dice al modelo en seguida.
         if (!p.plan) added.push({ role: 'tool', tool_call_id: call.id, content: `No se pudo proponer: ${p.error}` });
       }
-      setHistory([...next, ...added]);
+      const saved = attachments.length ? { ...userMsg, attachments: await uploads } : userMsg;
+      dirty.current = true;
+      setHistory([...before, saved, ...added]);
       setCards((c) => ({ ...c, ...newCards }));
       if (reply.fellBack) setNote(`${settings.model} no respondió; se usó ${reply.model}.`);
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') return;
-      // El mensaje vuelve al cuadro de texto para reintentarlo.
+      // El mensaje y los archivos vuelven al cuadro de texto para reintentarlo.
+      void uploads.then((done) => deleteFiles(done.map((a) => a.ref).filter(Boolean)));
       setHistory(before);
       setText(message);
+      setFiles(attachments);
       setError(errText(err));
     } finally {
       setBusy(false);
     }
   };
 
-  const qc = useQueryClient();
-  const exec = useMutation({
-    mutationKey: ['legacy', 'assistant'],
-    scope: { id: 'legacy' },
-    mutationFn: (plan: Plan) => runPlan(plan, qc.getQueryData<{ data: LegacyData }>(LEGACY_QUERY)?.data),
-    onSettled: () => {
-      if (qc.isMutating({ mutationKey: ['legacy'] }) <= 1) return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
-    },
-  });
-
-  const resolve = (id: string, status: Status, result: string) => {
+  const exec = useRunPlan();
+  const resolve = (id: string, status: CardStatus, result: string) => {
+    dirty.current = true;
     setCards((c) => ({ ...c, [id]: { ...c[id], status, error: undefined } }));
     setHistory((h) => [...h, { role: 'tool', tool_call_id: id, content: result }]);
   };
-  const doIt = async (card: ProposalCard) => {
+  const doIt = async (card: Card) => {
     if (!card.plan) return;
     setCards((c) => ({ ...c, [card.callId]: { ...c[card.callId], status: 'running', error: undefined } }));
     try {
@@ -320,15 +446,11 @@ function Conversation({ settings, ready }: { settings: AssistantSettings; ready:
       setCards((c) => ({ ...c, [card.callId]: { ...c[card.callId], status: 'pending', error: `No se pudo guardar: ${errorMessage(e)}` } }));
     }
   };
-  const discard = (card: ProposalCard) => resolve(card.callId, 'discarded', 'La persona descartó esta acción: no se hizo nada.');
+  const discard = (card: Card) => resolve(card.callId, 'discarded', 'La persona descartó esta acción: no se hizo nada.');
 
   const reset = () => {
     abort.current?.abort();
-    setHistory([]);
-    setCards({});
-    setError(null);
-    setNote(null);
-    setBusy(false);
+    onNew();
   };
 
   const shown = history.filter((m) => m.role !== 'tool');
@@ -338,18 +460,21 @@ function Conversation({ settings, ready }: { settings: AssistantSettings; ready:
     <Card style={{ gap: space[4] }}>
       <View style={st.chatHead}>
         <View style={{ flex: 1 }}>
-          <CardTitle icon={<Sparkles size={18} color={colors.primary} />}>Conversación</CardTitle>
+          <CardTitle icon={<Sparkles size={18} color={colors.primary} />}>{initial ? initial.title : 'Conversación'}</CardTitle>
         </View>
+        <IconButton label="Historial" onPress={onHistory}>
+          <History size={20} color={colors.primary} />
+        </IconButton>
         <Button small variant="ghost" label="Nueva" accessibilityLabel="Nueva conversación" icon={<MessageSquarePlus size={16} color={colors.primary} />} onPress={reset} disabled={!history.length && !busy} />
       </View>
       <T v="small" tint="muted" style={{ marginTop: -space[2] }}>
-        Solo vive en esta pantalla: se borra al salir, y no se guarda en tu cuenta.
+        Se guarda en tu cuenta: la encuentras en «Historial».
       </T>
 
       {shown.length === 0 && !busy ? (
         <View style={[st.empty, { borderColor: colors.lineStrong }]}>
           <T v="small" tint="muted" style={{ textAlign: 'center' }}>
-            Pregunta lo que quieras o pídele que añada algo por ti. Antes de escribir en tus datos, te mostrará la acción para que la confirmes.
+            Pregunta lo que quieras, adjunta una foto o un PDF, o pídele que añada algo por ti. Antes de escribir en tus datos, te mostrará la acción para que la confirmes.
           </T>
           <View accessibilityLabel="Ideas para empezar" style={[st.chips, { justifyContent: 'center' }]}>
             {SUGGESTIONS.map((s) => (
@@ -372,10 +497,24 @@ function Conversation({ settings, ready }: { settings: AssistantSettings; ready:
         <View accessibilityLabel="Mensajes" style={{ gap: space[3] }}>
           {shown.map((m, i) =>
             m.role === 'user' ? (
-              <View key={i} accessible accessibilityLabel={`Tú: ${m.content}`} style={[st.bubble, st.bubbleUser, { backgroundColor: colors.primary }]}>
-                <T v="body" style={{ color: colors.onPrimary }}>
-                  {m.content}
-                </T>
+              <View key={i} accessible accessibilityLabel={`Tú: ${[m.content, ...(m.attachments ?? []).map((a) => `adjunto ${a.name}`)].filter(Boolean).join(', ')}`} style={[st.bubble, st.bubbleUser, { backgroundColor: colors.primary }]}>
+                {m.attachments?.map((a, k) =>
+                  a.kind === 'image' && a.data ? (
+                    <Image key={k} source={{ uri: a.data }} style={st.bubbleImg} resizeMode="cover" />
+                  ) : (
+                    <View key={k} style={st.bubbleFile}>
+                      <FileText size={16} color={colors.onPrimary} />
+                      <T v="small" style={{ color: colors.onPrimary }} numberOfLines={1}>
+                        {a.name}
+                      </T>
+                    </View>
+                  ),
+                )}
+                {!!m.content && (
+                  <T v="body" style={{ color: colors.onPrimary }}>
+                    {m.content}
+                  </T>
+                )}
               </View>
             ) : (
               <View key={i} style={[st.bubble, st.bubbleAssistant, { backgroundColor: colors.surfaceSunken }]}>
@@ -427,6 +566,24 @@ function Conversation({ settings, ready }: { settings: AssistantSettings; ready:
       )}
 
       <View style={{ gap: space[2] }}>
+        {files.length > 0 && (
+          <View accessibilityLabel="Archivos para enviar" style={st.chips}>
+            {files.map((f, i) => (
+              <View key={`${f.name}-${i}`} style={[st.attachChip, { borderColor: colors.lineStrong, backgroundColor: colors.surface }]}>
+                {f.kind === 'image' && f.data ? <Image source={{ uri: f.data }} style={st.attachThumb} /> : <FileText size={16} color={colors.inkMuted} />}
+                <T v="small" numberOfLines={1} style={{ maxWidth: 140 }}>
+                  {f.name}
+                </T>
+                <T v="small" tint="muted">
+                  {formatBytes(f.size)}
+                </T>
+                <IconButton label={`Quitar «${f.name}»`} onPress={() => setFiles((x) => x.filter((_, k) => k !== i))}>
+                  <X size={16} color={colors.inkMuted} />
+                </IconButton>
+              </View>
+            ))}
+          </View>
+        )}
         <TextInput
           accessibilityLabel="Mensaje para el asistente"
           accessibilityHint={blocked ?? undefined}
@@ -435,12 +592,22 @@ function Conversation({ settings, ready }: { settings: AssistantSettings; ready:
           editable={ready}
           multiline
           maxLength={4000}
-          placeholder="Escribe un mensaje…"
+          placeholder={files.length ? 'Pregunta algo sobre el archivo…' : 'Escribe un mensaje…'}
           placeholderTextColor={colors.inkSubtle}
           style={[typo.body, st.input, { color: colors.ink, backgroundColor: colors.surface, borderColor: colors.lineStrong, opacity: ready ? 1 : 0.6 }]}
         />
         <View style={st.sendRow}>
-          {blocked ? (
+          <IconButton label="Adjuntar foto" onPress={() => attach('photos')} disabled={!ready || busy || reading}>
+            <ImagePlus size={20} color={colors.primary} />
+          </IconButton>
+          <IconButton label="Adjuntar archivo" onPress={() => attach('files')} disabled={!ready || busy || reading}>
+            <Paperclip size={20} color={colors.primary} />
+          </IconButton>
+          {reading ? (
+            <T v="small" tint="muted" style={{ flex: 1 }} accessibilityLiveRegion="polite">
+              Preparando el archivo…
+            </T>
+          ) : blocked ? (
             <T v="small" tint="muted" style={{ flex: 1 }}>
               {blocked}
             </T>
@@ -452,68 +619,6 @@ function Conversation({ settings, ready }: { settings: AssistantSettings; ready:
       </View>
     </Card>
   );
-}
-
-function ProposalView({ card, onDo, onDiscard }: { card: ProposalCard; onDo: (c: ProposalCard) => void; onDiscard: (c: ProposalCard) => void }) {
-  const { colors } = useTheme();
-  const label = card.status === 'done' ? 'Hecho' : card.status === 'discarded' ? 'Descartado' : card.status === 'invalid' ? 'No se puede hacer' : 'Acción propuesta';
-  const active = card.status === 'pending' || card.status === 'running';
-  return (
-    <View accessibilityLabel={`${label}: ${card.title}`} style={[st.proposal, { backgroundColor: colors.surface, borderColor: active ? colors.primary : colors.line, opacity: card.status === 'discarded' ? 0.7 : 1 }]}>
-      <View style={st.proposalHead}>
-        <T v="label" style={{ flexShrink: 1 }}>
-          {card.title}
-        </T>
-        {!!card.where && <Pill>{card.where}</Pill>}
-        <T v="small" tint={card.status === 'done' ? 'primary' : 'muted'} style={{ marginLeft: 'auto' }}>
-          {label}
-        </T>
-      </View>
-      {card.fields.map((f) => (
-        <View key={f.label} style={st.fieldRow}>
-          <T v="small" tint="muted" style={{ width: 96 }}>
-            {f.label}
-          </T>
-          <T v="small" style={{ flex: 1 }}>
-            {f.value}
-          </T>
-        </View>
-      ))}
-      {card.status === 'invalid' && (
-        <T v="small" tint="danger">
-          {card.error}
-        </T>
-      )}
-      {card.error && card.status === 'pending' && (
-        <T v="small" tint="danger" accessibilityRole="alert">
-          {card.error}
-        </T>
-      )}
-      {active && (
-        <View style={{ flexDirection: 'row', gap: space[2] }}>
-          <Button small label={card.status === 'running' ? 'Haciendo…' : 'Hacer'} icon={<Check size={16} color={colors.onPrimary} />} onPress={() => onDo(card)} busy={card.status === 'running'} accessibilityLabel={`Hacer: ${card.title}`} />
-          <Button small variant="ghost" label="Descartar" onPress={() => onDiscard(card)} disabled={card.status === 'running'} accessibilityLabel={`Descartar: ${card.title}`} />
-        </View>
-      )}
-      {card.status === 'done' && (
-        <T v="small" tint="muted">
-          {card.done}
-        </T>
-      )}
-    </View>
-  );
-}
-
-/** Escribe la acción confirmada con la API de módulos (como cualquier otra herramienta). */
-async function runPlan(plan: Plan, data: LegacyData | undefined): Promise<unknown> {
-  switch (plan.kind) {
-    case 'add':
-      return api.modules.add(plan.key, plan.item as never);
-    case 'update':
-      return api.modules.update(plan.key, plan.id, plan.patch as never);
-    case 'water':
-      return api.modules.patch('dayLog', waterPatch(data, plan.glasses, plan.today));
-  }
 }
 
 const st = StyleSheet.create({
@@ -537,4 +642,9 @@ const st = StyleSheet.create({
   proposal: { borderWidth: 1, borderRadius: radius.md, padding: space[3], gap: space[2] },
   proposalHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2] },
   fieldRow: { flexDirection: 'row', gap: space[2] },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: space[2], borderWidth: 1, borderRadius: radius.md, paddingLeft: space[3] },
+  attachChip: { flexDirection: 'row', alignItems: 'center', gap: space[2], borderWidth: 1, borderRadius: radius.md, paddingLeft: space[2] },
+  attachThumb: { width: 32, height: 32, borderRadius: radius.xs },
+  bubbleImg: { width: 200, height: 200, borderRadius: radius.md },
+  bubbleFile: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
 });

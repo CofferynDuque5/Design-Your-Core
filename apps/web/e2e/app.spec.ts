@@ -42,7 +42,10 @@ test('recorrido completo de una persona nueva', async ({ page }) => {
   await page.goto('/check-in');
   await expect(page.getByRole('group', { name: 'Ánimo' }).getByRole('radio', { name: /^4/ })).toBeChecked();
   await page.getByLabel('Horas de sueño').fill('7.5');
-  await page.getByLabel('Reflexión del día').fill('Buen día.');
+  // Propósito no está entre sus prioridades: va en «Otros pilares», plegado.
+  const reflection = page.getByLabel('Reflexión del día');
+  if (!(await reflection.isVisible())) await page.getByText(/^Otros pilares/).click();
+  await reflection.fill('Buen día.');
   await page.getByRole('button', { name: 'Guardar check-in' }).click();
   await expect(page).toHaveURL(/\/$/);
 

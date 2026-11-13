@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   CARE_KIND_INFO,
   CARE_KINDS,
   careKindOf,
@@ -19,11 +20,12 @@ import {
   type PetSpecies,
 } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
-import { Check, Pencil, Plus } from 'lucide-react-native';
+import { Camera, Check, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { deleteFiles, pickImages, uploadFile, useFiles } from '../../lib/files';
 import { Sheet } from '../../components/Sheet';
-import { DotChoices, FormActions, IconButton, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { Suggestions, DotChoices, FormActions, IconButton, SearchBar, Stats, TimeField, Toggle, ToolScreen, WeekdayPicker, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T } from '../../components/ui';
 import { UiIcon } from '../../components/UiIcon';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
@@ -43,6 +45,8 @@ export default function Pets() {
   const [editing, setEditing] = useState<LegacyPet | 'new' | null>(null);
   const [care, setCare] = useState<{ pet: LegacyPet; care: LegacyPetCare | null } | null>(null);
   const known = new Set(pets.map((p) => p.id));
+  const [q, setQ] = useState('');
+  const shownPets = pets.filter((p) => matchesSearch(q, p.name, p.note, PET_SPECIES_INFO[petSpeciesOf(p)].label, ...cares.filter((c) => c.petId === p.id).map((c) => c.title)));
   const ownCares = cares.filter((c) => known.has(c.petId));
   const doneToday = ownCares.filter((c) => c.lastDone === today).length;
   const pendingToday = ownCares.filter((c) => nextDue(c, now)?.inDays === 0).length;
@@ -72,11 +76,12 @@ export default function Pets() {
               { value: String(doneToday), label: doneToday === 1 ? 'Hecho hoy' : 'Hechos hoy' },
             ]}
           />
-          {pets.map((p) => (
+          <SearchBar label="Buscar en tus mascotas" value={q} onChange={setQ} placeholder="Buscar una mascota o un cuidado…" count={shownPets.length} />
+          {shownPets.map((p) => (
             <PetCard key={p.id} pet={p} cares={cares.filter((c) => c.petId === p.id)} today={today} now={now} onEdit={() => setEditing(p)} onCare={(c) => setCare({ pet: p, care: c })} />
           ))}
           <T v="small" tint="muted">
-            Los avisos con sonido de la app anterior todavía no están en la app nueva: aquí ves cuándo toca cada cuidado y lo marcas al hacerlo.
+            Aquí ves cuándo toca cada cuidado y lo marcas al hacerlo. Los cuidados con hora suenan si activas las alarmas en Perfil.
           </T>
         </>
       )}
@@ -98,9 +103,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
   return (
     <Card style={[st.card, { borderLeftColor: PET_COLOR }]}>
       <View style={st.head}>
-        <View style={[st.avatar, { backgroundColor: `${PET_COLOR}24` }]}>
-          <UiIcon name={species.icon} size={24} color={colors.ink} />
-        </View>
+        <PetPhoto pet={p} size={56} />
         <View style={{ flex: 1 }}>
           <T v="heading" accessibilityRole="header" style={{ fontSize: 19, lineHeight: 24 }}>
             {name}
@@ -113,6 +116,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
         <IconButton label={`Editar a ${name}`} onPress={onEdit} style={{ marginRight: -space[2] }}>
           <Pencil size={18} color={colors.inkMuted} />
         </IconButton>
+        <RemoveButton module="pets" id={p.id} name={name} style={{ marginRight: -space[2] }} />
       </View>
       {sorted.length === 0 ? (
         <T v="small" tint="muted">
@@ -165,24 +169,76 @@ function CareRow({ care: c, petName, today, now, onEdit }: { care: LegacyPetCare
       <IconButton label={`Editar «${title}» de ${petName}`} onPress={onEdit} style={{ marginRight: -space[2] }}>
         <Pencil size={16} color={colors.inkMuted} />
       </IconButton>
+      <RemoveButton module="petCares" id={c.id} name={`${title} de ${petName}`} style={{ marginRight: -space[2] }} />
+    </View>
+  );
+}
+
+/** Foto de la mascota (guardada en la nube) o el dibujo de su especie. */
+function PetPhoto({ pet, size }: { pet: Pick<LegacyPet, 'species' | 'photo' | 'name'>; size: number }) {
+  const { colors } = useTheme();
+  const files = useFiles(pet.photo ? [pet.photo] : []);
+  const src = pet.photo ? files.data?.images[pet.photo] : undefined;
+  const species = PET_SPECIES_INFO[petSpeciesOf(pet as LegacyPet)];
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: `${PET_COLOR}24`, borderWidth: src ? 2 : 0, borderColor: colors.primary }}>
+      {src ? (
+        <Image source={{ uri: src }} style={{ width: size, height: size }} accessibilityLabel={`Foto de ${pet.name || 'tu mascota'}`} />
+      ) : (
+        <UiIcon name={species.icon} size={Math.round(size * 0.42)} color={colors.ink} />
+      )}
     </View>
   );
 }
 
 function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number; onDone: () => void }) {
+  const { colors } = useTheme();
   const actions = useModule('pets');
   const [name, setName] = useState(pet?.name ?? '');
   const [species, setSpecies] = useState<PetSpecies>(pet ? petSpeciesOf(pet) : 'dog');
   const [note, setNote] = useState(pet?.note ?? '');
+  const [photo, setPhoto] = useState(pet?.photo ?? '');
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const pick = async () => {
+    setPhotoError(null);
+    try {
+      const [img] = await pickImages(1, 480);
+      if (!img) return;
+      setPhotoBusy(true);
+      setPhoto(await uploadFile(img.data, 'vf'));
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : 'No se pudo subir la foto.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
   const submit = () => {
     if (!name.trim()) return;
-    const fields = { name: name.trim(), species, note: note.trim() };
+    const fields = { name: name.trim(), species, note: note.trim(), photo };
+    // La foto anterior ya no se usa: se borra de la nube.
+    if (pet?.photo && pet.photo !== photo) void deleteFiles([pet.photo]);
     if (pet) actions.update(pet.id, fields);
     else actions.add({ id: newId(), ...fields });
     onDone();
   };
   return (
     <ScrollView style={{ maxHeight: 620 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
+        <PetPhoto pet={{ species, photo, name }} size={84} />
+        <View style={{ flex: 1, gap: space[2] }}>
+          <T v="label">Foto de perfil</T>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            <Button small variant="secondary" label={photoBusy ? 'Subiendo…' : photo ? 'Cambiar foto' : 'Subir foto'} icon={<Camera size={16} color={colors.primary} />} onPress={pick} disabled={photoBusy} />
+            {photo ? <Button small variant="ghost" label="Quitar" icon={<Trash2 size={16} color={colors.inkMuted} />} onPress={() => setPhoto('')} /> : null}
+          </View>
+          {photoError ? (
+            <T v="small" tint="danger" accessibilityRole="alert">
+              {photoError}
+            </T>
+          ) : null}
+        </View>
+      </View>
       <Field label="Nombre" value={name} onChangeText={setName} maxLength={80} placeholder="Luna" autoFocus={!pet} />
       <DotChoices
         legend="Especie"
@@ -194,7 +250,7 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
       <FormActions
         submitLabel={pet ? 'Guardar' : 'Añadir mascota'}
         onSubmit={submit}
-        disabled={!name.trim()}
+        disabled={!name.trim() || photoBusy}
         onDelete={
           pet
             ? () => {
@@ -210,6 +266,8 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
 }
 
 function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare | null; onDone: () => void }) {
+  const saved = useLegacyData().data?.data;
+  const pastTitles = useLegacyList(saved, 'petCares').map((c) => c.title ?? '');
   const actions = useModule('petCares');
   const [kind, setKind] = useState<CareKind>(care ? careKindOf(care) : 'comida');
   const [title, setTitle] = useState(care?.title ?? '');
@@ -229,6 +287,7 @@ function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare |
     <ScrollView style={{ maxHeight: 620 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
       <DotChoices legend="Tipo" value={kind} onChange={setKind} options={CARE_KINDS.map((k) => ({ value: k, ...CARE_KIND_INFO[k] }))} />
       <Field label="Qué hay que hacer" value={title} onChangeText={setTitle} maxLength={120} placeholder={kind === 'comida' ? 'Darle de comer' : CARE_KIND_INFO[kind].label} />
+      <Suggestions field="Qué hay que hacer" values={[...pastTitles, 'Darle de comer', 'Paseo', 'Agua fresca', 'Medicina', 'Baño', 'Cepillado']} current={title} onPick={setTitle} />
       <TimeField label="Hora (opcional)" value={time} onChange={setTime} optional />
       <WeekdayPicker legend="Días" value={days} onChange={setDays} />
       <FormActions

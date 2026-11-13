@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
+import { addDays } from '@dyc/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { dashboard, fakeFetch, profile, USER } from '../test/fakeApi';
 import { tokenStore } from './api';
@@ -83,6 +84,53 @@ describe('app web', () => {
     renderApp('/');
     expect(await screen.findByRole('heading', { name: 'Hola de nuevo' })).toBeInTheDocument();
     expect(tokenStore.get()).toBeNull();
+  });
+
+  it('Hoy muestra el proyecto que toca terminar primero', async () => {
+    tokenStore.set('t1');
+    fakeFetch({
+      'GET /api/me': () => ({ user: USER }),
+      'GET /api/v2/profile': () => ({ profile: profile() }),
+      'GET /api/v2/dashboard': () => dashboard(),
+      'GET /api/v2/modules': () => ({
+        updatedAt: null,
+        data: {
+          projects: [
+            { id: 'a', title: 'Portafolio', subject: '', deadline: '', status: 'entregado', priority: 'alta', color: '#0FA968', milestones: [] },
+            { id: 'b', title: 'App de notas', subject: '', deadline: '20 NOV', status: 'curso', priority: 'alta', color: '#0FA968', milestones: [] },
+            { id: 'c', title: 'Bot', subject: '', deadline: '', status: 'curso', color: '#0FA968', milestones: [] },
+          ],
+        },
+      }),
+    });
+    renderApp('/');
+    const card = await screen.findByRole('region', { name: 'Termina primero' });
+    expect(within(card).getByText('App de notas')).toBeInTheDocument();
+    expect(within(card).getByText(/Prioridad alta · Entrega 20 NOV · 0 % hecho/)).toBeInTheDocument();
+  });
+
+  it('Hoy muestra el enfoque del día, la racha y el mapa de constancia', async () => {
+    tokenStore.set('t1');
+    const consistency = Array.from({ length: 5 }, (_, i) => ({ date: addDays('2026-09-23', i - 5), done: 2, total: 3 }));
+    fakeFetch({
+      'GET /api/me': () => ({ user: USER }),
+      'GET /api/v2/profile': () => ({ profile: profile() }),
+      'GET /api/v2/dashboard': () => dashboard({ consistency }),
+      'GET /api/v2/modules': () => ({
+        updatedAt: null,
+        data: { projects: [{ id: 'b', title: 'App de notas', subject: '', deadline: '', status: 'curso', priority: 'alta', color: '#0FA968', milestones: [], todos: [{ id: 't', name: 'Pantalla de acceso', done: false, kind: 'falta' }] }] },
+      }),
+    });
+    renderApp('/');
+    const hero = await screen.findByRole('region', { name: /Hoy, una cosa a la vez/ });
+    expect(within(hero).getByText('Pantalla de acceso')).toBeInTheDocument();
+    expect(within(hero).getByRole('link', { name: /Empezar 25 min de foco/ })).toHaveAttribute('href', '/enfoque');
+    const streak = screen.getByRole('region', { name: 'Constancia' });
+    expect(within(streak).getByText('Aún estás a tiempo: marca algo hoy y tu racha sube a 6.')).toBeInTheDocument();
+    expect(within(streak).getByRole('list', { name: /últimas 12 semanas/ }).querySelectorAll('[data-level="3"]')).toHaveLength(5);
+    const logros = screen.getByRole('region', { name: 'Logros de constancia' });
+    expect(within(logros).getByText('3 días seguidos, conseguido')).toBeInTheDocument();
+    expect(within(logros).getByText('7 días seguidos, por conseguir')).toBeInTheDocument();
   });
 
   it('el progreso muestra un estado vacío sin datos', async () => {

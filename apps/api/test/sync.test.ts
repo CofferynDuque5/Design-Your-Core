@@ -64,6 +64,14 @@ describe('imágenes', () => {
 
     const peek = await api.post('/api/images/fetch').set(bearer(b.token)).send({ ids: ['compartido'] }).expect(200);
     expect(peek.body.images).toEqual({});
+
+    // Tampoco borrarlas: solo se borran las propias.
+    const del = await api.post('/api/images/delete').set(bearer(b.token)).send({ ids: ['compartido', 'mal id!'] }).expect(200);
+    expect(del.body.count).toBe(0);
+    expect(await db.row('SELECT 1 FROM "Image" WHERE "id" = $1', ['compartido'])).toBeTruthy();
+    const own = await api.post('/api/images/delete').set(bearer(a.token)).send({ ids: ['compartido'] }).expect(200);
+    expect(own.body.count).toBe(1);
+    expect(await db.row('SELECT 1 FROM "Image" WHERE "id" = $1', ['compartido'])).toBeFalsy();
   });
 });
 

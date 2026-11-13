@@ -15,10 +15,12 @@ import { AppState, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { auth, useAuth } from '../lib/api';
 import { notificationsSupported } from '../lib/notifications';
+import { ToolNotificationSync } from '../components/ToolNotificationSync';
 import { useProfile } from '../lib/queries';
 import { queryClient } from '../lib/queryClient';
 import { ThemeProvider, useTheme } from '../lib/theme';
 import { ToastProvider } from '../lib/toast';
+import { FocusWatcher } from '../components/FocusWatcher';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 auth.load();
@@ -69,6 +71,8 @@ function Root({ fontsReady }: { fontsReady: boolean }) {
     <>
       <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
       {signedIn && notificationsSupported && <NotificationLinks />}
+      {signedIn && onboarded && notificationsSupported && <ToolNotificationSync />}
+      {signedIn && onboarded && <FocusWatcher />}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="(auth)" />

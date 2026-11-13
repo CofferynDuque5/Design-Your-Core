@@ -7,6 +7,7 @@ import { isPlaceholderDatabaseUrl, loadConfig, loadEnvFiles } from './config.js'
 import { createDb } from './db/db.js';
 import { migrate } from './db/migrate.js';
 import { createMailer } from './lib/mailer.js';
+import { startAlarmScheduler } from './lib/webPush.js';
 import { databaseProblem } from './lib/safeMode.js';
 
 loadEnvFiles();
@@ -40,6 +41,8 @@ async function migrateOrRetry(): Promise<void> {
   }
 }
 await migrateOrRetry();
+// Alarmas del panel web (Web Push): se revisan cada 30 segundos.
+startAlarmScheduler(db);
 
 const server = app.listen(config.port, () => console.log(`[core-cloud] listening on ${config.port}${serveWeb ? ' (con la app web)' : ''}`));
 

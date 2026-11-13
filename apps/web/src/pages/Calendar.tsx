@@ -1,4 +1,6 @@
 import {
+  matchesSearch,
+  reminderFallsOn,
   CALENDAR_MARKS,
   calendarCycleDays,
   calendarMarks,
@@ -30,6 +32,7 @@ import { Link } from 'react-router';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
 import { ErrorState, Loading } from '../components/States';
@@ -76,6 +79,8 @@ export function Calendar() {
   };
 
   const describe = (d: Day) => describeCalendarDay(d, marks, reminders);
+  const [q, setQ] = useState('');
+  const found = q.trim() ? reminders.filter((r) => matchesSearch(q, displayTitle(r.title), r.when)).sort((a, b) => a.day - b.day) : [];
 
   return (
     <div className="page">
@@ -89,18 +94,30 @@ export function Calendar() {
       ) : legacy.isError ? (
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
       ) : (
+        <div className="stack-lg">
+        {reminders.length > 0 && (
+          <div className="stack-sm">
+            <SearchBox label="Buscar en tus eventos" value={q} onChange={setQ} placeholder="Buscar un evento por nombre u hora…" count={q.trim() ? found.length : undefined} />
+            {found.length > 0 && (
+              <ul className="card card--list day-items" aria-label="Eventos encontrados">
+                {found.slice(0, 30).map((r) => {
+                  const d = addDays(month, Math.min(r.day, n) - 1);
+                  return (
+                    <li key={r.id}>
+                      <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(d)}>
+                        Día {r.day} · {displayTitle(r.title)}
+                        {r.when ? ` · ${r.when}` : ''}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
         <div className="calendar-layout">
           <section className="card stack" aria-labelledby="month-title">
             <div className="month-nav">
-              <button type="button" className="icon-btn" onClick={() => go(-1)} aria-label="Mes anterior">
-                <ChevronLeft size={20} aria-hidden="true" />
-              </button>
-              <h2 id="month-title" className="section-title" aria-live="polite">
-                {monthLabel(month)}
-              </h2>
-              <button type="button" className="icon-btn" onClick={() => go(1)} aria-label="Mes siguiente">
-                <ChevronRight size={20} aria-hidden="true" />
-              </button>
               {month.slice(0, 7) !== today.slice(0, 7) && (
                 <button
                   type="button"
@@ -113,6 +130,15 @@ export function Calendar() {
                   Hoy
                 </button>
               )}
+              <button type="button" className="icon-btn" onClick={() => go(-1)} aria-label="Mes anterior">
+                <ChevronLeft size={20} aria-hidden="true" />
+              </button>
+              <h2 id="month-title" className="section-title" aria-live="polite">
+                {monthLabel(month)}
+              </h2>
+              <button type="button" className="icon-btn" onClick={() => go(1)} aria-label="Mes siguiente">
+                <ChevronRight size={20} aria-hidden="true" />
+              </button>
             </div>
             <table className="month">
               <caption className="visually-hidden">{monthLabel(month)}. Elige un día para ver lo que tiene.</caption>
@@ -164,6 +190,7 @@ export function Calendar() {
           </section>
           <DayPanel day={selected} data={data} reminders={reminders} onEdit={setEditing} cycle={showCycle ? { period: cycleDays.period.has(selected), predicted: cycleDays.predicted.has(selected) } : null} />
         </div>
+        </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo evento' : 'Editar evento'}>
         {editing !== null && <EventForm event={editing === 'new' ? null : editing} day={Number(selected.slice(8))} onDone={() => setEditing(null)} />}
@@ -186,8 +213,7 @@ function DayPanel({
   cycle: { period: boolean; predicted: boolean } | null;
 }) {
   const actions = useModule('reminders');
-  const dayNum = Number(day.slice(8));
-  const events = reminders.filter((r) => r.day === dayNum);
+  const events = reminders.filter((r) => reminderFallsOn(r, day));
   const workouts = arr<Workout>(data, 'workouts').filter((w) => w.date === day);
   const goals = arr<Goal>(data, 'goals').filter((g) => g.deadline === day);
   const journal = arr<Journal>(data, 'journal').filter((j) => j.date === day);
@@ -200,7 +226,7 @@ function DayPanel({
         <h2 id="day-panel-title" className="section-title">
           {longDay(day)}
         </h2>
-        <p className="muted small">Los eventos se repiten cada mes en el mismo día, como en la app anterior.</p>
+        <p className="muted small">Los eventos se repiten cada mes en el mismo día.</p>
       </div>
       {empty ? (
         <p className="muted">Nada este día.</p>
@@ -303,6 +329,8 @@ function JournalMood({ mood }: { mood: unknown }) {
 
 function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder | null; day: number; onDone: () => void }) {
   const actions = useModule('reminders');
+  const saved = useLegacyData().data?.data;
+  const past = useLegacyList(saved, 'reminders');
   const [title, setTitle] = useState(displayTitle(event?.title));
   const [when, setWhen] = useState(event?.when ?? '');
   const [day, setDay] = useState(event?.day ?? initialDay);
@@ -318,10 +346,10 @@ function EventForm({ event, day: initialDay, onDone }: { event: LegacyReminder |
 
   return (
     <form className="stack" onSubmit={submit}>
-      <TextField label="Título" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus placeholder="Dentista" />
+      <TextField label="Título" suggestions={past.map((r) => displayTitle(r.title))} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus placeholder="Dentista" />
       <div className="grid-2">
-        <TextField label="Hora o nota (opcional)" value={when} onChange={(e) => setWhen(e.target.value)} maxLength={60} placeholder="14:00" />
-        <SelectField label="Día del mes" value={day} onChange={(e) => setDay(Number(e.target.value))} hint={`Se repite el día ${day} de cada mes.`}>
+        <TextField label="Hora o nota (opcional)" suggestions={past.map((r) => r.when ?? '')} value={when} onChange={(e) => setWhen(e.target.value)} maxLength={60} placeholder="14:00" />
+        <SelectField label="Día del mes" value={day} onChange={(e) => setDay(Number(e.target.value))} hint={`Se repite el día ${day} de cada mes.${day > 28 ? ' En los meses más cortos sale el último día.' : ''}`}>
           {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
             <option key={d} value={d}>
               {d}

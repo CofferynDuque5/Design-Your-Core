@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   BLOCK_KIND_INFO,
   BLOCK_KINDS,
   drawableBlocks,
@@ -21,7 +22,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckRow, Dot, DotChoices, IconButton, Stepper, tint, ToolScreen } from '../../components/tools';
+import { Suggestions, SearchBar, CheckRow, Dot, DotChoices, IconButton, Stepper, tint, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, Segmented, SectionHeader, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -164,7 +165,7 @@ function DayView({ data }: { data: LegacyData }) {
           );
         })}
         <T v="small" tint="muted">
-          Los bloques no llevan fecha: tu plan se repite cada día, igual que en la app anterior.
+          Los bloques no llevan fecha: tu plan se repite cada día.
         </T>
       </Card>
 
@@ -180,6 +181,8 @@ const up = (v: number) => Math.floor(v * 2) / 2 + 0.5;
 const down = (v: number) => Math.ceil(v * 2) / 2 - 0.5;
 
 function BlockForm({ block, onDone }: { block: LegacyBlock | null; onDone: () => void }) {
+  const saved = useLegacyData().data?.data;
+  const past = useLegacyList(saved, 'blocks');
   const blocks = useModule('blocks');
   const [label, setLabel] = useState(block?.label ?? '');
   const [sub, setSub] = useState(block?.sub ?? '');
@@ -198,7 +201,9 @@ function BlockForm({ block, onDone }: { block: LegacyBlock | null; onDone: () =>
   return (
     <ScrollView style={{ maxHeight: 560 }} contentContainerStyle={{ gap: space[4] }} keyboardShouldPersistTaps="handled">
       <Field label="Nombre" value={label} onChangeText={setLabel} maxLength={120} placeholder="Estudiar cálculo" autoFocus={!block} />
+      <Suggestions field="Nombre" values={past.map((b) => b.label ?? '')} current={label} onPick={setLabel} />
       <Field label="Detalle (opcional)" value={sub} onChangeText={setSub} maxLength={200} placeholder="Capítulo 3" />
+      <Suggestions field="Detalle" values={past.filter((b) => b.label === label).map((b) => b.sub ?? '')} current={sub} onPick={setSub} />
       <DotChoices legend="Tipo" value={kind} onChange={setKind} options={BLOCK_KINDS.map((k) => ({ value: k, label: BLOCK_KIND_INFO[k].label, color: BLOCK_KIND_INFO[k].color }))} />
       <View style={{ flexDirection: 'row', gap: space[3] }}>
         <Stepper
@@ -253,6 +258,7 @@ function TasksView({ data }: { data: LegacyData }) {
   const [title, setTitle] = useState('');
   const [pri, setPri] = useState<TaskPriority>('media');
   const [editing, setEditing] = useState<LegacyTask | null>(null);
+  const [q, setQ] = useState('');
 
   const add = () => {
     if (!title.trim()) return;
@@ -268,11 +274,12 @@ function TasksView({ data }: { data: LegacyData }) {
         <Button label="Añadir tarea" icon={<Plus size={18} color={colors.onPrimary} />} onPress={add} disabled={!title.trim()} />
       </Card>
 
+      {tasks.length > 3 && <SearchBar label="Buscar en tus tareas" value={q} onChange={setQ} placeholder="Buscar una tarea o etiqueta…" count={tasks.filter((t) => matchesSearch(q, t.title, t.tags)).length} />}
       {tasks.length === 0 ? (
         <EmptyState title="Sin tareas por ahora">Escribe la primera arriba y elige su prioridad.</EmptyState>
       ) : (
         TASK_PRIORITIES.map((p) => {
-          const group = tasks.filter((t) => priOf(t) === p);
+          const group = tasks.filter((t) => priOf(t) === p && matchesSearch(q, t.title, t.tags));
           const done = group.filter((t) => t.done).length;
           const info = TASK_PRIORITY_INFO[p];
           return (

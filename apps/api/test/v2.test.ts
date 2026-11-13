@@ -160,6 +160,11 @@ describe('v2 · panel', () => {
     expect(b.pillars.map((p: { id: string }) => p.id)).toEqual(['movimiento', 'descanso', 'alimentacion', 'enfoque', 'relaciones', 'proposito']);
     expect(b.series).toHaveLength(7);
     expect(b.checkIns.streak).toBe(1);
+    // Mapa de constancia: hoy cuenta el hábito y el check-in; hace una semana, solo el check-in.
+    const cons = new Map(b.consistency.map((c: { date: string }) => [c.date, c]));
+    expect(b.consistency.at(-1).date).toBe(d);
+    expect(cons.get(d)).toEqual({ date: d, done: 2, total: 2 });
+    expect(cons.get(lastWeek)).toEqual({ date: lastWeek, done: 1, total: 2 });
     expect(b.todayStatus.checkIn.mood).toBe(5);
     expect(b.todayStatus.habits).toEqual([expect.objectContaining({ title: 'Estirar', done: true })]);
     expect(b.habits.done).toBeGreaterThanOrEqual(1);

@@ -1,3 +1,4 @@
+import { DEFAULT_NOTIFY, notificationPlan, parseNotifyPrefs, type LegacyData, type NotifyPrefs, type PlannedNotification } from '@dyc/core';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -36,7 +37,8 @@ export const readReminder = () => readJson<ReminderPrefs>(PREFS_KEY, DEFAULT_REM
 
 if (notificationsSupported) {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
+    // Las alarmas de la Agenda, el Calendario y el Horario suenan también con la app abierta.
+    handleNotification: async (n) => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: !!(n.request.content.data as { alarm?: boolean } | undefined)?.alarm, shouldSetBadge: false }),
   });
 }
 
@@ -107,4 +109,97 @@ export async function forgetDevice(): Promise<void> {
   await unregisterPushDevice();
   await Notifications.cancelScheduledNotificationAsync(REMINDER_ID).catch(() => undefined);
   await writeJson(PREFS_KEY, DEFAULT_REMINDER);
+  await clearToolNotifications();
+  await writeJson(NOTIFY_KEY, DEFAULT_NOTIFY);
+  lastSignature = '';
+  emitNotify(DEFAULT_NOTIFY);
+}
+
+// ---------- Avisos de las herramientas (Horario, Cursos, Calendario, Agenda) ----------
+
+const NOTIFY_KEY = 'dyc.notify';
+const TOOL_PREFIX = 'dyc-tool-';
+// Canal nuevo con sonido y vibración de alarma (Android no deja cambiar el sonido de un canal ya creado).
+const TOOL_CHANNEL = 'alarmas';
+
+export const readNotify = async (): Promise<NotifyPrefs> => parseNotifyPrefs(await readJson<unknown>(NOTIFY_KEY, DEFAULT_NOTIFY));
+
+type Listener = (p: NotifyPrefs) => void;
+const listeners = new Set<Listener>();
+const emitNotify = (p: NotifyPrefs) => listeners.forEach((l) => l(p));
+/** Avisa cuando cambian las preferencias (para volver a programar). */
+export function onNotifyChange(l: Listener): () => void {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
+/**
+ * Guarda las preferencias. Al encender pide permiso; devuelve "denied" si la
+ * persona no lo da (y lo deja apagado).
+ */
+export async function setToolNotifications(prefs: NotifyPrefs): Promise<'on' | 'off' | 'denied'> {
+  if (!notificationsSupported) return 'off';
+  let next = prefs;
+  let result: 'on' | 'off' | 'denied' = prefs.enabled ? 'on' : 'off';
+  if (prefs.enabled && !(await ensurePermission())) {
+    next = { ...prefs, enabled: false };
+    result = 'denied';
+  }
+  await writeJson(NOTIFY_KEY, next);
+  if (!next.enabled) await clearToolNotifications();
+  lastSignature = '';
+  emitNotify(next);
+  return result;
+}
+
+async function clearToolNotifications(): Promise<void> {
+  const all = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
+  await Promise.all(all.filter((n) => n.identifier.startsWith(TOOL_PREFIX)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => undefined)));
+}
+
+function triggerOf(p: PlannedNotification): Notifications.NotificationTriggerInput {
+  const t = p.trigger;
+  const channelId = TOOL_CHANNEL;
+  if (t.kind === 'daily') return { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: t.hour, minute: t.minute, channelId };
+  if (t.kind === 'weekly') return { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: (t.weekday % 7) + 1, hour: t.hour, minute: t.minute, channelId };
+  if (t.kind === 'monthly') return { type: Notifications.SchedulableTriggerInputTypes.MONTHLY, day: t.day, hour: t.hour, minute: t.minute, channelId };
+  return { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(t.at), channelId };
+}
+
+let lastSignature = '';
+
+/**
+ * Vuelve a programar los avisos con los datos actuales: quita los anteriores
+ * y programa el plan. Si nada cambió desde la última vez, no hace nada.
+ * Devuelve cuántos quedaron programados.
+ */
+export async function syncToolNotifications(data: LegacyData | null | undefined, prefs: NotifyPrefs, now = new Date()): Promise<number> {
+  if (!notificationsSupported) return 0;
+  const plan = notificationPlan(data, prefs, now);
+  const signature = JSON.stringify(plan);
+  if (signature === lastSignature) return plan.length;
+  lastSignature = signature;
+  await clearToolNotifications();
+  if (!plan.length) return 0;
+  const { granted } = await Notifications.getPermissionsAsync();
+  if (!granted) return 0;
+  if (Platform.OS === 'android') {
+    await Notifications.deleteNotificationChannelAsync('avisos').catch(() => undefined);
+    await Notifications.setNotificationChannelAsync(TOOL_CHANNEL, {
+      name: 'Alarmas de clases, tareas y recordatorios',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      vibrationPattern: [0, 600, 300, 600, 300, 600],
+      bypassDnd: false,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });
+  }
+  for (const p of plan) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: TOOL_PREFIX + p.id,
+      content: { title: p.title, body: p.body, data: { url: p.url, alarm: true }, sound: 'default', priority: Notifications.AndroidNotificationPriority.MAX, interruptionLevel: 'timeSensitive' },
+      trigger: triggerOf(p),
+    }).catch(() => undefined);
+  }
+  return plan.length;
 }

@@ -21,8 +21,14 @@ export function useProfile() {
   return useQuery({ queryKey: keys.profile, queryFn: api.profile.get, staleTime: 5 * 60_000, enabled: !!token });
 }
 
-export const useDashboard = (period: Period, date?: string) =>
-  useQuery({ queryKey: keys.dashboard(period, date), queryFn: () => api.dashboard(period, date), placeholderData: (prev) => prev });
+export const useDashboard = (period: Period, date?: string, opts: { enabled?: boolean } = {}) =>
+  useQuery({
+    queryKey: keys.dashboard(period, date),
+    queryFn: () => api.dashboard(period, date),
+    // Al cambiar de periodo se sigue viendo el anterior mientras carga; el de comparación no lo necesita.
+    placeholderData: opts.enabled === undefined ? (prev) => prev : undefined,
+    enabled: opts.enabled ?? true,
+  });
 
 export const useHabits = (archived = false) => useQuery({ queryKey: keys.habits(archived), queryFn: () => api.habits.list(archived) });
 

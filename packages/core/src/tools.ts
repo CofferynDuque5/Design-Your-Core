@@ -2,6 +2,14 @@ import { addDays, diffDays, isDay, periodRange, type Day } from './dates.js';
 import { daysLabel, plural, shortDay } from './format.js';
 import { moodIcon } from './icons.js';
 import {
+  type CourseLanguage,
+  COURSE_UNITS_MAX,
+  PROJECT_CATEGORIES,
+  PROJECT_CATEGORIES_MAX,
+  PROJECT_CATEGORY_INFO,
+  checkItems,
+  type LegacyProjectTodo,
+  type ProjectCategory,
   BOX_COLORS,
   CARE_KIND_INFO,
   CARE_KINDS,
@@ -14,19 +22,24 @@ import {
   cyclePredictions,
   hhmmToHours,
   IDEA_CATEGORIES,
-  MEDITATION_KIND,
   NOTE_DEFAULT_SUBJECT,
   NOTE_DEFAULT_TITLE,
   noteTag,
   splitTags,
   WORK_PROJECTS,
+  WORK_PROJECT_INFO,
   WORK_STATUSES,
   legacyList,
   legacyObject,
+  sleepMinutes,
+  waterToday,
   nextDue,
   PERIOD_FLOWS,
   PET_SPECIES,
   PROJECT_STATUSES,
+  PROJECT_PRIORITIES,
+  PROJECT_PRIORITY_INFO,
+  type ProjectPriority,
   SLEEP_QUALITY_LABELS,
   type CareKind,
   type ContentPlatform,
@@ -34,11 +47,12 @@ import {
   type GoalCategory,
   type IdeaCategory,
   type LegacyClass,
+  type CourseLesson,
+  type LegacyCourse,
   type LegacyContent,
   type LegacyData,
   type LegacyIdea,
   type LegacyJournal,
-  type LegacyMeditation,
   type LegacyNote,
   type LegacyNoteBox,
   type LegacyPetCare,
@@ -52,6 +66,9 @@ import {
   type WorkProject,
   type WorkStatus,
   type LegacyWorkItem,
+  type LegacyProject,
+  type LegacyVentureItem,
+  type VentureItemKind,
 } from './legacy.js';
 import { markdownToText } from './markdown.js';
 import { legacyVault, vaultSecureOf } from './vault.js';
@@ -82,23 +99,25 @@ export type ToolId =
   | 'horario'
   | 'enfoque'
   | 'materias'
+  | 'cursos'
   | 'proyectos'
   | 'roadmaps'
   | 'cuadernos'
   | 'contenido'
   | 'ideas'
   | 'trabajo'
+  | 'emprendimientos'
   | 'notas'
   | 'boveda'
   | 'asistente'
   | 'finanzas'
   | 'metas'
   | 'mascotas'
+  | 'pareja'
   | 'ejercicio'
   | 'sueno'
   | 'diario'
   | 'rutina'
-  | 'respiracion'
   | 'ciclo';
 
 export interface ToolInfo {
@@ -157,7 +176,7 @@ export const TOOL_CATALOG: ToolInfo[] = [
   {
     id: 'enfoque',
     path: '/enfoque',
-    label: 'Enfoque',
+    label: 'Pomodoro',
     group: 'organizacion',
     description: 'Temporizador Pomodoro y tus horas de concentración',
     count: (d) => legacyList(d, 'focus').filter((f) => f.mode === 'focus').length,
@@ -171,6 +190,15 @@ export const TOOL_CATALOG: ToolInfo[] = [
     description: 'Asignaturas, temas y avance del curso',
     count: (d) => legacyList(d, 'subjects').length,
     unit: ['materia', 'materias'],
+  },
+  {
+    id: 'cursos',
+    path: '/cursos',
+    label: 'Cursos',
+    group: 'estudio',
+    description: 'Temas por estudiar con sus enlaces de YouTube u otras plataformas',
+    count: (d) => legacyList(d, 'courses').filter((c) => c.status !== 'hecho').length,
+    unit: ['por ver', 'por ver'],
   },
   {
     id: 'proyectos',
@@ -222,9 +250,18 @@ export const TOOL_CATALOG: ToolInfo[] = [
     path: '/trabajo',
     label: 'Trabajo',
     group: 'estudio',
-    description: 'Tareas de trabajo por proyecto, de la app anterior',
+    description: 'Tareas de trabajo por proyecto',
     count: (d) => legacyList(d, 'workItems').filter((w) => !w.done).length,
     unit: ['por hacer', 'por hacer'],
+  },
+  {
+    id: 'emprendimientos',
+    path: '/emprendimientos',
+    label: 'Emprendimientos',
+    group: 'estudio',
+    description: 'Tus negocios y proyectos con notas, imágenes, archivos y enlaces',
+    count: (d) => legacyList(d, 'ventures').length,
+    unit: ['proyecto', 'proyectos'],
   },
   {
     id: 'notas',
@@ -280,6 +317,14 @@ export const TOOL_CATALOG: ToolInfo[] = [
     unit: ['mascota', 'mascotas'],
   },
   {
+    id: 'pareja',
+    path: '/pareja',
+    label: 'En pareja',
+    group: 'personal',
+    description: 'Fotos, metas y emprendimientos que comparten',
+    note: 'Con tu pareja vinculada',
+  },
+  {
     id: 'ejercicio',
     path: '/ejercicio',
     label: 'Ejercicio',
@@ -314,15 +359,6 @@ export const TOOL_CATALOG: ToolInfo[] = [
     description: 'Rutinas por hora y día, comidas y agua',
     count: (d) => legacyList(d, 'routines').length,
     unit: ['rutina', 'rutinas'],
-  },
-  {
-    id: 'respiracion',
-    path: '/respiracion',
-    label: 'Respiración',
-    group: 'salud',
-    description: 'Respiración guiada y tus minutos de calma',
-    count: (d) => legacyList(d, 'meditations').length,
-    unit: ['sesión', 'sesiones'],
   },
   {
     id: 'ciclo',
@@ -371,10 +407,14 @@ export const localDayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth(
 /** "HH:MM" de una fecha local. */
 export const localTime = (d = new Date()) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-/** Cantidades sin moneda: con céntimos, siempre dos decimales (1234.5 → "1234,50"); sin ellos, ninguno (12345 → "12.345"). */
+/** Símbolo de moneda de Finanzas (el mismo en web, móvil y Asistente). */
+export const CURRENCY_SYMBOL = '$';
+
+/** Cantidad con moneda: con céntimos, siempre dos decimales (1234.5 → "$1234,50"); sin ellos, ninguno (12345 → "$12.345"; -8 → "-$8"). */
 export const money = (n: number) => {
   const cents = Math.round(n * 100) % 100 !== 0;
-  return new Intl.NumberFormat('es', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 }).format(n);
+  const text = new Intl.NumberFormat('es', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 }).format(Math.abs(n));
+  return `${n < 0 ? '-' : ''}${CURRENCY_SYMBOL}${text}`;
 };
 
 /** 465 → "7 h 45 min". */
@@ -474,6 +514,28 @@ export function normalizeHHMM(v: string): string {
   return `${m[1].padStart(2, '0')}:${m[2]}`;
 }
 
+/**
+ * Clases que se pueden dibujar. Acepta datos antiguos un poco distintos («8:00»,
+ * el día como texto «1») y los muestra con la forma correcta, sin cambiar el dato.
+ */
+export function showableClasses(list: LegacyClass[]): LegacyClass[] {
+  return list
+    .map((c) => ({
+      ...c,
+      day: typeof (c.day as unknown) === 'string' && /^[1-7]$/.test(String(c.day)) ? Number(c.day) : c.day,
+      start: typeof (c.start as unknown) === 'string' ? normalizeHHMM(c.start) : c.start,
+      end: typeof (c.end as unknown) === 'string' ? normalizeHHMM(c.end) : c.end,
+    }))
+    .filter(validClass);
+}
+
+/** Horas que muestra la cuadrícula del Horario: de 7:00 a 21:00, ampliadas para que quepan todas las clases. */
+export function scheduleHours(classes: LegacyClass[]): { from: number; to: number } {
+  const from = Math.min(7, ...classes.map((c) => Math.floor(hhmmToHours(c.start))));
+  const to = Math.max(21, ...classes.map((c) => Math.ceil(hhmmToHours(c.end))));
+  return { from, to };
+}
+
 /** La clase en curso o la siguiente de la semana (las clases se repiten cada semana). */
 export function nextClass(classes: LegacyClass[], now: Date): { c: LegacyClass; wait: number; ongoing: boolean } | null {
   const nowMin = (isoDay(now) - 1) * 1440 + now.getHours() * 60 + now.getMinutes();
@@ -571,7 +633,8 @@ export function calendarMarks(data: LegacyData | undefined, month: Day, cycleDay
   };
   const n = daysInMonth(month);
   for (const r of legacyList(data, 'reminders')) {
-    if (r.on !== false && Number.isInteger(r.day) && r.day >= 1 && r.day <= n) add(`${month.slice(0, 8)}${String(r.day).padStart(2, '0')}`, 'event');
+    // Un evento del 29, 30 o 31 sale el último día de los meses más cortos.
+    if (r.on !== false && Number.isInteger(r.day) && r.day >= 1 && r.day <= 31) add(`${month.slice(0, 8)}${String(Math.min(r.day, n)).padStart(2, '0')}`, 'event');
   }
   looseList<CalendarWorkout>(data, 'workouts').forEach((w) => add(w.date, 'workout'));
   looseList<CalendarGoal>(data, 'goals').forEach((g) => add(g.deadline, 'goal'));
@@ -581,12 +644,20 @@ export function calendarMarks(data: LegacyData | undefined, month: Day, cycleDay
   return byDay;
 }
 
+/**
+ * ¿El evento mensual cae en este día? Un evento del 29, 30 o 31 se muestra el
+ * último día de los meses más cortos (no desaparece).
+ */
+export function reminderFallsOn(r: Pick<LegacyReminder, 'day'>, day: Day): boolean {
+  if (!Number.isInteger(r.day) || r.day < 1 || r.day > 31) return false;
+  return Math.min(r.day, daysInMonth(`${day.slice(0, 7)}-01`)) === Number(day.slice(8, 10));
+}
+
 /** «: 2 eventos, entreno» para el nombre accesible de un día. */
 export function describeCalendarDay(day: Day, marks: Map<Day, Set<CalendarMark>>, reminders: LegacyReminder[]): string {
   const set = marks.get(day);
   if (!set) return '';
-  const dayNum = Number(day.slice(8));
-  const events = reminders.filter((r) => r.on !== false && r.day === dayNum).length;
+  const events = reminders.filter((r) => r.on !== false && reminderFallsOn(r, day)).length;
   const parts = [...set].map((k) => (k === 'event' ? `${events} ${events === 1 ? 'evento' : 'eventos'}` : CALENDAR_MARKS[k].toLowerCase()));
   return `: ${parts.join(', ')}`;
 }
@@ -620,6 +691,82 @@ export function legacySubjectNames(data: Record<string, unknown> | undefined): s
 }
 
 // Un valor desconocido se muestra como el de por defecto, sin cambiar el dato.
+export const projectPriorityOf = (p: { priority?: unknown }): ProjectPriority => (PROJECT_PRIORITIES.includes(p.priority as ProjectPriority) ? (p.priority as ProjectPriority) : 'media');
+
+/**
+ * Orden «terminar primero»: los pendientes en el orden que eligió la persona, y los entregados al final.
+ * El orden de la lista es el que se guarda; esta función solo aparta los entregados.
+ */
+export function projectsInOrder<T extends { status?: unknown }>(list: readonly T[]): T[] {
+  return [...list.filter((p) => projectStatusOf(p) !== 'entregado'), ...list.filter((p) => projectStatusOf(p) === 'entregado')];
+}
+
+/** Ids reordenados por prioridad (alta, media, baja), sin cambiar el orden dentro de cada prioridad. Entregados al final. */
+export function projectIdsByPriority<T extends { id: string; status?: unknown; priority?: unknown }>(list: readonly T[]): string[] {
+  const open = list.filter((p) => projectStatusOf(p) !== 'entregado');
+  const sorted = open.map((p, i) => ({ p, i })).sort((a, b) => PROJECT_PRIORITY_INFO[projectPriorityOf(a.p)].rank - PROJECT_PRIORITY_INFO[projectPriorityOf(b.p)].rank || a.i - b.i);
+  return [...sorted.map((x) => x.p.id), ...list.filter((p) => projectStatusOf(p) === 'entregado').map((p) => p.id)];
+}
+
+/** El proyecto que toca terminar primero (el primero sin entregar), o undefined. */
+export const firstProject = <T extends { status?: unknown }>(list: readonly T[]): T | undefined => list.find((p) => projectStatusOf(p) !== 'entregado');
+
+export const projectCategoryOf = (p: { category?: unknown }): ProjectCategory | null => (PROJECT_CATEGORIES.includes(p.category as ProjectCategory) ? (p.category as ProjectCategory) : null);
+
+/**
+ * Las categorías de un proyecto: la lista nueva (`categories`) o, si es de antes,
+ * su única `category`. Sin repetir; las de la lista van con su clave.
+ */
+export function projectCategoriesOf(p: { category?: unknown; categories?: unknown }): string[] {
+  const raw = Array.isArray(p.categories) ? p.categories : projectCategoryOf(p) ? [p.category] : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of raw) {
+    if (typeof c !== 'string' || !c.trim()) continue;
+    const v = projectCategoryKey(c);
+    const k = v.toLocaleLowerCase('es');
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(v);
+    }
+  }
+  return out.slice(0, PROJECT_CATEGORIES_MAX);
+}
+
+/** Una categoría escrita a mano que coincide con una de la lista se guarda con su clave. */
+export function projectCategoryKey(c: string): string {
+  const t = c.trim().slice(0, 40);
+  const known = PROJECT_CATEGORIES.find((k) => k === t || PROJECT_CATEGORY_INFO[k].label.toLocaleLowerCase('es') === t.toLocaleLowerCase('es'));
+  return known ?? t;
+}
+
+/** Nombre visible de una categoría (la de la lista o la que escribió la persona). */
+export const projectCategoryLabel = (c: string): string => (PROJECT_CATEGORIES.includes(c as ProjectCategory) ? PROJECT_CATEGORY_INFO[c as ProjectCategory].label : c);
+
+/** Todas las categorías para elegir: las de la lista y las propias que ya usan tus proyectos. */
+export function projectCategoryChoices(projects: Array<{ category?: unknown; categories?: unknown }>): string[] {
+  const own = projects.flatMap((p) => projectCategoriesOf(p)).filter((c) => !PROJECT_CATEGORIES.includes(c as ProjectCategory));
+  return [...PROJECT_CATEGORIES, ...[...new Set(own)].sort((a, b) => a.localeCompare(b, 'es'))];
+}
+
+/** Lo que se guarda: la lista y, para lo que lee solo una, la primera de la lista conocida. */
+export function projectCategoriesPatch(list: string[]): { categories: string[]; category: ProjectCategory | '' } {
+  const categories = projectCategoriesOf({ categories: list });
+  return { categories, category: (categories.find((c) => PROJECT_CATEGORIES.includes(c as ProjectCategory)) as ProjectCategory | undefined) ?? '' };
+}
+
+/** Lo que falta y las mejoras de un proyecto, con ids seguros. */
+export function projectTodos(p: { todos?: unknown }, makeId: () => string): LegacyProjectTodo[] {
+  return checkItems<LegacyProjectTodo>(p.todos, makeId).map((t) => ({ ...t, kind: t.kind === 'mejora' ? 'mejora' : 'falta' }));
+}
+
+/** El enlace para abrir el correo de un proyecto: el que se guardó o el webmail de su dominio (cPanel). */
+export function projectMailLink(p: { email?: unknown; mailUrl?: unknown }): string | null {
+  if (typeof p.mailUrl === 'string' && /^https?:\/\//i.test(p.mailUrl.trim())) return p.mailUrl.trim();
+  const domain = typeof p.email === 'string' ? p.email.trim().split('@')[1] : '';
+  return domain && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain) ? `https://${domain.toLowerCase()}/webmail` : null;
+}
+
 export const projectStatusOf = (p: { status?: unknown }): ProjectStatus => (PROJECT_STATUSES.includes(p.status as ProjectStatus) ? (p.status as ProjectStatus) : 'curso');
 export const contentPlatformOf = (c: Pick<LegacyContent, 'platform'>): ContentPlatform => (CONTENT_PLATFORMS.includes(c.platform) ? c.platform : 'otro');
 export const contentStageOf = (c: Pick<LegacyContent, 'stage'>): ContentStage => (CONTENT_STAGES.includes(c.stage) ? c.stage : 'idea');
@@ -661,7 +808,7 @@ export const inlineImages = (text: string): string[] => Array.from(new Set(text.
 
 /** "12,30" o "12.30" → 12.3 (hasta dos decimales). null si no es una cantidad. */
 export function parseAmount(text: string): number | null {
-  const t = text.trim().replace(/\s/g, '');
+  const t = text.trim().replace(/\s/g, '').replace(/^\$/, ''); // «$12,50» también vale
   if (!/^\d+([.,]\d{1,2})?$/.test(t)) return null;
   return Number(t.replace(',', '.'));
 }
@@ -787,7 +934,7 @@ export function toggleWeekday(days: string, iso: string): string {
   return next || days;
 }
 
-// ---------- Tanda 4: Notas, Trabajo y Respiración ----------
+// ---------- Tanda 4: Notas y Trabajo ----------
 
 /** Orden alfabético español sin distinguir mayúsculas ni tildes. */
 export const byNameEs = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
@@ -795,7 +942,24 @@ export const byNameEs = (a: string, b: string) => a.localeCompare(b, 'es', { sen
 /** Texto para buscar: sin tildes y en minúsculas («Física» encuentra «fisica»). */
 export const searchFold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+/**
+ * ¿Coincide con la búsqueda? Sin tildes ni mayúsculas, y cada palabra tiene
+ * que aparecer en alguno de los campos («pagar luz» encuentra «Pagar la luz»).
+ */
+export function matchesSearch(query: string, ...fields: unknown[]): boolean {
+  const words = searchFold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = searchFold(fields.filter((f) => typeof f === 'string' || typeof f === 'number').join(' \u0000 '));
+  return words.every((w) => hay.includes(w));
+}
+
 // Una nota con datos raros se muestra con los valores por defecto, sin cambiar el dato.
+/** Nota recién creada que nunca se escribió: sin título propio ni texto. Se borra al salir del editor. */
+export const noteIsBlank = (n: { title?: string | null; body?: string | null }): boolean => {
+  const t = (n.title ?? '').trim();
+  return (!t || t === NOTE_DEFAULT_TITLE) && !(n.body ?? '').trim();
+};
+
 export const noteSubjectOf = (n: Pick<LegacyNote, 'subject'>): string => (typeof n.subject === 'string' && n.subject.trim() ? n.subject.trim() : NOTE_DEFAULT_SUBJECT);
 export const noteTitleOf = (n: Pick<LegacyNote, 'title'>): string => (typeof n.title === 'string' && n.title.trim() ? n.title : NOTE_DEFAULT_TITLE);
 export const noteBodyOf = (n: Pick<LegacyNote, 'body'>): string => (typeof n.body === 'string' ? n.body : '');
@@ -826,7 +990,33 @@ export function groupNotesBySubject<N extends LegacyNote>(notes: N[]): Array<[st
 }
 
 // Proyecto y estado desconocidos (datos raros) se muestran como el primero, sin cambiar el dato.
-export const workProjectOf = (w: Pick<LegacyWorkItem, 'project'>): WorkProject => (WORK_PROJECTS.includes(w.project) ? w.project : 'p1');
+export const workProjectOf = (w: Pick<LegacyWorkItem, 'project'>): WorkProject => (WORK_PROJECTS.includes(w.project as WorkProject) ? (w.project as WorkProject) : 'p1');
+
+export interface WorkProjectView {
+  id: string;
+  label: string;
+  color: string;
+  /** true si es un proyecto de la sección Proyectos. */
+  real: boolean;
+}
+
+const NO_PROJECT: WorkProjectView = { id: '', label: 'Sin proyecto', color: '#8A8F98', real: false };
+
+/** Proyecto al que pertenece una tarea de Trabajo: uno real de Proyectos, uno de los fijos antiguos o ninguno. */
+export function workProjectView(w: Pick<LegacyWorkItem, 'project'>, projects: Array<Pick<LegacyProject, 'id' | 'title' | 'color'>>): WorkProjectView {
+  const real = projects.find((p) => p.id === w.project);
+  if (real) return { id: real.id, label: real.title || 'Proyecto sin nombre', color: real.color || '#8A8F98', real: true };
+  if (WORK_PROJECTS.includes(w.project as WorkProject)) return { id: w.project, ...WORK_PROJECT_INFO[w.project as WorkProject], real: false };
+  return NO_PROJECT;
+}
+
+/** Opciones para elegir proyecto: los de Proyectos sin entregar, «Sin proyecto» y, si la tarea ya lo tiene, su proyecto actual. */
+export function workProjectOptions(projects: Array<Pick<LegacyProject, 'id' | 'title' | 'color' | 'status'>>, current = ''): WorkProjectView[] {
+  const open = projects.filter((p) => p.status !== 'entregado' || p.id === current).map((p) => workProjectView({ project: p.id }, projects));
+  const out = [...open, NO_PROJECT];
+  if (current && !out.some((o) => o.id === current)) out.push(workProjectView({ project: current }, projects));
+  return out;
+}
 export const workStatusOf = (w: Pick<LegacyWorkItem, 'status'>): WorkStatus => (WORK_STATUSES.includes(w.status) ? w.status : 'todo');
 
 /** Mismos grupos que la app anterior: en curso, por hacer y hecho. */
@@ -837,59 +1027,527 @@ export const WORK_BUCKETS: Array<{ id: 'curso' | 'todo' | 'hecho'; label: string
 ];
 export const workBucketOf = (w: Pick<LegacyWorkItem, 'done' | 'status'>): 'curso' | 'todo' | 'hecho' => (w.done ? 'hecho' : workStatusOf(w));
 
-export type BreathPhase = 'in' | 'hold' | 'out';
-export type BreathPatternId = 'caja' | '478';
+// ---------- Cursos ----------
 
-/** Técnicas de respiración de la app anterior (fases con sus segundos). */
-export const BREATH_PATTERNS: Record<BreathPatternId, { label: string; hint: string; phases: Array<[BreathPhase, number]> }> = {
-  caja: { label: 'Caja 4-4-4-4', hint: 'Inhala 4, mantén 4, exhala 4 y mantén 4 segundos. Ayuda a calmarte y concentrarte.', phases: [['in', 4], ['hold', 4], ['out', 4], ['hold', 4]] },
-  '478': { label: '4-7-8', hint: 'Inhala 4, mantén 7 y exhala 8 segundos. Ayuda a relajarte antes de dormir.', phases: [['in', 4], ['hold', 7], ['out', 8]] },
-};
-/** Orden fijo: «478» parece un número y Object.keys lo pondría primero. */
-export const BREATH_PATTERN_ORDER: BreathPatternId[] = ['caja', '478'];
-export const BREATH_PHASE_LABEL: Record<BreathPhase, string> = { in: 'Inhala', hold: 'Mantén', out: 'Exhala' };
-export const BREATH_DURATIONS = [1, 3, 5] as const;
-export type BreathMinutes = (typeof BREATH_DURATIONS)[number];
+/** «youtube.com/watch?v=…» → «https://youtube.com/watch?v=…». Vacío se queda vacío. */
+export function normalizeCourseUrl(v: string): string {
+  const t = v.trim();
+  if (!t) return '';
+  return /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
+}
 
-/** Duración de un ciclo completo de la técnica, en milisegundos. */
-export const breathCycleMs = (pattern: BreathPatternId) => BREATH_PATTERNS[pattern].phases.reduce((s, [, n]) => s + n, 0) * 1000;
-
-/** Fase de la respiración en un momento de la sesión (en milisegundos desde el inicio). */
-export function breathPhase(pattern: BreathPatternId, ms: number): { phase: BreathPhase; index: number; secondsLeft: number; seconds: number } {
-  const phases = BREATH_PATTERNS[pattern].phases;
-  let t = ms % breathCycleMs(pattern);
-  for (let i = 0; i < phases.length; i++) {
-    const len = phases[i][1] * 1000;
-    if (t < len) return { phase: phases[i][0], index: i, seconds: phases[i][1], secondsLeft: Math.ceil((len - t) / 1000) };
-    t -= len;
+/** Un enlace que se puede guardar y abrir (solo http y https). */
+export function validCourseUrl(v: string): boolean {
+  if (!v) return true;
+  try {
+    const u = new URL(v);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && u.hostname.includes('.') && v.length <= 2000;
+  } catch {
+    return false;
   }
-  return { phase: phases[0][0], index: 0, seconds: phases[0][1], secondsLeft: phases[0][1] };
 }
 
-/** El círculo está grande al inhalar y al mantener después de inhalar; pequeño en lo demás. */
-export function breathExpanded(pattern: BreathPatternId, index: number): boolean {
-  const phases = BREATH_PATTERNS[pattern].phases;
-  const phase = phases[index][0];
-  const prev = phases[(index + phases.length - 1) % phases.length][0];
-  return phase === 'in' || (phase === 'hold' && prev === 'in');
+const COURSE_SITES: Array<{ match: RegExp; label: string; video: boolean }> = [
+  { match: /(^|\.)(youtube\.com|youtu\.be)$/, label: 'YouTube', video: true },
+  { match: /(^|\.)udemy\.com$/, label: 'Udemy', video: false },
+  { match: /(^|\.)coursera\.org$/, label: 'Coursera', video: false },
+  { match: /(^|\.)platzi\.com$/, label: 'Platzi', video: false },
+  { match: /(^|\.)domestika\.org$/, label: 'Domestika', video: false },
+  { match: /(^|\.)edx\.org$/, label: 'edX', video: false },
+  { match: /(^|\.)khanacademy\.org$/, label: 'Khan Academy', video: false },
+  { match: /(^|\.)crehana\.com$/, label: 'Crehana', video: false },
+  { match: /(^|\.)skillshare\.com$/, label: 'Skillshare', video: false },
+  { match: /(^|\.)linkedin\.com$/, label: 'LinkedIn Learning', video: false },
+  { match: /(^|\.)vimeo\.com$/, label: 'Vimeo', video: true },
+  { match: /(^|\.)twitch\.tv$/, label: 'Twitch', video: true },
+];
+
+/** De dónde es un enlace: «YouTube», «Udemy»… o el dominio («miweb.com»). */
+export function courseSource(url: string): { label: string; video: boolean } | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    const site = COURSE_SITES.find((s) => s.match.test(host));
+    return site ? { label: site.label, video: site.video } : { label: host, video: false };
+  } catch {
+    return null;
+  }
 }
 
-/** 90500 → "1:31" (el reloj de Respiración). */
-export const breathClock = (ms: number) => {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
+/** Academias y plataformas habituales, para elegirlas sin escribir. */
+export const COURSE_ACADEMIES = ['YouTube', 'Platzi', 'Udemy', 'Coursera', 'EDteam', 'Domestika', 'Crehana', 'freeCodeCamp', 'LinkedIn Learning', 'edX', 'Khan Academy', 'Google'] as const;
 
-/** Minutos de hoy, de esta semana y sesiones válidas de Respiración (día en UTC, como la app anterior). */
-export function meditationStats(sessions: LegacyMeditation[], today: Day) {
-  const valid = sessions.filter((s) => isDay(s.date) && typeof s.minutes === 'number');
-  const week = periodRange('week', today);
+/** Nombre que se muestra: el título, o la plataforma si solo hay enlace. */
+export const courseName = (c: { title?: string; url?: string; topic?: string }) => c.title?.trim() || (c.url ? `Curso en ${courseSource(c.url)?.label ?? 'internet'}` : (c.topic ?? 'Curso'));
+
+/** Cursos agrupados por tema, en el orden en que aparece cada tema por primera vez. */
+export function coursesByTopic<T extends { topic: string }>(list: T[]): Array<{ topic: string; items: T[] }> {
+  const groups = new Map<string, { topic: string; items: T[] }>();
+  for (const c of list) {
+    const topic = (c.topic ?? '').trim() || 'Sin tema';
+    const key = topic.toLocaleLowerCase('es');
+    const g = groups.get(key) ?? groups.set(key, { topic, items: [] }).get(key)!;
+    g.items.push(c);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Cursos de un tema por subcategoría, en el orden en que aparece cada una:
+ * primero los que no tienen subcategoría (`subtopic: ''`).
+ */
+export function coursesBySubtopic<T extends { subtopic?: string }>(list: T[]): Array<{ subtopic: string; items: T[] }> {
+  const groups = new Map<string, { subtopic: string; items: T[] }>();
+  groups.set('', { subtopic: '', items: [] });
+  for (const c of list) {
+    const subtopic = (c.subtopic ?? '').trim();
+    const key = subtopic.toLocaleLowerCase('es');
+    const g = groups.get(key) ?? groups.set(key, { subtopic, items: [] }).get(key)!;
+    g.items.push(c);
+  }
+  return [...groups.values()].filter((g) => g.items.length);
+}
+
+/** Quién lo dicta: el canal o academia escrito, o si no, la plataforma del enlace. */
+export const courseOrigin = (c: { source?: string; url?: string }): string => c.source?.trim() || (c.url ? (courseSource(c.url)?.label ?? '') : '');
+
+/**
+ * Video (y lista) de un enlace de YouTube, para verlo dentro de la app y
+ * guardar dónde se pausó. `null` si no es de YouTube o no tiene video ni lista.
+ */
+export function youtubeRef(url: string): { video: string; list: string; start: number } | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase().replace(/^(www|m|music)\./, '');
+  const id = (v: string | null | undefined) => (v && /^[\w-]{6,20}$/.test(v) ? v : '');
+  let video = '';
+  if (host === 'youtu.be') video = id(u.pathname.split('/')[1]);
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    const parts = u.pathname.split('/').filter(Boolean);
+    video = parts[0] === 'watch' ? id(u.searchParams.get('v')) : ['embed', 'shorts', 'live', 'v'].includes(parts[0]) ? id(parts[1]) : '';
+  } else return null;
+  const list = u.searchParams.get('list') ?? '';
+  const t = u.searchParams.get('t') ?? u.searchParams.get('start') ?? '';
+  const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(t);
+  const start = m ? Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0) : 0;
+  if (!video && !/^[\w-]{10,64}$/.test(list)) return null;
+  return { video, list: /^[\w-]{10,64}$/.test(list) ? list : '', start };
+}
+
+/** Porcentaje visto (0-100): con YouTube, la posición guardada; si no, lo que anotó la persona. */
+export function courseProgress(c: Pick<LegacyCourse, 'progress' | 'position' | 'duration' | 'status'> & { lessons?: LegacyCourse['lessons'] }): number {
+  if (c.status === 'hecho') return 100;
+  // Con lecciones, el avance es cuántas marcaste como vistas.
+  if (c.lessons?.length) return Math.round((c.lessons.filter((l) => l.done).length / c.lessons.length) * 100);
+  const p = typeof c.progress === 'number' ? c.progress : c.duration && c.position ? (c.position / c.duration) * 100 : 0;
+  return Math.max(0, Math.min(100, Math.round(p)));
+}
+
+/** 75 → «1:15», 3725 → «1:02:05». */
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/** Texto corto de dónde se quedó: «Lección 12 · 40 %» o «Vas en 12:05 de 45:10». */
+export function courseResume(c: LegacyCourse): string {
+  const pct = courseProgress(c);
+  if (c.status === 'hecho') return 'Terminado';
+  if (c.lessons?.length) {
+    const done = c.lessons.filter((l) => l.done).length;
+    const next = nextLesson(c);
+    return `${done} de ${c.lessons.length} lecciones${next && done ? ` · sigue «${next.title}»` : ''}`;
+  }
+  const parts: string[] = [];
+  if (c.spot?.trim()) parts.push(c.spot.trim());
+  else if (c.position && c.duration) parts.push(`Vas en ${formatClock(c.position)} de ${formatClock(c.duration)}`);
+  else if (c.position) parts.push(`Vas en ${formatClock(c.position)}`);
+  if (pct > 0 && !(c.position && c.duration && !c.spot)) parts.push(`${pct} %`);
+  return parts.join(' · ');
+}
+
+/** Lo que se guarda al pausar o cerrar el video. */
+export function coursePlaybackPatch(c: LegacyCourse, at: { position: number; duration: number; video?: string; index?: number; count?: number }, now = new Date()): Partial<LegacyCourse> {
+  const position = Math.max(0, Math.round(at.position));
+  const duration = Math.max(0, Math.round(at.duration));
+  const one = duration ? position / duration : 0;
+  const count = at.count && at.count > 1 ? at.count : 1;
+  const index = count > 1 ? Math.max(0, Math.min(count - 1, at.index ?? 0)) : 0;
+  const progress = Math.round(Math.min(1, (index + one) / count) * 100);
+  const finished = count === 1 ? one >= 0.97 : index === count - 1 && one >= 0.97;
   return {
-    valid,
-    todayMinutes: valid.filter((s) => s.date === today).reduce((n, s) => n + s.minutes, 0),
-    weekMinutes: valid.filter((s) => s.date >= week.from && s.date <= week.to).reduce((n, s) => n + s.minutes, 0),
+    position,
+    duration,
+    progress: finished ? 100 : progress,
+    ...(at.video !== undefined ? { video: /^[\w-]{6,20}$/.test(at.video) ? at.video : '' } : {}),
+    lastAt: now.toISOString(),
+    status: finished ? 'hecho' : c.status === 'hecho' ? 'hecho' : 'curso',
   };
 }
 
-/** Nombre del tipo de sesión («Respiración» para la de la app anterior o sin tipo). */
-export const meditationKindLabel = (kind: unknown) => (kind === MEDITATION_KIND || !kind || typeof kind !== 'string' ? 'Respiración' : kind);
+/** La primera lección sin ver. */
+export const nextLesson = (c: Pick<LegacyCourse, 'lessons'>): CourseLesson | undefined => c.lessons?.find((l) => !l.done);
+
+/** Lecciones por unidad, en el orden en que aparece cada una (las sin unidad, donde caigan). */
+export function lessonsByUnit(lessons: CourseLesson[], units: string[] = []): Array<{ unit: string; items: CourseLesson[] }> {
+  const out: Array<{ unit: string; items: CourseLesson[] }> = [];
+  const find = (unit: string) => out.find((x) => sameUnit(x.unit, unit));
+  // Primero las unidades creadas (aunque estén vacías), en su orden.
+  for (const u of units) if (u.trim() && !find(u.trim())) out.push({ unit: u.trim(), items: [] });
+  for (const l of lessons) {
+    const unit = (l.unit ?? '').trim();
+    const g = find(unit);
+    if (g) g.items.push(l);
+    else out.push({ unit, items: [l] });
+  }
+  return out;
+}
+
+const sameUnit = (a: string, b: string) => a.trim().toLocaleLowerCase('es') === b.trim().toLocaleLowerCase('es');
+
+/** Las unidades de un curso en orden: las creadas y las que solo aparecen en lecciones. */
+export function courseUnits(c: Pick<LegacyCourse, 'units' | 'lessons'>): string[] {
+  return lessonsByUnit(c.lessons ?? [], c.units ?? [])
+    .map((g) => g.unit)
+    .filter(Boolean);
+}
+
+const UNIT_NUMBER = /^\s*(?:unidad|unit|unidade|unit[eé]|unit[aà]|einheit|m[oó]dulo|module|modul|tema|secci[oó]n|section)\s+(\d{1,3})\b/i;
+
+/** Número que le toca a la próxima unidad: uno más que la mayor ya numerada, o el siguiente en la lista. */
+export function nextUnitNumber(units: readonly string[]): number {
+  const nums = units.map((u) => Number(UNIT_NUMBER.exec(u)?.[1] ?? 0));
+  return Math.max(units.length, ...nums, 0) + 1;
+}
+
+const UNIT_WORDS: Record<string, string> = { en: 'Unit', pt: 'Unidade', fr: 'Unité', it: 'Unità', de: 'Einheit' };
+
+/** Palabra para «unidad» según el idioma del curso: «Unit» en inglés, «Unidade» en portugués… */
+export function unitWord(language?: string | null): string {
+  return (language && UNIT_WORDS[language]) || 'Unidad';
+}
+
+// ---- Idioma de un texto ----
+
+const STOPWORDS: Record<'es' | 'en' | 'pt' | 'fr' | 'it' | 'de', string[]> = {
+  es: ['el', 'la', 'los', 'las', 'de', 'del', 'y', 'en', 'con', 'para', 'por', 'una', 'un', 'curso', 'desde', 'cero', 'aprende', 'completo', 'qué', 'cómo', 'básico', 'introducción', 'es', 'al', 'tu', 'como', 'que', 'clase', 'nivel'],
+  en: ['the', 'and', 'of', 'to', 'in', 'for', 'with', 'how', 'learn', 'course', 'beginners', 'beginner', 'complete', 'guide', 'your', 'from', 'scratch', 'what', 'is', 'an', 'a', 'full', 'tutorial', 'introduction', 'class', 'level', 'english'],
+  pt: ['o', 'os', 'do', 'da', 'dos', 'das', 'e', 'em', 'com', 'para', 'por', 'uma', 'um', 'curso', 'aprenda', 'completo', 'não', 'você', 'como', 'que', 'aula', 'iniciantes', 'nível'],
+  fr: ['le', 'la', 'les', 'de', 'des', 'du', 'et', 'en', 'avec', 'pour', 'une', 'un', 'cours', 'apprendre', 'complet', 'débutants', 'comment', 'est', 'au', 'aux', 'leçon', 'niveau'],
+  it: ['il', 'lo', 'la', 'gli', 'le', 'di', 'del', 'della', 'e', 'in', 'con', 'per', 'una', 'un', 'corso', 'impara', 'completo', 'principianti', 'come', 'che', 'lezione', 'livello'],
+  de: ['der', 'die', 'das', 'und', 'in', 'mit', 'für', 'ein', 'eine', 'kurs', 'lernen', 'anfänger', 'wie', 'ist', 'zu', 'den', 'von', 'auf', 'deutsch', 'stufe'],
+};
+
+/**
+ * Adivina el idioma de un título mientras se escribe: por el alfabeto (japonés,
+ * coreano, chino, ruso, árabe) o por las palabras más comunes (español, inglés,
+ * portugués, francés, italiano, alemán). Devuelve null si no está claro.
+ */
+export function detectLanguage(text: string): CourseLanguage | null {
+  const t = (text ?? '').trim();
+  if (t.length < 3) return null;
+  if (/[\u3040-\u30ff]/.test(t)) return 'ja';
+  if (/[\uac00-\ud7af]/.test(t)) return 'ko';
+  if (/[\u4e00-\u9fff]/.test(t)) return 'zh';
+  if (/[\u0400-\u04ff]/.test(t)) return 'ru';
+  if (/[\u0600-\u06ff]/.test(t)) return 'ar';
+  const words = t.toLocaleLowerCase().match(/[\p{L}']+/gu) ?? [];
+  if (!words.length) return null;
+  const score: Record<string, number> = { es: 0, en: 0, pt: 0, fr: 0, it: 0, de: 0 };
+  for (const [lang, list] of Object.entries(STOPWORDS)) {
+    const set = new Set(list);
+    for (const w of words) if (set.has(w)) score[lang] += 1;
+  }
+  // Letras que delatan el idioma.
+  if (/ñ|¿|¡/.test(t)) score.es += 2;
+  if (/[ãõ]|ção|ções/.test(t)) score.pt += 2;
+  if (/[èêëœ]|ç(?!ão)/.test(t)) score.fr += 1.5;
+  if (/[äöüß]/.test(t)) score.de += 2;
+  if (/\b\w+'s\b|ing\b/.test(t)) score.en += 1;
+  if (/ción\b|ciones\b|idad\b/.test(t)) score.es += 1;
+  const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  const [best, second] = ranked;
+  if (best[1] < 1 || best[1] === second[1]) return null;
+  return best[0] as CourseLanguage;
+}
+
+// ---- Cursos repetidos ----
+
+const plainTitle = (s: string) =>
+  s
+    .toLocaleLowerCase('es')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/** Clave de un enlace para comparar: el video o la lista de YouTube, o el enlace sin «www», «#» ni «/» final. */
+function urlKey(url: string | undefined): string {
+  if (!url) return '';
+  const yt = youtubeRef(url);
+  if (yt) return yt.list ? `yt-list:${yt.list}` : `yt:${yt.video}`;
+  try {
+    const u = new URL(url);
+    return `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/+$/, '')}${u.search}`.toLowerCase();
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
+
+/** El curso que ya tienes con el mismo enlace o el mismo nombre (sin contar `exceptId`). */
+export function findDuplicateCourse<T extends { id: string; url?: string; title?: string }>(courses: readonly T[], candidate: { url?: string; title?: string }, exceptId?: string): { course: T; by: 'enlace' | 'nombre' } | null {
+  const key = urlKey(candidate.url);
+  const name = plainTitle(candidate.title ?? '');
+  for (const c of courses) {
+    if (c.id === exceptId) continue;
+    if (key && urlKey(c.url) === key) return { course: c, by: 'enlace' };
+  }
+  if (name.length >= 4)
+    for (const c of courses) {
+      if (c.id === exceptId) continue;
+      if (plainTitle(c.title ?? '') === name) return { course: c, by: 'nombre' };
+    }
+  return null;
+}
+
+/** Grupos de cursos repetidos (mismo enlace o mismo nombre), para avisar en la lista. */
+export function duplicateCourseGroups<T extends { id: string; url?: string; title?: string }>(courses: readonly T[]): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const c of courses) {
+    const keys = [urlKey(c.url) && `u:${urlKey(c.url)}`, plainTitle(c.title ?? '').length >= 4 && `t:${plainTitle(c.title ?? '')}`].filter(Boolean) as string[];
+    for (const k of keys) groups.set(k, [...(groups.get(k) ?? []), c]);
+  }
+  const seen = new Set<string>();
+  const out: T[][] = [];
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const sig = g.map((c) => c.id).sort().join('|');
+    if (seen.has(sig) || g.every((c) => out.some((o) => o.includes(c)))) continue;
+    seen.add(sig);
+    out.push(g);
+  }
+  return out;
+}
+
+/** Actividades de una lección hechas y en total. */
+export function activityCount(l: { activities?: Array<{ done?: boolean }> }): { done: number; total: number } {
+  const list = l.activities ?? [];
+  return { done: list.filter((a) => a.done).length, total: list.length };
+}
+
+/** «Unidad 3: Variables» (o «Unit 3: Variables» en un curso en inglés); si ya se escribió con su número, se respeta. */
+export function numberedUnit(n: number, title: string, language?: string | null): string {
+  const t = title.trim().replace(/^[:\-–\s]+/, '');
+  if (UNIT_NUMBER.test(t)) return t;
+  const w = unitWord(language);
+  return t ? `${w} ${n}: ${t}` : `${w} ${n}`;
+}
+
+/** Para mostrar en la tarjeta: cada unidad con sus lecciones vistas. */
+export function unitSummary(c: Pick<LegacyCourse, 'units' | 'lessons'>): Array<{ unit: string; done: number; total: number }> {
+  return lessonsByUnit(c.lessons ?? [], c.units ?? [])
+    .filter((g) => g.unit)
+    .map((g) => ({ unit: g.unit, done: g.items.filter((l) => l.done).length, total: g.items.length }));
+}
+
+/** Añade una unidad vacía al final (si no existe ya). */
+export function addUnitPatch(c: LegacyCourse, name: string): Partial<LegacyCourse> | null {
+  const unit = name.trim();
+  const units = courseUnits(c);
+  if (!unit || units.some((u) => sameUnit(u, unit)) || units.length >= COURSE_UNITS_MAX) return null;
+  return { units: [...units, unit] };
+}
+
+/** Cambia el nombre de una unidad, también en sus lecciones. */
+export function renameUnitPatch(c: LegacyCourse, from: string, to: string): Partial<LegacyCourse> | null {
+  const name = to.trim();
+  const units = courseUnits(c);
+  if (!name || units.some((u) => sameUnit(u, name) && !sameUnit(u, from))) return null;
+  return {
+    units: units.map((u) => (sameUnit(u, from) ? name : u)),
+    lessons: (c.lessons ?? []).map((l) => (l.unit && sameUnit(l.unit, from) ? { ...l, unit: name } : l)),
+  };
+}
+
+/** Quita una unidad con sus lecciones; el avance del curso se recalcula. */
+export function removeUnitPatch(c: LegacyCourse, unit: string, now = new Date()): Partial<LegacyCourse> {
+  const lessons = (c.lessons ?? []).filter((l) => !(l.unit && sameUnit(l.unit, unit)));
+  return { ...lessonsPatch(c, lessons, now), units: courseUnits(c).filter((u) => !sameUnit(u, unit)) };
+}
+
+/**
+ * Lo que se guarda al cambiar las lecciones: el avance sale de las vistas, y
+ * el estado sigue: alguna vista → «Viendo», todas → «Terminado».
+ */
+export function lessonsPatch(c: LegacyCourse, lessons: CourseLesson[], now = new Date()): Partial<LegacyCourse> {
+  const done = lessons.filter((l) => l.done).length;
+  const all = lessons.length > 0 && done === lessons.length;
+  const status: LegacyCourse['status'] = all ? 'hecho' : done > 0 ? 'curso' : c.status === 'hecho' ? 'curso' : c.status;
+  const before = c.lessons?.filter((l) => l.done).length ?? 0;
+  return {
+    lessons,
+    progress: lessons.length ? Math.round((done / lessons.length) * 100) : (c.progress ?? 0),
+    status,
+    ...(done !== before ? { lastAt: now.toISOString() } : {}),
+  };
+}
+
+/** Clases del Horario que vienen de un curso. */
+export const courseClasses = (data: LegacyData | null | undefined, courseId: string): LegacyClass[] => legacyList(data, 'classes').filter((k) => k.course === courseId);
+
+// ---------- Emprendimientos ----------
+
+/** Lo guardado en un emprendimiento, lo más nuevo primero (como se añadió). */
+export function ventureItemsOf(data: LegacyData | undefined, ventureId: string, kind?: VentureItemKind): LegacyVentureItem[] {
+  return legacyList(data, 'ventureItems')
+    .filter((i) => i.ventureId === ventureId && (!kind || i.kind === kind))
+    .reverse();
+}
+
+/** «3 notas · 2 imágenes · 1 archivo». */
+export function ventureSummary(items: LegacyVentureItem[]): string {
+  const n = (k: VentureItemKind) => items.filter((i) => i.kind === k).length;
+  const parts = [
+    [n('note'), 'nota', 'notas'],
+    [n('image'), 'imagen', 'imágenes'],
+    [n('file'), 'archivo', 'archivos'],
+    [n('link'), 'enlace', 'enlaces'],
+  ] as const;
+  const out = parts.filter(([c]) => c > 0).map(([c, one, many]) => plural(c, one, many));
+  return out.length ? out.join(' · ') : 'Vacío';
+}
+
+/** Nombre para mostrar de lo guardado: su título, el nombre del archivo o el enlace. */
+export const ventureItemName = (i: Pick<LegacyVentureItem, 'title' | 'kind' | 'url'>) =>
+  i.title || (i.kind === 'link' ? i.url.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 80) : i.kind === 'note' ? 'Nota sin título' : i.kind === 'image' ? 'Imagen' : 'Archivo');
+
+/**
+ * Lo que tus herramientas ya registraron un día y que el check-in también pide:
+ * agua (Rutina), sueño (Sueño), gratitud (Diario) y minutos activos (Ejercicio).
+ * Así el dato se escribe una sola vez: el check-in lo toma de aquí y las
+ * herramientas lo copian al check-in al guardarlo.
+ */
+export interface ToolSignals {
+  water?: number;
+  sleepHours?: number;
+  sleepQuality?: number;
+  gratitude?: string;
+  activeMinutes?: number;
+}
+
+export const TOOL_SIGNAL_SOURCE: Record<keyof ToolSignals, string> = {
+  water: 'Rutina',
+  sleepHours: 'Sueño',
+  sleepQuality: 'Sueño',
+  gratitude: 'Diario',
+  activeMinutes: 'Ejercicio',
+};
+
+export function toolSignals(data: LegacyData | null | undefined, date: Day): ToolSignals {
+  const out: ToolSignals = {};
+  const log = legacyObject(data, 'dayLog');
+  const water = waterToday(log, date);
+  if (water > 0) out.water = Math.min(40, water);
+  const night = legacyList(data, 'sleep').find((s) => s.date === date);
+  if (night) {
+    const m = sleepMinutes(night.bedtime, night.waketime);
+    if (m !== null && m > 0) out.sleepHours = Math.round((m / 60) * 2) / 2;
+    if (Number.isInteger(night.quality) && night.quality >= 1 && night.quality <= 5) out.sleepQuality = night.quality;
+  }
+  const page = legacyList(data, 'journal').find((j) => j.date === date);
+  if (page?.gratitude?.trim()) out.gratitude = page.gratitude.trim().slice(0, 1000);
+  const active = legacyList(data, 'workouts')
+    .filter((w) => w.date === date)
+    .reduce((sum, w) => sum + (Number.isFinite(w.minutes) && w.minutes > 0 ? w.minutes : 0), 0);
+  if (active > 0) out.activeMinutes = Math.min(1440, Math.round(active));
+  return out;
+}
+
+/** Valores del check-in completados con lo que ya registraron tus herramientas, y de dónde salió cada uno. */
+export function mergeToolSignals<V extends Partial<Record<keyof ToolSignals, unknown>>>(values: V, signals: ToolSignals): { values: V; from: Partial<Record<keyof ToolSignals, string>> } {
+  const next = { ...values } as Record<string, unknown>;
+  const from: Partial<Record<keyof ToolSignals, string>> = {};
+  for (const k of Object.keys(signals) as Array<keyof ToolSignals>) {
+    const empty = next[k] === null || next[k] === undefined || next[k] === '';
+    if (empty) {
+      next[k] = signals[k];
+      from[k] = TOOL_SIGNAL_SOURCE[k];
+    }
+  }
+  return { values: next as V, from };
+}
+
+/**
+ * Grupo de un pendiente según cómo lo escribiste: «Login de NV Hotel» → «NV Hotel»,
+ * «Logo para Café Luna» → «Café Luna». Sin un nombre propio al final, no hay grupo.
+ */
+export function todoGroupOf(title: string): string | null {
+  const m = /\s(?:de|del|para|en|-|·|:)\s+((?:[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ&.'-]*)(?:\s+[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ&.'-]*){0,3})\s*$/.exec((title ?? '').trim());
+  return m ? m[1] : null;
+}
+
+/** Pendientes agrupados por proyecto (solo grupos de 2 o más, del más grande al más pequeño) y el resto en «Otros». */
+export function todoGroups<T extends { title: string }>(todos: T[]): Array<{ label: string; items: T[] }> {
+  const map = new Map<string, T[]>();
+  for (const t of todos) {
+    const g = todoGroupOf(t.title);
+    const key = g ? searchFold(g) : '';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(t);
+  }
+  const groups: Array<{ label: string; items: T[] }> = [];
+  const rest: T[] = [...(map.get('') ?? [])];
+  for (const [key, items] of map) {
+    if (!key) continue;
+    if (items.length >= 2) groups.push({ label: todoGroupOf(items[0].title) as string, items });
+    else rest.push(...items);
+  }
+  groups.sort((a, b) => b.items.length - a.items.length || byNameEs(a.label, b.label));
+  const order = new Map(todos.map((t, i) => [t, i]));
+  rest.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+  if (rest.length) groups.push({ label: groups.length ? 'Otros' : 'Pendientes', items: rest });
+  return groups;
+}
+
+// Duración de un curso en días, horas, minutos y segundos.
+export type LengthParts = { d: string; h: string; m: string; s: string };
+export const LENGTH_UNITS = [
+  { key: 'd', label: 'Días', seconds: 86400, max: 83 },
+  { key: 'h', label: 'Horas', seconds: 3600, max: 2000 },
+  { key: 'm', label: 'Minutos', seconds: 60, max: 59 },
+  { key: 's', label: 'Segundos', seconds: 1, max: 59 },
+] as const;
+export const LENGTH_MAX = 2000 * 3600;
+
+/** Segundos a días, horas, minutos y segundos (vacío lo que es cero). */
+export function lengthParts(total?: number): LengthParts {
+  if (!total || total <= 0) return { d: '', h: '', m: '', s: '' };
+  let rest = Math.round(total);
+  const out = { d: '', h: '', m: '', s: '' };
+  for (const u of LENGTH_UNITS) {
+    const n = Math.floor(rest / u.seconds);
+    rest -= n * u.seconds;
+    out[u.key] = n ? String(n) : '';
+  }
+  return out;
+}
+
+/** Lo escrito en días, horas, minutos y segundos a segundos; null si algo no es un entero válido o pasa de 2000 horas. */
+export function lengthFromParts(parts: LengthParts): number | null {
+  let total = 0;
+  for (const u of LENGTH_UNITS) {
+    const raw = parts[u.key].trim();
+    const n = raw === '' ? 0 : Number(raw);
+    if (!Number.isInteger(n) || n < 0) return null;
+    total += n * u.seconds;
+  }
+  return total > LENGTH_MAX ? null : total;
+}
+

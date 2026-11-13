@@ -41,11 +41,10 @@ describe('preferencia de tipografía', () => {
     await expect(loadAllFonts()).resolves.toBeUndefined();
   });
 
-  it('index.html pinta la tipografía por defecto y conoce todas antes de cargar la app', () => {
+  it('index.html pinta siempre el valor por defecto y borra la elección vieja (ya no se elige en Perfil)', () => {
     const html = srcFile('../index.html');
     expect(html).toMatch(new RegExp(`<html [^>]*data-font="${DEFAULT_FONT}"`));
-    const list = /\[([^\]]*)\]\.indexOf\(f\)/.exec(html)?.[1] ?? '';
-    expect([...list.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort()).toEqual(FONT_OPTIONS.map((o) => o.value).sort());
+    expect(html).toContain("localStorage.removeItem('dyc.font')");
   });
 });
 

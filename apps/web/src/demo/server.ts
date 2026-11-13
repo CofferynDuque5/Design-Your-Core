@@ -1,5 +1,19 @@
 import type { CheckIn, Habit, PartnerView, UserChallenge } from '@dyc/api-client';
 import {
+  DEFAULT_PAYMENT_SETTINGS,
+  coupleCreateInput,
+  coupleDataSchemas,
+  type CoupleItem,
+  effectivePlan,
+  extendPlan,
+  localAmount,
+  methodReady,
+  paymentRequestInput,
+  paymentReviewInput,
+  paymentSettingsSchema,
+  publicMethod,
+  type PaymentRequest,
+  type PaymentSettings,
   accountDeleteSchema,
   addDays,
   averageScores,
@@ -8,6 +22,8 @@ import {
   challengeStartSchema,
   CHALLENGES,
   checkInInputSchema,
+  consistencyDay,
+  consistencyRange,
   dayScores,
   daysIn,
   deriveLegacyPatch,
@@ -120,6 +136,7 @@ function publicProfile(a: DemoAccount) {
     bedTime: p?.bedTime ?? null,
     timezone: p?.timezone ?? 'UTC',
     baseline: p?.baseline ?? {},
+    avatar: p?.avatar ?? '',
     onboarded: !!p?.onboardedAt,
     onboardedAt: p?.onboardedAt ?? null,
   };
@@ -613,6 +630,7 @@ export function createDemoServer(opts: DemoServerOptions = {}) {
       challenges: activeChallenges(a, today),
       recommendations: recommendationsFor(a, today),
       onboarded: !!a.profile?.onboardedAt,
+      consistency: daysIn(consistencyRange(today)).map((d) => consistencyDay(d, habitsOn(a, d), !!a.checkIns[d])),
     };
   });
 
@@ -825,6 +843,107 @@ export function createDemoServer(opts: DemoServerOptions = {}) {
     return { images: Object.fromEntries(wanted.filter((id) => a.images[id]).map((id) => [id, a.images[id]])) };
   });
 
+  // La demostración no sale a internet: la duración se escribe a mano.
+  on('POST', '/api/v2/courses/length', () => fail(404, 'En la demostración no se leen otras páginas. Escribe la duración a mano.'));
+
+  // ----- Planes y pagos (en la demostración, la cuenta es administración) -----
+
+  const paySettings: PaymentSettings = demoPaymentSettings();
+  type DemoPay = PaymentRequest & { userId: string; user: { name: string; email: string } };
+  const payRequests: DemoPay[] = [
+    {
+      id: 'pay-demo-1', userId: 'otra-persona', user: { name: 'María González', email: 'maria@ejemplo.com' },
+      plan: 'pro', period: 'mes', methodId: 've-bancos', methodName: 'Bancos venezolanos', currency: 'VES', amount: localAmount(3.99, paySettings.methods[0]), amountUsd: 3.99,
+      reference: '004512889', payerName: 'María González', note: 'Pago Móvil desde Banesco', proof: DEMO_PROOF, hasProof: true, status: 'pendiente', adminNote: '', createdAt: new Date(Date.now() - 3_600_000).toISOString(), reviewedAt: null,
+    },
+    {
+      id: 'pay-demo-2', userId: 'otra-persona-2', user: { name: 'Luis Rojas', email: 'luis@ejemplo.com' },
+      plan: 'pareja', period: 'ano', methodId: 'zelle', methodName: 'Zelle', currency: 'USD', amount: 44.99, amountUsd: 44.99,
+      reference: 'ZL-77812', payerName: 'Luis Rojas', note: '', proof: DEMO_PROOF, hasProof: true, status: 'pendiente', adminNote: '', createdAt: new Date(Date.now() - 7_200_000).toISOString(), reviewedAt: null,
+    },
+  ];
+  const plans = new Map<string, { plan: string; until: string | null }>();
+  const strip = ({ userId: _u, user: _x, proof: _p, ...r }: DemoPay): PaymentRequest => r;
+
+  on('GET', '/api/v2/billing', ({ token }) => {
+    const a = account(token);
+    const p = plans.get(a.user.id);
+    const plan = effectivePlan(p?.plan, p?.until);
+    return {
+      plan,
+      planUntil: plan === 'gratis' ? null : p?.until ?? null,
+      admin: true,
+      prices: paySettings.prices,
+      methods: paySettings.methods.filter(methodReady).map(publicMethod),
+      requests: payRequests.filter((r) => r.userId === a.user.id).map(strip),
+    };
+  });
+  on('POST', '/api/v2/billing/requests', ({ token, body }) => {
+    const a = account(token);
+    const input = parse(paymentRequestInput, body);
+    const m = paySettings.methods.find((x) => x.id === input.methodId);
+    if (!m || !methodReady(m)) fail(400, 'Ese método de pago no está disponible');
+    if (payRequests.some((r) => r.userId === a.user.id && r.status === 'pendiente')) fail(409, 'Ya tienes un pago en revisión. Espera la respuesta o cancélalo para enviar otro.');
+    const usd = paySettings.prices[input.plan][input.period];
+    const r: DemoPay = {
+      id: demoId(), userId: a.user.id, user: { name: a.user.name, email: a.user.email }, plan: input.plan, period: input.period, methodId: m!.id, methodName: m!.name, currency: m!.currency,
+      amount: localAmount(usd, m!), amountUsd: usd, reference: input.reference, payerName: input.payerName, note: input.note, proof: input.proof, hasProof: !!input.proof,
+      status: 'pendiente', adminNote: '', createdAt: stamp(), reviewedAt: null,
+    };
+    payRequests.unshift(r);
+    return created({ request: strip(r) });
+  });
+  on('DELETE', '/api/v2/billing/requests/:id', ({ token, params }) => {
+    const a = account(token);
+    const i = payRequests.findIndex((r) => r.id === params[0] && r.userId === a.user.id && r.status === 'pendiente');
+    if (i < 0) fail(404, 'No hay un pago en revisión con ese número');
+    payRequests.splice(i, 1);
+    return { ok: true };
+  });
+  on('GET', '/api/v2/admin/payments/settings', () => ({ settings: paySettings }));
+  on('PUT', '/api/v2/admin/payments/settings', ({ body }) => {
+    const next = parse(paymentSettingsSchema, body.settings) as PaymentSettings;
+    Object.assign(paySettings, structuredClone(next));
+    return { settings: paySettings };
+  });
+  on('GET', '/api/v2/admin/payments/requests', ({ query }) => {
+    const status = query.get('status');
+    return {
+      pending: payRequests.filter((r) => r.status === 'pendiente').length,
+      requests: payRequests.filter((r) => !status || r.status === status).map((r) => ({ ...strip(r), user: r.user })),
+    };
+  });
+  on('GET', '/api/v2/admin/payments/requests/:id/proof', ({ params }) => {
+    const r = payRequests.find((x) => x.id === params[0]);
+    return r?.proof ? { proof: r.proof } : fail(404, 'Esta solicitud no tiene comprobante');
+  });
+  const review = (status: 'aprobado' | 'rechazado') => ({ params, body }: Ctx) => {
+    const { note } = parse(paymentReviewInput, body ?? {});
+    const r = payRequests.find((x) => x.id === params[0]);
+    if (!r) return fail(404, 'No existe esa solicitud');
+    if (r.status !== 'pendiente') return fail(409, 'Esta solicitud ya fue revisada');
+    Object.assign(r, { status, adminNote: note, reviewedAt: stamp() });
+    if (status === 'aprobado') {
+      const p = plans.get(r.userId);
+      plans.set(r.userId, { plan: r.plan, until: extendPlan(effectivePlan(p?.plan, p?.until) === 'gratis' ? null : p?.until, r.period).toISOString() });
+    }
+    return { request: strip(r) };
+  };
+  on('POST', '/api/v2/admin/payments/requests/:id/approve', review('aprobado'));
+  on('POST', '/api/v2/admin/payments/requests/:id/reject', review('rechazado'));
+
+  on('POST', '/api/images/delete', ({ token, body }) => {
+    const a = account(token);
+    const ids: string[] = Array.isArray(body.ids) ? body.ids.filter((x: unknown): x is string => typeof x === 'string').slice(0, 100) : [];
+    let count = 0;
+    for (const id of ids)
+      if (a.images[id]) {
+        delete a.images[id];
+        count++;
+      }
+    return { ok: true, count };
+  });
+
   // Pareja: en la prueba, cualquier código válido vincula con una pareja de ejemplo.
   const partnerView = (a: DemoAccount): PartnerView => {
     if (!a.partner) return { partner: null };
@@ -866,6 +985,54 @@ export function createDemoServer(opts: DemoServerOptions = {}) {
   on('DELETE', '/api/partner', ({ token }) => {
     account(token).partner = null;
     return { ok: true };
+  });
+
+  // Espacio en pareja: en la prueba se guarda en la cuenta (con ejemplos al vincularse).
+  const coupleOf = (a: DemoAccount) => {
+    if (!a.partner) fail(409, 'Vincúlate con tu pareja en Perfil para usar el espacio compartido.');
+    a.couple ??= demoCoupleItems();
+    return a.couple;
+  };
+  const coupleOut = ({ image: _i, ...item }: CoupleItem & { image?: string }): CoupleItem => item;
+  on('GET', '/api/v2/couple', ({ token }) => {
+    const a = account(token);
+    if (!a.partner) return { partner: null, items: [] };
+    return { partner: a.partner, items: coupleOf(a).map(coupleOut) };
+  });
+  on('POST', '/api/v2/couple/items', ({ token, body }) => {
+    const list = coupleOf(account(token));
+    const input = parse(coupleCreateInput, body);
+    const item: CoupleItem & { image?: string } = {
+      id: demoId(),
+      kind: input.kind,
+      data: input.data,
+      byMe: true,
+      createdAt: stamp(),
+      updatedAt: stamp(),
+      ...(input.kind === 'foto' ? { thumb: input.thumb, image: input.image } : {}),
+    };
+    list.unshift(item);
+    return created({ item: coupleOut(item) });
+  });
+  on('PATCH', '/api/v2/couple/items/:id', ({ token, params, body }) => {
+    const item = coupleOf(account(token)).find((x) => x.id === params[0]);
+    if (!item) fail(404, 'Ya no existe.');
+    const it = item!;
+    it.data = parse(coupleDataSchemas[it.kind] as typeof coupleDataSchemas.meta, { ...it.data, ...(isObj(body.data) ? body.data : {}) }) as CoupleItem['data'];
+    it.updatedAt = stamp();
+    return { item: coupleOut(it) };
+  });
+  on('DELETE', '/api/v2/couple/items/:id', ({ token, params }) => {
+    const list = coupleOf(account(token));
+    const i = list.findIndex((x) => x.id === params[0]);
+    if (i < 0) fail(404, 'Ya no existe.');
+    list.splice(i, 1);
+    return { ok: true };
+  });
+  on('GET', '/api/v2/couple/items/:id/image', ({ token, params }) => {
+    const item = coupleOf(account(token)).find((x) => x.id === params[0]);
+    if (!item?.image && !item?.thumb) fail(404, 'No hay foto');
+    return { image: item!.image ?? item!.thumb };
   });
 
   /** Atiende una petición y devuelve [estado, cuerpo]. */
@@ -941,3 +1108,63 @@ export function demoServer(): DemoServer {
   return shared;
 }
 
+/** Datos de ejemplo para la demostración (no son cuentas reales). */
+function demoPaymentSettings(): PaymentSettings {
+  const s = structuredClone(DEFAULT_PAYMENT_SETTINGS);
+  const fill = (id: string, values: string[], rate?: number) => {
+    const m = s.methods.find((x) => x.id === id);
+    if (!m) return;
+    m.fields.forEach((f, i) => (f.value = values[i] ?? ''));
+    if (rate) m.rate = rate;
+  };
+  fill('ve-bancos', ['Banco de ejemplo', '0414-000-0000', 'V-00.000.000', '', 'Design Your Core'], 236.5);
+  fill('zelle', ['pagos@ejemplo.com', 'Design Your Core']);
+  fill('bancolombia', ['Ahorros', '000-000000-00', 'Design Your Core', '000.000.000'], 4000);
+  fill('yape-plin', ['900 000 000', 'Design Your Core'], 3.75);
+  fill('paypal', ['pagos@ejemplo.com', 'paypal.me/ejemplo']);
+  fill('zinli', ['pagos@ejemplo.com', 'Design Your Core']);
+  return s;
+}
+
+/** Un comprobante de ejemplo (dibujado, no es un pago real). */
+const DEMO_PROOF = `data:image/svg+xml;base64,${typeof btoa === 'function' ? btoa('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="520"><rect width="360" height="520" rx="24" fill="#f4f5f0"/><text x="180" y="90" font-family="sans-serif" font-size="22" text-anchor="middle" fill="#222">Pago exitoso</text><text x="180" y="150" font-family="sans-serif" font-size="34" text-anchor="middle" fill="#111">Bs 943,64</text><text x="40" y="230" font-family="sans-serif" font-size="16" fill="#555">Referencia</text><text x="320" y="230" font-family="sans-serif" font-size="16" text-anchor="end" fill="#111">004512889</text><text x="40" y="270" font-family="sans-serif" font-size="16" fill="#555">Banco</text><text x="320" y="270" font-family="sans-serif" font-size="16" text-anchor="end" fill="#111">Ejemplo</text><text x="180" y="470" font-family="sans-serif" font-size="13" text-anchor="middle" fill="#888">Comprobante de demostración</text></svg>') : ''}`;
+
+/** Ejemplos del espacio en pareja para la prueba: paisajes dibujados como «fotos». */
+function demoCoupleItems(): Array<CoupleItem & { image?: string }> {
+  const scene = (sky: [string, string], sun: string, ground: string, extra = '') =>
+    `data:image/svg+xml;utf8,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs><rect width="400" height="400" fill="url(#s)"/><circle cx="270" cy="190" r="56" fill="${sun}"/>${extra}<path d="M0 290 Q100 240 200 280 T400 270 V400 H0Z" fill="${ground}"/></svg>`,
+    )}`;
+  const now = new Date().toISOString();
+  const photo = (id: string, caption: string, takenOn: string, src: string, byMe: boolean) => ({ id, kind: 'foto' as const, data: { caption, takenOn }, thumb: src, image: src, byMe, createdAt: now, updatedAt: now });
+  return [
+    photo('f1', 'Atardecer en la playa', '2026-10-18', scene(['#F7B267', '#F25C54'], '#FFE29A', '#2B2E29', '<path d="M0 300 H400 V320 H0Z" fill="#4C8DAE" opacity=".7"/>'), true),
+    photo('f2', 'Subida al Ávila', '2026-09-27', scene(['#9EC9E8', '#E8F1F7'], '#FFFFFF', '#3E5C3A', '<path d="M40 300 L150 150 L260 300Z M180 300 L290 120 L400 300Z" fill="#567D46"/>'), false),
+    photo('f3', 'Noche de pelis', '2026-11-02', scene(['#151714', '#2B2E29'], '#F2E3B3', '#1F2712', '<circle cx="80" cy="80" r="3" fill="#C8F23A"/><circle cx="140" cy="120" r="2" fill="#C8F23A"/><circle cx="330" cy="70" r="2.5" fill="#C8F23A"/>'), true),
+    photo('f4', 'Café de los domingos', '2026-11-09', scene(['#E8C9A0', '#F3F4EF'], '#D9825B', '#7A5A43'), false),
+    {
+      id: 'm1',
+      kind: 'meta',
+      data: { title: 'Viajar a Mérida en diciembre', note: 'Ahorrar entre los dos y reservar la posada.', deadline: '2026-12-15', done: false, steps: [{ id: 's1', name: 'Ahorrar $300', done: true }, { id: 's2', name: 'Reservar la posada', done: true }, { id: 's3', name: 'Comprar los pasajes', done: false }] },
+      byMe: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'm2',
+      kind: 'meta',
+      data: { title: 'Leer un libro juntos al mes', note: '', deadline: '', done: false, steps: [{ id: 's4', name: 'Elegir el de noviembre', done: true }, { id: 's5', name: 'Terminarlo', done: false }] },
+      byMe: false,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'e1',
+      kind: 'emprendimiento',
+      data: { name: 'Velas artesanales', description: 'Velas de soya con aromas. Ella diseña las etiquetas y él lleva las ventas por Instagram.', stage: 'en-marcha', tasks: [{ id: 't1', name: 'Logo y etiquetas', done: true }, { id: 't2', name: 'Fotos del catálogo', done: true }, { id: 't3', name: 'Precios y combos', done: false }, { id: 't4', name: 'Primera feria', done: false }] },
+      byMe: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+}

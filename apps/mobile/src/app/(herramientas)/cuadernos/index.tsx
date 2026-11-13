@@ -1,4 +1,4 @@
-import { legacySubjectNames, plural, uniqueTexts, type LegacyNotebook } from '@dyc/core';
+import { legacySubjectNames, matchesSearch, plural, uniqueTexts, type LegacyNotebook } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter, type Href } from 'expo-router';
 import { Plus } from 'lucide-react-native';
@@ -7,7 +7,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { NotebookCover } from '../../../components/NotebookCover';
 import { NotebookForm, NotebookTags } from '../../../components/notebooks';
 import { Sheet } from '../../../components/Sheet';
-import { ToolScreen } from '../../../components/tools';
+import { SearchBar, ToolScreen } from '../../../components/tools';
 import { Button, EmptyState, ErrorState, Loading, T, fonts } from '../../../components/ui';
 import { useLegacyData, useLegacyList } from '../../../lib/legacy';
 import { useTheme } from '../../../lib/theme';
@@ -21,11 +21,12 @@ export default function Notebooks() {
   const [category, setCategory] = useState('');
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
+  const [q, setQ] = useState('');
 
   // Filtros en cascada Categoría → Materia → Tema, con los valores que existen (como la app anterior).
   const inCategory = notebooks.filter((n) => !category || n.category === category);
   const inSubject = inCategory.filter((n) => !subject || n.subject === subject);
-  const shown = inSubject.filter((n) => !topic || n.topic === topic);
+  const shown = inSubject.filter((n) => (!topic || n.topic === topic) && matchesSearch(q, n.title, n.category, n.subject, n.topic));
   const filtering = !!(category || subject || topic);
   const subjects = uniqueTexts(inCategory.map((n) => n.subject));
   const topics = uniqueTexts(inSubject.map((n) => n.topic));
@@ -45,6 +46,7 @@ export default function Notebooks() {
         <EmptyState title="Aún no tienes cuadernos">Organiza tus apuntes por categoría, materia y tema, y guárdalos en cajitas de texto o de código fáciles de copiar.</EmptyState>
       ) : (
         <>
+          <SearchBar label="Buscar cuadernos" value={q} onChange={setQ} placeholder="Buscar por título, materia o tema…" count={shown.length} />
           <View style={{ gap: space[3] }} accessibilityLabel="Filtrar cuadernos">
             <FilterRow
               legend="Categoría"
@@ -85,7 +87,9 @@ export default function Notebooks() {
             )}
           </View>
           {shown.length === 0 ? (
-            <EmptyState title="Ningún cuaderno con estos filtros" />
+            q.trim() ? null : (
+              <EmptyState title="Ningún cuaderno con estos filtros" />
+            )
           ) : (
             // De dos en dos; si quedan impares, el último conserva el ancho de media columna.
             <View style={{ gap: space[3] }}>

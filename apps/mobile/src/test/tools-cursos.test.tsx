@@ -1,0 +1,274 @@
+import type { LegacyData } from '@dyc/core';
+import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import * as SecureStore from 'expo-secure-store';
+import { Linking } from 'react-native';
+import { auth } from '../lib/api';
+import { queryClient } from '../lib/queryClient';
+import { fakeModules, tokens } from './fakeApi';
+
+// Cursos (nuevo) y la cuadrícula del Horario en el móvil.
+
+const reset = () => (SecureStore as unknown as { __reset: () => void }).__reset();
+
+function legacyDoc(over: Partial<LegacyData> = {}): LegacyData {
+  return {
+    courses: [
+      { id: 'cr1', topic: 'Inglés', title: 'Inglés básico', url: 'https://www.youtube.com/watch?v=abc', status: 'curso', notes: 'Lección 6' },
+      { id: 'cr2', topic: 'Inglés', title: '', url: 'https://www.udemy.com/course/ingles/', status: 'pendiente', notes: '' },
+      { id: 'cr3', topic: 'React', title: 'Hooks', url: '', status: 'hecho', notes: '' },
+    ],
+    ...over,
+  } as unknown as LegacyData;
+}
+
+const writes = (api: ReturnType<typeof fakeModules>) => api.calls.filter((c) => c.method !== 'GET');
+
+describe('Cursos y Horario en el móvil', () => {
+  beforeEach(async () => {
+    reset();
+    queryClient.clear();
+    await auth.signIn(tokens());
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    queryClient.clear();
+  });
+
+  it('Cursos: la tarjeta muestra unidades e idioma, que se elige al editar', async () => {
+    const api = fakeModules(
+      legacyDoc({
+        courses: [
+          { id: 'p1', topic: 'Programación', title: 'Intro', url: '', status: 'pendiente', notes: '', units: ['Unit 1: Basics', 'Unit 2: Variables'], lessons: [{ id: 'l1', title: 'Hola', unit: 'Unit 1: Basics', done: true }] },
+        ] as never,
+      }),
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByLabelText('Unidades de «Intro»: Unit 1: Basics, Unit 2: Variables')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Editar «Intro»' }));
+    fireEvent.press(await screen.findByRole('radio', { name: 'Inglés' }));
+    fireEvent.press(screen.getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/p1', body: { language: 'en' } }));
+  });
+
+  it('Cursos: agrupa por tema, abre el enlace, cambia el estado y añade uno nuevo', async () => {
+    const api = fakeModules(legacyDoc());
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByRole('header', { name: 'Inglés' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'React' })).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByRole('link', { name: 'Curso en Udemy, en Udemy. Abrir' }));
+    expect(openURL).toHaveBeenCalledWith('https://www.udemy.com/course/ingles/');
+    // Sin nombre, se muestra la plataforma.
+    expect(screen.getByRole('link', { name: 'Curso en Udemy, en Udemy. Abrir' })).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Estado de «Curso en Udemy»: Por ver. Cambiar a Viendo' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/cr2', body: { status: 'curso' } }));
+
+    fireEvent.press(screen.getByRole('button', { name: 'Nuevo curso' }));
+    fireEvent.changeText(await screen.findByLabelText('Tema'), 'Guitarra');
+    fireEvent.changeText(screen.getByLabelText('Enlace (opcional)'), 'javascript:alert(1)');
+    expect(screen.getByRole('button', { name: 'Añadir curso' })).toBeDisabled();
+    fireEvent.changeText(screen.getByLabelText('Enlace (opcional)'), 'youtu.be/xyz');
+    expect(screen.getByText('Se abrirá en YouTube.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir curso' }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({ method: 'POST', path: '/api/v2/modules/courses', body: { item: { topic: 'Guitarra', url: 'https://youtu.be/xyz', title: '', status: 'pendiente' } } }),
+    );
+    expect(await screen.findByRole('header', { name: 'Guitarra' })).toBeOnTheScreen();
+  });
+
+  it('Cursos: el video de YouTube se ve aquí y guarda dónde lo pausaste', async () => {
+    const api = fakeModules(legacyDoc({ courses: [{ id: 'cr1', topic: 'Inglés', title: 'Inglés básico', url: 'https://www.youtube.com/watch?v=abcdefghijk', status: 'curso', notes: '', position: 300, duration: 1200 }] as unknown as LegacyData['courses'] }));
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByText('Vas en 5:00 de 20:00')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Continuar «Inglés básico» aquí' }));
+    expect(await screen.findByLabelText('Video: Inglés básico')).toBeOnTheScreen();
+    const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
+    act(() => wv.__send({ type: 'progress', position: 605, duration: 1200, video: 'abcdefghijk', index: 0, count: 1 }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/cr1', body: { position: 605, duration: 1200, progress: 50, status: 'curso' } }),
+    );
+    expect(await screen.findByText('Guardado: Vas en 10:05 de 20:00.')).toBeOnTheScreen();
+  });
+
+  it('Cursos: anota el avance de Udemy y lo agrega al horario', async () => {
+    const api = fakeModules(legacyDoc());
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    fireEvent.press(await screen.findByRole('button', { name: 'Anotar avance de «Curso en Udemy»' }));
+    fireEvent.changeText(await screen.findByLabelText('Dónde lo dejaste (opcional)'), 'Módulo 3');
+    fireEvent.press(screen.getByRole('radio', { name: '40 %' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Guardar avance' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/cr2', body: { spot: 'Módulo 3', progress: 40, status: 'curso' } }));
+
+    fireEvent.press(screen.getByRole('button', { name: 'Agregar «Inglés básico» al horario' }));
+    expect(screen.getByRole('button', { name: 'Agregar al horario' })).toBeDisabled();
+    fireEvent.press(await screen.findByRole('checkbox', { name: 'lunes' }));
+    fireEvent.press(screen.getByRole('checkbox', { name: 'miércoles' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Agregar al horario' }));
+    await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(2));
+    expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0]).toMatchObject({ method: 'POST', body: { item: { day: 1, start: '18:00', end: '19:00', title: 'Inglés básico', room: 'YouTube', course: 'cr1' } } });
+    expect(await screen.findByRole('link', { name: 'En tu horario: Lun y Mié 18:00' })).toBeOnTheScreen();
+  });
+
+  it('Horario: una clase de un curso lo abre', async () => {
+    fakeModules(legacyDoc({ classes: [{ id: 'k1', title: 'Curso en Udemy', day: 2, start: '18:00', end: '19:00', room: 'Udemy', color: '#4F7CFF', subject: '', course: 'cr2' }] as unknown as LegacyData['classes'] }));
+    renderRouter('./src/app', { initialUrl: '/horario' });
+    fireEvent.press(await screen.findByRole('button', { name: /^Martes: Curso en Udemy/ }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Abrir el curso' }));
+    expect(await screen.findByLabelText('Dónde lo dejaste (opcional)')).toBeOnTheScreen();
+  });
+
+  it('Cursos: con solo pegar el enlace lee cuánto dura (si YouTube no responde, lo lee el servidor)', async () => {
+    const api = fakeModules(legacyDoc({ courses: [] }), { 'POST /api/v2/courses/length': () => ({ seconds: 45000, exact: true, videos: 12 }) });
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    fireEvent.press(await screen.findByRole('button', { name: 'Añadir el primero' }));
+    fireEvent.changeText(await screen.findByLabelText('Tema'), 'Inglés');
+    fireEvent.changeText(screen.getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
+    fireEvent(screen.getByLabelText('Enlace (opcional)'), 'blur');
+    const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
+    await waitFor(() => expect(screen.getByTestId('webview', { includeHiddenElements: true })).toBeOnTheScreen());
+    act(() => wv.__send({ type: 'fail' }));
+    expect(await screen.findByText('Dura 12 h 30 min (12 videos), según la página.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir curso' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'POST', path: '/api/v2/modules/courses', body: { item: { length: 45000, lengthFrom: 'enlace' } } }));
+  });
+
+  it('Cursos: «Crear horario» pone un curso de cada tema en los huecos libres', async () => {
+    const api = fakeModules(
+      legacyDoc({
+        courses: [
+          { id: 'a', topic: 'Inglés', title: 'Inglés', url: '', status: 'curso', notes: '', length: 36000, progress: 50 },
+          { id: 'b', topic: 'React', title: 'React', url: '', status: 'curso', notes: '', length: 21600 },
+        ] as unknown as LegacyData['courses'],
+        classes: [{ id: 'k1', day: 1, start: '18:00', end: '19:00', title: 'Gimnasio', room: '', color: '#4F7CFF', subject: '' }] as unknown as LegacyData['classes'],
+      }),
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    fireEvent.press(await screen.findByRole('button', { name: 'Crear horario' }));
+    for (const d of ['martes', 'jueves', 'viernes']) fireEvent.press(await screen.findByRole('checkbox', { name: d }));
+    fireEvent.changeText(screen.getByLabelText('Hasta'), '20:00');
+    expect(await screen.findByText('En esos días y horas caben 3 h a la semana, así que usamos esas.')).toBeOnTheScreen();
+    expect(screen.getByText(/React: 2 sesiones a la semana · lo terminas hacia el .+ \(3 semanas\)/)).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Poner en mi horario' }));
+    await waitFor(() => expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')).toHaveLength(3));
+    expect(writes(api).filter((c) => c.path === '/api/v2/modules/classes')[0]).toMatchObject({ body: { item: { day: 1, start: '19:00', end: '20:00', course: 'a' } } });
+  });
+
+  it('Cursos: subcategoría y canal; YouTube se mide en el teléfono y llena el canal y el nombre', async () => {
+    const api = fakeModules(
+      legacyDoc({ courses: [{ id: 'a', topic: 'React', subtopic: 'Bases', title: 'React desde cero', url: '', status: 'curso', notes: '', source: 'Platzi' }] as unknown as LegacyData['courses'] }),
+      { 'POST /api/v2/courses/length': () => [500, { error: 'no debería llamarse' }] },
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByRole('header', { name: 'BASES' })).toBeOnTheScreen();
+    expect(screen.getByText(/Platzi/)).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir a React' }));
+    fireEvent.changeText(await screen.findByLabelText('Subcategoría (opcional)'), 'Hooks');
+    fireEvent.changeText(screen.getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
+    fireEvent(screen.getByLabelText('Enlace (opcional)'), 'blur');
+    const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
+    await waitFor(() => expect(screen.getByTestId('webview', { includeHiddenElements: true })).toBeOnTheScreen());
+    act(() => wv.__send({ type: 'step', done: 1, total: 3 }));
+    expect(await screen.findByText('Midiendo los videos de la lista: 1 de 3…')).toBeOnTheScreen();
+    act(() => wv.__send({ type: 'length', seconds: 5400, exact: true, videos: 3, author: 'midudev' }));
+    expect(await screen.findByText('Dura 1 h 30 min (3 videos), de midudev, según la página.')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Canal de YouTube o academia (opcional)').props.value).toBe('midudev');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir curso' }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({ method: 'POST', path: '/api/v2/modules/courses', body: { item: { topic: 'React', subtopic: 'Hooks', source: 'midudev', length: 5400, lengthFrom: 'enlace' } } }),
+    );
+    expect(await screen.findByRole('header', { name: 'HOOKS' })).toBeOnTheScreen();
+  });
+
+  it('Cursos: lecciones por unidad, se marcan, se añaden y se traen de la lista de YouTube', async () => {
+    const api = fakeModules(
+      legacyDoc({
+        courses: [
+          {
+            id: 'a',
+            topic: 'React',
+            title: 'React desde cero',
+            url: 'https://www.youtube.com/playlist?list=PLabcdefghijk',
+            status: 'pendiente',
+            notes: '',
+            lessons: [
+              { id: 'l1', title: 'Instalación', unit: 'Unidad 1' },
+              { id: 'l2', title: 'JSX', unit: 'Unidad 1' },
+            ],
+          },
+        ] as unknown as LegacyData['courses'],
+      }),
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    fireEvent.press(await screen.findByRole('button', { name: 'Unidades y lecciones de «React desde cero» (0 de 2 vistas)' }));
+    expect(await screen.findByRole('header', { name: 'UNIDAD 1 · 0/2' })).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('checkbox', { name: 'Instalación' }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/courses/a', body: { progress: 50, status: 'curso', lessons: [{ id: 'l1', done: true }, { id: 'l2' }] } }),
+    );
+    // El número va solo: sin nombre queda «Unidad 2».
+    fireEvent.changeText(screen.getByLabelText('Nueva unidad'), 'Hooks');
+    expect(screen.getByText('Se guarda como «Unidad 2: Hooks».')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByLabelText('Nueva unidad'), '');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir unidad 2' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Unidad 2'] } }));
+    expect(await screen.findByRole('header', { name: 'UNIDAD 2 · 0/0' })).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir lección a «Unidad 2»' }));
+    expect(screen.getByLabelText('En la unidad (opcional)').props.value).toBe('Unidad 2');
+    fireEvent.changeText(screen.getByLabelText('Lección o video'), 'useState');
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir lección' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Traer los videos nuevos de la lista' }));
+    const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
+    await waitFor(() => expect(screen.getByTestId('webview', { includeHiddenElements: true })).toBeOnTheScreen());
+    act(() => wv.__send({ type: 'length', seconds: 900, exact: true, videos: 2, items: [{ video: 'aaaaaaaaaaa', title: 'Clase 1', seconds: 300 }, { video: 'bbbbbbbbbbb', title: 'Clase 2', seconds: 600 }] }));
+    expect(await screen.findByText('Listo: 2 lecciones nuevas de la lista.')).toBeOnTheScreen();
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{}, {}, {}, { title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabcdefghijk' }, { title: 'Clase 2' }] } }));
+  });
+
+  it('Cursos: cada tema va de lo básico a lo avanzado y al terminar uno sus clases pasan al siguiente', async () => {
+    const api = fakeModules(
+      legacyDoc({
+        courses: [
+          { id: 'r1', topic: 'React', title: 'Redux avanzado', url: '', status: 'pendiente', notes: '' },
+          { id: 'r2', topic: 'React', title: 'Hooks en React', url: '', status: 'pendiente', notes: '' },
+          { id: 'r3', topic: 'React', title: 'React desde cero', url: '', status: 'curso', notes: '' },
+        ] as unknown as LegacyData['courses'],
+        classes: [{ id: 'k1', day: 1, start: '18:00', end: '19:00', title: 'React desde cero', room: '', color: '#4F7CFF', subject: '', course: 'r3' }] as unknown as LegacyData['classes'],
+      }),
+    );
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByText('En orden: lo que empezaste y de lo básico a lo avanzado.')).toBeOnTheScreen();
+    const names = screen.getAllByRole('button', { name: /^Estado de «/ }).map((b) => /«(.+)»/.exec(b.props.accessibilityLabel)?.[1]);
+    expect(names).toEqual(['React desde cero', 'Hooks en React', 'Redux avanzado']);
+    expect(screen.getByText('Sigue')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: /^Estado de «React desde cero»/ }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v2/modules/classes/k1', body: { course: 'r2', title: 'Hooks en React' } }));
+    expect(await screen.findByText('Terminaste «React desde cero». Tus clases siguen con «Hooks en React».')).toBeOnTheScreen();
+  });
+
+  it('Cursos vacío invita a añadir el primero', async () => {
+    fakeModules(legacyDoc({ courses: [] }));
+    renderRouter('./src/app', { initialUrl: '/cursos' });
+    expect(await screen.findByText('Anota lo que quieres aprender')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir el primero' }));
+    expect(await screen.findByLabelText('Tema')).toBeOnTheScreen();
+  });
+
+  it('Horario: la cuadrícula se ve vacía y dibuja clases antiguas con «8:00»', async () => {
+    fakeModules(legacyDoc({ classes: [{ id: 'old', title: 'Química', day: '2', start: '8:00', end: '9:30', room: '', color: '#4F7CFF', subject: '' }] as unknown as LegacyData['classes'] }));
+    const view = renderRouter('./src/app', { initialUrl: '/horario' });
+    expect(await screen.findByRole('button', { name: 'Martes: Química, martes de 08:00 a 09:30. Editar' })).toBeOnTheScreen();
+    expect(screen.queryByText('Tu horario está vacío')).toBeNull();
+    view.unmount();
+    queryClient.clear();
+
+    fakeModules(legacyDoc({ classes: [] }));
+    renderRouter('./src/app', { initialUrl: '/horario' });
+    expect(await screen.findByText('Tu horario está vacío')).toBeOnTheScreen();
+    // La cuadrícula sigue ahí, con sus horas (de 7 a 21) para ver la semana.
+    expect(screen.getByText('7', { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(screen.getByText('20', { includeHiddenElements: true })).toBeOnTheScreen();
+  });
+});

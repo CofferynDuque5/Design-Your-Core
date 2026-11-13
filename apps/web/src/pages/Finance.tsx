@@ -1,9 +1,10 @@
-import { monthSummary, parseAmount, shortDay, TX_CATEGORIES, TX_TYPE_INFO, TX_TYPES, txTypeOf as typeOf, utcDayKey, type LegacyTransaction, type TxType } from '@dyc/core';
+import { matchesSearch, monthSummary, parseAmount, shortDay, TX_CATEGORIES, TX_TYPE_INFO, TX_TYPES, txTypeOf as typeOf, utcDayKey, type LegacyTransaction, type TxType } from '@dyc/core';
 import { Pencil, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { Segmented, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -11,7 +12,10 @@ import { FormActions, Meter, MonthNav, optionsWith, Stats } from '../components/
 import { money } from '../lib/tools';
 
 const SHOWN_MAX = 300;
-const TYPE_OPTIONS = TX_TYPES.map((t) => ({ value: t, label: TX_TYPE_INFO[t].label }));
+const TYPE_OPTIONS = TX_TYPES.map((t) => ({
+  value: t,
+  label: TX_TYPE_INFO[t].label,
+}));
 
 /** Presupuesto que la app anterior guardaba en este navegador (solo como sugerencia). */
 function oldBudget(): number | null {
@@ -34,13 +38,16 @@ export function Finance() {
   const [month, setMonth] = useState(`${today.slice(0, 7)}-01`);
   const [editing, setEditing] = useState<LegacyTransaction | 'new' | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const [q, setQ] = useState('');
   const summary = useMemo(() => monthSummary(list, month.slice(0, 7)), [list, month]);
+  const found = summary.items.filter((t) => matchesSearch(q, t.category, t.note, String(Math.abs(t.amount)), TX_TYPE_INFO[typeOf(t)].label));
   const monthly = typeof budget.monthly === 'number' && budget.monthly > 0 ? budget.monthly : 0;
 
   const remove = (t: LegacyTransaction) => {
     const order = list.map((x) => x.id);
-    actions.remove(t.id);
+    actions.remove(t.id, { undo: false });
     toast('Movimiento eliminado.', {
+      key: 'undo',
       action: {
         label: 'Deshacer',
         run: () => {
@@ -80,13 +87,14 @@ export function Finance() {
               <h2 id="tx-title" className="list-count">
                 Movimientos <span className="chip small numeric">{summary.items.length}</span>
               </h2>
+              {summary.items.length > 0 && <SearchBox label="Buscar movimientos" value={q} onChange={setQ} placeholder="Buscar por categoría, nota o monto…" count={found.length} />}
               {summary.items.length === 0 ? (
                 <EmptyState title={list.length ? 'Sin movimientos este mes' : 'Aún no tienes movimientos'}>
                   Apunta tus ingresos y gastos para ver en qué se va tu dinero cada mes.
                 </EmptyState>
               ) : (
                 <ul className="tx-list">
-                  {summary.items.slice(0, SHOWN_MAX).map((t) => (
+                  {found.slice(0, SHOWN_MAX).map((t) => (
                     <TxRow key={t.id} tx={t} onEdit={() => setEditing(t)} onRemove={() => remove(t)} />
                   ))}
                 </ul>
@@ -199,6 +207,8 @@ function TxRow({ tx, onEdit, onRemove }: { tx: LegacyTransaction; onEdit: () => 
 
 function TxForm({ tx, today, month, onDone }: { tx: LegacyTransaction | null; today: string; month: string; onDone: () => void }) {
   const actions = useModule('transactions');
+  const saved = useLegacyData().data?.data;
+  const past = useLegacyList(saved, 'transactions');
   const [type, setType] = useState<TxType>(tx ? typeOf(tx) : 'expense');
   const [amount, setAmount] = useState(tx ? String(Math.abs(tx.amount ?? 0)).replace('.', ',') : '');
   const [category, setCategory] = useState(tx?.category || TX_CATEGORIES.expense[0]);
@@ -218,7 +228,13 @@ function TxForm({ tx, today, month, onDone }: { tx: LegacyTransaction | null; to
     e.preventDefault();
     if (!valid || !date) return;
     // Como la app anterior: el monto siempre en positivo; el signo lo da el tipo.
-    const fields = { type, amount: Math.round(Math.abs(value as number) * 100) / 100, category, note: note.trim(), date };
+    const fields = {
+      type,
+      amount: Math.round(Math.abs(value as number) * 100) / 100,
+      category,
+      note: note.trim(),
+      date,
+    };
     if (tx) actions.update(tx.id, fields);
     else actions.add({ id: newId(), ...fields });
     onDone();
@@ -239,7 +255,9 @@ function TxForm({ tx, today, month, onDone }: { tx: LegacyTransaction | null; to
           onChange={(e) => setAmount(e.target.value)}
           required
           autoFocus
-          error={amount.trim() && !valid ? 'Escribe un monto mayor que 0, con hasta dos decimales (12,50).' : null}
+          // Una sola línea siempre (pista o error): el diálogo no cambia de alto al escribir.
+          hint={amount.trim() && !valid ? undefined : 'En $, por ejemplo 12,50'}
+          error={!amount.trim() || valid ? null : value !== null && value > 1e12 ? 'El máximo es 1.000.000.000.000.' : 'Usa un número mayor que 0, como 12,50.'}
         />
         <TextField label="Fecha" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
       </div>
@@ -250,7 +268,7 @@ function TxForm({ tx, today, month, onDone }: { tx: LegacyTransaction | null; to
           </option>
         ))}
       </SelectField>
-      <TextField label="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder={type === 'income' ? 'Pago de septiembre' : 'Supermercado'} />
+      <TextField label="Nota (opcional)" suggestions={past.filter((t) => t.category === category).map((t) => t.note ?? '')} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder={type === 'income' ? 'Pago de septiembre' : 'Supermercado'} />
       <FormActions
         submitLabel={tx ? 'Guardar' : 'Añadir movimiento'}
         disabled={!valid || !date}
@@ -293,7 +311,7 @@ function BudgetForm({ monthly, onDone }: { monthly: number; onDone: () => void }
         autoFocus
         hint={
           suggested
-            ? `La app anterior tenía ${money(suggested)} guardado en este navegador; lo hemos puesto como sugerencia.`
+            ? `Tenías ${money(suggested)} guardado en este navegador; lo hemos puesto como sugerencia.`
             : 'Vale para todos los meses y se guarda en tu cuenta, así lo ves en todos tus dispositivos.'
         }
       />

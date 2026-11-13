@@ -45,6 +45,11 @@ test('onboarding y pantallas de la app', async ({ page }) => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   await seedLegacy(page, {
+    ventures: [{ id: 've1', name: 'Tienda de velas', description: 'Velas de soya', stage: 'validando', color: '#4F7CFF' }],
+    ventureItems: [
+      { id: 'vi1', ventureId: 've1', kind: 'note', title: 'Proveedores', text: 'Cera de **soya**', url: '', ref: '', mime: '', size: 0, date: '2026-10-30' },
+      { id: 'vi2', ventureId: 've1', kind: 'link', title: '', text: '', url: 'https://instagram.com/velas', ref: '', mime: '', size: 0, date: '2026-10-30' },
+    ],
     blocks: [
       { id: 'b1', label: 'Estudiar', sub: 'Cálculo', start: 9, dur: 1.5, kind: 'study' },
       { id: 'b2', label: 'Pausa', sub: '', start: 10.5, dur: 0.5, kind: 'break' },
@@ -97,6 +102,10 @@ test('onboarding y pantallas de la app', async ({ page }) => {
       { id: 'n1', title: 'Ondas', subject: 'Física', date: '3 sept', tag: '#4F7CFF', excerpt: '# Ondas', body: '# Ondas\n\n- [x] Repasar la **frecuencia**\n- [ ] Ejercicios\n\n> La luz también es una onda.\n\n```\nf = 1 / T\n```\n\nFórmula: $v = \\lambda f$ y [un enlace](https://example.com).\n\n![imagen](coreimg:no-esta)', commit: false, tags: 'examen, física', shareId: null },
       { id: 'n2', title: 'Libros', subject: 'General', date: '10 sept', tag: '#E8912A', excerpt: 'Leer', body: 'Leer *Rayuela*', commit: false, tags: 'lectura', shareId: null },
     ],
+    courses: [
+      { id: 'cr1', topic: 'Inglés', title: 'Inglés básico', url: 'https://youtu.be/abc', status: 'curso', notes: 'Lección 6' },
+      { id: 'cr2', topic: 'Inglés', title: '', url: 'https://www.udemy.com/course/ingles/', status: 'hecho', notes: '' },
+    ],
     workItems: [
       { id: 'wk1', title: 'Informe mensual', project: 'p2', status: 'curso', done: false, due: 'Hoy' },
       { id: 'wk2', title: 'Revisar cambios', project: 'p1', status: 'todo', done: true, due: '' },
@@ -107,7 +116,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   const token = await sessionToken(page);
   expect((await page.request.patch('/api/v2/me', { data: { showCycle: true }, headers: { Authorization: `Bearer ${token}` } })).ok()).toBe(true);
 
-  for (const path of ['/', '/check-in', '/progreso', '/retos', '/habitos', '/perfil', '/mas', '/agenda', '/agenda?vista=tareas', '/pendientes', '/calendario', '/horario', '/enfoque', '/materias', '/proyectos', '/roadmaps', '/cuadernos', '/cuadernos/nb1', '/contenido', '/ideas', '/finanzas', '/metas', '/mascotas', '/ciclo', '/ejercicio', '/sueno', '/diario', '/rutina', '/notas', '/notas/n1', '/trabajo', '/respiracion', '/no-existe']) {
+  for (const path of ['/', '/check-in', '/progreso', '/retos', '/habitos', '/perfil', '/mas', '/agenda', '/agenda?vista=tareas', '/pendientes', '/calendario', '/horario', '/enfoque', '/materias', '/cursos', '/proyectos', '/roadmaps', '/cuadernos', '/cuadernos/nb1', '/contenido', '/ideas', '/finanzas', '/metas', '/mascotas', '/ciclo', '/ejercicio', '/sueno', '/diario', '/rutina', '/notas', '/notas/n1', '/trabajo', '/emprendimientos', '/emprendimientos/ve1', '/no-existe']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expectAccessible(page, path);
@@ -134,7 +143,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   await page.goto('/ideas');
   await page.getByRole('button', { name: 'Borrar «App de hábitos»' }).click();
   await expectAccessible(page, 'ideas vacías con ejemplos');
-  // Editor de notas escribiendo, búsqueda sin resultados y respiración en marcha.
+  // Editor de notas escribiendo y búsqueda sin resultados.
   await page.goto('/notas/n1');
   await page.getByRole('button', { name: 'Escribir' }).click();
   await expectAccessible(page, 'editor de notas');
@@ -143,14 +152,12 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   await page.goto('/notas');
   await page.getByLabel('Buscar en tus notas').fill('nada que coincida');
   await expectAccessible(page, 'notas sin resultados');
-  await page.goto('/respiracion');
-  await page.getByRole('button', { name: 'Empezar' }).click();
-  await expectAccessible(page, 'respiración en marcha');
   for (const [path, button] of [
     ['/agenda', 'Nuevo bloque'],
     ['/calendario', 'Nuevo evento'],
     ['/horario', 'Nueva clase'],
     ['/materias', 'Nueva materia'],
+    ['/cursos', 'Nuevo curso'],
     ['/materias', 'Editar «Física»'],
     ['/proyectos', 'Nuevo proyecto'],
     ['/roadmaps', 'Nuevo roadmap'],
@@ -158,7 +165,7 @@ test('onboarding y pantallas de la app', async ({ page }) => {
     ['/cuadernos/nb1', 'Decorar'],
     ['/contenido', 'Editar «Probé 100 apps»'],
     ['/finanzas', 'Nuevo movimiento'],
-    ['/finanzas', 'Editar: Gasto de 45,50 en Comida (Mercado)'],
+    ['/finanzas', 'Editar: Gasto de $45,50 en Comida (Mercado)'],
     ['/finanzas', 'Cambiar'],
     ['/metas', 'Nueva meta'],
     ['/metas', 'Editar «Leer 12 libros»'],
@@ -175,6 +182,9 @@ test('onboarding y pantallas de la app', async ({ page }) => {
     ['/rutina', 'Añadir comida'],
     ['/rutina', 'Editar Desayuno'],
     ['/trabajo', 'Editar «Informe mensual»'],
+    ['/emprendimientos', 'Nuevo emprendimiento'],
+    ['/emprendimientos/ve1', 'Editar «Proveedores»'],
+    ['/pendientes', 'Sugerencias'],
   ] as const) {
     await page.goto(path);
     await page.getByRole('button', { name: button }).click();
@@ -195,103 +205,26 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   await expectAccessible(page, 'diálogo de borrar cuenta');
 });
 
-test('estilos visuales: pantallas representativas en cada estilo', async ({ page }) => {
-  // Cada estilo solo cambia tokens y unos pocos componentes: basta con una muestra de pantallas.
-  test.setTimeout(360_000);
-  await register(page, 'a11y-estilos');
+test('aspecto de la marca: siempre el mismo estilo, tipografía y color, aunque quede algo guardado', async ({ page }) => {
+  // Estilo, tipografía y color ya no se eligen en Perfil: lo que quedó guardado de antes se ignora.
+  test.setTimeout(120_000);
+  await register(page, 'a11y-marca');
   await onboard(page);
-  const today = new Date().toISOString().slice(0, 10);
-  await seedLegacy(page, {
-    blocks: [{ id: 'b1', label: 'Estudiar', sub: 'Cálculo', start: 9, dur: 1.5, kind: 'study' }],
-    todos: [
-      { id: 'td1', title: 'Pagar la luz', done: false },
-      { id: 'td2', title: 'Llamar al banco', done: true },
-    ],
-    transactions: [
-      { id: 'tx1', date: today, amount: 1200, type: 'income', category: 'Sueldo', note: '' },
-      { id: 'tx2', date: today, amount: 45.5, type: 'expense', category: 'Comida', note: 'Mercado' },
-    ],
-    budget: { monthly: 500 },
-    notes: [{ id: 'n1', title: 'Ondas', subject: 'Física', date: '3 sept', tag: '#4F7CFF', excerpt: 'Repasar', body: 'Repasar la **frecuencia**', commit: false, tags: 'examen', shareId: null }],
-    vault: [{ id: 'v1', name: 'Banco Sol', mono: 'BS', user: 'ana.perez', pass: 'Clave-Plana-123' }],
+  await page.evaluate(() => {
+    localStorage.setItem('dyc.style', 'glass');
+    localStorage.setItem('dyc.font', 'amable');
+    localStorage.setItem('dyc.palette', 'lavanda');
   });
-
-  for (const [style, option] of [
-    ['minimal', /^Minimalista/],
-    ['glass', /^Cristal \(glassmorphism\)/],
-    ['suave', /^Suave/],
-    ['editorial', /^Editorial/],
-  ] as const) {
-    // Se elige en Perfil, como lo haría la persona; el estilo se aplica al momento y se recuerda.
-    await page.goto('/perfil');
-    await page.getByRole('radio', { name: option }).check();
-    await expect(page.locator('html')).toHaveAttribute('data-style', style);
-    for (const path of ['/', '/progreso', '/agenda', '/pendientes', '/finanzas', '/notas', '/boveda', '/mas', '/perfil']) {
-      await page.goto(path);
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      await expect(page.locator('html')).toHaveAttribute('data-style', style);
-      await expectAccessible(page, `${path} (estilo ${style})`);
-    }
+  for (const path of ['/', '/agenda', '/finanzas', '/perfil']) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('data-style', 'editorial');
+    await expect(html).toHaveAttribute('data-font', 'clasica');
+    await expect(html).toHaveAttribute('data-palette', 'lima');
+    await expectAccessible(page, `${path} (aspecto de la marca)`);
   }
-});
-
-test('paletas y tipografías: cada una en tres pantallas', async ({ page }) => {
-  // Paletas y tipografías solo cambian tokens: basta con tres pantallas y el estilo por defecto
-  // (el contraste de cada paleta con cada estilo lo comprueban las pruebas unitarias).
-  test.setTimeout(240_000);
-  await register(page, 'a11y-paletas');
-  await onboard(page);
-  const today = new Date().toISOString().slice(0, 10);
-  await seedLegacy(page, {
-    blocks: [{ id: 'b1', label: 'Estudiar', sub: 'Cálculo', start: 9, dur: 1.5, kind: 'study' }],
-    tasks: [{ id: 't1', title: 'Entregar ensayo', pri: 'alta', time: null, rem: false, done: false, tags: '' }],
-    transactions: [
-      { id: 'tx1', date: today, amount: 1200, type: 'income', category: 'Sueldo', note: '' },
-      { id: 'tx2', date: today, amount: 45.5, type: 'expense', category: 'Comida', note: 'Mercado' },
-    ],
-    budget: { monthly: 500 },
-  });
-  const screens = ['/', '/agenda', '/finanzas'];
-
-  for (const [palette, option] of [
-    ['salvia', /^Salvia/],
-    ['terracota', /^Terracota/],
-    ['lavanda', /^Lavanda/],
-    ['grafito', /^Grafito/],
-    ['azul', /^Azul/],
-    ['lima', /^Lima/],
-  ] as const) {
-    await page.goto('/perfil');
-    await page.getByRole('group', { name: 'Color' }).getByRole('radio', { name: option }).check();
-    await expect(page.locator('html')).toHaveAttribute('data-palette', palette);
-    for (const path of screens) {
-      await page.goto(path);
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      await expect(page.locator('html')).toHaveAttribute('data-palette', palette);
-      await expectAccessible(page, `${path} (paleta ${palette})`);
-    }
-  }
-
-  for (const [font, option, family] of [
-    ['moderna', /^Moderna/, 'Manrope'],
-    ['geometrica', /^Geométrica/, 'Outfit'],
-    ['elegante', /^Elegante/, 'Fraunces'],
-    ['amable', /^Amable/, 'Nunito'],
-    ['clasica', /^Clásica/, 'Newsreader'],
-  ] as const) {
-    await page.goto('/perfil');
-    await page.getByRole('group', { name: 'Tipografía' }).getByRole('radio', { name: option }).check();
-    await expect(page.locator('html')).toHaveAttribute('data-font', font);
-    for (const path of screens) {
-      await page.goto(path);
-      const h1 = page.getByRole('heading', { level: 1 });
-      await expect(h1).toBeVisible();
-      // La fuente elegida se carga al arrancar (aunque no sea la del paquete inicial) y se usa en los títulos.
-      await expect(h1).toHaveCSS('font-family', new RegExp(`^"?${family}`));
-      await expect.poll(() => page.evaluate((f) => document.fonts.load(`16px "${f}"`).then((faces) => faces.length), family)).toBeGreaterThan(0);
-      await expectAccessible(page, `${path} (tipografía ${font})`);
-    }
-  }
+  expect(await page.evaluate(() => [localStorage.getItem('dyc.style'), localStorage.getItem('dyc.font'), localStorage.getItem('dyc.palette')])).toEqual([null, null, null]);
 });
 
 test('bóveda: crear, desbloqueada, bloqueada y sus diálogos', async ({ page }) => {
@@ -328,7 +261,7 @@ test('bóveda: crear, desbloqueada, bloqueada y sus diálogos', async ({ page })
   await page.keyboard.press('Escape');
 
   await page.getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }).click();
-  await expect(page.getByRole('dialog', { name: 'Cifrar las contraseñas de la app anterior' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Cifrar las contraseñas guardadas sin cifrar' })).toBeVisible();
   await expectAccessible(page, 'diálogo de migración');
   await page.keyboard.press('Escape');
 

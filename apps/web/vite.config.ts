@@ -65,6 +65,8 @@ function demoHtml(): Plugin {
           ],
         },
         workbox: {
+          // Alarmas con el panel cerrado (public/alarm-sw.js).
+          importScripts: ['alarm-sw.js'],
           globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
           // Las fuentes de las tipografías opcionales (Perfil → Tipografía) no se precachean:
           // se guardan la primera vez que se usan, para no descargarlas todas al instalar.

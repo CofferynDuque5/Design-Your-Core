@@ -1,12 +1,14 @@
-import { byTime, daysLabel, displayTitle, MEAL_LABELS, onWeekday, ROUTINE_DAY_FILTERS as DAY_FILTERS, utcDayKey, waterToday, WATER_GOAL_DEFAULT, weekdaysOf as validDays, type LegacyMeal, type LegacyRoutine } from '@dyc/core';
+import { matchesSearch, byTime, daysLabel, displayTitle, MEAL_LABELS, onWeekday, ROUTINE_DAY_FILTERS as DAY_FILTERS, utcDayKey, waterToday, WATER_GOAL_DEFAULT, weekdaysOf as validDays, type LegacyMeal, type LegacyRoutine } from '@dyc/core';
 import { GlassWater, Minus, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { CheckInNote, FormActions, Meter, optionsWith, WeekdayPicker } from '../components/ToolParts';
+import { useSyncCheckIn } from '../lib/checkinSync';
+import { CheckInNote, FormActions, Meter, optionsWith, WeekdayPicker, RemoveButton } from '../components/ToolParts';
 import { isoDay, localTime } from '../lib/tools';
 
 export function Routine() {
@@ -18,7 +20,8 @@ export function Routine() {
   const [meal, setMeal] = useState<LegacyMeal | 'new' | null>(null);
   // Comidas y agua van por día en UTC, como la app anterior.
   const today = utcDayKey();
-  const shown = useMemo(() => routines.filter((r) => day === 0 || onWeekday(r.days, day)).sort(byTime), [routines, day]);
+  const [q, setQ] = useState('');
+  const shown = useMemo(() => routines.filter((r) => (day === 0 || onWeekday(r.days, day)) && matchesSearch(q, displayTitle(r.title), r.time, daysLabel(r.days))).sort(byTime), [routines, day, q]);
   const todayMeals = useMemo(() => meals.filter((m) => m.dateKey === today).sort(byTime), [meals, today]);
   const filter = DAY_FILTERS.find((f) => f.iso === day) ?? DAY_FILTERS[0];
 
@@ -50,6 +53,7 @@ export function Routine() {
                   </button>
                 ))}
               </div>
+              {routines.length > 0 && <SearchBox label="Buscar en tus rutinas" value={q} onChange={setQ} placeholder="Buscar una rutina u hora…" count={shown.length} />}
               {routines.length === 0 ? (
                 <EmptyState
                   title="Aún no tienes rutinas"
@@ -62,7 +66,7 @@ export function Routine() {
                   Tus hábitos con hora fija: despertar, tomar vitaminas, entrenar, leer antes de dormir.
                 </EmptyState>
               ) : shown.length === 0 ? (
-                <p className="muted recent-empty">Nada este día.</p>
+                q.trim() ? null : <p className="muted recent-empty">Nada este día.</p>
               ) : (
                 <ul className="routine-list">
                   {shown.map((r) => (
@@ -94,8 +98,8 @@ export function Routine() {
               </section>
             </div>
           </div>
-          <CheckInNote>El check-in diario registra aparte tus vasos de agua y tu alimentación para el pilar Alimentación.</CheckInNote>
-          <p className="muted small">Los avisos con sonido de la app anterior todavía no están en la app nueva: aquí organizas tus rutinas y ves qué toca cada día.</p>
+          <CheckInNote>Los vasos de agua que sumes aquí cuentan en tu check-in del día (pilar Alimentación). No hace falta anotarlos dos veces.</CheckInNote>
+          <p className="muted small">Aquí organizas tus rutinas y ves qué toca cada día. Para que suenen a su hora, activa las alarmas en Perfil.</p>
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nueva rutina' : 'Editar rutina'}>
@@ -130,6 +134,7 @@ function RoutineRow({ routine: r, onEdit }: { routine: LegacyRoutine; onEdit: ()
       <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
         <Pencil size={18} aria-hidden="true" />
       </button>
+      <RemoveButton module="routines" id={r.id} name={title} />
     </li>
   );
 }
@@ -141,7 +146,12 @@ function WaterCard({ today }: { today: string }) {
   const water = waterToday(log, today);
   const goal = typeof log.waterGoal === 'number' && log.waterGoal >= 1 && log.waterGoal <= 40 ? log.waterGoal : WATER_GOAL_DEFAULT;
   // Si el registro es de otro día, empieza en 0 (como la app anterior en el primer cambio).
-  const set = (n: number) => actions.patch({ dateKey: today, water: Math.max(0, Math.min(40, n)) });
+  const sync = useSyncCheckIn();
+  const set = (n: number) => {
+    const water = Math.max(0, Math.min(40, n));
+    actions.patch({ dateKey: today, water });
+    sync(today, { water });
+  };
   const pct = Math.min(100, Math.round((water / goal) * 100));
   return (
     <section className="card stack-sm water-card" aria-labelledby="water-title">
@@ -172,7 +182,6 @@ function WaterCard({ today }: { today: string }) {
   );
 }
 
-// En la columna lateral solo cabe un botón: borrar está en el diálogo de edición, con confirmación.
 function MealRow({ meal: m, onEdit }: { meal: LegacyMeal; onEdit: () => void }) {
   const label = `${m.label || 'Comida'}${m.time ? ` de las ${m.time}` : ''}`;
   return (
@@ -185,6 +194,7 @@ function MealRow({ meal: m, onEdit }: { meal: LegacyMeal; onEdit: () => void }) 
       <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar ${label}`}>
         <Pencil size={16} aria-hidden="true" />
       </button>
+      <RemoveButton module="meals" id={m.id} name={label} size={16} />
     </li>
   );
 }

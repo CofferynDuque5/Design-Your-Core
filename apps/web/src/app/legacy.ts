@@ -1,5 +1,6 @@
 import {
   applyLegacyOp,
+  legacyWithSaved,
   legacyList,
   legacyObject,
   newLegacyId,
@@ -11,8 +12,12 @@ import {
   type LegacyObjects,
   type LegacyOp,
   type LegacyPatch,
+  legacyChangeLabel,
+  undoLegacyObjectPatch,
+  undoLegacyOp,
+  type LegacyUndoStep,
 } from '@dyc/core';
-import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { errorMessage } from '../components/States';
 import { api } from './api';
@@ -54,8 +59,41 @@ function send<K extends LegacyKey>(key: K, op: Op<K>): Promise<{ updatedAt: stri
   }
 }
 
-/** Acciones sobre una clave: se ven al instante y se deshacen con un aviso si la API falla. */
-export function useModule<K extends LegacyKey>(key: K) {
+/**
+ * Si algo falló, al terminar el último cambio en vuelo se vuelve a pedir el
+ * documento (para quedar igual que el servidor). Si todo salió bien, no.
+ */
+let reloadAfterSave = false;
+function settle(qc: QueryClient) {
+  if (qc.isMutating({ mutationKey: ['legacy'] }) > 1 || !reloadAfterSave) return;
+  reloadAfterSave = false;
+  return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
+}
+
+/**
+ * Deshace un cambio: aplica los pasos en la copia local y los envía en orden.
+ * Si algo falla, se vuelve a pedir el documento para quedar igual que el servidor.
+ */
+export async function runUndo(qc: QueryClient, steps: LegacyUndoStep[], fail: (e: unknown) => void) {
+  for (const s of steps) {
+    qc.setQueryData<Legacy>(LEGACY_QUERY, (prev) => prev && { ...prev, data: applyLegacyOp(prev.data, s.key, s.op) });
+  }
+  try {
+    for (const s of steps) await send(s.key, s.op);
+  } catch (e) {
+    fail(e);
+  }
+  return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
+}
+
+/** Opciones de un cambio: `undo: false` para lo que se guarda solo (avance de un video, notas mientras escribes). */
+export type ChangeOpts = { undo?: boolean };
+
+/**
+ * Acciones sobre una clave: se ven al instante, se deshacen con un aviso si la
+ * API falla y, tras cada cambio hecho a mano, sale «Deshacer» unos segundos.
+ */
+export function useModule<K extends LegacyKey>(key: K, hook: ChangeOpts = {}) {
   const qc = useQueryClient();
   const toast = useToast();
   const m = useMutation({
@@ -69,25 +107,41 @@ export function useModule<K extends LegacyKey>(key: K) {
       if (prev) qc.setQueryData<Legacy>(LEGACY_QUERY, { ...prev, data: applyLegacyOp(prev.data, key, op) });
       return { prev };
     },
+    onSuccess: (res, op) => {
+      // La copia del servidor sustituye a la optimista; no se recarga todo el documento.
+      const item = 'item' in res ? (res.item as LegacyItems[K]) : null;
+      qc.setQueryData<Legacy>(LEGACY_QUERY, (prev) => prev && { data: op.type === 'add' || op.type === 'update' ? legacyWithSaved(prev.data, key, item) : prev.data, updatedAt: res.updatedAt ?? prev.updatedAt });
+    },
     onError: (e, _op, ctx) => {
       if (ctx?.prev) qc.setQueryData(LEGACY_QUERY, ctx.prev);
+      reloadAfterSave = true;
       toast(errorMessage(e), { tone: 'error' });
     },
-    onSettled: () => {
-      // Se recarga solo cuando termina el último cambio en vuelo.
-      if (qc.isMutating({ mutationKey: ['legacy'] }) <= 1) return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
-    },
+    onSettled: () => settle(qc),
   });
   const { mutate } = m;
-  return useMemo(
-    () => ({
-      add: (item: LegacyItems[K]) => mutate({ type: 'add', item }),
-      update: (id: string, patch: LegacyPatch<K>) => mutate({ type: 'update', id, patch }),
-      remove: (id: string) => mutate({ type: 'remove', id }),
-      reorder: (ids: string[]) => mutate({ type: 'reorder', ids }),
-    }),
-    [mutate],
-  );
+  const undoable = hook.undo !== false;
+  return useMemo(() => {
+    const run = (op: Op<K>, opts?: ChangeOpts) => {
+      const prev = undoable && opts?.undo !== false ? qc.getQueryData<Legacy>(LEGACY_QUERY) : undefined;
+      const steps = prev ? undoLegacyOp(prev.data, key, op) : null;
+      mutate(op);
+      if (steps)
+        toast(legacyChangeLabel(op.type), {
+          key: 'undo',
+          action: {
+            label: 'Deshacer',
+            run: () => void runUndo(qc, steps, (e) => toast(errorMessage(e), { tone: 'error' })),
+          },
+        });
+    };
+    return {
+      add: (item: LegacyItems[K], opts?: ChangeOpts) => run({ type: 'add', item }, opts),
+      update: (id: string, patch: LegacyPatch<K>, opts?: ChangeOpts) => run({ type: 'update', id, patch }, opts),
+      remove: (id: string, opts?: ChangeOpts) => run({ type: 'remove', id }, opts),
+      reorder: (ids: string[], opts?: ChangeOpts) => run({ type: 'reorder', ids }, opts),
+    };
+  }, [mutate, qc, key, toast, undoable]);
 }
 
 /** Un objeto del documento (`cycle`, `dayLog`, `budget`) con sus valores por defecto. */
@@ -99,7 +153,7 @@ export function useLegacyObject<K extends LegacyObjectKey>(data: LegacyData | un
  * Cambios en una clave que es un objeto: se fusionan al instante con lo
  * guardado (conservando lo desconocido) y se deshacen con un aviso si la API falla.
  */
-export function useModuleObject<K extends LegacyObjectKey>(key: K) {
+export function useModuleObject<K extends LegacyObjectKey>(key: K, hook: ChangeOpts = {}) {
   const qc = useQueryClient();
   const toast = useToast();
   const { mutate } = useMutation({
@@ -112,15 +166,32 @@ export function useModuleObject<K extends LegacyObjectKey>(key: K) {
       if (prev) qc.setQueryData<Legacy>(LEGACY_QUERY, { ...prev, data: { ...prev.data, [key]: { ...legacyObject(prev.data, key), ...patch } } });
       return { prev };
     },
+    onSuccess: (res) => {
+      qc.setQueryData<Legacy>(LEGACY_QUERY, (prev) => prev && { data: { ...prev.data, [key]: res.value }, updatedAt: res.updatedAt ?? prev.updatedAt });
+    },
     onError: (e, _patch, ctx) => {
       if (ctx?.prev) qc.setQueryData(LEGACY_QUERY, ctx.prev);
+      reloadAfterSave = true;
       toast(errorMessage(e), { tone: 'error' });
     },
-    onSettled: () => {
-      if (qc.isMutating({ mutationKey: ['legacy'] }) <= 1) return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
-    },
+    onSettled: () => settle(qc),
   });
-  return useMemo(() => ({ patch: (patch: Partial<LegacyObjects[K]>) => mutate(patch) }), [mutate]);
+  const undoable = hook.undo !== false;
+  return useMemo(
+    () => ({
+      patch: (patch: Partial<LegacyObjects[K]>, opts?: ChangeOpts) => {
+        const prev = undoable && opts?.undo !== false ? qc.getQueryData<Legacy>(LEGACY_QUERY) : undefined;
+        const back = prev ? undoLegacyObjectPatch(prev.data, key, patch) : null;
+        mutate(patch);
+        if (back)
+          toast(legacyChangeLabel('update'), {
+            key: 'undo',
+            action: { label: 'Deshacer', run: () => mutate(back) },
+          });
+      },
+    }),
+    [mutate, qc, key, toast, undoable],
+  );
 }
 
 /** Pide confirmación al recargar o cerrar mientras quedan cambios sin guardar (el navegador los cancelaría). */

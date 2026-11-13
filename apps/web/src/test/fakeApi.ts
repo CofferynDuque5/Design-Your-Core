@@ -31,6 +31,7 @@ export const USER = { id: 'u1', email: 'ana@example.com', name: 'Ana Pérez', ge
 export const profile = (over: Partial<Profile> = {}): Profile => ({
   focusPillars: ['descanso'],
   intention: null,
+  avatar: '',
   energyLevel: 3,
   activityLevel: 'ligera',
   wakeTime: '07:00',
@@ -187,5 +188,9 @@ export const legacyDoc = (): Record<string, unknown> => ({
     { id: 'wk2', title: 'Revisar cambios', project: 'p1', status: 'todo', done: true, due: '' },
   ],
   meditations: [{ id: 'md1', date: '2026-09-20', minutes: 3, kind: 'respiracion' }],
+  courses: [
+    { id: 'cr1', topic: 'Inglés', title: 'Inglés básico', url: 'https://www.youtube.com/watch?v=abc', status: 'curso', notes: 'Lección 6' },
+    { id: 'cr2', topic: 'Inglés', title: '', url: 'https://www.udemy.com/course/ingles/', status: 'pendiente', notes: '' },
+  ],
   claveFutura: true,
 });

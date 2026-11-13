@@ -1,10 +1,10 @@
-import { plural, type LegacySubtask, type LegacyTodo } from '@dyc/core';
+import { matchesSearch, plural, todoGroups, type LegacySubtask, type LegacyTodo } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { Check, ChevronDown, ChevronUp, ListChecks, Pencil, Plus, Trash2, X } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { CheckRow, IconButton, ToolScreen } from '../../components/tools';
-import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
+import { SearchBar, CheckRow, IconButton, Toggle, ToolScreen } from '../../components/tools';
+import { Button, Card, EmptyState, ErrorState, Field, Loading, Segmented, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
@@ -16,10 +16,30 @@ export default function Todos() {
   const subtasks = useLegacyList(legacy.data?.data, 'subtasks');
   const actions = useModule('todos');
   const [title, setTitle] = useState('');
+  const [empty, setEmpty] = useState(false);
+  const [q, setQ] = useState('');
+  const [grouped, setGrouped] = useState(false);
+  const [hideDone, setHideDone] = useState(false);
+  const found = todos.filter((t) => (!hideDone || !t.done) && matchesSearch(q, t.title, ...subtasks.filter((s) => s.todoId === t.id).map((s) => s.title)));
+  const doneCount = todos.filter((t) => t.done).length;
+  const card = (list: LegacyTodo[]) =>
+    list.length > 0 && (
+      <Card style={{ paddingVertical: space[1], gap: 0 }}>
+        {list.map((t, k) => {
+          const i = todos.indexOf(t);
+          return (
+            <Fragment key={t.id}>
+              {k > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.line }} />}
+              <TodoRow todo={t} subtasks={subtasks.filter((s) => s.todoId === t.id)} first={i === 0} last={i === todos.length - 1} onMove={(d) => move(i, d)} />
+            </Fragment>
+          );
+        })}
+      </Card>
+    );
   const pending = todos.filter((t) => !t.done).length;
 
   const add = () => {
-    if (!title.trim()) return;
+    if (!title.trim()) return setEmpty(true);
     actions.add({ id: newId(), title: title.trim(), done: false });
     setTitle('');
   };
@@ -41,9 +61,21 @@ export default function Todos() {
         <>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space[2] }}>
             <View style={{ flex: 1 }}>
-              <Field label="Nuevo pendiente" value={title} onChangeText={setTitle} maxLength={300} placeholder="Algo que tengas que hacer" returnKeyType="done" onSubmitEditing={add} />
+              <Field
+                label="Nuevo pendiente"
+                value={title}
+                onChangeText={(v) => {
+                  setTitle(v);
+                  setEmpty(false);
+                }}
+                maxLength={300}
+                placeholder="¿Qué tienes que hacer?"
+                returnKeyType="done"
+                onSubmitEditing={add}
+                error={empty ? 'Escribe qué tienes que hacer antes de añadirlo.' : null}
+              />
             </View>
-            <Button label="Añadir" icon={<Plus size={18} color={colors.onPrimary} />} onPress={add} disabled={!title.trim()} />
+            <Button label="Añadir" icon={<Plus size={18} color={colors.onPrimary} />} onPress={add} />
           </View>
 
           {todos.length === 0 ? (
@@ -58,14 +90,31 @@ export default function Todos() {
                   · {todos.length} en total
                 </T>
               </View>
-              <Card style={{ paddingVertical: space[1], gap: 0 }}>
-                {todos.map((t, i) => (
-                  <Fragment key={t.id}>
-                    {i > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.line }} />}
-                    <TodoRow todo={t} subtasks={subtasks.filter((s) => s.todoId === t.id)} first={i === 0} last={i === todos.length - 1} onMove={(d) => move(i, d)} />
-                  </Fragment>
-                ))}
-              </Card>
+              {todos.length > 3 && <SearchBar label="Buscar en tus pendientes" value={q} onChange={setQ} placeholder="Buscar un pendiente o un paso…" count={found.length} />}
+              {todos.length > 3 && (
+                <View style={{ gap: space[2] }}>
+                  <Segmented
+                    label="Cómo ver tus pendientes"
+                    value={grouped ? 'grupos' : 'lista'}
+                    onChange={(v) => setGrouped(v === 'grupos')}
+                    options={[
+                      { value: 'lista', label: 'Lista' },
+                      { value: 'grupos', label: 'Por proyecto' },
+                    ]}
+                  />
+                  {doneCount > 0 && <Toggle label={`Ocultar los hechos (${doneCount})`} value={hideDone} onChange={setHideDone} />}
+                </View>
+              )}
+              {grouped
+                ? todoGroups(found).map((g) => (
+                    <View key={g.label} style={{ gap: space[2] }}>
+                      <T v="label" accessibilityRole="header">
+                        {`${g.label} · ${g.items.filter((t) => !t.done).length} por hacer`}
+                      </T>
+                      {card(g.items)}
+                    </View>
+                  ))
+                : card(found)}
               <T v="small" tint="muted">
                 Toca el botón de la derecha de un pendiente para ver sus pasos, moverlo, renombrarlo o borrarlo.
               </T>
@@ -150,7 +199,6 @@ function TodoRow({ todo, subtasks, first, last, onMove }: { todo: LegacyTodo; su
               label={`Borrar «${todo.title}»`}
               onPress={() => {
                 actions.remove(todo.id);
-                toast(subtasks.length ? 'Pendiente y subtareas eliminados.' : 'Pendiente eliminado.');
               }}
             >
               <Trash2 size={18} color={colors.danger} />

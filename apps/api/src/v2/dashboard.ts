@@ -1,4 +1,4 @@
-import { addDays, daysIn, isDay, isPillarId, overallScore, periodRange, periodSchema, previousRange, recommend, todayIn, type PillarId } from '@dyc/core';
+import { addDays, consistencyDay, consistencyRange, daysIn, isDay, isPillarId, overallScore, periodRange, periodSchema, previousRange, recommend, todayIn, type PillarId } from '@dyc/core';
 import { Router, type RequestHandler } from 'express';
 import { upsert, type Db } from '../db/db.js';
 import type { Dismissal } from '../db/types.js';
@@ -63,6 +63,9 @@ export function dashboardRoutes({ db, requireAuth }: { db: Db; requireAuth: Requ
       toDb(today),
     ]);
 
+    const cRange = consistencyRange(today);
+    const cData = await loadDays(db, userId, cRange);
+
     const todayCheckIn = data.checkIns.get(today);
     res.json({
       period: period.data,
@@ -88,6 +91,7 @@ export function dashboardRoutes({ db, requireAuth }: { db: Db; requireAuth: Requ
       challenges: await activeChallenges(db, userId, today),
       recommendations: await recommendationsFor(db, userId, today),
       onboarded: !!profile?.onboardedAt,
+      consistency: daysIn(cRange).map((d) => consistencyDay(d, habitsOn(cData, d), cData.checkIns.has(d))),
     });
   }));
 

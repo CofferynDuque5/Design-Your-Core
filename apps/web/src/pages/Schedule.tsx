@@ -1,8 +1,10 @@
-import { CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, validClass, type LegacyClass } from '@dyc/core';
-import { Clock, MapPin, Plus, Trash2 } from 'lucide-react';
+import { matchesSearch, CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, scheduleHours, showableClasses, type LegacyClass } from '@dyc/core';
+import { Clock, MapPin, Play, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -25,17 +27,19 @@ const whenLabel = classWhenLabel;
 export function Schedule() {
   const legacy = useLegacyData();
   const all = useLegacyList(legacy.data?.data, 'classes');
-  const classes = all.filter(validClass);
+  // Datos antiguos con «8:00» o el día como texto también se dibujan.
+  const classes = showableClasses(all);
   const [editing, setEditing] = useState<LegacyClass | 'new' | null>(null);
   const now = useNow();
   const today = isoDay(now);
 
-  const from = Math.min(7, ...classes.map((c) => Math.floor(hhmmToHours(c.start))));
-  const to = Math.max(from + 1, ...classes.map((c) => Math.ceil(hhmmToHours(c.end))));
+  const { from, to } = scheduleHours(classes);
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i);
   const nowH = nowHours(now);
   const next = nextClass(classes, now);
   const describe = (c: LegacyClass) => `${classDescription(c)}. Editar`;
+  const [q, setQ] = useState('');
+  const shown = classes.filter((c) => matchesSearch(q, c.title, c.room, CLASS_DAY_NAMES[c.day - 1], c.start));
 
   return (
     <div className="page">
@@ -48,11 +52,13 @@ export function Schedule() {
         <Loading label="Cargando tu horario" />
       ) : legacy.isError ? (
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
-      ) : classes.length === 0 ? (
-        <EmptyState title="Tu horario está vacío">Añade tus clases: se repiten cada semana en el mismo día y hora.</EmptyState>
       ) : (
         <div className="stack-lg">
-          {next && (
+          {classes.length === 0 && (
+            <EmptyState title="Tu horario está vacío">Añade tus clases con «Nueva clase»: se repiten cada semana en el mismo día y hora.</EmptyState>
+          )}
+          {classes.length > 0 && <SearchBox label="Buscar en tu horario" value={q} onChange={setQ} placeholder="Buscar una clase, aula o día…" count={shown.length} />}
+          {next && !q.trim() && (
             <section className="card card--accent next-class" aria-labelledby="next-class-title" style={{ ['--c' as string]: next.c.color }}>
               <p id="next-class-title" className="eyebrow">
                 {next.ongoing ? 'Clase en curso' : 'Próxima clase'}
@@ -71,12 +77,17 @@ export function Schedule() {
                       </span>
                     )}
                   </span>
+                  {next.c.course && (
+                    <Link to={`/cursos?abrir=${encodeURIComponent(next.c.course)}`} className="small">
+                      Continuar el curso
+                    </Link>
+                  )}
                 </div>
               </div>
             </section>
           )}
 
-          {/* Cuadrícula semanal (pantallas anchas) */}
+          {/* Cuadrícula semanal: siempre visible, también vacía y en el teléfono */}
           <section className="card week-grid-card" aria-labelledby="week-title">
             <h2 id="week-title" className="visually-hidden">
               Semana
@@ -97,7 +108,7 @@ export function Schedule() {
               </div>
               {DAY_NAMES.map((name, i) => {
                 const day = i + 1;
-                const placed = layoutLanes(classes.filter((c) => c.day === day).map((c) => ({ item: c, start: hhmmToHours(c.start), end: hhmmToHours(c.end) })));
+                const placed = layoutLanes(shown.filter((c) => c.day === day).map((c) => ({ item: c, start: hhmmToHours(c.start), end: hhmmToHours(c.end) })));
                 return (
                   <div key={name} className={`week-grid__col${day === today ? ' week-grid__col--today' : ''}`} style={{ height: (to - from) * HOUR }}>
                     <ul aria-label={name}>
@@ -132,10 +143,10 @@ export function Schedule() {
             </div>
           </section>
 
-          {/* Lista por días (móvil) */}
+          {/* Lista por días (teléfono, debajo de la cuadrícula) */}
           <div className="day-list stack">
             {DAY_NAMES.map((name, i) => {
-              const list = classes.filter((c) => c.day === i + 1).sort(byStart);
+              const list = shown.filter((c) => c.day === i + 1).sort(byStart);
               if (!list.length) return null;
               return (
                 <section key={name} className="card card--list" aria-labelledby={`day-${i}`}>
@@ -180,6 +191,8 @@ function subjectsOf(data: Record<string, unknown> | undefined): Subject[] {
 
 function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; count: number; subjects: Subject[]; onDone: () => void }) {
   const actions = useModule('classes');
+  const saved = useLegacyData().data?.data;
+  const rooms = [...useLegacyList(saved, 'classes').map((c) => c.room ?? ''), ...subjects.map((s) => s.room ?? '')];
   const [subject, setSubject] = useState(cls?.subject && subjects.some((s) => s.id === cls.subject) ? cls.subject : '');
   const [title, setTitle] = useState(cls?.title ?? '');
   const [day, setDay] = useState(cls?.day ?? 1);
@@ -211,6 +224,11 @@ function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; 
 
   return (
     <form className="stack" onSubmit={submit}>
+      {cls?.course && (
+        <Link to={`/cursos?abrir=${encodeURIComponent(cls.course)}`} className="btn btn--secondary" style={{ alignSelf: 'flex-start' }}>
+          <Play size={16} aria-hidden="true" /> Abrir el curso
+        </Link>
+      )}
       {subjects.length > 0 && (
         <SelectField label="Materia" value={subject} onChange={(e) => pickSubject(e.target.value)}>
           <option value="">Clase suelta</option>
@@ -233,7 +251,7 @@ function ClassForm({ cls, count, subjects, onDone }: { cls: LegacyClass | null; 
         <TextField label="Empieza" type="time" value={start} onChange={(e) => setStart(e.target.value)} required />
         <TextField label="Termina" type="time" value={end} onChange={(e) => setEnd(e.target.value)} required error={badTime && TIME_RE.test(start) && TIME_RE.test(end) ? 'Debe ser después de la hora de inicio.' : null} />
       </div>
-      <TextField label="Aula (opcional)" value={room} onChange={(e) => setRoom(e.target.value)} maxLength={60} placeholder="A-201" />
+      <TextField label="Aula (opcional)" suggestions={rooms} value={room} onChange={(e) => setRoom(e.target.value)} maxLength={60} placeholder="A-201" />
       <ColorPicker legend="Color" colors={palette} value={color} onChange={setColor} names={COLOR_NAMES} />
       <div className="form-actions">
         {cls && (

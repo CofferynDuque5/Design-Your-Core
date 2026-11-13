@@ -1,10 +1,22 @@
-import type { LegacySubtask, LegacyTodo } from '@dyc/core';
+import { matchesSearch, todoGroups, type LegacySubtask, type LegacyTodo } from '@dyc/core';
 import { Check, ChevronDown, ChevronUp, ListChecks, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
-import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { Segmented } from '../components/Form';
+import { SearchBox } from '../components/SearchBox';
 import { EmptyState, ErrorState, Loading } from '../components/States';
+
+type View = { group: boolean; hideDone: boolean };
+const VIEW_KEY = 'dyc-pendientes-vista';
+function readView(): View {
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}') as Partial<View>;
+    return { group: v.group === true, hideDone: v.hideDone === true };
+  } catch {
+    return { group: false, hideDone: false };
+  }
+}
 
 export function Todos() {
   const legacy = useLegacyData();
@@ -12,13 +24,34 @@ export function Todos() {
   const subtasks = useLegacyList(legacy.data?.data, 'subtasks');
   const actions = useModule('todos');
   const [title, setTitle] = useState('');
+  const [empty, setEmpty] = useState(false);
+  const [added, setAdded] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const [view, setViewState] = useState<View>(readView);
+  const setView = (v: Partial<View>) => {
+    const next = { ...view, ...v };
+    setViewState(next);
+    try {
+      localStorage.setItem(VIEW_KEY, JSON.stringify(next));
+    } catch {
+      /* sin almacenamiento: la vista no se recuerda */
+    }
+  };
+  const found = todos.filter((t) => (!view.hideDone || !t.done || t.id === added) && matchesSearch(q, t.title, ...subtasks.filter((s) => s.todoId === t.id).map((s) => s.title)));
+  const doneCount = todos.filter((t) => t.done).length;
+  const row = (t: LegacyTodo) => {
+    const i = todos.indexOf(t);
+    return <TodoRow key={t.id} fresh={t.id === added} todo={t} subtasks={subtasks.filter((s) => s.todoId === t.id)} first={i === 0} last={i === todos.length - 1} onMove={(d) => move(i, d)} />;
+  };
   const pending = todos.filter((t) => !t.done).length;
 
   const add = (e: FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
-    actions.add({ id: newId(), title: title.trim(), done: false });
+    if (!title.trim()) return setEmpty(true);
+    const id = newId();
+    actions.add({ id, title: title.trim(), done: false });
     setTitle('');
+    setAdded(id);
   };
 
   const move = (index: number, delta: -1 | 1) => {
@@ -41,26 +74,71 @@ export function Todos() {
             <label className="visually-hidden" htmlFor="new-todo">
               Nuevo pendiente
             </label>
-            <input id="new-todo" className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} placeholder="Añade algo que tengas que hacer" />
-            <button type="submit" className="btn" disabled={!title.trim()}>
+            <input
+              id="new-todo"
+              className="input"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setEmpty(false);
+              }}
+              maxLength={300}
+              placeholder="¿Qué tienes que hacer?"
+              aria-invalid={empty || undefined}
+              aria-describedby={empty ? 'new-todo-error' : undefined}
+            />
+            <button type="submit" className="btn">
               <Plus size={18} aria-hidden="true" /> Añadir
             </button>
           </form>
+          {empty && (
+            <p id="new-todo-error" className="field__error" role="alert">
+              Escribe qué tienes que hacer antes de añadirlo.
+            </p>
+          )}
 
           {todos.length === 0 ? (
             <EmptyState title="Nada pendiente">Anota lo que tengas en la cabeza y divídelo en pasos pequeños.</EmptyState>
           ) : (
-            <section className="card card--list" aria-labelledby="todos-count">
-              <h2 id="todos-count" className="list-count">
-                {pending === 0 ? 'Todo hecho' : `${pending} por hacer`}
-                <span className="muted small"> · {todos.length} en total</span>
-              </h2>
-              <ul className="todo-list">
-                {todos.map((t, i) => (
-                  <TodoRow key={t.id} todo={t} subtasks={subtasks.filter((s) => s.todoId === t.id)} first={i === 0} last={i === todos.length - 1} onMove={(d) => move(i, d)} />
-                ))}
-              </ul>
-            </section>
+            <>
+              {todos.length > 3 && <SearchBox label="Buscar en tus pendientes" value={q} onChange={setQ} placeholder="Buscar un pendiente o un paso…" count={found.length} />}
+              {todos.length > 3 && (
+                <div className="todo-view">
+                  <Segmented
+                    label="Cómo ver tus pendientes"
+                    value={view.group ? 'grupos' : 'lista'}
+                    onChange={(v) => setView({ group: v === 'grupos' })}
+                    options={[
+                      { value: 'lista', label: 'Lista' },
+                      { value: 'grupos', label: 'Por proyecto' },
+                    ]}
+                  />
+                  {doneCount > 0 && (
+                    <label className="check-inline small">
+                      <input type="checkbox" checked={view.hideDone} onChange={(e) => setView({ hideDone: e.target.checked })} /> Ocultar los hechos ({doneCount})
+                    </label>
+                  )}
+                </div>
+              )}
+              <section className="card card--list" aria-labelledby="todos-count">
+                <h2 id="todos-count" className="list-count">
+                  {pending === 0 ? 'Todo hecho' : `${pending} por hacer`}
+                  <span className="muted small"> · {todos.length} en total</span>
+                </h2>
+                {view.group ? (
+                  todoGroups(found).map((g) => (
+                    <div key={g.label} className="todo-group">
+                      <h3 className="group-title">
+                        {g.label} <span className="muted small numeric">{g.items.filter((t) => !t.done).length} por hacer</span>
+                      </h3>
+                      <ul className="todo-list">{g.items.map(row)}</ul>
+                    </div>
+                  ))
+                ) : (
+                  <ul className="todo-list">{found.map(row)}</ul>
+                )}
+              </section>
+            </>
           )}
         </div>
       )}
@@ -68,14 +146,18 @@ export function Todos() {
   );
 }
 
-function TodoRow({ todo, subtasks, first, last, onMove }: { todo: LegacyTodo; subtasks: LegacySubtask[]; first: boolean; last: boolean; onMove: (d: -1 | 1) => void }) {
+function TodoRow({ todo, subtasks, first, last, onMove, fresh }: { fresh?: boolean; todo: LegacyTodo; subtasks: LegacySubtask[]; first: boolean; last: boolean; onMove: (d: -1 | 1) => void }) {
   const actions = useModule('todos');
-  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(todo.title);
   const doneSubs = subtasks.filter((s) => s.done).length;
   const panelId = `subs-${todo.id}`;
+  // Lo recién añadido va al final de la lista: se lleva a la vista para que se vea que entró.
+  const row = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (fresh) row.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [fresh]);
 
   const rename = (e: FormEvent) => {
     e.preventDefault();
@@ -84,7 +166,7 @@ function TodoRow({ todo, subtasks, first, last, onMove }: { todo: LegacyTodo; su
   };
 
   return (
-    <li className={`todo${todo.done ? ' todo--done' : ''}`}>
+    <li ref={row} className={`todo${todo.done ? ' todo--done' : ''}`}>
       <div className="todo__main">
         {renaming ? (
           <form className="todo__rename" onSubmit={rename}>
@@ -152,7 +234,6 @@ function TodoRow({ todo, subtasks, first, last, onMove }: { todo: LegacyTodo; su
                 className="icon-btn"
                 onClick={() => {
                   actions.remove(todo.id);
-                  toast(subtasks.length ? 'Pendiente y subtareas eliminados.' : 'Pendiente eliminado.');
                 }}
                 aria-label={`Borrar «${todo.title}»`}
               >

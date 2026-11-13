@@ -1,12 +1,13 @@
-import { checkItems, checkItemsPayload, COLOR_NAMES, donePercent, ROADMAP_COLORS, STEP_STATE_LABEL, stepStates, type LegacyCheckItem, type LegacyRoadmap } from '@dyc/core';
+import { matchesSearch, checkItems, checkItemsPayload, COLOR_NAMES, donePercent, ROADMAP_COLORS, STEP_STATE_LABEL, stepStates, type LegacyCheckItem, type LegacyRoadmap } from '@dyc/core';
 import { ArrowRight, Check, Lock, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useId, useMemo, useState, type FormEvent } from 'react';
 import { newId, newSubId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { ColorPicker, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, Meter, paletteWith, safeColor } from '../components/ToolParts';
+import { FormActions, Meter, paletteWith, safeColor, RemoveButton } from '../components/ToolParts';
 import { plural } from '../lib/format';
 
 type Roadmap = LegacyRoadmap & { steps: LegacyCheckItem[] };
@@ -17,6 +18,8 @@ export function Roadmaps() {
   const raw = useLegacyList(legacy.data?.data, 'roadmaps');
   const roadmaps = useMemo<Roadmap[]>(() => raw.map((r) => ({ ...r, steps: checkItems(r.steps, newSubId) })), [raw]);
   const [editing, setEditing] = useState<Roadmap | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = roadmaps.filter((r) => matchesSearch(q, r.name, ...r.steps.map((s) => s.name)));
   const steps = roadmaps.flatMap((r) => r.steps);
   const done = steps.filter((s) => s.done).length;
 
@@ -45,8 +48,9 @@ export function Roadmaps() {
               </p>
             )}
           </div>
+          <SearchBox label="Buscar en tus roadmaps" value={q} onChange={setQ} placeholder="Buscar por nombre o paso…" count={found.length} />
           <ul className="card-grid tool-grid tool-grid--wide">
-            {roadmaps.map((r) => (
+            {found.map((r) => (
               <li key={r.id}>
                 <RoadmapCard roadmap={r} onEdit={() => setEditing(r)} />
               </li>
@@ -89,17 +93,17 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
             {title}
           </h2>
           <span className="muted small">
-            Ruta de materias{r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
+            Ruta por pasos
+            {r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
           </span>
         </div>
         <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
           <Pencil size={18} aria-hidden="true" />
         </button>
+        <RemoveButton module="roadmaps" id={r.id} name={title} />
       </div>
       {r.steps.length > 0 && <Meter value={donePercent(r.steps)} color={color} label={`Avance de ${title}`} />}
-      {r.steps.length === 0 ? (
-        <p className="muted small">Sin pasos todavía. Añade la primera materia abajo.</p>
-      ) : (
+      {r.steps.length === 0 ? null : (
         <ol className="steps-path" aria-label={`Pasos de «${title}»`}>
           {r.steps.map((s, i) => {
             const state = states[i];
@@ -117,8 +121,8 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
                     </button>
                   </div>
                   {state === 'current' && (
-                    <button type="button" className="btn btn--sm" onClick={() => mark(s.id, true)} aria-label={`Marcar «${s.name}» como completada`}>
-                      <Check size={16} aria-hidden="true" /> Marcar como completada
+                    <button type="button" className="btn btn--sm" onClick={() => mark(s.id, true)} aria-label={`Marcar «${s.name}» como completado`}>
+                      <Check size={16} aria-hidden="true" /> Marcar como completado
                     </button>
                   )}
                   {state === 'done' && (
@@ -151,7 +155,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
             <Check size={15} aria-hidden="true" className="inline-icon" /> <strong>¡Ruta completada!</strong>
           </>
         ) : (
-          <span className="muted">Añade materias para empezar tu ruta.</span>
+          <span className="muted">Sin pasos todavía: añade el primero abajo.</span>
         )}
       </p>
     </article>

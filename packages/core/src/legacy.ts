@@ -38,6 +38,10 @@ export const LEGACY_KEYS = [
   'notes',
   'workItems',
   'meditations',
+  'courses',
+  'ventures',
+  'ventureItems',
+  'chats',
 ] as const;
 export type LegacyKey = (typeof LEGACY_KEYS)[number];
 export const isLegacyKey = (k: unknown): k is LegacyKey => typeof k === 'string' && (LEGACY_KEYS as readonly string[]).includes(k);
@@ -107,6 +111,11 @@ export const COLOR_NAMES: Record<string, string> = {
   '#EDE4FF': 'Lila',
   '#FFE8D6': 'Melocotón',
   '#F1F3F5': 'Gris',
+  '#C8F23A': 'Lima',
+  '#F2A33A': 'Ámbar',
+  '#E05A6A': 'Coral',
+  '#3AC2B0': 'Aguamarina',
+  '#B57CF2': 'Lavanda',
 };
 
 export const PROJECT_STATUSES = ['curso', 'revision', 'entregado'] as const;
@@ -115,6 +124,39 @@ export const PROJECT_STATUS_INFO: Record<ProjectStatus, { label: string }> = {
   curso: { label: 'En curso' },
   revision: { label: 'En revisión' },
   entregado: { label: 'Entregado' },
+};
+
+/** Prioridad de un proyecto (campo nuevo: la app anterior no lo tenía). */
+export const PROJECT_PRIORITIES = ['alta', 'media', 'baja'] as const;
+export type ProjectPriority = (typeof PROJECT_PRIORITIES)[number];
+export const PROJECT_PRIORITY_INFO: Record<ProjectPriority, { label: string; rank: number }> = {
+  alta: { label: 'Alta', rank: 0 },
+  media: { label: 'Media', rank: 1 },
+  baja: { label: 'Baja', rank: 2 },
+};
+
+/** Tipo de proyecto (campo nuevo y opcional). */
+/** Cuántas categorías puede llevar un proyecto. */
+export const PROJECT_CATEGORIES_MAX = 10;
+export const PROJECT_CATEGORIES = ['web', 'app', 'automatizacion', 'tienda', 'diseno', 'contenido', 'estudio', 'otro'] as const;
+export type ProjectCategory = (typeof PROJECT_CATEGORIES)[number];
+export const PROJECT_CATEGORY_INFO: Record<ProjectCategory, { label: string }> = {
+  web: { label: 'Sitio web' },
+  app: { label: 'Aplicación' },
+  automatizacion: { label: 'Automatización' },
+  tienda: { label: 'Tienda en línea' },
+  diseno: { label: 'Diseño' },
+  contenido: { label: 'Contenido' },
+  estudio: { label: 'Trabajo de estudio' },
+  otro: { label: 'Otro' },
+};
+
+/** Lo que falta para terminar un proyecto, o una mejora para después. */
+export const PROJECT_TODO_KINDS = ['falta', 'mejora'] as const;
+export type ProjectTodoKind = (typeof PROJECT_TODO_KINDS)[number];
+export const PROJECT_TODO_KIND_INFO: Record<ProjectTodoKind, { label: string; noun: string }> = {
+  falta: { label: 'Falta por hacer', noun: 'pendiente' },
+  mejora: { label: 'Mejoras', noun: 'punto de mejora' },
 };
 
 export const CONTENT_STAGES = ['idea', 'guion', 'grabar', 'editar', 'publicado'] as const;
@@ -151,7 +193,7 @@ export const CLASS_DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as
 export const FOCUS_MODES = ['focus', 'short', 'long'] as const;
 export type FocusMode = (typeof FOCUS_MODES)[number];
 export const FOCUS_MODE_INFO: Record<FocusMode, { label: string; minutes: number }> = {
-  focus: { label: 'Enfoque', minutes: 25 },
+  focus: { label: 'Concentración', minutes: 25 },
   short: { label: 'Descanso corto', minutes: 5 },
   long: { label: 'Descanso largo', minutes: 15 },
 };
@@ -287,7 +329,7 @@ export const noteExcerpt = (body: string): string => body.slice(0, NOTE_EXCERPT_
  */
 export const noteDateLabel = (now: Date = new Date()): string => now.toLocaleDateString('es', { day: 'numeric', month: 'short' });
 
-/** Proyectos de Trabajo: tres proyectos de demostración fijos en el código de la app anterior (no son `projects`). */
+/** Proyectos fijos antiguos de Trabajo (no son `projects`): las tareas que los usan se pueden pasar a un proyecto real. */
 export const WORK_PROJECTS = ['p1', 'p2', 'p3'] as const;
 export type WorkProject = (typeof WORK_PROJECTS)[number];
 export const WORK_PROJECT_INFO: Record<WorkProject, { label: string; color: string }> = {
@@ -302,11 +344,42 @@ export const WORK_STATUS_INFO: Record<WorkStatus, { label: string }> = {
   curso: { label: 'En curso' },
 };
 
+/** Cursos (nuevo, no existe en la app anterior): temas por estudiar con su enlace. */
+export const COURSE_STATUSES = ['pendiente', 'curso', 'hecho'] as const;
+export type CourseStatus = (typeof COURSE_STATUSES)[number];
+export const COURSE_STATUS_INFO: Record<CourseStatus, { label: string; short: string }> = {
+  pendiente: { label: 'Por ver', short: 'Por ver' },
+  curso: { label: 'Viendo', short: 'Viendo' },
+  hecho: { label: 'Terminado', short: 'Hecho' },
+};
+
+/** Emprendimientos (nuevo): proyectos de negocio con sus notas, imágenes, archivos y enlaces. */
+export const VENTURE_STAGES = ['idea', 'validando', 'lanzado', 'pausa'] as const;
+export type VentureStage = (typeof VENTURE_STAGES)[number];
+export const VENTURE_STAGE_INFO: Record<VentureStage, { label: string }> = {
+  idea: { label: 'Idea' },
+  validando: { label: 'Validando' },
+  lanzado: { label: 'En marcha' },
+  pausa: { label: 'En pausa' },
+};
+export const VENTURE_COLORS = ['#C8F23A', '#4F7CFF', '#F2A33A', '#E05A6A', '#3AC2B0', '#B57CF2'] as const;
+export const VENTURE_ITEM_KINDS = ['note', 'image', 'file', 'link'] as const;
+export type VentureItemKind = (typeof VENTURE_ITEM_KINDS)[number];
+/** Archivos e imágenes se guardan en /api/images como data: URL (máximo ~4 MB de texto). */
+export const VENTURE_FILE_MAX_BYTES = 3 * 1024 * 1024;
+
+/** Asistente (nuevo): conversaciones guardadas en tu cuenta, la más reciente primero. */
+export const CHATS_MAX = 50;
+export const ATTACHMENT_KINDS = ['image', 'pdf', 'text'] as const;
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+export const CARD_STATUSES = ['pending', 'running', 'done', 'discarded', 'invalid'] as const;
+export type CardStatus = (typeof CARD_STATUSES)[number];
+
 /** Tipo de sesión de Respiración (`meditations.kind`) que escribe la app anterior. */
 export const MEDITATION_KIND = 'respiracion';
 
 /** Máximo de registros que guarda la app anterior (el más reciente primero). */
-export const LEGACY_NEWEST_FIRST: Partial<Record<LegacyKey, number>> = { focus: FOCUS_MAX, transactions: 2000, workouts: 400, sleep: 400, meditations: 400 };
+export const LEGACY_NEWEST_FIRST: Partial<Record<LegacyKey, number>> = { focus: FOCUS_MAX, transactions: 2000, workouts: 400, sleep: 400, meditations: 400, chats: CHATS_MAX };
 
 /** Claves con un solo registro por fecha (la app anterior no permite duplicados). */
 export const LEGACY_UNIQUE: Partial<Record<LegacyKey, { field: string; message: string }>> = {
@@ -372,6 +445,8 @@ export interface LegacyClass {
   color: string;
   /** Id de la materia (`subjects`) o "". */
   subject: string;
+  /** Id del curso (`courses`) que se estudia en este hueco, si se añadió desde Cursos. */
+  course?: string;
 }
 
 export interface LegacyFocus {
@@ -413,8 +488,24 @@ export interface LegacyProject {
   /** Texto libre, p. ej. "20 SEP". */
   deadline: string;
   status: ProjectStatus;
+  /** Falta en los proyectos de la app anterior: cuenta como «media». */
+  priority?: ProjectPriority;
   color: string;
   milestones: LegacyMilestone[];
+  /** Tipo de proyecto; falta en los proyectos antiguos y "" es «sin categoría». */
+  category?: ProjectCategory | '';
+  /** Varias categorías: las de la lista (claves) y las que escribe la persona (texto). */
+  categories?: string[];
+  /** Correo del sitio o del proyecto (por ejemplo contacto@misitio.com). */
+  email?: string;
+  /** Enlace del webmail para abrir ese correo; si falta se usa https://dominio/webmail. */
+  mailUrl?: string;
+  /** Lo que falta para terminar y las mejoras pendientes. */
+  todos?: LegacyProjectTodo[];
+}
+
+export interface LegacyProjectTodo extends LegacyCheckItem {
+  kind: ProjectTodoKind;
 }
 
 export interface LegacyRoadmap {
@@ -494,6 +585,8 @@ export interface LegacyPet {
   name: string;
   species: PetSpecies;
   note: string;
+  /** Foto de perfil: id en /api/images, o "" sin foto. */
+  photo?: string;
 }
 
 export interface LegacyPetCare {
@@ -607,11 +700,195 @@ export interface LegacyNote {
 export interface LegacyWorkItem {
   id: string;
   title: string;
-  project: WorkProject;
+  /** Id de un proyecto de la sección Proyectos, "p1"/"p2"/"p3" (proyectos fijos antiguos) o "" (sin proyecto). */
+  project: string;
   status: WorkStatus;
   done: boolean;
   /** Texto libre («Hoy», «Vie»…) o "". */
   due: string;
+}
+
+export interface LegacyCourse {
+  id: string;
+  /** Tema que se quiere estudiar («Inglés», «React»…). Agrupa los cursos. */
+  topic: string;
+  /** Subcategoría dentro del tema («Hooks», «Gramática»…); vacía o ausente si no tiene. */
+  subtopic?: string;
+  /** Nombre del curso o video; "" si solo hay enlace. */
+  title: string;
+  /** Canal de YouTube o academia que lo dicta («midudev», «Platzi»…). */
+  source?: string;
+  /** Enlace http(s) o "". */
+  url: string;
+  status: CourseStatus;
+  notes: string;
+  /** 0-100. En YouTube se calcula con `position`/`duration`. */
+  progress?: number;
+  /** Segundos vistos del video actual (YouTube). */
+  position?: number;
+  duration?: number;
+  /** Video actual de una lista de YouTube. */
+  video?: string;
+  /** Dónde se quedó, con sus palabras («Lección 12»). */
+  spot?: string;
+  /** Última vez que se abrió (ISO). */
+  lastAt?: string;
+  /** Duración total en segundos (leída del enlace o escrita a mano). */
+  length?: number;
+  /** De dónde salió `length`: exacta del enlace, aproximada o escrita a mano. */
+  lengthFrom?: CourseLengthFrom;
+  /** Lecciones o videos del curso, en orden; `unit` las agrupa («Unidad 1»). */
+  lessons?: CourseLesson[];
+  /** Unidades del curso en orden, también las que aún no tienen lecciones. */
+  units?: string[];
+  /**
+   * Idioma en que se dicta: un código de COURSE_LANGUAGES («es», «en», «pt»…),
+   * otro escrito por la persona («Catalán») o sin indicar ("").
+   */
+  language?: string;
+}
+
+export interface CourseLesson {
+  id: string;
+  title: string;
+  /** Unidad o módulo al que pertenece; vacío si no tiene. */
+  unit?: string;
+  /** Enlace http(s) de la lección (por ejemplo, un video de YouTube). */
+  url?: string;
+  done?: boolean;
+  /** Duración en segundos, si se sabe. */
+  seconds?: number;
+  /** Lo que hay que hacer dentro de la lección: videos, lecturas, cuestionarios, exámenes… */
+  activities?: LessonActivity[];
+}
+
+export const ACTIVITY_KINDS = ['video', 'lectura', 'cuestionario', 'examen', 'tarea', 'practica', 'proyecto', 'otro'] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+export const ACTIVITY_KIND_LABEL: Record<ActivityKind, string> = {
+  video: 'Video',
+  lectura: 'Lectura',
+  cuestionario: 'Cuestionario',
+  examen: 'Examen',
+  tarea: 'Tarea',
+  practica: 'Práctica',
+  proyecto: 'Proyecto',
+  otro: 'Otra',
+};
+export const ACTIVITIES_MAX = 60;
+
+export interface LessonActivity {
+  id: string;
+  kind: ActivityKind;
+  title: string;
+  done?: boolean;
+  url?: string;
+}
+
+/** Hasta cuántas lecciones guarda un curso. */
+export const COURSE_LESSONS_MAX = 500;
+export const COURSE_UNITS_MAX = 100;
+
+export const COURSE_LANGUAGES = ['es', 'en', 'pt', 'fr', 'it', 'de', 'ja', 'ko', 'zh', 'ru', 'ar'] as const;
+export type CourseLanguage = (typeof COURSE_LANGUAGES)[number];
+export const COURSE_LANGUAGE_LABEL: Record<CourseLanguage, string> = {
+  es: 'Español',
+  en: 'Inglés',
+  pt: 'Portugués',
+  fr: 'Francés',
+  it: 'Italiano',
+  de: 'Alemán',
+  ja: 'Japonés',
+  ko: 'Coreano',
+  zh: 'Chino',
+  ru: 'Ruso',
+  ar: 'Árabe',
+};
+export const isCourseLanguage = (v: unknown): v is CourseLanguage => (COURSE_LANGUAGES as readonly unknown[]).includes(v);
+/** Nombre del idioma de un curso: el de la lista o el que escribió la persona. */
+export const courseLanguageLabel = (v: string | undefined | null): string => (!v ? '' : isCourseLanguage(v) ? COURSE_LANGUAGE_LABEL[v] : v);
+/** Lo escrito como idioma, como código si es uno de la lista («inglés» → «en»). */
+export function courseLanguageValue(v: string): string {
+  const t = v.trim();
+  const key = t.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const known = COURSE_LANGUAGES.find((l) => l === key || COURSE_LANGUAGE_LABEL[l].toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '') === key);
+  return known ?? t.slice(0, 40);
+}
+
+export const COURSE_LENGTH_FROM = ['enlace', 'aprox', 'manual'] as const;
+export type CourseLengthFrom = (typeof COURSE_LENGTH_FROM)[number];
+
+export interface LegacyVenture {
+  id: string;
+  name: string;
+  description: string;
+  stage: VentureStage;
+  color: string;
+}
+
+export interface LegacyVentureItem {
+  id: string;
+  ventureId: string;
+  kind: VentureItemKind;
+  title: string;
+  /** Texto de una nota (o descripción de una imagen, archivo o enlace). */
+  text: string;
+  /** Enlace http(s) de `link`; "" en el resto. */
+  url: string;
+  /** Id del archivo en /api/images (`image` y `file`); "" en el resto. */
+  ref: string;
+  mime: string;
+  /** Tamaño en bytes del archivo original. */
+  size: number;
+  /** Día en que se añadió (AAAA-MM-DD). */
+  date: string;
+}
+
+/** Archivo adjunto a un mensaje del Asistente. */
+export interface ChatAttachment {
+  name: string;
+  mime: string;
+  kind: AttachmentKind;
+  size: number;
+  /** Id en /api/images (imágenes y PDF); "" si no se pudo guardar. */
+  ref: string;
+  /** Contenido de un archivo de texto. */
+  text?: string;
+  /** data: URL de la imagen o el PDF. Solo en memoria: nunca se guarda en el documento. */
+  data?: string;
+}
+
+export interface StoredToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+export type StoredChatMessage =
+  | { role: 'user'; content: string; attachments?: ChatAttachment[] }
+  | { role: 'assistant'; content: string; tool_calls?: StoredToolCall[] }
+  | { role: 'tool'; tool_call_id: string; content: string };
+
+/** Acción propuesta por el Asistente, tal como se mostró. */
+export interface StoredCard {
+  callId: string;
+  tool: string;
+  title: string;
+  where: string;
+  fields: Array<{ label: string; value: string }>;
+  plan: Record<string, unknown> | null;
+  error?: string;
+  done: string;
+  status: CardStatus;
+}
+
+export interface LegacyChat {
+  id: string;
+  title: string;
+  model: string;
+  /** Fecha y hora ISO del último mensaje. */
+  updatedAt: string;
+  messages: StoredChatMessage[];
+  cards: Record<string, StoredCard>;
 }
 
 export interface LegacyMeditation {
@@ -661,6 +938,10 @@ export interface LegacyItems {
   notes: LegacyNote;
   workItems: LegacyWorkItem;
   meditations: LegacyMeditation;
+  courses: LegacyCourse;
+  ventures: LegacyVenture;
+  ventureItems: LegacyVentureItem;
+  chats: LegacyChat;
 }
 
 /** Documento completo de la app anterior: claves conocidas y cualquier otra que traiga. */
@@ -692,6 +973,39 @@ const weekdays = z
  */
 const checkItem = z.object({ id: legacyIdSchema, name: z.string().max(300), done: z.boolean().default(false) }).strict();
 const checkList = (item: z.AnyZodObject = checkItem) => z.array(item).max(1000).default([]);
+
+const httpUrl = z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://');
+/** Id de un archivo en /api/images (igual que el servidor). */
+const fileRef = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/, 'Archivo no válido');
+const chatAttachment = z
+  .object({
+    name: z.string().max(200),
+    mime: z.string().max(120),
+    kind: z.enum(ATTACHMENT_KINDS),
+    size: z.number().int().min(0).max(100_000_000).default(0),
+    ref: z.union([z.literal(''), fileRef]).default(''),
+    text: z.string().max(200_000).optional(),
+  })
+  .strict();
+const toolCall = z.object({ id: z.string().max(200), type: z.literal('function'), function: z.object({ name: z.string().max(100), arguments: z.string().max(50_000) }).strict() }).strict();
+const chatMessage = z.discriminatedUnion('role', [
+  z.object({ role: z.literal('user'), content: z.string().max(20_000), attachments: z.array(chatAttachment).max(10).optional() }).strict(),
+  z.object({ role: z.literal('assistant'), content: z.string().max(100_000), tool_calls: z.array(toolCall).max(20).optional() }).strict(),
+  z.object({ role: z.literal('tool'), tool_call_id: z.string().max(200), content: z.string().max(10_000) }).strict(),
+]);
+const storedCard = z
+  .object({
+    callId: z.string().max(200),
+    tool: z.string().max(100),
+    title: z.string().max(300),
+    where: z.string().max(120),
+    fields: z.array(z.object({ label: z.string().max(120), value: z.string().max(10_000) }).strict()).max(40),
+    plan: z.record(z.unknown()).nullable(),
+    error: z.string().max(1000).optional(),
+    done: z.string().max(1000),
+    status: z.enum(CARD_STATUSES),
+  })
+  .strict();
 
 const shapes = {
   blocks: z.object({
@@ -732,6 +1046,8 @@ const shapes = {
     // La paleta del Horario, o el color copiado de una materia.
     color: hex.default(CLASS_COLORS[0]),
     subject: z.union([legacyIdSchema, z.literal('')]).default(''),
+    // Curso de Cursos que se estudia en este hueco (nuevo, opcional).
+    course: z.union([legacyIdSchema, z.literal('')]).optional(),
   }),
   focus: z.object({
     id: legacyIdSchema,
@@ -754,8 +1070,14 @@ const shapes = {
     subject: line(120),
     deadline: line(60),
     status: z.enum(PROJECT_STATUSES).default('curso'),
+    priority: z.enum(PROJECT_PRIORITIES).default('media'),
     color: hex.default(PROJECT_COLORS[0]),
     milestones: checkList(checkItem.extend({ date: z.string().max(60).default('') })),
+    category: z.union([z.literal(''), z.enum(PROJECT_CATEGORIES)]).optional(),
+    categories: z.array(z.string().trim().min(1).max(40)).max(PROJECT_CATEGORIES_MAX).optional(),
+    email: z.union([z.literal(''), z.string().trim().max(200).email('Correo no válido')]).optional(),
+    mailUrl: z.union([z.literal(''), z.string().trim().max(500).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).optional(),
+    todos: z.array(checkItem.extend({ kind: z.enum(PROJECT_TODO_KINDS).default('falta') })).max(1000).optional(),
   }),
   roadmaps: z.object({
     id: legacyIdSchema,
@@ -820,6 +1142,7 @@ const shapes = {
     name: named(80),
     species: z.enum(PET_SPECIES).default('dog'),
     note: line(300),
+    photo: z.union([z.literal(''), fileRef]).optional(),
   }),
   petCares: z.object({
     id: legacyIdSchema,
@@ -895,10 +1218,84 @@ const shapes = {
   workItems: z.object({
     id: legacyIdSchema,
     title: title(200),
-    project: z.enum(WORK_PROJECTS).default('p1'),
+    project: z.string().max(80).default(''),
     status: z.enum(WORK_STATUSES).default('todo'),
     done: z.boolean().default(false),
     due: line(60),
+  }),
+  courses: z.object({
+    id: legacyIdSchema,
+    topic: z.string().trim().min(1, 'Escribe el tema').max(120),
+    subtopic: z.string().trim().max(120).optional(),
+    title: line(200),
+    source: z.string().trim().max(120).optional(),
+    url: z.union([z.literal(''), z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).default(''),
+    status: z.enum(COURSE_STATUSES).default('pendiente'),
+    notes: text(5000),
+    // Progreso (nuevo, opcional): YouTube lo guarda solo al pausar; en otras
+    // plataformas lo anota la persona al volver.
+    progress: z.number().int().min(0).max(100).optional(),
+    position: z.number().min(0).max(1e6).optional(),
+    duration: z.number().min(0).max(1e6).optional(),
+    video: z.union([z.literal(''), z.string().regex(/^[\w-]{6,20}$/)]).optional(),
+    spot: z.string().trim().max(200).optional(),
+    lastAt: z.union([z.literal(''), z.string().datetime()]).optional(),
+    length: z.number().int().min(0).max(1e7).optional(),
+    lengthFrom: z.enum(COURSE_LENGTH_FROM).optional(),
+    lessons: z
+      .array(
+        z.object({
+          id: legacyIdSchema,
+          title: z.string().trim().min(1, 'Escribe el nombre de la lección').max(200),
+          unit: z.string().trim().max(120).optional(),
+          url: z.union([z.literal(''), z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).optional(),
+          done: z.boolean().optional(),
+          seconds: z.number().int().min(0).max(1e6).optional(),
+          activities: z
+            .array(
+              z.object({
+                id: legacyIdSchema,
+                kind: z.enum(ACTIVITY_KINDS).default('otro'),
+                title: z.string().trim().min(1, 'Escribe qué hay que hacer').max(200),
+                done: z.boolean().optional(),
+                url: z.union([z.literal(''), httpUrl]).optional(),
+              }),
+            )
+            .max(ACTIVITIES_MAX, `Máximo ${ACTIVITIES_MAX} actividades por lección`)
+            .optional(),
+        }),
+      )
+      .max(COURSE_LESSONS_MAX, `Máximo ${COURSE_LESSONS_MAX} lecciones por curso`)
+      .optional(),
+    language: z.string().trim().max(40).optional(),
+    units: z.array(z.string().trim().min(1, 'Escribe el nombre de la unidad').max(120)).max(COURSE_UNITS_MAX, `Máximo ${COURSE_UNITS_MAX} unidades por curso`).optional(),
+  }),
+  ventures: z.object({
+    id: legacyIdSchema,
+    name: named(120),
+    description: text(5000),
+    stage: z.enum(VENTURE_STAGES).default('idea'),
+    color: hex.default(VENTURE_COLORS[0]),
+  }),
+  ventureItems: z.object({
+    id: legacyIdSchema,
+    ventureId: legacyIdSchema,
+    kind: z.enum(VENTURE_ITEM_KINDS).default('note'),
+    title: line(200),
+    text: text(100_000),
+    url: z.union([z.literal(''), httpUrl]).default(''),
+    ref: z.union([z.literal(''), fileRef]).default(''),
+    mime: line(120),
+    size: z.number().int().min(0).max(100_000_000).default(0),
+    date: optionalDay.default(''),
+  }),
+  chats: z.object({
+    id: legacyIdSchema,
+    title: z.string().trim().max(120).default('Conversación').transform((t) => t || 'Conversación'),
+    model: line(80),
+    updatedAt: line(40),
+    messages: z.array(chatMessage).max(400).default([]),
+    cards: z.record(z.string().max(200), storedCard).default({}),
   }),
   meditations: z.object({
     id: legacyIdSchema,
@@ -998,6 +1395,10 @@ export const legacyItemSchemas = {
   })),
   workItems: shapes.workItems.strict(),
   meditations: shapes.meditations.strict(),
+  courses: shapes.courses.strict(),
+  ventures: shapes.ventures.strict(),
+  ventureItems: shapes.ventureItems.strict(),
+  chats: shapes.chats.strict(),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 const patchOf = (o: z.AnyZodObject): z.AnyZodObject => {
@@ -1036,6 +1437,10 @@ export const legacyPatchSchemas = {
   notes: patchOf(shapes.notes.omit({ shareId: true, commit: true, tag: true, excerpt: true })),
   workItems: patchOf(shapes.workItems),
   meditations: patchOf(shapes.meditations),
+  courses: patchOf(shapes.courses),
+  ventures: patchOf(shapes.ventures),
+  ventureItems: patchOf(shapes.ventureItems),
+  chats: patchOf(shapes.chats),
 } satisfies Record<LegacyKey, z.ZodTypeAny>;
 
 /**
@@ -1095,6 +1500,7 @@ export const LEGACY_CHILDREN: Partial<Record<LegacyKey, { key: LegacyKey; field:
   todos: { key: 'subtasks', field: 'todoId' },
   notebooks: { key: 'noteBoxes', field: 'notebookId' },
   pets: { key: 'petCares', field: 'petId' },
+  ventures: { key: 'ventureItems', field: 'ventureId' },
 };
 
 /** Padre de cada clave hija (el inverso de LEGACY_CHILDREN) y el error si no existe. */
@@ -1102,6 +1508,7 @@ export const LEGACY_PARENT: Partial<Record<LegacyKey, { key: LegacyKey; field: s
   subtasks: { key: 'todos', field: 'todoId', missing: 'La tarea principal no existe' },
   noteBoxes: { key: 'notebooks', field: 'notebookId', missing: 'El cuaderno no existe' },
   petCares: { key: 'pets', field: 'petId', missing: 'La mascota no existe' },
+  ventureItems: { key: 'ventures', field: 'ventureId', missing: 'El emprendimiento no existe' },
 };
 
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -1131,7 +1538,16 @@ export function checkItems<T extends LegacyCheckItem>(list: unknown, makeId: () 
 
 /** Para enviar una lista anidada: solo los campos conocidos (el servidor conserva el resto por id). */
 export function checkItemsPayload<T extends LegacyCheckItem>(list: T[]): T[] {
-  return list.map((s) => ({ id: s.id, name: s.name, done: !!s.done, ...('date' in s ? { date: typeof s.date === 'string' ? s.date : '' } : {}) }) as T);
+  return list.map(
+    (s) =>
+      ({
+        id: s.id,
+        name: s.name,
+        done: !!s.done,
+        ...('date' in s ? { date: typeof s.date === 'string' ? s.date : '' } : {}),
+        ...('kind' in s ? { kind: s.kind === 'mejora' ? 'mejora' : 'falta' } : {}),
+      }) as T,
+  );
 }
 
 export const legacyReorderSchema = z.object({ ids: z.array(legacyIdSchema).max(5000) }).strict();
@@ -1161,6 +1577,79 @@ export type LegacyOp<K extends LegacyKey> =
   | { type: 'remove'; id: string }
   | { type: 'reorder'; ids: string[] };
 
+/** Un paso para deshacer: un cambio sobre una clave (puede ser otra, como las subtareas de un pendiente). */
+export type LegacyUndoStep = { key: LegacyKey; op: LegacyOp<LegacyKey> };
+
+/** Valor «vacío» del mismo tipo, para quitar un campo que antes no existía. */
+const emptyLike = (v: unknown): unknown => (typeof v === 'string' ? '' : typeof v === 'boolean' ? false : typeof v === 'number' ? 0 : Array.isArray(v) ? [] : null);
+
+/**
+ * Los pasos que devuelven la lista a como estaba antes de `op` (para el botón
+ * «Deshacer» que sale tras cada cambio). null si no hay nada que deshacer.
+ */
+export function undoLegacyOp<K extends LegacyKey>(data: LegacyData, key: K, op: LegacyOp<K>): LegacyUndoStep[] | null {
+  const list = legacyList(data, key) as Array<LegacyItems[K]>;
+  const ids = list.map((x) => x.id);
+  const step = (o: LegacyOp<K>): LegacyUndoStep => ({
+    key,
+    op: o as LegacyOp<LegacyKey>,
+  });
+  switch (op.type) {
+    case 'add':
+      return [step({ type: 'remove', id: op.item.id })];
+    case 'remove': {
+      const item = list.find((x) => x.id === op.id);
+      if (!item) return null;
+      const steps = [step({ type: 'add', item }), step({ type: 'reorder', ids })];
+      // Lo que se borró junto con él (pasos de un pendiente, cajitas de un cuaderno…) vuelve también.
+      const child = LEGACY_CHILDREN[key];
+      if (child) {
+        const kids = legacyList(data, child.key);
+        const gone = kids.filter((s) => (s as unknown as Record<string, unknown>)[child.field] === op.id);
+        for (const k of gone) steps.push({ key: child.key, op: { type: 'add', item: k } });
+        if (gone.length)
+          steps.push({
+            key: child.key,
+            op: { type: 'reorder', ids: kids.map((k) => k.id) },
+          });
+      }
+      return steps;
+    }
+    case 'update': {
+      const item = list.find((x) => x.id === op.id) as Record<string, unknown> | undefined;
+      if (!item) return null;
+      const back: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(op.patch as Record<string, unknown>)) {
+        if (JSON.stringify(item[k]) === JSON.stringify(v)) continue;
+        back[k] = item[k] === undefined ? emptyLike(v) : item[k];
+      }
+      return Object.keys(back).length ? [step({ type: 'update', id: op.id, patch: back as LegacyPatch<K> })] : null;
+    }
+    case 'reorder':
+      return ids.join() === op.ids.join() ? null : [step({ type: 'reorder', ids })];
+  }
+}
+
+/** Lo que devuelve un objeto (`cycle`, `dayLog`, `budget`) a como estaba antes de `patch`. */
+export function undoLegacyObjectPatch<K extends LegacyObjectKey>(data: LegacyData, key: K, patch: Partial<LegacyObjects[K]>): Partial<LegacyObjects[K]> | null {
+  const before = legacyObject(data, key) as unknown as Record<string, unknown>;
+  const back: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(patch as Record<string, unknown>)) {
+    if (JSON.stringify(before[k]) === JSON.stringify(v)) continue;
+    back[k] = before[k] === undefined ? emptyLike(v) : before[k];
+  }
+  return Object.keys(back).length ? (back as Partial<LegacyObjects[K]>) : null;
+}
+
+/** Cómo se dice el cambio en el aviso con «Deshacer». */
+export const legacyChangeLabel = (type: LegacyOp<LegacyKey>['type']): string =>
+  ({
+    add: 'Añadido.',
+    update: 'Cambio guardado.',
+    remove: 'Eliminado.',
+    reorder: 'Orden cambiado.',
+  })[type];
+
 /** Aplica un cambio en la copia local igual que lo hará el servidor (para las vistas optimistas). */
 export function applyLegacyOp<K extends LegacyKey>(data: LegacyData, key: K, op: LegacyOp<K>): LegacyData {
   const list = legacyList(data, key) as Array<LegacyItems[K]>;
@@ -1189,6 +1678,18 @@ export function applyLegacyOp<K extends LegacyKey>(data: LegacyData, key: K, op:
   }
 }
 
+/**
+ * Tras guardar: la copia del servidor reemplaza a la optimista (puede traer
+ * textos recortados o campos normalizados). Así no hace falta volver a pedir
+ * todo el documento después de cada cambio.
+ */
+export function legacyWithSaved<K extends LegacyKey>(data: LegacyData, key: K, item: LegacyItems[K] | null | undefined): LegacyData {
+  if (!item || typeof item !== 'object' || typeof item.id !== 'string') return data;
+  const list = legacyList(data, key) as Array<LegacyItems[K]>;
+  if (!list.some((x) => x.id === item.id)) return data;
+  return { ...data, [key]: list.map((x) => (x.id === item.id ? item : x)) };
+}
+
 /** Id nuevo como en la app anterior: randomUUID si existe (navegador) o uno aleatorio con la fecha (React Native). */
 export function newLegacyId(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
@@ -1198,8 +1699,11 @@ export function newLegacyId(): string {
 
 // ---------- Enfoque (Pomodoro) ----------
 
-/** Día en UTC, como guarda la app anterior (`toISOString().slice(0,10)`). */
-export const utcDayKey = (now: Date = new Date()): Day => now.toISOString().slice(0, 10);
+/**
+ * «Hoy» con la fecha del lugar donde está la persona (no en UTC: en Caracas, a
+ * partir de las 20:00 UTC ya era «mañana»). Conserva el nombre por compatibilidad.
+ */
+export const utcDayKey = (now: Date = new Date()): Day => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 /**
  * Lo que viene después de una sesión. Tras cada cuarta sesión de enfoque
@@ -1281,14 +1785,39 @@ export function parseDeadline(text: unknown, now: Date = new Date()): Date | nul
     if (month < 0 || day < 1 || day > 31) return null;
     return new Date(m[3] ? Number(m[3]) : now.getFullYear(), month, day);
   }
+  // «hoy», «mañana», «viernes» (el próximo), «20/12» o «20/12/2026».
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (t === 'hoy') return base;
+  if (t === 'mañana' || t === 'manana') return new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
+  const wd = WEEKDAYS_ES.indexOf(
+    t
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/^(el|este|proximo)\s+/, ''),
+  );
+  if (wd >= 0) {
+    const ahead = (wd - base.getDay() + 7) % 7;
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate() + ahead);
+  }
+  const dm = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2}|\d{4}))?$/.exec(t);
+  if (dm) {
+    const day = Number(dm[1]);
+    const month = Number(dm[2]) - 1;
+    const year = dm[3] ? (dm[3].length === 2 ? 2000 + Number(dm[3]) : Number(dm[3])) : now.getFullYear();
+    const d = new Date(year, month, day);
+    return d.getMonth() === month && d.getDate() === day ? d : null;
+  }
   if (!/\d{4}/.test(t)) return null;
   const at = Date.parse(t);
   return Number.isNaN(at) ? null : new Date(at);
 }
 
+/** Domingo = 0, como `Date.getDay()`. */
+const WEEKDAYS_ES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+
 /**
- * ¿Cuenta como entrega de esta semana? Como la app anterior: entre ayer y
- * dentro de 7 días, y una fecha que no se entiende cuenta siempre (vacía no).
+ * ¿Cuenta como entrega de esta semana? Entre ayer y dentro de 7 días. Una
+ * fecha que no se entiende no cuenta (la app anterior la contaba siempre).
  * Mejora: "20 SEP" se lee en español del año en curso (la app anterior se lo
  * pasaba a `Date.parse`, que en Chrome lo toma como del año 2001).
  */
@@ -1296,7 +1825,7 @@ export function dueThisWeek(deadline: unknown, now: number = Date.now()): boolea
   const t = typeof deadline === 'string' ? deadline.trim() : '';
   if (!t) return false;
   const at = parseDeadline(t, new Date(now));
-  if (!at) return true;
+  if (!at) return false;
   const day = 86_400_000;
   // Fin del día de la entrega: "hoy" cuenta todo el día.
   const diff = at.getTime() + day - 1 - now;

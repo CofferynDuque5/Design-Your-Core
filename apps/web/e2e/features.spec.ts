@@ -124,16 +124,15 @@ test('la sección Más reúne todas las herramientas', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Llegan pronto' })).toHaveCount(0);
   const tools = page.getByRole('region', { name: 'Herramientas' });
   await expect(tools.getByRole('list', { name: 'Organización' }).getByRole('link')).toHaveCount(5);
-  await expect(tools.getByRole('list', { name: 'Estudio y trabajo' }).getByRole('link')).toHaveCount(7);
+  await expect(tools.getByRole('list', { name: 'Estudio y trabajo' }).getByRole('link')).toHaveCount(9);
   await expect(tools.getByRole('list', { name: 'Conocimiento' }).getByRole('link')).toHaveCount(TOOLS_KNOWLEDGE);
-  await expect(tools.getByRole('list', { name: 'Vida personal' }).getByRole('link')).toHaveCount(3);
+  await expect(tools.getByRole('list', { name: 'Vida personal' }).getByRole('link')).toHaveCount(4);
   // Ciclo está en Salud aunque no se muestre en el menú.
-  await expect(tools.getByRole('list', { name: 'Salud' }).getByRole('link')).toHaveCount(6);
+  await expect(tools.getByRole('list', { name: 'Salud' }).getByRole('link')).toHaveCount(5);
   await expect(tools.getByRole('link', { name: /Ciclo.*oculto en el menú/ })).toBeVisible();
   await tools.getByRole('link', { name: /Pendientes/ }).click();
   await expect(page).toHaveURL(/\/pendientes$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Pendientes' })).toBeVisible();
   await page.goto('/mas');
-  await page.getByRole('region', { name: 'Herramientas' }).getByRole('link', { name: /Respiración/ }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Respiración' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Herramientas' }).getByRole('link', { name: /Respiración/ })).toHaveCount(0);
 });

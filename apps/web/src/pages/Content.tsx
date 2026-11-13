@@ -1,12 +1,13 @@
-import { contentPlatformOf, contentStageOf, CONTENT_PLATFORM_INFO, CONTENT_PLATFORMS, CONTENT_STAGE_INFO, CONTENT_STAGES, type ContentPlatform, type ContentStage, type LegacyContent } from '@dyc/core';
+import { matchesSearch, contentPlatformOf, contentStageOf, CONTENT_PLATFORM_INFO, CONTENT_PLATFORMS, CONTENT_STAGE_INFO, CONTENT_STAGES, type ContentPlatform, type ContentStage, type LegacyContent } from '@dyc/core';
 import { CalendarClock, Pencil, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, Stats } from '../components/ToolParts';
+import { FormActions, Stats, RemoveButton } from '../components/ToolParts';
 
 /** Valores desconocidos se muestran como los de por defecto, sin cambiar el dato. */
 const platformOf = contentPlatformOf;
@@ -19,6 +20,8 @@ export function Content() {
   const [title, setTitle] = useState('');
   const [platform, setPlatform] = useState<ContentPlatform>('youtube');
   const [editing, setEditing] = useState<LegacyContent | null>(null);
+  const [q, setQ] = useState('');
+  const hit = (c: LegacyContent) => matchesSearch(q, c.title, c.notes, c.script, CONTENT_PLATFORM_INFO[contentPlatformOf(c)].label);
   const published = items.filter((c) => stageOf(c) === 'publicado');
   const inProgress = items.filter((c) => stageOf(c) !== 'publicado');
 
@@ -75,9 +78,18 @@ export function Content() {
                   ))}
                 </ol>
               </section>
+              <SearchBox label="Buscar en tu contenido" value={q} onChange={setQ} placeholder="Buscar por título, guion o plataforma…" count={items.filter(hit).length} />
               {[
-                { id: 'produccion', label: 'En producción', list: inProgress },
-                { id: 'publicados', label: 'Publicados', list: published },
+                {
+                  id: 'produccion',
+                  label: 'En producción',
+                  list: inProgress.filter(hit),
+                },
+                {
+                  id: 'publicados',
+                  label: 'Publicados',
+                  list: published.filter(hit),
+                },
               ].map(
                 (g) =>
                   g.list.length > 0 && (
@@ -133,6 +145,7 @@ function ContentRow({ item: c, onEdit }: { item: LegacyContent; onEdit: () => vo
       <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
         <Pencil size={18} aria-hidden="true" />
       </button>
+      <RemoveButton module="content" id={c.id} name={title} />
     </li>
   );
 }

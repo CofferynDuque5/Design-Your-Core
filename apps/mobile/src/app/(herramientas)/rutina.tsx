@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   byTime,
   daysLabel,
   displayTitle,
@@ -22,9 +23,10 @@ import { GlassWater, Minus, Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckInNote, DotChoices, FormActions, IconButton, Meter, Stepper, TimeField, Toggle, ToolScreen, WeekdayPicker } from '../../components/tools';
+import { CheckInNote, DotChoices, FormActions, IconButton, Meter, SearchBar, Stepper, TimeField, Toggle, ToolScreen, WeekdayPicker, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../../lib/legacy';
+import { useSyncCheckIn } from '../../lib/checkinSync';
 import { useTheme } from '../../lib/theme';
 
 const WATER_COLOR = '#4F7CFF';
@@ -39,7 +41,8 @@ export default function Routine() {
   const [meal, setMeal] = useState<LegacyMeal | 'new' | null>(null);
   // Comidas y agua van por día en UTC, como la app anterior.
   const today = utcDayKey();
-  const shown = useMemo(() => routines.filter((r) => day === 0 || onWeekday(r.days, day)).sort(byTime), [routines, day]);
+  const [q, setQ] = useState('');
+  const shown = useMemo(() => routines.filter((r) => (day === 0 || onWeekday(r.days, day)) && matchesSearch(q, displayTitle(r.title), r.time, daysLabel(r.days))).sort(byTime), [routines, day, q]);
   const todayMeals = useMemo(() => meals.filter((m) => m.dateKey === today).sort(byTime), [meals, today]);
   const filter = ROUTINE_DAY_FILTERS.find((f) => f.iso === day) ?? ROUTINE_DAY_FILTERS[0];
 
@@ -81,12 +84,13 @@ export default function Routine() {
               <T v="heading" accessibilityRole="header">
                 {day === 0 ? 'Todas tus rutinas' : `Rutinas del ${filter.long.toLowerCase()}${day === isoDay() ? ' (hoy)' : ''}`}
               </T>
+              {routines.length > 0 && <SearchBar label="Buscar en tus rutinas" value={q} onChange={setQ} placeholder="Buscar una rutina u hora…" count={shown.length} />}
               {routines.length === 0 ? (
                 <EmptyState title="Aún no tienes rutinas" action={<Button small variant="secondary" label="Crear la primera" icon={<Plus size={16} color={colors.primary} />} onPress={() => setEditing('new')} />}>
                   Tus hábitos con hora fija: despertar, tomar vitaminas, entrenar, leer antes de dormir.
                 </EmptyState>
               ) : shown.length === 0 ? (
-                <T v="body" tint="muted">
+                q.trim() ? null : <T v="body" tint="muted">
                   Nada este día.
                 </T>
               ) : (
@@ -124,9 +128,9 @@ export default function Routine() {
               </View>
             )}
           </Card>
-          <CheckInNote>El check-in diario registra aparte tus vasos de agua y tu alimentación para el pilar Alimentación.</CheckInNote>
+          <CheckInNote>Los vasos de agua que sumes aquí cuentan en tu check-in del día (pilar Alimentación). No hace falta anotarlos dos veces.</CheckInNote>
           <T v="small" tint="muted">
-            Los avisos con sonido de la app anterior todavía no están en la app nueva: aquí organizas tus rutinas y ves qué toca cada día.
+            Aquí organizas tus rutinas y ves qué toca cada día. Para que suenen a su hora, activa las alarmas en Perfil.
           </T>
         </>
       )}
@@ -161,6 +165,7 @@ function RoutineRow({ routine: r, onEdit }: { routine: LegacyRoutine; onEdit: ()
       <IconButton label={`Editar «${title}»`} onPress={onEdit} style={{ marginRight: -space[2] }}>
         <Pencil size={18} color={colors.inkMuted} />
       </IconButton>
+      <RemoveButton module="routines" id={r.id} name={title} style={{ marginRight: -space[2] }} />
     </View>
   );
 }
@@ -173,7 +178,12 @@ function WaterCard({ today }: { today: string }) {
   const water = waterToday(log, today);
   const goal = typeof log.waterGoal === 'number' && log.waterGoal >= 1 && log.waterGoal <= 40 ? log.waterGoal : WATER_GOAL_DEFAULT;
   // Si el registro es de otro día, empieza en 0 (como la app anterior en el primer cambio).
-  const set = (n: number) => actions.patch({ dateKey: today, water: Math.max(0, Math.min(40, n)) });
+  const sync = useSyncCheckIn();
+  const set = (n: number) => {
+    const water = Math.max(0, Math.min(40, n));
+    actions.patch({ dateKey: today, water });
+    sync(today, { water });
+  };
   const pct = Math.min(100, Math.round((water / goal) * 100));
   return (
     <Card>

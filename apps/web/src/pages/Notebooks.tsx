@@ -1,4 +1,21 @@
-import { BOX_COLORS, CODE_LANGS, COLOR_NAMES, coreImageIds, inlineImages, legacySubjectNames, newNoteBox, NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, notebookIconOptions, noteBoxKind, sameEmoji, uniqueTexts, type LegacyNoteBox, type LegacyNotebook } from '@dyc/core';
+import {
+  matchesSearch,
+  BOX_COLORS,
+  CODE_LANGS,
+  COLOR_NAMES,
+  coreImageIds,
+  inlineImages,
+  legacySubjectNames,
+  newNoteBox,
+  NOTEBOOK_COLORS,
+  NOTEBOOK_EMOJIS,
+  notebookIconOptions,
+  noteBoxKind,
+  sameEmoji,
+  uniqueTexts,
+  type LegacyNoteBox,
+  type LegacyNotebook,
+} from '@dyc/core';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Code2, Copy, ImageOff, Palette, Plus, Trash2, Type } from 'lucide-react';
 import { useId, useMemo, useState, type FormEvent } from 'react';
@@ -7,11 +24,12 @@ import { api } from '../app/api';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
-import { ColorPicker, SelectField, TextField } from '../components/Form';
+import { ChoiceField, ColorPicker, SelectField, TextField } from '../components/Form';
 import { NotebookCover } from '../components/NotebookCover';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, optionsWith, paletteWith, safeColor } from '../components/ToolParts';
+import { FormActions, optionsWith, paletteWith, RemoveButton, safeColor } from '../components/ToolParts';
 import { UiIcon } from '../components/UiIcon';
 import { plural } from '../lib/format';
 import { useAutosave } from '../lib/tools';
@@ -29,11 +47,12 @@ export function Notebooks() {
   const [category, setCategory] = useState('');
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
+  const [q, setQ] = useState('');
 
   // Filtros en cascada Categoría → Materia → Tema, con los valores que existen (como la app anterior).
   const inCategory = notebooks.filter((n) => !category || n.category === category);
   const inSubject = inCategory.filter((n) => !subject || n.subject === subject);
-  const shown = inSubject.filter((n) => !topic || n.topic === topic);
+  const shown = inSubject.filter((n) => (!topic || n.topic === topic) && matchesSearch(q, n.title, n.category, n.subject, n.topic));
   const filtering = !!(category || subject || topic);
 
   return (
@@ -51,6 +70,7 @@ export function Notebooks() {
         <EmptyState title="Aún no tienes cuadernos">Organiza tus apuntes por categoría, materia y tema, y guárdalos en cajitas de texto o de código fáciles de copiar.</EmptyState>
       ) : (
         <div className="stack-lg">
+          <SearchBox label="Buscar cuadernos" value={q} onChange={setQ} placeholder="Buscar por título, materia o tema…" count={shown.length} />
           <div className="filters" role="group" aria-label="Filtrar cuadernos">
             <SelectField
               label="Categoría"
@@ -100,13 +120,15 @@ export function Notebooks() {
             )}
           </div>
           {shown.length === 0 ? (
-            <EmptyState title="Ningún cuaderno con estos filtros" />
+            q.trim() ? null : (
+              <EmptyState title="Ningún cuaderno con estos filtros" />
+            )
           ) : (
             <ul className="notebook-grid" aria-label="Cuadernos">
               {shown.map((n) => {
                 const count = boxes.filter((b) => b.notebookId === n.id).length;
                 return (
-                  <li key={n.id}>
+                  <li key={n.id} className="notebook-item">
                     <Link to={`/cuadernos/${encodeURIComponent(n.id)}`} className="notebook-card" style={{ ['--c' as string]: safeColor(n.color, NOTEBOOK_COLORS[0]) }}>
                       <NotebookCover notebook={n} variant="card" />
                       <span className="notebook-card__body">
@@ -115,6 +137,9 @@ export function Notebooks() {
                         <span className="muted small">{plural(count, 'cajita', 'cajitas')}</span>
                       </span>
                     </Link>
+                    <span className="notebook-item__remove">
+                      <RemoveButton module="notebooks" id={n.id} name={n.title || 'Cuaderno'} size={16} />
+                    </span>
                   </li>
                 );
               })}
@@ -164,26 +189,11 @@ function NotebookForm({ notebook, all, subjects, boxCount = 0, onDone, onDeleted
   return (
     <form className="stack" onSubmit={submit}>
       <TextField label="Título" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} autoFocus placeholder="Cuaderno" />
-      <TextField label="Categoría" value={category} onChange={(e) => setCategory(e.target.value)} maxLength={60} placeholder="General" list={`${listId}-cat`} />
+      <ChoiceField label="Categoría" value={category} onChange={setCategory} options={uniq(['General', 'Universidad', ...all.map((n) => n.category)])} otherLabel="Otra categoría…" maxLength={60} placeholder="General" />
       <div className="grid-2">
-        <TextField label="Materia (opcional)" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={120} placeholder="Cálculo" list={`${listId}-sub`} />
-        <TextField label="Tema (opcional)" value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={120} placeholder="Derivadas" list={`${listId}-top`} />
+        <ChoiceField label="Materia (opcional)" value={subject} onChange={setSubject} options={uniq([...subjects, ...all.map((n) => n.subject)])} emptyLabel="Sin materia" otherLabel="Otra materia…" maxLength={120} placeholder="Cálculo" />
+        <ChoiceField label="Tema (opcional)" value={topic} onChange={setTopic} options={uniq(all.map((n) => n.topic))} emptyLabel="Sin tema" otherLabel="Otro tema…" maxLength={120} placeholder="Derivadas" />
       </div>
-      <datalist id={`${listId}-cat`}>
-        {uniq(['General', 'Universidad', ...all.map((n) => n.category)]).map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
-      <datalist id={`${listId}-sub`}>
-        {uniq([...subjects, ...all.map((n) => n.subject)]).map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
-      <datalist id={`${listId}-top`}>
-        {uniq(all.map((n) => n.topic)).map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
       <ColorPicker legend="Color" colors={paletteWith(NOTEBOOK_COLORS, color)} value={color} onChange={setColor} names={COLOR_NAMES} />
       <fieldset className="field">
         <legend className="field__label">Icono</legend>
@@ -247,7 +257,7 @@ export function NotebookDetail() {
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
           <EmptyState title="Este cuaderno ya no existe" action={<Link to="/cuadernos" className="btn btn--secondary">Ver tus cuadernos</Link>}>
-            Puede que lo hayas borrado aquí o en la app anterior.
+            Puede que lo hayas borrado.
           </EmptyState>
         )}
       </div>

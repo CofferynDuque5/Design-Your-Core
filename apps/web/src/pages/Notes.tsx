@@ -6,6 +6,7 @@ import {
   insertBlock,
   NOTE_DEFAULT_SUBJECT,
   NOTE_DEFAULT_TITLE,
+  noteIsBlank,
   noteBodyOf as bodyOf,
   noteColorOf as colorOf,
   noteDateLabel,
@@ -122,7 +123,7 @@ export function Notes() {
                             .slice(0, 4)
                             .map((t) => (
                               <span key={t} className="note-card__tag">
-                                #{t}
+                                #{t.toLowerCase()}
                               </span>
                             ))}
                         </span>
@@ -158,7 +159,7 @@ export function NoteEditor() {
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
           <EmptyState title="Esta nota ya no existe" action={<Link to="/notas" className="btn btn--secondary">Ver tus notas</Link>}>
-            Puede que la hayas borrado aquí o en la app anterior.
+            Puede que la hayas borrado.
           </EmptyState>
         )}
       </div>
@@ -185,8 +186,11 @@ const TOOLBAR: Array<{ kind: FormatKind; label: string; icon: typeof Bold }> = [
   { kind: 'quote', label: 'Cita', icon: Quote },
 ];
 
+const blankRemovals = new Map<string, number>();
+
 function Editor({ note, subjects }: { note: LegacyNote; subjects: string[] }) {
-  const actions = useModule('notes');
+  // Se guarda solo mientras escribes: sin «Deshacer» por cada pausa.
+  const actions = useModule('notes', { undo: false });
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -216,6 +220,25 @@ function Editor({ note, subjects }: { note: LegacyNote; subjects: string[] }) {
     if (s !== note.subject) actions.update(note.id, { subject: s });
   };
   const resolve = useCoreImages(body.draft);
+
+  // Una nota que se abrió y nunca se escribió no se queda guardada vacía.
+  const latest = useRef({ title: title.draft, body: body.draft, removed: false });
+  latest.current.title = title.draft;
+  latest.current.body = body.draft;
+  useEffect(() => {
+    // En desarrollo React monta dos veces: se cancela el borrado si vuelve a montarse enseguida.
+    window.clearTimeout(blankRemovals.get(note.id));
+    return () => {
+      if (latest.current.removed || !noteIsBlank(latest.current)) return;
+      blankRemovals.set(
+        note.id,
+        window.setTimeout(() => {
+          blankRemovals.delete(note.id);
+          actions.remove(note.id);
+        }, 0),
+      );
+    };
+  }, [actions, note.id]);
 
   useEffect(() => {
     document.title = `${title.draft.trim() || NOTE_DEFAULT_TITLE} · Notas · Design Your Core`;
@@ -270,6 +293,7 @@ function Editor({ note, subjects }: { note: LegacyNote; subjects: string[] }) {
   };
 
   const remove = () => {
+    latest.current.removed = true;
     actions.remove(note.id);
     toast('Nota eliminada.');
     navigate('/notas');
@@ -379,7 +403,7 @@ function Editor({ note, subjects }: { note: LegacyNote; subjects: string[] }) {
           <p className="muted note-preview">Esta nota está vacía. Pulsa «Escribir» para empezar.</p>
         )}
       </section>
-      <p className="muted small">Se guarda sola mientras escribes. Las fórmulas entre $ se muestran como texto, sin dibujarlas.</p>
+      <p className="muted small">Se guarda sola mientras escribes. {'Escribe fórmulas entre $, como $x^2 + \\frac{a}{b}$, y se dibujan al leer la nota.'}</p>
 
       <div className="note-page__danger">
         {asking ? (

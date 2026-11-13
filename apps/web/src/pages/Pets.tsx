@@ -1,12 +1,15 @@
-import { CARE_KIND_INFO, CARE_KINDS, careKindOf as kindOf, careWhen, nextDue, PET_SPECIES, PET_SPECIES_INFO, petSpeciesOf as speciesOf, utcDayKey, weekdaysOf as validDays, type CareKind, type LegacyPet, type LegacyPetCare, type PetSpecies } from '@dyc/core';
-import { Pencil, Plus } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { matchesSearch, CARE_KIND_INFO, CARE_KINDS, careKindOf as kindOf, careWhen, nextDue, PET_SPECIES, PET_SPECIES_INFO, petSpeciesOf as speciesOf, utcDayKey, weekdaysOf as validDays, type CareKind, type LegacyPet, type LegacyPetCare, type PetSpecies } from '@dyc/core';
+import { Camera, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useId, useState, type FormEvent } from 'react';
+import { api } from '../app/api';
+import { compressImage, uploadImage, useCoreImages } from '../app/images';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, IconChoices, Stats, WeekdayPicker } from '../components/ToolParts';
+import { FormActions, IconChoices, Stats, WeekdayPicker, RemoveButton } from '../components/ToolParts';
 import { UiIcon } from '../components/UiIcon';
 import { plural } from '../lib/format';
 import { useNow } from '../lib/tools';
@@ -23,6 +26,8 @@ export function Pets() {
   const ownCares = cares.filter((c) => known.has(c.petId));
   const doneToday = ownCares.filter((c) => c.lastDone === today).length;
   const pendingToday = ownCares.filter((c) => nextDue(c, now)?.inDays === 0).length;
+  const [q, setQ] = useState('');
+  const shownPets = pets.filter((p) => matchesSearch(q, p.name, p.note, PET_SPECIES_INFO[speciesOf(p)].label, ...cares.filter((c) => c.petId === p.id).map((c) => c.title)));
 
   return (
     <div className="page">
@@ -55,14 +60,15 @@ export function Pets() {
               { value: doneToday, label: doneToday === 1 ? 'Hecho hoy' : 'Hechos hoy' },
             ]}
           />
+          <SearchBox label="Buscar en tus mascotas" value={q} onChange={setQ} placeholder="Buscar una mascota o un cuidado…" count={shownPets.length} />
           <ul className="card-grid tool-grid tool-grid--wide" aria-label="Mascotas">
-            {pets.map((p) => (
+            {shownPets.map((p) => (
               <li key={p.id}>
                 <PetCard pet={p} cares={cares.filter((c) => c.petId === p.id)} today={today} now={now} onEdit={() => setEditing(p)} onCare={(c) => setCare({ pet: p, care: c })} />
               </li>
             ))}
           </ul>
-          <p className="muted small">Los avisos con sonido de la app anterior todavía no están en la app nueva: aquí ves cuándo toca cada cuidado y lo marcas al hacerlo.</p>
+          <p className="muted small">Aquí ves cuándo toca cada cuidado y lo marcas al hacerlo. Los cuidados con hora suenan si activas las alarmas en Perfil.</p>
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nueva mascota' : 'Editar mascota'}>
@@ -85,9 +91,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
     <article className="card tool-card pet-card" style={{ ['--c' as string]: '#E8912A' }} aria-labelledby={titleId}>
       <div className="tool-card__head">
         <div className="pet-card__who">
-          <span className="pet-card__avatar" aria-hidden="true">
-            <UiIcon name={species.icon} size={24} />
-          </span>
+          <PetPhoto pet={p} size={56} />
           <div>
             <h2 id={titleId} className="tool-card__title">
               {name}
@@ -101,6 +105,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
         <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar a ${name}`}>
           <Pencil size={18} aria-hidden="true" />
         </button>
+        <RemoveButton module="pets" id={p.id} name={name} />
       </div>
       {sorted.length === 0 ? (
         <p className="muted small">Sin cuidados todavía.</p>
@@ -133,6 +138,7 @@ function PetCard({ pet: p, cares, today, now, onEdit, onCare }: { pet: LegacyPet
                 <button type="button" className="icon-btn" onClick={() => onCare(c)} aria-label={`Editar «${title}» de ${name}`}>
                   <Pencil size={16} aria-hidden="true" />
                 </button>
+                <RemoveButton module="petCares" id={c.id} name={`${title} de ${name}`} size={16} />
               </li>
             );
           })}
@@ -153,22 +159,75 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
   const [name, setName] = useState(pet?.name ?? '');
   const [species, setSpecies] = useState<PetSpecies>(pet ? speciesOf(pet) : 'dog');
   const [note, setNote] = useState(pet?.note ?? '');
+  const [photo, setPhoto] = useState(pet?.photo ?? '');
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileId = useId();
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      // Pequeña y cuadrada de sobra para la tarjeta: sube rápido y ocupa poco.
+      setPhoto(await uploadImage(await compressImage(file, 480, 0.8)));
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'No se pudo subir la foto.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const fields = { name: name.trim(), species, note: note.trim() };
+    const fields = { name: name.trim(), species, note: note.trim(), photo };
+    // La foto anterior ya no se usa: se borra de la nube.
+    if (pet?.photo && pet.photo !== photo) void api.legacy.deleteImages([pet.photo]).catch(() => undefined);
     if (pet) actions.update(pet.id, fields);
     else actions.add({ id: newId(), ...fields });
     onDone();
   };
   return (
     <form className="stack" onSubmit={submit}>
+      <div className="pet-photo-field">
+        <PetPhoto pet={{ species, photo, name }} size={88} />
+        <div className="stack-xs">
+          <span className="field__label">Foto de perfil</span>
+          <div className="row wrap">
+            <label htmlFor={fileId} className={`btn btn--secondary btn--sm${photoBusy ? ' is-disabled' : ''}`}>
+              <Camera size={16} aria-hidden="true" /> {photoBusy ? 'Subiendo…' : photo ? 'Cambiar foto' : 'Subir foto'}
+            </label>
+            <input
+              id={fileId}
+              type="file"
+              accept="image/*"
+              className="visually-hidden"
+              disabled={photoBusy}
+              onChange={(e) => {
+                void pick(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+            {photo && (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPhoto('')}>
+                <Trash2 size={16} aria-hidden="true" /> Quitar
+              </button>
+            )}
+          </div>
+          {photoError ? (
+            <p className="field__error" role="alert">
+              {photoError}
+            </p>
+          ) : (
+            <p className="field__hint">Una foto de tu mascota para su tarjeta.</p>
+          )}
+        </div>
+      </div>
       <TextField label="Nombre" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required autoFocus placeholder="Luna" />
       <IconChoices legend="Especie" value={species} onChange={setSpecies} options={PET_SPECIES.map((s) => ({ value: s, ...PET_SPECIES_INFO[s] }))} />
       <TextField label="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Raza, edad…" />
       <FormActions
         submitLabel={pet ? 'Guardar' : 'Añadir mascota'}
-        disabled={!name.trim()}
+        disabled={!name.trim() || photoBusy}
         onDelete={
           pet
             ? () => {
@@ -185,6 +244,8 @@ function PetForm({ pet, cares, onDone }: { pet: LegacyPet | null; cares: number;
 
 function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare | null; onDone: () => void }) {
   const actions = useModule('petCares');
+  const saved = useLegacyData().data?.data;
+  const pastTitles = useLegacyList(saved, 'petCares').map((c) => c.title ?? '');
   const [kind, setKind] = useState<CareKind>(care ? kindOf(care) : 'comida');
   const [title, setTitle] = useState(care?.title ?? '');
   const [time, setTime] = useState(care?.time ?? '');
@@ -201,7 +262,7 @@ function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare |
     <form className="stack" onSubmit={submit}>
       <IconChoices legend="Tipo" value={kind} onChange={setKind} options={CARE_KINDS.map((k) => ({ value: k, ...CARE_KIND_INFO[k] }))} />
       <div className="grid-2">
-        <TextField label="Qué hay que hacer" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} autoFocus placeholder={kind === 'comida' ? 'Darle de comer' : CARE_KIND_INFO[kind].label} />
+        <TextField label="Qué hay que hacer" suggestions={[...pastTitles, 'Darle de comer', 'Paseo', 'Agua fresca', 'Medicina', 'Baño', 'Cepillado']} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} autoFocus placeholder={kind === 'comida' ? 'Darle de comer' : CARE_KIND_INFO[kind].label} />
         <TextField label="Hora (opcional)" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
       </div>
       <WeekdayPicker legend="Días" value={days} onChange={setDays} />
@@ -218,5 +279,18 @@ function CareForm({ pet, care, onDone }: { pet: LegacyPet; care: LegacyPetCare |
         confirm={`Se borrará «${care?.title || 'este cuidado'}».`}
       />
     </form>
+  );
+}
+
+/** Foto de la mascota (guardada en la nube) o el dibujo de su especie. */
+function PetPhoto({ pet, size }: { pet: Pick<LegacyPet, 'species' | 'photo' | 'name'>; size: number }) {
+  const ref = pet.photo ? `coreimg:${pet.photo}` : '';
+  const resolve = useCoreImages(ref);
+  const src = ref ? resolve(ref) : null;
+  const species = PET_SPECIES_INFO[speciesOf(pet as LegacyPet)];
+  return (
+    <span className={`pet-card__avatar${src ? ' has-photo' : ''}`} style={{ width: size, height: size }} aria-hidden={!src}>
+      {src ? <img src={src} alt={`Foto de ${pet.name || 'tu mascota'}`} /> : <UiIcon name={species.icon} size={Math.round(size * 0.42)} />}
+    </span>
   );
 }

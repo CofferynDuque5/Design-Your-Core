@@ -1,15 +1,13 @@
-import { PILLAR_IDS, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
+import { AVATARS, avatarById, MEALS, MEAL_LABEL, WATER_EVERY, waterTimes, positiveMessage, PLAN_NAME, CLASS_LEADS, COMMON_TIMEZONES, CONTACT_EMAIL, PILLAR_IDS, type NotifyPrefs, isStrongPassword, passwordChecks, type PillarId } from '@dyc/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Download, LogOut } from 'lucide-react';
+import { ArrowRight, BellRing, Download, LogOut, Mail, Pencil } from 'lucide-react';
+import { AvatarArt, UserAvatar } from '../components/Avatar';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { api } from '../app/api';
 import { useShowCycle } from '../app/prefs';
 import { keys, useProfile } from '../app/queries';
 import { useSession } from '../app/session';
-import { FONT_OPTIONS, loadAllFonts, useFont } from '../app/font';
-import { PALETTE_OPTIONS, usePalette } from '../app/palette';
-import { STYLE_OPTIONS, useStyle } from '../app/style';
 import { useTheme, type ThemePreference } from '../app/theme';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
@@ -17,6 +15,7 @@ import { Dialog } from '../components/Dialog';
 import { PasswordField, Segmented, TextArea, TextField } from '../components/Form';
 import { pillarShort } from '../components/Pillar';
 import { ErrorState, errorMessage, Loading } from '../components/States';
+import { disablePush, enablePush, playAlarm, pushSupported, readAlarmPrefs, saveAlarmPrefs } from '../lib/alarms';
 import { deviceTimeZone } from '../lib/format';
 
 export function Profile() {
@@ -24,18 +23,20 @@ export function Profile() {
 
   return (
     <div className="page page--narrow">
-      <PageHeader eyebrow="Perfil" title={user?.name || 'Tu perfil'} />
+      <PageHeader eyebrow="Perfil" title="Tu perfil" />
       <div className="stack-lg">
-        {user && <p className="muted">{user.email}</p>}
+        <ProfileHero name={user?.name ?? ''} email={user?.email ?? ''} />
+        <PlanSection />
         <FocusSection />
         <PreferencesSection />
+        <AlarmsSection />
         <PartnerSection />
         <SecuritySection />
         <DataSection />
         <Link to="/mas" className="card link-card">
           <span>
             <strong>Más herramientas</strong>
-            <span className="muted"> · agenda, materias, finanzas, metas, ejercicio, sueño, diario y el resto de la app anterior</span>
+            <span className="muted"> · agenda, materias, finanzas, metas, ejercicio, sueño, diario y el resto de herramientas</span>
           </span>
           <ArrowRight size={18} aria-hidden="true" />
         </Link>
@@ -46,6 +47,91 @@ export function Profile() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Tu personaje (foto de perfil dibujada) y tu nombre; se cambia tocándolo. */
+function ProfileHero({ name, email }: { name: string; email: string }) {
+  const profile = useProfile();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const current = profile.data?.avatar ?? '';
+  const save = useMutation({
+    mutationFn: (avatar: string) => api.profile.update({ avatar }),
+    onSuccess: (p) => {
+      qc.setQueryData(keys.profile, p);
+      const a = avatarById(p.avatar);
+      toast(a ? `Ahora eres ${a.name}.` : 'Vuelves a tus iniciales.');
+    },
+    onError: (e) => toast(errorMessage(e), { tone: 'error' }),
+  });
+  const shown = save.isPending ? (save.variables ?? current) : current;
+  return (
+    <section className="card profile-hero" aria-labelledby="hero-name">
+      <button type="button" className="profile-hero__art" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="avatar-picker" aria-label="Cambiar tu personaje">
+        <UserAvatar avatar={shown} name={name} size={112} />
+        <span className="profile-hero__edit" aria-hidden="true">
+          <Pencil size={14} />
+        </span>
+      </button>
+      <div className="profile-hero__who">
+        <h2 id="hero-name" className="profile-hero__name">
+          {name || 'Tu perfil'}
+        </h2>
+        <p className="muted small">{email}</p>
+        <button type="button" className="btn btn--secondary btn--sm" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="avatar-picker">
+          {avatarById(shown) ? 'Cambiar personaje' : 'Elegir personaje'}
+        </button>
+      </div>
+      {open && (
+        <div id="avatar-picker" className="avatar-picker" role="radiogroup" aria-label="Elige tu personaje">
+          {AVATARS.map((a) => (
+            <button key={a.id} type="button" role="radio" aria-checked={shown === a.id} className={`avatar-picker__item${shown === a.id ? ' is-on' : ''}`} onClick={() => save.mutate(a.id)} disabled={save.isPending}>
+              <AvatarArt avatar={a} size={72} />
+              <span>{a.name}</span>
+            </button>
+          ))}
+          <button type="button" role="radio" aria-checked={!avatarById(shown)} className={`avatar-picker__item${!avatarById(shown) ? ' is-on' : ''}`} onClick={() => save.mutate('')} disabled={save.isPending}>
+            <UserAvatar name={name} size={72} />
+            <span>Iniciales</span>
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Tu plan y el acceso a pagar (y a administrar pagos si eres administración). */
+function PlanSection() {
+  const billing = useQuery({ queryKey: ['billing'], queryFn: api.billing.get });
+  const b = billing.data;
+  const pending = b?.requests.some((r) => r.status === 'pendiente');
+  return (
+    <section className="card stack-sm" aria-labelledby="plan-title">
+      <h2 id="plan-title" className="section-title">
+        Tu plan{b ? `: ${PLAN_NAME[b.plan]}` : ''}
+      </h2>
+      <p className="muted small">
+        {!b
+          ? 'Planes Pro, Pareja y Estudiante.'
+          : pending
+            ? 'Tu pago está en revisión. Te avisamos en «Planes» cuando se apruebe.'
+            : b.plan === 'gratis'
+              ? 'Pásate a Pro para tener todas las herramientas sin límites.'
+              : `Activo hasta el ${new Date(b.planUntil ?? '').toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}.`}
+      </p>
+      <div className="row">
+        <Link to="/planes" className="btn btn--sm">
+          {b?.plan === 'gratis' || !b ? 'Ver planes' : 'Renovar o cambiar'}
+        </Link>
+        {b?.admin && (
+          <Link to="/admin/pagos" className="btn btn--secondary btn--sm">
+            Administrar pagos
+          </Link>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -84,10 +170,10 @@ function FocusSection() {
   return (
     <form className="card stack" onSubmit={submit} aria-labelledby="focus-title">
       <h2 id="focus-title" className="section-title">
-        Tu enfoque
+        Tus prioridades
       </h2>
       <fieldset className="field">
-        <legend className="field__label">Pilares en los que te enfocas (hasta 3)</legend>
+        <legend className="field__label">Pilares que son tu prioridad (hasta 3)</legend>
         <div className="chips">
           {PILLAR_IDS.map((p) => (
             <label key={p} className="chip-radio" data-pillar={p}>
@@ -117,7 +203,6 @@ function timeZones(): string[] {
 
 function PreferencesSection() {
   const [theme, setTheme] = useTheme();
-  const [style, setStyle] = useStyle();
   const profile = useProfile();
   const qc = useQueryClient();
   const toast = useToast();
@@ -153,40 +238,29 @@ function PreferencesSection() {
           ]}
         />
       </div>
-      <fieldset className="field">
-        <legend className="field__label">Estilo visual</legend>
-        <div className="style-picker">
-          {STYLE_OPTIONS.map((o) => (
-            <label key={o.value} className="style-option">
-              <input type="radio" name="visual-style" value={o.value} checked={style === o.value} onChange={() => setStyle(o.value)} aria-describedby={`style-hint-${o.value}`} />
-              <span className="style-option__preview" data-preview={o.value} aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-              <span className="style-option__label">{o.label}</span>
-              <span className="style-option__hint" id={`style-hint-${o.value}`}>
-                {o.hint}
-              </span>
-            </label>
-          ))}
-        </div>
-        <span className="field__hint">Se aplica al momento, en claro y en oscuro, y se recuerda en este navegador.</span>
-      </fieldset>
-      <FontPicker />
-      <PalettePicker />
       <div className="field">
         <label className="field__label" htmlFor="tz">
           Zona horaria
         </label>
         {zones.length ? (
           <select id="tz" className="input" value={tz} onChange={(e) => saveTz.mutate(e.target.value)} disabled={saveTz.isPending}>
-            {!zones.includes(tz) && <option value={tz}>{tz}</option>}
-            {zones.map((z) => (
-              <option key={z} value={z}>
-                {z.replace(/_/g, ' ')}
-              </option>
-            ))}
+            {!zones.includes(tz) && !COMMON_TIMEZONES.some((c) => c.id === tz) && <option value={tz}>{tz}</option>}
+            <optgroup label="Latinoamérica y España">
+              {COMMON_TIMEZONES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Todas las zonas">
+              {zones
+                .filter((z) => !COMMON_TIMEZONES.some((c) => c.id === z))
+                .map((z) => (
+                  <option key={z} value={z}>
+                    {z.replace(/_/g, ' ')}
+                  </option>
+                ))}
+            </optgroup>
           </select>
         ) : (
           <input id="tz" className="input" value={tz} readOnly />
@@ -205,61 +279,6 @@ function PreferencesSection() {
   );
 }
 
-function FontPicker() {
-  const [font, setFont] = useFont();
-  // Cada opción se muestra con su letra: se cargan todas (el navegador solo descarga lo que pinta).
-  useEffect(() => {
-    void loadAllFonts();
-  }, []);
-  return (
-    <fieldset className="field">
-      <legend className="field__label">Tipografía</legend>
-      <div className="style-picker">
-        {FONT_OPTIONS.map((o) => (
-          <label key={o.value} className="style-option" data-font-option={o.value}>
-            <input type="radio" name="font" value={o.value} checked={font === o.value} onChange={() => setFont(o.value)} aria-describedby={`font-hint-${o.value}`} />
-            <span className="font-option__sample" aria-hidden="true">
-              <b>Tu día</b>
-              <span>Pasos pequeños, cada día.</span>
-            </span>
-            <span className="style-option__label">{o.label}</span>
-            <span className="style-option__hint" id={`font-hint-${o.value}`}>
-              {o.hint}
-            </span>
-          </label>
-        ))}
-      </div>
-      <span className="field__hint">Letra de los títulos y del texto. Funciona con cualquier estilo y se recuerda en este navegador.</span>
-    </fieldset>
-  );
-}
-
-function PalettePicker() {
-  const [palette, setPalette] = usePalette();
-  return (
-    <fieldset className="field">
-      <legend className="field__label">Color</legend>
-      <div className="style-picker">
-        {PALETTE_OPTIONS.map((o) => (
-          <label key={o.value} className="style-option">
-            <input type="radio" name="palette" value={o.value} checked={palette === o.value} onChange={() => setPalette(o.value)} aria-describedby={`palette-hint-${o.value}`} />
-            <span className="palette-swatch" data-swatch={o.value} aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-            <span className="style-option__label">{o.label}</span>
-            <span className="style-option__hint" id={`palette-hint-${o.value}`}>
-              {o.hint}
-            </span>
-          </label>
-        ))}
-      </div>
-      <span className="field__hint">Color de botones, enlaces y selección, con su versión clara y oscura, en cualquier estilo. Se recuerda en este navegador.</span>
-    </fieldset>
-  );
-}
-
 function CycleSetting() {
   const { showCycle, setShowCycle } = useShowCycle();
   return (
@@ -269,7 +288,7 @@ function CycleSetting() {
           Ciclo menstrual
         </span>
         <span className="field__hint" id="cycle-setting-hint">
-          Muestra Ciclo en el menú y tus días de regla en el Calendario. Es el mismo ajuste que usa la app anterior. Siempre puedes abrirlo desde Más.
+          Muestra Ciclo en el menú y tus días de regla en el Calendario. Siempre puedes abrirlo desde Más.
         </span>
       </span>
       <label className="switch">
@@ -277,6 +296,143 @@ function CycleSetting() {
         <span aria-hidden="true" />
       </label>
     </div>
+  );
+}
+
+/** Alarmas de clases, recordatorios y tareas en este navegador, también con el panel cerrado. */
+function AlarmsSection() {
+  const toast = useToast();
+  const [prefs, setPrefs] = useState(readAlarmPrefs);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const apply = (p: NotifyPrefs) => {
+    setPrefs(p);
+    saveAlarmPrefs(p);
+  };
+  const toggle = async (enabled: boolean) => {
+    setBusy(true);
+    try {
+      if (!enabled) {
+        apply({ ...prefs, enabled });
+        await disablePush();
+        setNote(null);
+        return;
+      }
+      apply({ ...prefs, enabled });
+      const r = await enablePush().catch(() => 'unsupported' as const);
+      if (r === 'on') {
+        setNote('Listo: suenan con el panel abierto y llegan como aviso aunque lo cierres.');
+        toast('Alarmas activadas.');
+      } else if (r === 'denied') setNote('El navegador no dio permiso para avisos: solo sonarán con el panel abierto. Puedes darlo en el candado de la barra de direcciones.');
+      else setNote('Este navegador no recibe avisos con el panel cerrado: sonarán con el panel abierto. En iPhone, instala el panel en la pantalla de inicio.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const test = () => {
+    const stop = playAlarm(3);
+    window.setTimeout(stop, 3200);
+    if (pushSupported() && Notification.permission === 'granted')
+      void navigator.serviceWorker.ready
+        .then((r) =>
+          r.showNotification('Prueba de alarma', {
+            body: 'Así te avisará Design Your Core.',
+            icon: '/icon-192.png',
+            tag: 'dyc-prueba',
+          }),
+        )
+        .catch(() => undefined);
+  };
+  const row = (label: string, checked: boolean, onChange: (v: boolean) => void) => (
+    <label className="setting-row">
+      <span>{label}</span>
+      <span className="switch">
+        <input type="checkbox" role="switch" checked={checked} disabled={busy} onChange={(e) => onChange(e.target.checked)} />
+        <span aria-hidden="true" />
+      </span>
+    </label>
+  );
+  return (
+    <section className="card stack" aria-labelledby="alarms-title">
+      <h2 id="alarms-title" className="section-title">
+        Alarmas
+      </h2>
+      <p className="muted small">Suenan a la hora de tus clases y cursos del Horario, los recordatorios del Calendario y las tareas de la Agenda con aviso. También te recuerdan comer, tomar agua y te dejan un mensaje positivo cada día. En el teléfono se activan en su app, en Perfil.</p>
+      {row('Alarmas en este navegador', prefs.enabled, (v) => void toggle(v))}
+      {note && (
+        <p className="small muted" role="status">
+          {note}
+        </p>
+      )}
+      {prefs.enabled && (
+        <div className="stack">
+          {row('Clases y cursos del Horario', prefs.classes, (classes) => apply({ ...prefs, classes }))}
+          {prefs.classes && (
+            <div className="field">
+              <span className="field__label">Avisarme antes de empezar</span>
+              <Segmented<string>
+                label="Avisarme antes de empezar"
+                value={String(prefs.classLead)}
+                onChange={(v) => apply({ ...prefs, classLead: Number(v) })}
+                options={CLASS_LEADS.map((m) => ({
+                  value: String(m),
+                  label: m === 0 ? 'A la hora' : `${m} min`,
+                }))}
+              />
+            </div>
+          )}
+          {row('Recordatorios del Calendario', prefs.reminders, (reminders) => apply({ ...prefs, reminders }))}
+          {row('Tareas de la Agenda con aviso', prefs.tasks, (tasks) => apply({ ...prefs, tasks }))}
+          {row('Rutinas y cuidados de mascotas', prefs.routines, (routines) => apply({ ...prefs, routines }))}
+          <h3 className="planner__title">Cuidarte</h3>
+          {row('Recordarme comer a mis horas', prefs.meals, (meals) => apply({ ...prefs, meals }))}
+          {prefs.meals && (
+            <div className="care-times">
+              {MEALS.map((m) => (
+                <TextField
+                  key={m}
+                  label={MEAL_LABEL[m]}
+                  type="time"
+                  value={prefs.mealTimes[m]}
+                  onChange={(e) => apply({ ...prefs, mealTimes: { ...prefs.mealTimes, [m]: e.target.value } })}
+                  hint={prefs.mealTimes[m] ? undefined : 'Sin aviso'}
+                />
+              ))}
+            </div>
+          )}
+          {row('Recordarme tomar agua', prefs.water, (water) => apply({ ...prefs, water }))}
+          {prefs.water && (
+            <div className="stack-sm">
+              <div className="field">
+                <span className="field__label">Cada cuánto</span>
+                <Segmented<string>
+                  label="Cada cuánto tomar agua"
+                  value={String(prefs.waterEvery)}
+                  onChange={(v) => apply({ ...prefs, waterEvery: Number(v) })}
+                  options={WATER_EVERY.map((h) => ({ value: String(h), label: h === 1 ? 'Cada hora' : `Cada ${h} horas` }))}
+                />
+              </div>
+              <div className="care-times">
+                <TextField label="Desde" type="time" value={prefs.waterFrom} onChange={(e) => e.target.value && apply({ ...prefs, waterFrom: e.target.value })} />
+                <TextField label="Hasta" type="time" value={prefs.waterTo} onChange={(e) => e.target.value && apply({ ...prefs, waterTo: e.target.value })} />
+              </div>
+              <p className="small muted">{waterTimes(prefs.waterFrom, prefs.waterTo, prefs.waterEvery).join(' · ') || 'Elige un «Hasta» después del «Desde».'}</p>
+            </div>
+          )}
+          {row('Un mensaje positivo cada día', prefs.cheers, (cheers) => apply({ ...prefs, cheers }))}
+          {prefs.cheers && (
+            <div className="care-times">
+              <TextField label="A qué hora" type="time" value={prefs.cheerTime} onChange={(e) => e.target.value && apply({ ...prefs, cheerTime: e.target.value })} hint={`Hoy: «${positiveMessage()}»`} />
+            </div>
+          )}
+          <div>
+            <button type="button" className="btn btn--secondary btn--sm" onClick={test}>
+              <BellRing size={16} aria-hidden="true" /> Probar el sonido
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -340,7 +496,10 @@ function PartnerSection() {
             Vinculada/o con <strong>{partner.data.partner.name}</strong>
             {partner.data.total ? ` · hoy cumplió ${partner.data.doneToday} de ${partner.data.total} hábitos` : ''}.
           </p>
-          <div>
+          <div className="row wrap">
+            <Link to="/pareja" className="btn btn--sm">
+              Abrir su espacio en pareja <ArrowRight size={16} aria-hidden="true" />
+            </Link>
             <button type="button" className="btn btn--ghost btn--sm danger-text" onClick={() => unlink.mutate()} disabled={unlink.isPending}>
               Desvincular
             </button>
@@ -481,6 +640,9 @@ function DataSection() {
         Tus datos
       </h2>
       <p className="muted">Tus datos son tuyos. Puedes descargarlos todos en un archivo o borrar tu cuenta.</p>
+      <p className="muted">
+        <Mail size={16} aria-hidden="true" style={{ verticalAlign: '-3px' }} /> ¿Dudas o sugerencias? Escríbenos a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+      </p>
       <div className="row">
         <button type="button" className="btn btn--secondary" onClick={() => exportData.mutate()} disabled={exportData.isPending} aria-busy={exportData.isPending}>
           <Download size={18} aria-hidden="true" /> Descargar mis datos
@@ -497,7 +659,7 @@ function DataSection() {
             remove.mutate();
           }}
         >
-          <p>Se borrarán tu perfil, check-ins, hábitos, retos y los datos de la app anterior. No se puede deshacer.</p>
+          <p>Se borrarán tu perfil, check-ins, hábitos, retos y los datos de todas tus herramientas. No se puede deshacer.</p>
           {remove.isError && (
             <div className="alert alert--danger" role="alert">
               {errorMessage(remove.error)}

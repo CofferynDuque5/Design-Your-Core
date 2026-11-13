@@ -58,6 +58,7 @@ Para cambiar el esquema: edita `prisma/schema.prisma`, genera el SQL con `prisma
 | `PUBLIC_URL` | Recomendada | URL pública de la API; los enlaces de recuperación de contraseña apuntan aquí |
 | `ALLOWED_ROOT_DOMAINS` | No | Dominios propios cuyos subdominios pueden usar la API (por defecto `nvcorx.com`) |
 | `SMTP_*` | No | Correo de invitación y recuperación. Sin `SMTP_HOST` los enlaces solo se registran en el log |
+| `ADMIN_EMAILS` | Para cobrar | Correo(s) de las cuentas del panel que administran pagos (datos de cada método, precios y aprobación de comprobantes) |
 | `PORT` | No | Puerto o socket; cPanel lo define solo |
 
 ## Despliegue de la app web (estática)
@@ -76,7 +77,7 @@ La app anterior puede seguir publicada en su dominio mientras tanto: ambas usan 
 1. Crea `apps/site/.env.production` a partir de `apps/site/.env.example`:
    - `SITE_URL`: el dominio del sitio (se usa en el sitemap y en los enlaces para compartir).
    - `PUBLIC_APP_URL`: la dirección de la app web; los botones «Entrar» y «Crear cuenta» llevan ahí.
-   - `PUBLIC_CONTACT_EMAIL` (opcional): si lo pones, aparece en la página de privacidad.
+   - `PUBLIC_CONTACT_EMAIL` (opcional): cambia el correo de contacto del sitio (por defecto designyourcore@nvcorx.com).
 2. `pnpm build`. El resultado queda en `apps/site/dist/`.
 3. Sube el **contenido** de `dist/` a la carpeta pública del dominio del sitio. El `.htaccess` incluido hace que `/privacidad` funcione sin `.html` y usa `404.html` para las páginas que no existen.
 
