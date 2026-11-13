@@ -8087,6 +8087,10 @@
     .profile-hero__who {
       align-items: center;
     }
+
+    .avatar-picker {
+      justify-self: stretch;
+    }
   }
 }
 
@@ -8271,5 +8275,12 @@
     border-radius: inherit;
     background: var(--color-primary);
     transition: width 0.3s ease;
+  }
+}
+
+@layer dyc.app {
+  .couple-section > .section-head {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
   }
 }

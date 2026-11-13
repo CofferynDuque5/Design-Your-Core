@@ -72,7 +72,7 @@ export function Couple() {
             label="Sección"
             value={tab}
             onChange={setTab}
-            options={(['foto', 'meta', 'emprendimiento'] as const).map((k) => ({ value: k, label: `${COUPLE_KIND_LABEL[k]} · ${of(k).length}` }))}
+            options={(['foto', 'meta', 'emprendimiento'] as const).map((k) => ({ value: k, label: `${COUPLE_KIND_LABEL[k]}\u00a0${of(k).length}` }))}
           />
           {tab === 'foto' && <Gallery photos={of('foto')} partner={partner.name} />}
           {tab === 'meta' && <Goals goals={of('meta')} partner={partner.name} />}
@@ -132,7 +132,7 @@ function Gallery({ photos, partner }: { photos: Item<'foto'>[]; partner: string 
   };
 
   return (
-    <section className="stack" aria-labelledby="fotos-title">
+    <section className="stack couple-section" aria-labelledby="fotos-title">
       <div className="section-head">
         <h2 id="fotos-title" className="section-title">
           <Images size={18} aria-hidden="true" className="inline-icon" /> Galería
@@ -271,7 +271,7 @@ function Goals({ goals, partner }: { goals: Item<'meta'>[]; partner: string }) {
   const [editing, setEditing] = useState<Item<'meta'> | 'new' | null>(null);
   const sorted = [...goals].sort((a, b) => Number(a.data.done) - Number(b.data.done));
   return (
-    <section className="stack" aria-labelledby="metas-title">
+    <section className="stack couple-section" aria-labelledby="metas-title">
       <div className="section-head">
         <h2 id="metas-title" className="section-title">
           <Target size={18} aria-hidden="true" className="inline-icon" /> Metas juntos
@@ -355,7 +355,7 @@ function Ventures({ ventures, partner }: { ventures: Item<'emprendimiento'>[]; p
   const { update } = useCouple();
   const [editing, setEditing] = useState<Item<'emprendimiento'> | 'new' | null>(null);
   return (
-    <section className="stack" aria-labelledby="emp-title">
+    <section className="stack couple-section" aria-labelledby="emp-title">
       <div className="section-head">
         <h2 id="emp-title" className="section-title">
           <Store size={18} aria-hidden="true" className="inline-icon" /> Emprendimientos juntos

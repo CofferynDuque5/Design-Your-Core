@@ -61,13 +61,13 @@ describe('En pareja', () => {
     expect(await screen.findByText('Tú y Nathan')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ver la foto «Playa»' })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /Metas · 1/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Metas\s1/ }));
     expect(screen.getByRole('heading', { name: 'Viajar a Mérida' })).toBeInTheDocument();
     expect(screen.getByText(/Lo agregó Nathan/)).toBeInTheDocument();
     await userEvent.click(within(screen.getByRole('list', { name: 'Pasos de «Viajar a Mérida»' })).getByRole('checkbox', { name: 'Ahorrar' }));
     await waitFor(() => expect(api.calls.find((c) => c.method === 'PATCH')).toMatchObject({ path: '/api/v2/couple/items/m1', body: { data: { steps: [{ id: 's1', name: 'Ahorrar', done: true }] } } }));
 
-    await userEvent.click(screen.getByRole('button', { name: /Emprendimientos · 1/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Emprendimientos\s1/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Nuevo emprendimiento' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo emprendimiento en pareja' });
     await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Tienda de plantas');
