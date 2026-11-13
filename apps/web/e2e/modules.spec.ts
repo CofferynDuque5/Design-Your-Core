@@ -206,7 +206,7 @@ test('cursos: tema con enlaces, estado y datos guardados', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Añadir el primero' }).click();
   let dialog = page.getByRole('dialog', { name: 'Nuevo curso' });
-  await dialog.getByLabel('Tema').fill('Inglés');
+  await dialog.getByRole('textbox', { name: 'Tema' }).fill('Inglés');
   await dialog.getByLabel('Enlace (opcional)').fill('youtube.com/watch?v=abc');
   await expect(dialog.getByText('Se abrirá en YouTube.')).toBeVisible();
   await dialog.getByLabel('Nombre (opcional)').fill('Inglés básico');
@@ -216,7 +216,7 @@ test('cursos: tema con enlaces, estado y datos guardados', async ({ page }) => {
   await expect(card.getByRole('link', { name: /Inglés básico/ })).toHaveAttribute('href', 'https://youtube.com/watch?v=abc');
   await page.getByRole('button', { name: 'Añadir a Inglés' }).click();
   dialog = page.getByRole('dialog', { name: 'Nuevo curso' });
-  await expect(dialog.getByLabel('Tema')).toHaveValue('Inglés');
+  await expect(dialog.getByRole('textbox', { name: 'Tema' })).toHaveValue('Inglés');
   await dialog.getByLabel('Enlace (opcional)').fill('https://www.udemy.com/course/ingles/');
   await dialog.getByRole('button', { name: 'Añadir curso' }).click();
   await card.getByRole('button', { name: /Estado de «Inglés básico»: Por ver/ }).click();
@@ -226,8 +226,9 @@ test('cursos: tema con enlaces, estado y datos guardados', async ({ page }) => {
 
   const doc = await readLegacy(page);
   expect(doc.courses).toEqual([
-    { id: expect.any(String), topic: 'Inglés', title: 'Inglés básico', url: 'https://youtube.com/watch?v=abc', status: 'curso', notes: '' },
-    { id: expect.any(String), topic: 'Inglés', title: '', url: 'https://www.udemy.com/course/ingles/', status: 'pendiente', notes: '' },
+    // El idioma se detecta por el nombre («Inglés básico» está escrito en español).
+    { id: expect.any(String), topic: 'Inglés', title: 'Inglés básico', url: 'https://youtube.com/watch?v=abc', status: 'curso', notes: '', language: 'es', source: '', subtopic: '' },
+    { id: expect.any(String), topic: 'Inglés', title: '', url: 'https://www.udemy.com/course/ingles/', status: 'pendiente', notes: '', language: '', source: '', subtopic: '' },
   ]);
   expect(doc).toMatchObject(OLD);
 });
@@ -244,7 +245,7 @@ test('enfoque: una sesión saltada se guarda y cuenta', async ({ page }) => {
   await page.getByRole('button', { name: 'Empezar' }).click();
   await page.clock.fastForward('02:00');
   await expect(page.getByRole('timer')).toHaveText('23:00');
-  await expect(page).toHaveTitle('23:00 · Enfoque');
+  await expect(page).toHaveTitle(/^2[23]:\d\d · Concentración$/);
   await page.getByRole('button', { name: 'Pausar' }).click();
   await page.getByRole('button', { name: 'Saltar' }).click();
   await expect(page.getByRole('button', { name: 'Descanso corto' })).toHaveAttribute('aria-pressed', 'true');
@@ -351,6 +352,13 @@ test('proyectos: crear con materia, estado, hitos y filtros', async ({ page }) =
     .poll(async () => (await readLegacy(page)).projects)
     .toEqual([
       {
+        // Campos nuevos de Proyectos, con sus valores por defecto.
+        categories: [],
+        category: '',
+        email: '',
+        mailUrl: '',
+        priority: 'media',
+        todos: [],
         id: expect.any(String),
         title: 'Ensayo de Historia',
         subject: 'Historia',
@@ -386,8 +394,8 @@ test('roadmaps: pasos que se desbloquean al completar', async ({ page }) => {
     await card.getByRole('button', { name: 'Añadir', exact: true }).click();
     await expect(card.getByRole('list', { name: /^Pasos de/ }).getByText(name, { exact: true })).toBeVisible();
   }
-  await card.getByRole('button', { name: 'Marcar «Cálculo I» como completada' }).click();
-  await expect(card.getByRole('button', { name: 'Marcar «Cálculo II» como completada' })).toBeVisible();
+  await card.getByRole('button', { name: 'Marcar «Cálculo I» como completado' }).click();
+  await expect(card.getByRole('button', { name: 'Marcar «Cálculo II» como completado' })).toBeVisible();
   await expect(page.getByText('1 de 3 completadas')).toBeVisible();
 
   await expect
@@ -402,7 +410,7 @@ test('roadmaps: pasos que se desbloquean al completar', async ({ page }) => {
     ]);
   await reloadWhenSaved(page);
   await page.getByRole('button', { name: 'Reabrir «Cálculo I»' }).click();
-  await expect(page.getByRole('button', { name: 'Marcar «Cálculo I» como completada' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Marcar «Cálculo I» como completado' })).toBeVisible();
   await expect.poll(async () => ((await readLegacy(page)).roadmaps as Array<{ steps: Array<{ done: boolean }> }>)[0].steps.map((s) => s.done)).toEqual([false, false, false]);
   expect(await readLegacy(page)).toMatchObject(OLD);
 });
@@ -419,7 +427,7 @@ test('cuadernos: cuaderno, cajitas de texto y de código con su lenguaje, y borr
   await page.getByRole('button', { name: 'Nuevo cuaderno' }).click();
   const dialog = page.getByRole('dialog', { name: 'Nuevo cuaderno' });
   await dialog.getByLabel('Título').fill('Cálculo');
-  await dialog.getByLabel('Categoría').fill('Universidad');
+  await dialog.getByLabel('Categoría').selectOption('Universidad');
   await dialog.getByLabel('Tema (opcional)').fill('Derivadas');
   await dialog.getByRole('radio', { name: 'Calculadora' }).check();
   await dialog.getByRole('button', { name: 'Crear cuaderno' }).click();
@@ -511,7 +519,8 @@ test('contenido e ideas: publicar, etapas, filtros y guardado al escribir', asyn
 
 // ---------- Tanda 3: vida personal y salud ----------
 
-const utcToday = () => new Date().toISOString().slice(0, 10);
+// «Hoy» es el día local de la persona (la zona de las pruebas, la de playwright.config).
+const utcToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date());
 const byDate = (list: unknown) => [...(list as Array<{ date: string }>)].sort((a, b) => a.date.localeCompare(b.date));
 
 test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) => {
@@ -529,7 +538,7 @@ test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) =>
   await page.getByRole('button', { name: 'Definir' }).click();
   const budget = page.getByRole('dialog', { name: 'Presupuesto mensual' });
   await expect(budget.getByLabel('Cuánto quieres gastar al mes')).toHaveValue('300');
-  await expect(budget.getByText(/La app anterior tenía \$300/)).toBeVisible();
+  await expect(budget.getByText(/Tenías \$300 guardado en este navegador/)).toBeVisible();
   await budget.getByLabel('Cuánto quieres gastar al mes').fill('250,5');
   await budget.getByRole('button', { name: 'Guardar' }).click();
   await expect(page.getByText(/Quedan \$210,50/)).toBeVisible();
@@ -563,7 +572,9 @@ test('finanzas y metas: presupuesto, movimientos y avances', async ({ page }) =>
   dialog = page.getByRole('dialog', { name: 'Nueva meta' });
   await dialog.getByLabel('Meta').fill('Ahorrar para el viaje');
   await dialog.getByLabel('Objetivo').fill('600');
-  await dialog.getByLabel('Unidad (opcional)').fill('€');
+  // La unidad se elige de la lista; «Otra unidad…» abre un campo para escribirla.
+  await dialog.getByLabel('Unidad (opcional)', { exact: true }).selectOption({ label: 'Otra unidad…' });
+  await dialog.getByLabel('Unidad (opcional): escribe otra unidad').fill('€');
   await dialog.getByLabel('Fecha límite (opcional)').fill('2026-12-09');
   await dialog.getByLabel('Categoría').selectOption('dinero');
   await dialog.getByRole('button', { name: 'Añadir meta' }).click();
@@ -624,7 +635,7 @@ test('mascotas y rutina: cuidados por días, borrado en cascada, agua y comidas'
   await expect(page.getByRole('article', { name: 'Luna' })).toHaveCount(0);
   await expect.poll(async () => (await readLegacy(page)).petCares).toEqual([]);
   let doc = await readLegacy(page);
-  expect(doc.pets).toEqual([{ id: expect.any(String), name: 'Toby', species: 'dog', note: '' }]);
+  expect(doc.pets).toEqual([{ id: expect.any(String), name: 'Toby', species: 'dog', note: '', photo: '' }]);
 
   // El agua es de hoy: el registro de otro día empieza de cero y la meta se conserva.
   await page.goto('/rutina');
@@ -838,12 +849,13 @@ test('notas: biblioteca por materia, formato, imagen subida y formatos de la app
 test('trabajo: tareas por proyecto; Respiración se quitó sin tocar sus minutos', async ({ page }) => {
   await register(page, 'trabajo');
   await onboard(page);
-  await seedLegacy(page, { ...OLD, workItems: [{ id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: false, due: 'Hoy' }], meditations: [{ id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' }] });
+  await seedLegacy(page, { ...OLD, projects: [{ id: 'pr_demo', title: 'Lanzamiento', subject: '', deadline: '', status: 'curso', color: '#4F7CFF', milestones: [] }], workItems: [{ id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: false, due: 'Hoy' }], meditations: [{ id: 'md_viejo', date: '2026-01-05', minutes: 5, kind: 'respiracion' }] });
 
   await page.goto('/trabajo');
   await expect(page.getByRole('region', { name: /En curso/ }).getByText('Proyecto 2')).toBeVisible();
   await page.getByLabel('Nueva tarea de trabajo').fill('Preparar la demo');
-  await page.getByLabel('Proyecto de la tarea nueva').selectOption('p3');
+  // Los proyectos son los de la sección Proyectos.
+  await page.getByLabel('Proyecto de la tarea nueva').selectOption('pr_demo');
   await page.getByRole('button', { name: 'Añadir', exact: true }).click();
   await page.getByRole('region', { name: /En curso/ }).getByRole('checkbox', { name: /Informe/ }).click();
   await expect(page.getByRole('region', { name: /Hecho/ }).getByRole('checkbox', { name: /Informe/ })).toBeChecked();
@@ -858,7 +870,7 @@ test('trabajo: tareas por proyecto; Respiración se quitó sin tocar sus minutos
   const doc = await readLegacy(page);
   expect(doc.workItems).toEqual([
     { id: 'wk_viejo', title: 'Informe', project: 'p2', status: 'curso', done: true, due: 'Hoy' },
-    { id: expect.any(String), title: 'Preparar la demo', project: 'p3', status: 'curso', done: false, due: 'Viernes' },
+    { id: expect.any(String), title: 'Preparar la demo', project: 'pr_demo', status: 'curso', done: false, due: 'Viernes' },
   ]);
 
   // Respiración se quitó: el enlace viejo lleva a Más y los minutos guardados siguen en el documento.
@@ -880,7 +892,7 @@ test('bóveda: crear, añadir, bloquear, desbloquear y cifrar las contraseñas d
   await seedLegacy(page, { ...OLD, vault: OLD_VAULT });
 
   await page.goto('/boveda');
-  const notice = page.getByRole('region', { name: 'Hay 2 contraseñas de la app anterior guardadas sin cifrar' });
+  const notice = page.getByRole('region', { name: 'Hay 2 contraseñas guardadas sin cifrar' });
   await expect(notice).toContainText('Crea tu bóveda para cifrarlas.');
   await page.getByLabel('Contraseña maestra', { exact: true }).fill(MASTER);
   await page.getByLabel('Repite la contraseña maestra').fill(MASTER);
@@ -911,8 +923,8 @@ test('bóveda: crear, añadir, bloquear, desbloquear y cifrar las contraseñas d
 
   // Migración: solo tras confirmarla.
   await notice.getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }).click();
-  const confirm = page.getByRole('dialog', { name: 'Cifrar las contraseñas de la app anterior' });
-  await expect(confirm).toContainText('la bóveda de la app anterior aparecerá vacía');
+  const confirm = page.getByRole('dialog', { name: 'Cifrar las contraseñas guardadas sin cifrar' });
+  await expect(confirm).toContainText('Se borra la lista sin cifrar.');
   expect((await readLegacy(page)).vault).toEqual(OLD_VAULT);
   await confirm.getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }).click();
   await expect(notice).toBeHidden();

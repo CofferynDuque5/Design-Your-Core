@@ -205,103 +205,26 @@ test('onboarding y pantallas de la app', async ({ page }) => {
   await expectAccessible(page, 'diálogo de borrar cuenta');
 });
 
-test('estilos visuales: pantallas representativas en cada estilo', async ({ page }) => {
-  // Cada estilo solo cambia tokens y unos pocos componentes: basta con una muestra de pantallas.
-  test.setTimeout(360_000);
-  await register(page, 'a11y-estilos');
+test('aspecto de la marca: siempre el mismo estilo, tipografía y color, aunque quede algo guardado', async ({ page }) => {
+  // Estilo, tipografía y color ya no se eligen en Perfil: lo que quedó guardado de antes se ignora.
+  test.setTimeout(120_000);
+  await register(page, 'a11y-marca');
   await onboard(page);
-  const today = new Date().toISOString().slice(0, 10);
-  await seedLegacy(page, {
-    blocks: [{ id: 'b1', label: 'Estudiar', sub: 'Cálculo', start: 9, dur: 1.5, kind: 'study' }],
-    todos: [
-      { id: 'td1', title: 'Pagar la luz', done: false },
-      { id: 'td2', title: 'Llamar al banco', done: true },
-    ],
-    transactions: [
-      { id: 'tx1', date: today, amount: 1200, type: 'income', category: 'Sueldo', note: '' },
-      { id: 'tx2', date: today, amount: 45.5, type: 'expense', category: 'Comida', note: 'Mercado' },
-    ],
-    budget: { monthly: 500 },
-    notes: [{ id: 'n1', title: 'Ondas', subject: 'Física', date: '3 sept', tag: '#4F7CFF', excerpt: 'Repasar', body: 'Repasar la **frecuencia**', commit: false, tags: 'examen', shareId: null }],
-    vault: [{ id: 'v1', name: 'Banco Sol', mono: 'BS', user: 'ana.perez', pass: 'Clave-Plana-123' }],
+  await page.evaluate(() => {
+    localStorage.setItem('dyc.style', 'glass');
+    localStorage.setItem('dyc.font', 'amable');
+    localStorage.setItem('dyc.palette', 'lavanda');
   });
-
-  for (const [style, option] of [
-    ['minimal', /^Minimalista/],
-    ['glass', /^Cristal \(glassmorphism\)/],
-    ['suave', /^Suave/],
-    ['editorial', /^Editorial/],
-  ] as const) {
-    // Se elige en Perfil, como lo haría la persona; el estilo se aplica al momento y se recuerda.
-    await page.goto('/perfil');
-    await page.getByRole('radio', { name: option }).check();
-    await expect(page.locator('html')).toHaveAttribute('data-style', style);
-    for (const path of ['/', '/progreso', '/agenda', '/pendientes', '/finanzas', '/notas', '/boveda', '/mas', '/perfil']) {
-      await page.goto(path);
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      await expect(page.locator('html')).toHaveAttribute('data-style', style);
-      await expectAccessible(page, `${path} (estilo ${style})`);
-    }
+  for (const path of ['/', '/agenda', '/finanzas', '/perfil']) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('data-style', 'editorial');
+    await expect(html).toHaveAttribute('data-font', 'clasica');
+    await expect(html).toHaveAttribute('data-palette', 'lima');
+    await expectAccessible(page, `${path} (aspecto de la marca)`);
   }
-});
-
-test('paletas y tipografías: cada una en tres pantallas', async ({ page }) => {
-  // Paletas y tipografías solo cambian tokens: basta con tres pantallas y el estilo por defecto
-  // (el contraste de cada paleta con cada estilo lo comprueban las pruebas unitarias).
-  test.setTimeout(240_000);
-  await register(page, 'a11y-paletas');
-  await onboard(page);
-  const today = new Date().toISOString().slice(0, 10);
-  await seedLegacy(page, {
-    blocks: [{ id: 'b1', label: 'Estudiar', sub: 'Cálculo', start: 9, dur: 1.5, kind: 'study' }],
-    tasks: [{ id: 't1', title: 'Entregar ensayo', pri: 'alta', time: null, rem: false, done: false, tags: '' }],
-    transactions: [
-      { id: 'tx1', date: today, amount: 1200, type: 'income', category: 'Sueldo', note: '' },
-      { id: 'tx2', date: today, amount: 45.5, type: 'expense', category: 'Comida', note: 'Mercado' },
-    ],
-    budget: { monthly: 500 },
-  });
-  const screens = ['/', '/agenda', '/finanzas'];
-
-  for (const [palette, option] of [
-    ['salvia', /^Salvia/],
-    ['terracota', /^Terracota/],
-    ['lavanda', /^Lavanda/],
-    ['grafito', /^Grafito/],
-    ['azul', /^Azul/],
-    ['lima', /^Lima/],
-  ] as const) {
-    await page.goto('/perfil');
-    await page.getByRole('group', { name: 'Color' }).getByRole('radio', { name: option }).check();
-    await expect(page.locator('html')).toHaveAttribute('data-palette', palette);
-    for (const path of screens) {
-      await page.goto(path);
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      await expect(page.locator('html')).toHaveAttribute('data-palette', palette);
-      await expectAccessible(page, `${path} (paleta ${palette})`);
-    }
-  }
-
-  for (const [font, option, family] of [
-    ['moderna', /^Moderna/, 'Manrope'],
-    ['geometrica', /^Geométrica/, 'Outfit'],
-    ['elegante', /^Elegante/, 'Fraunces'],
-    ['amable', /^Amable/, 'Nunito'],
-    ['clasica', /^Clásica/, 'Newsreader'],
-  ] as const) {
-    await page.goto('/perfil');
-    await page.getByRole('group', { name: 'Tipografía' }).getByRole('radio', { name: option }).check();
-    await expect(page.locator('html')).toHaveAttribute('data-font', font);
-    for (const path of screens) {
-      await page.goto(path);
-      const h1 = page.getByRole('heading', { level: 1 });
-      await expect(h1).toBeVisible();
-      // La fuente elegida se carga al arrancar (aunque no sea la del paquete inicial) y se usa en los títulos.
-      await expect(h1).toHaveCSS('font-family', new RegExp(`^"?${family}`));
-      await expect.poll(() => page.evaluate((f) => document.fonts.load(`16px "${f}"`).then((faces) => faces.length), family)).toBeGreaterThan(0);
-      await expectAccessible(page, `${path} (tipografía ${font})`);
-    }
-  }
+  expect(await page.evaluate(() => [localStorage.getItem('dyc.style'), localStorage.getItem('dyc.font'), localStorage.getItem('dyc.palette')])).toEqual([null, null, null]);
 });
 
 test('bóveda: crear, desbloqueada, bloqueada y sus diálogos', async ({ page }) => {
@@ -338,7 +261,7 @@ test('bóveda: crear, desbloqueada, bloqueada y sus diálogos', async ({ page })
   await page.keyboard.press('Escape');
 
   await page.getByRole('button', { name: 'Cifrar y borrar las copias sin cifrar' }).click();
-  await expect(page.getByRole('dialog', { name: 'Cifrar las contraseñas de la app anterior' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Cifrar las contraseñas guardadas sin cifrar' })).toBeVisible();
   await expectAccessible(page, 'diálogo de migración');
   await page.keyboard.press('Escape');
 

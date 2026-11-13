@@ -126,7 +126,7 @@ test('la sección Más reúne todas las herramientas', async ({ page }) => {
   await expect(tools.getByRole('list', { name: 'Organización' }).getByRole('link')).toHaveCount(5);
   await expect(tools.getByRole('list', { name: 'Estudio y trabajo' }).getByRole('link')).toHaveCount(9);
   await expect(tools.getByRole('list', { name: 'Conocimiento' }).getByRole('link')).toHaveCount(TOOLS_KNOWLEDGE);
-  await expect(tools.getByRole('list', { name: 'Vida personal' }).getByRole('link')).toHaveCount(3);
+  await expect(tools.getByRole('list', { name: 'Vida personal' }).getByRole('link')).toHaveCount(4);
   // Ciclo está en Salud aunque no se muestre en el menú.
   await expect(tools.getByRole('list', { name: 'Salud' }).getByRole('link')).toHaveCount(5);
   await expect(tools.getByRole('link', { name: /Ciclo.*oculto en el menú/ })).toBeVisible();
