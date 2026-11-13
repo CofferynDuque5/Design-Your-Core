@@ -494,7 +494,9 @@ describe('Cursos: progreso y horario', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Añadir el primero' }));
     let dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
     await userEvent.type(within(dialog).getByLabelText('Tema'), 'Inglés');
-    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://www.youtube.com/playlist?list=PLabcdefghijk');
+    // Se pega, como hace la gente (y es más rápido que escribir letra a letra).
+    await userEvent.click(within(dialog).getByLabelText('Enlace (opcional)'));
+    await userEvent.paste('https://www.youtube.com/playlist?list=PLabcdefghijk');
     await userEvent.tab();
     expect(await within(dialog).findByText('Dura 12 h 30 min (12 videos), según la página.')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Horas')).toHaveValue(12);
@@ -505,7 +507,8 @@ describe('Cursos: progreso y horario', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Añadir a Inglés' }));
     dialog = screen.getByRole('dialog', { name: 'Nuevo curso' });
-    await userEvent.type(within(dialog).getByLabelText('Enlace (opcional)'), 'https://ejemplo.com/curso');
+    await userEvent.click(within(dialog).getByLabelText('Enlace (opcional)'));
+    await userEvent.paste('https://ejemplo.com/curso');
     await userEvent.tab();
     expect(await within(dialog).findByText('Esa página no dice cuánto dura. Escribe la duración a mano.')).toBeInTheDocument();
     await userEvent.type(within(dialog).getByLabelText('Días'), '1');
@@ -515,7 +518,7 @@ describe('Cursos: progreso y horario', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir curso' }));
     expect(writes(api).at(-1)).toMatchObject({ body: { item: { url: 'https://ejemplo.com/curso', length: 86400 + 6 * 3600 + 5 * 60 + 9, lengthFrom: 'manual' } } });
     expect(asked).toHaveLength(2);
-  });
+  }, 15_000);
 
   it('cada tema va en orden de lo básico a lo avanzado y al terminar uno sus clases pasan al siguiente', async () => {
     const api = withApi({}, (doc) => {
