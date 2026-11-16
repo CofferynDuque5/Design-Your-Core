@@ -7684,14 +7684,27 @@
 
   .opt-picker__input .input {
     width: 100%;
-    padding-right: 44px;
+    padding-right: 48px;
   }
 
-  .opt-picker__clear {
+  /* Botón para borrar lo escrito, dentro del campo a la derecha. Más específico que
+     `.icon-btn[aria-label]` (que lo dejaba en position: relative, debajo del campo). */
+  .opt-picker__input > .icon-btn.opt-picker__clear {
     position: absolute;
     top: 50%;
-    right: 2px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
     transform: translateY(-50%);
+    background: var(--color-surface-sunken);
+    color: var(--color-ink-muted);
+  }
+
+  .opt-picker__input > .icon-btn.opt-picker__clear:hover,
+  .opt-picker__input > .icon-btn.opt-picker__clear:focus-visible {
+    background: var(--color-line-strong);
+    color: var(--color-ink);
   }
 
   .opt-picker__chips {

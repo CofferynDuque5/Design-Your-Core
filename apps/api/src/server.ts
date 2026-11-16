@@ -6,6 +6,7 @@ import { createApp } from './app.js';
 import { isPlaceholderDatabaseUrl, loadConfig, loadEnvFiles, normalizeDatabaseUrl } from './config.js';
 import { copyFromDatabase, copyStatus } from './db/copyFrom.js';
 import { createDb } from './db/db.js';
+import { lockDownPublicApi } from './db/lockdown.js';
 import { migrate } from './db/migrate.js';
 import { createMailer } from './lib/mailer.js';
 import { startAlarmScheduler } from './lib/webPush.js';
@@ -36,6 +37,8 @@ process.on('uncaughtException', (e) => console.error('[core-cloud] uncaughtExcep
 async function migrateOrRetry(): Promise<void> {
   try {
     await migrate(db);
+    // Supabase: cierra su API REST pública sobre nuestras tablas.
+    await lockDownPublicApi(db).catch((e) => console.error('[core-cloud] no se pudo cerrar la API pública de Supabase:', e instanceof Error ? e.message : e));
     void copyOrRetry();
   } catch (e) {
     console.error('[core-cloud] error de migración:', databaseProblem(e) ?? (e instanceof Error ? e.message : e));
