@@ -118,7 +118,8 @@ Dominio: ${API_URL} (la app web y la API van juntas en este dominio)
    Tu core-config.env no se toca: este ZIP no trae uno.
 4. La configuración va en las variables de la app en «Setup Node.js App», o en ${API_FOLDER}/core-config.env
    (guía: core-config.env.example):
-   - DATABASE_URL: la misma de siempre.
+   - DATABASE_URL: la misma de siempre (o la del PostgreSQL del hosting; ver core-config.env.example,
+     y COPY_FROM_DATABASE_URL para copiar los datos de la base anterior).
    - JWT_SECRET: pon uno NUEVO (el anterior se considera expuesto). Todos tendrán que volver a entrar una vez.
    - CLIENT_ORIGIN y PUBLIC_URL: copia las líneas del ejemplo.
 5. En «Setup Node.js App»: archivo de inicio dist/index.js. Pulsa «Start App» (o «Restart»).

@@ -11,7 +11,7 @@ export function startupProblem(error: unknown): string {
     return 'Falta JWT_SECRET o es muy corto: debe tener al menos 32 caracteres. Ponlo en las variables de la app en «Setup Node.js App» y pulsa Restart.';
   }
   if (/DATABASE_URL|Invalid URL/i.test(raw)) {
-    return 'Falta DATABASE_URL o no es válida. Pega tu cadena de Neon (postgresql://…) en las variables de la app en «Setup Node.js App» y pulsa Restart.';
+    return 'Falta DATABASE_URL o no es válida. Pega la cadena de tu base PostgreSQL (postgresql://…) en las variables de la app en «Setup Node.js App» y pulsa Restart.';
   }
   if (/Cannot find (module|package)/i.test(raw)) {
     return 'Faltan archivos de la API. Vuelve a extraer el ZIP en tu carpeta de inicio (debe quedar core-api/dist/server.mjs) y pulsa Restart.';
@@ -40,9 +40,9 @@ export function databaseProblem(error: unknown): string | null {
   switch (e.code) {
     case '28P01':
     case '28000':
-      return 'La base de datos rechazó el usuario o la contraseña de DATABASE_URL. Copia de nuevo la cadena de conexión desde Neon.';
+      return 'La base de datos rechazó el usuario o la contraseña de DATABASE_URL. Revisa el usuario y la contraseña de la base (en cPanel: «PostgreSQL Databases»).';
     case '3D000':
-      return 'La base de datos que indica DATABASE_URL no existe. Revisa el nombre al final de la cadena de Neon.';
+      return 'La base de datos que indica DATABASE_URL no existe. Revisa el nombre de la base al final de la cadena.';
     case 'ENOTFOUND':
     case 'EAI_AGAIN':
       return 'No se encuentra el servidor de la base de datos. Revisa el host de DATABASE_URL (la parte después de la @).';
@@ -52,12 +52,18 @@ export function databaseProblem(error: unknown): string | null {
     case 'EHOSTUNREACH':
       return 'No se pudo conectar con la base de datos. Revisa DATABASE_URL; si es correcta, el hosting puede estar bloqueando la salida al puerto 5432.';
   }
+  if (/compute time quota|exceeded the .*quota|data transfer quota/i.test(msg)) {
+    return 'Neon apagó la base porque se acabaron las horas gratis del mes. Pasa la base al PostgreSQL de tu hosting (pasos en LEEME.txt).';
+  }
+  if (/permission denied for (schema|database)/i.test(msg)) {
+    return 'El usuario de la base no tiene permiso para crear tablas. En cPanel, «PostgreSQL Databases», añade el usuario a la base con todos los privilegios.';
+  }
   if (/timeout exceeded when trying to connect|Connection terminated/i.test(msg)) {
     return 'La base de datos no respondió a tiempo. Revisa DATABASE_URL y vuelve a intentarlo en un momento.';
   }
   if (/SSL|certificate|self[- ]signed/i.test(msg)) return 'Falló la conexión segura con la base de datos. Asegúrate de que DATABASE_URL termine en ?sslmode=require.';
   if (/password authentication failed|no pg_hba\.conf entry/i.test(msg)) {
-    return 'La base de datos rechazó el usuario o la contraseña de DATABASE_URL. Copia de nuevo la cadena de conexión desde Neon.';
+    return 'La base de datos rechazó el usuario o la contraseña de DATABASE_URL. Revisa el usuario y la contraseña de la base (en cPanel: «PostgreSQL Databases»).';
   }
   return null;
 }

@@ -4,7 +4,7 @@ import { databaseProblem, startupProblem } from '../src/lib/safeMode.js';
 describe('arranque protegido', () => {
   it('explica qué hacer en los fallos típicos de cPanel', () => {
     expect(startupProblem(new Error('JWT_SECRET debe tener 32+ caracteres en producción'))).toMatch(/al menos 32 caracteres/);
-    expect(startupProblem(new Error('Falta DATABASE_URL'))).toMatch(/Pega tu cadena de Neon/);
+    expect(startupProblem(new Error('Falta DATABASE_URL'))).toMatch(/Pega la cadena de tu base PostgreSQL/);
     expect(startupProblem(new TypeError('Invalid URL'))).toMatch(/DATABASE_URL/);
     expect(startupProblem(new Error("Cannot find module '/home/x/core-api/dist/server.mjs'"))).toMatch(/Vuelve a extraer el ZIP/);
   });

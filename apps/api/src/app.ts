@@ -20,6 +20,7 @@ import { v2Routes } from './v2/index.js';
 import { webRoutes } from './routes/web.js';
 import { courseLengthRoutes } from './routes/courseLength.js';
 import { fetchPublicPage, type FetchPage } from './lib/fetchPage.js';
+import { copyStatus } from './db/copyFrom.js';
 
 export interface AppDeps {
   db: Db;
@@ -66,7 +67,7 @@ export function createApp({ db, config, mailer, limits = { general: 600, strict:
   app.get('/api/health', async (_req, res) => {
     try {
       await db.row('SELECT 1');
-      res.json({ ok: true, service: 'core-cloud' });
+      res.json({ ok: true, service: 'core-cloud', ...(copyStatus.value ? { mudanza: copyStatus.value.detalle } : {}) });
     } catch (e) {
       res.status(503).json({ ok: false, service: 'core-cloud', error: databaseProblem(e) ?? 'La base de datos devolvió un error. Revisa DATABASE_URL.' });
     }

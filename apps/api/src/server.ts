@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
-import { isPlaceholderDatabaseUrl, loadConfig, loadEnvFiles } from './config.js';
+import { isPlaceholderDatabaseUrl, loadConfig, loadEnvFiles, normalizeDatabaseUrl } from './config.js';
+import { copyFromDatabase, copyStatus } from './db/copyFrom.js';
 import { createDb } from './db/db.js';
 import { migrate } from './db/migrate.js';
 import { createMailer } from './lib/mailer.js';
@@ -35,9 +36,28 @@ process.on('uncaughtException', (e) => console.error('[core-cloud] uncaughtExcep
 async function migrateOrRetry(): Promise<void> {
   try {
     await migrate(db);
+    void copyOrRetry();
   } catch (e) {
     console.error('[core-cloud] error de migración:', databaseProblem(e) ?? (e instanceof Error ? e.message : e));
     setTimeout(() => void migrateOrRetry(), 60_000).unref();
+  }
+}
+// Mudanza de base (COPY_FROM_DATABASE_URL): copia los datos de la base anterior
+// si la nueva aún no tiene cuentas. Si la anterior no responde, se reintenta cada 5 minutos.
+const copyFrom = normalizeDatabaseUrl(process.env.COPY_FROM_DATABASE_URL);
+async function copyOrRetry(): Promise<void> {
+  if (isPlaceholderDatabaseUrl(copyFrom) || copyFrom === config.databaseUrl) return;
+  const source = createDb(copyFrom, { max: 2 });
+  try {
+    copyStatus.value = await copyFromDatabase(db, source);
+    console.log(`[core-cloud] mudanza de base: ${copyStatus.value.detalle}`);
+  } catch (e) {
+    const why = databaseProblem(e) ?? (e instanceof Error ? e.message : String(e));
+    copyStatus.value = { estado: 'error', detalle: `No se pudo copiar desde la base anterior (se reintenta en 5 minutos): ${why}` };
+    console.error(`[core-cloud] mudanza de base: ${why}`);
+    setTimeout(() => void copyOrRetry(), 5 * 60_000).unref();
+  } finally {
+    await source.close().catch(() => undefined);
   }
 }
 await migrateOrRetry();
