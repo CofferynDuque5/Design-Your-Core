@@ -122,7 +122,7 @@ export function PasswordField({
   );
 }
 
-export function TextArea({ label, hint, ...input }: FieldProps & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function TextArea({ label, hint, ...input }: FieldProps & { ref?: Ref<HTMLTextAreaElement> } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const id = useId();
   return (
     <div className="field">

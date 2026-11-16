@@ -48,6 +48,10 @@ import {
   type IdeaCategory,
   type LegacyClass,
   type CourseLesson,
+  type ActivityKind,
+  type LessonActivity,
+  ACTIVITIES_MAX,
+  COURSE_LESSONS_MAX,
   type LegacyCourse,
   type LegacyContent,
   type LegacyData,
@@ -1340,6 +1344,140 @@ export function duplicateCourseGroups<T extends { id: string; url?: string; titl
 export function activityCount(l: { activities?: Array<{ done?: boolean }> }): { done: number; total: number } {
   const list = l.activities ?? [];
   return { done: list.filter((a) => a.done).length, total: list.length };
+}
+
+// ---- Subtemas numerados («1.2: …») y materiales ----
+
+/** «1.2: Título», «1.2 Título», «1.2. Título», «1.2.3) Título». */
+const SUBTOPIC_NUMBER = /^\s*(\d{1,3}(?:\.\d{1,3})+)\.?\s*[:)\-–—]?\s*/;
+
+/** El número de subtema con que empieza un título («1.2»), o null. */
+export function subtopicNumber(title: string): string | null {
+  const m = SUBTOPIC_NUMBER.exec(title ?? '');
+  return m && m[0].length < (title ?? '').length ? m[1] : null;
+}
+
+/** El número de una unidad numerada («Unidad 3: …» → 3), o null. */
+export function unitNumber(unit: string | null | undefined): number | null {
+  const n = UNIT_NUMBER.exec(unit ?? '')?.[1];
+  return n ? Number(n) : null;
+}
+
+/**
+ * Número del siguiente subtema de una unidad numerada: con «1.1» y «1.2» ya
+ * guardados, «1.3». Null si la unidad no tiene número.
+ */
+export function nextSubtopicNumber(unit: string, lessons: readonly CourseLesson[]): string | null {
+  const u = unitNumber(unit);
+  if (u == null) return null;
+  const inUnit = lessons.filter((l) => l.unit && sameUnit(l.unit, unit));
+  let max = 0;
+  for (const l of inUnit) {
+    const parts = subtopicNumber(l.title)?.split('.') ?? [];
+    if (Number(parts[0]) === u) max = Math.max(max, Number(parts[1]) || 0);
+  }
+  return `${u}.${(max || inUnit.length) + 1}`;
+}
+
+const URL_IN_LINE = /https?:\/\/[^\s<>"'«»]+/i;
+
+/**
+ * Lo pegado, línea por línea: sin viñetas ni líneas vacías, y con el enlace de
+ * cada línea aparte. Una línea que es solo un enlace también vale.
+ */
+export function pastedLines(text: string): Array<{ title: string; url?: string }> {
+  const out: Array<{ title: string; url?: string }> = [];
+  for (const raw of (text ?? '').split(/\r?\n/)) {
+    let line = raw.replace(/^\s*(?:[-*•·▪◦–—]|\[\s?[xX]?\s?\])\s+/, '').trim();
+    if (!line) continue;
+    const found = URL_IN_LINE.exec(line);
+    let url: string | undefined;
+    if (found) {
+      url = found[0].replace(/[).,;:]+$/, '');
+      line = line.replace(found[0], ' ').replace(/\s*[-–—|:(]\s*$/, '').replace(/\(\s*\)/g, '').replace(/\s{2,}/g, ' ').trim();
+    }
+    const title = line || (url ? shortUrl(url) : '');
+    if (title) out.push({ title: title.slice(0, 200), ...(url ? { url: url.slice(0, 2000) } : {}) });
+  }
+  return out;
+}
+
+const shortUrl = (url: string) => {
+  try {
+    const u = new URL(url);
+    const path = decodeURIComponent(u.pathname).replace(/\/+$/, '');
+    return `${u.hostname.replace(/^www\./, '')}${path}`.slice(0, 200);
+  } catch {
+    return url.slice(0, 200);
+  }
+};
+
+/**
+ * Varios subtemas de una vez (uno por línea), listos para guardar. En una
+ * unidad numerada («Unidad 1»), los que no traen número se numeran solos:
+ * «1.3: …», «1.4: …», siguiendo a los que ya hay; los que ya lo traen
+ * («1.2: Generic Programming») se respetan.
+ */
+export function subtopicLessons(text: string, unit: string, lessons: readonly CourseLesson[], makeId: () => string, room = COURSE_LESSONS_MAX - lessons.length): CourseLesson[] {
+  const u = unitNumber(unit);
+  const first = nextSubtopicNumber(unit, lessons);
+  let m = first ? Number(first.split('.')[1]) : 1;
+  const out: CourseLesson[] = [];
+  for (const line of pastedLines(text)) {
+    if (out.length >= Math.max(0, room)) break;
+    let title = line.title;
+    const own = subtopicNumber(title);
+    if (own) {
+      // «1.2 Título» → «1.2: Título», y se sigue contando desde ahí.
+      title = `${own}: ${title.replace(SUBTOPIC_NUMBER, '')}`;
+      const parts = own.split('.');
+      if (u != null && Number(parts[0]) === u) m = Number(parts[1]) + 1;
+    } else if (u != null) {
+      title = `${u}.${m}: ${title}`;
+      m += 1;
+    }
+    out.push({ id: makeId(), title: title.slice(0, 200), ...(unit.trim() ? { unit: unit.trim() } : {}), ...(line.url ? { url: line.url } : {}) });
+  }
+  return out;
+}
+
+const plainWords = (s: string) =>
+  ` ${s
+    .toLocaleLowerCase('es')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')} `;
+
+const KIND_WORDS: Array<[ActivityKind, RegExp]> = [
+  ['video', / (watch|video|videos|ver|mira|lecture video|listen|escucha|podcast) /],
+  ['cuestionario', / (quiz|quizzes|cuestionario|autoevaluacion|self assessment) /],
+  ['examen', / (exam|examen|final test|test) /],
+  ['ejercicio', / (exercise|exercises|ejercicio|ejercicios|practice problems|problem set|problems|complete this activity) /],
+  ['tarea', / (assignment|tarea|homework|entrega) /],
+  ['proyecto', / (project|proyecto) /],
+  ['pagina', / (webpage|web page|website|sitio web|pagina web|explore this|explora) /],
+  ['lectura', / (read|reading|lee|leer|lectura|article|articulo|chapter|capitulo|book|libro|text|texto|notes|apuntes|pdf) /],
+];
+
+/**
+ * Qué tipo de material es, por sus palabras o su enlace: «Watch this lecture»
+ * o un enlace de YouTube → video; «Read this article» → lectura; «Complete
+ * this exercise» → ejercicio; otro enlace → página web.
+ */
+export function guessActivityKind(title: string, url?: string): ActivityKind {
+  if (url && youtubeRef(url)) return 'video';
+  if (url && /\.(mp4|webm|mov)(\?|$)/i.test(url)) return 'video';
+  const words = plainWords(title);
+  for (const [kind, re] of KIND_WORDS) if (re.test(words)) return kind;
+  if (url && /\.pdf(\?|$)/i.test(url)) return 'lectura';
+  return url ? 'pagina' : 'otro';
+}
+
+/** Varios materiales de una vez (uno por línea), cada uno con su tipo adivinado y su enlace. */
+export function materialsFromText(text: string, makeId: () => string, room = ACTIVITIES_MAX): LessonActivity[] {
+  return pastedLines(text)
+    .slice(0, Math.max(0, room))
+    .map((l) => ({ id: makeId(), kind: guessActivityKind(l.title, l.url), title: l.title, ...(l.url ? { url: l.url } : {}) }));
 }
 
 /** «Unidad 3: Variables» (o «Unit 3: Variables» en un curso en inglés); si ya se escribió con su número, se respeta. */

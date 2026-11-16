@@ -607,19 +607,20 @@ describe('Cursos: progreso y horario', () => {
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Unidad 2'] } }));
     expect(await within(dialog).findByRole('heading', { name: /Unidad 2/ })).toBeInTheDocument();
     expect(within(dialog).getByText('Sin lecciones todavía.')).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir lección a «Unidad 2»' }));
-    expect(within(dialog).getByLabelText('Lección o video')).toHaveFocus();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir subtemas a «Unidad 2»' }));
+    expect(within(dialog).getByLabelText('Subtemas, uno por línea')).toHaveFocus();
     expect(within(dialog).getByLabelText('En la unidad (opcional)')).toHaveValue('Unidad 2');
-    await userEvent.type(within(dialog).getByLabelText('Lección o video'), 'useState');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir lección' }));
-    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { progress: 33, lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));
+    await userEvent.type(within(dialog).getByLabelText('Subtemas, uno por línea'), 'useState');
+    expect(within(dialog).getByText('Se guarda como «2.1: useState».')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir subtema' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { progress: 33, lessons: [{ id: 'l1' }, { id: 'l2' }, { title: '2.1: useState', unit: 'Unidad 2' }] } }));
     expect(await within(dialog).findByRole('heading', { name: /Unidad 2 · 0\/1/ })).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cambiar el nombre de «Unidad 2»' }));
     const nombre = within(dialog).getByLabelText('Nuevo nombre de «Unidad 2»');
     await userEvent.clear(nombre);
     await userEvent.type(nombre, 'Hooks');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar el nombre' }));
-    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Hooks'], lessons: [{}, {}, { title: 'useState', unit: 'Hooks' }] } }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Hooks'], lessons: [{}, {}, { title: '2.1: useState', unit: 'Hooks' }] } }));
     expect(await within(dialog).findByRole('heading', { name: /Hooks/ })).toBeInTheDocument();
 
     readYouTubeLength.mockResolvedValueOnce({ seconds: 900, exact: true, videos: 2, items: [{ video: 'aaaaaaaaaaa', title: 'Clase 1', seconds: 300 }, { video: 'bbbbbbbbbbb', title: 'Clase 2', seconds: 600 }] });
@@ -685,6 +686,73 @@ describe('Cursos: progreso y horario', () => {
   });
 });
 
+describe('Cursos: varios subtemas de una vez y sus materiales', () => {
+  it('pega varios subtemas de una unidad y se numeran solos; luego pega los materiales de uno', async () => {
+    const api = withApi({}, (doc) => {
+      doc.courses = [
+        {
+          id: 'a', topic: 'C++', title: 'CS107: C++ Programming', url: '', status: 'curso', notes: '', language: 'en',
+          units: ['Unit 1: Generic Programming'],
+          lessons: [{ id: 'l1', title: '1.1: Programming Paradigms', unit: 'Unit 1: Generic Programming' }],
+        },
+      ];
+    });
+    renderAt('/cursos');
+    await userEvent.click(await screen.findByRole('button', { name: /Unidades y lecciones de «CS107: C\+\+ Programming»/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Unidades y lecciones de «CS107: C++ Programming»' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir subtemas a «Unit 1: Generic Programming»' }));
+    const box = within(dialog).getByLabelText('Subtemas, uno por línea');
+    await userEvent.click(box);
+    await userEvent.paste('Generic Programming\nTemplates https://learn.saylor.org/mod/page/view.php?id=1\n- Iterators');
+    expect(within(dialog).getByText('Se guardan como «1.2: Generic Programming», «1.3: Templates», «1.4: Iterators».')).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Enlace (opcional)')).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir 3 subtemas' }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({
+        body: {
+          lessons: [
+            { id: 'l1' },
+            { title: '1.2: Generic Programming', unit: 'Unit 1: Generic Programming' },
+            { title: '1.3: Templates', url: 'https://learn.saylor.org/mod/page/view.php?id=1' },
+            { title: '1.4: Iterators' },
+          ],
+        },
+      }),
+    );
+    expect(await within(dialog).findByText('Añadidos 3 subtemas, de «1.2: Generic Programming» a «1.4: Iterators».')).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Editar «1.2: Generic Programming» y sus materiales' }));
+    const editor = within(dialog).getByRole('region', { name: 'Editar «1.2: Generic Programming»' });
+    await userEvent.click(within(editor).getByRole('button', { name: 'Pegar varios materiales' }));
+    await userEvent.click(within(editor).getByLabelText('Materiales, uno por línea'));
+    await userEvent.paste('Read this: Generic Programming https://a.org/gp\nWatch this lecture https://www.youtube.com/watch?v=abcdefghijk\nExplore this webpage https://cplusplus.com/doc/\nComplete these exercises');
+    await userEvent.click(within(editor).getByRole('button', { name: 'Añadir 4 materiales' }));
+    await waitFor(() =>
+      expect(writes(api).at(-1)).toMatchObject({
+        body: {
+          lessons: [
+            {},
+            {
+              title: '1.2: Generic Programming',
+              done: false,
+              activities: [
+                { kind: 'lectura', title: 'Read this: Generic Programming', url: 'https://a.org/gp' },
+                { kind: 'video', title: 'Watch this lecture' },
+                { kind: 'pagina', title: 'Explore this webpage', url: 'https://cplusplus.com/doc/' },
+                { kind: 'ejercicio', title: 'Complete these exercises' },
+              ],
+            },
+            {},
+            {},
+          ],
+        },
+      }),
+    );
+    expect(within(editor).getByRole('link', { name: 'Abrir «Read this: Generic Programming» (se abre en otra pestaña)' })).toHaveAttribute('href', 'https://a.org/gp');
+    expect(within(dialog).getByText(/0\/4 materiales/)).toBeInTheDocument();
+  });
+});
+
 describe('Cursos: editar lecciones y sus actividades', () => {
   it('cambia el nombre de una lección y le añade actividades por tipo; al marcarlas todas queda vista', async () => {
     const api = withApi({}, (doc) => {
@@ -693,27 +761,27 @@ describe('Cursos: editar lecciones y sus actividades', () => {
     renderAt('/cursos');
     await userEvent.click(await screen.findByRole('button', { name: /Unidades y lecciones de «React desde cero»/ }));
     const dialog = screen.getByRole('dialog', { name: 'Unidades y lecciones de «React desde cero»' });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Editar «Instalacion» y sus actividades' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Editar «Instalacion» y sus materiales' }));
     const editor = within(dialog).getByRole('region', { name: 'Editar «Instalacion»' });
-    const name = within(editor).getByLabelText('Nombre de la lección');
+    const name = within(editor).getByLabelText('Nombre del subtema o lección');
     await userEvent.clear(name);
     await userEvent.type(name, 'Instalación de Node');
     await userEvent.click(within(editor).getByRole('button', { name: /Guardar cambios/ }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1', title: 'Instalación de Node', unit: 'Unidad 1' }] } }));
 
-    const types = within(editor).getByRole('group', { name: 'Tipo de actividad' });
-    await userEvent.type(within(editor).getByLabelText('Qué hay que hacer'), 'Ver el video{Enter}');
+    const types = within(editor).getByRole('group', { name: 'Tipo de material' });
+    await userEvent.type(within(editor).getByLabelText('Material o actividad'), 'Ver el video{Enter}');
     await userEvent.click(within(types).getByRole('button', { name: /Examen/ }));
-    await userEvent.type(within(editor).getByLabelText('Qué hay que hacer'), 'Examen corto');
+    await userEvent.type(within(editor).getByLabelText('Material o actividad'), 'Examen corto');
     await userEvent.click(within(editor).getByRole('button', { name: /Añadir examen/ }));
     await waitFor(() =>
       expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1', done: false, activities: [{ kind: 'video', title: 'Ver el video' }, { kind: 'examen', title: 'Examen corto' }] }] } }),
     );
-    const acts = within(editor).getByRole('list', { name: /Actividades de/ });
+    const acts = within(editor).getByRole('list', { name: /Materiales de/ });
     await userEvent.click(within(acts).getByRole('checkbox', { name: /Ver el video/ }));
     await userEvent.click(within(acts).getByRole('checkbox', { name: /Examen corto/ }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1', done: true }] } }));
-    expect(within(dialog).getByText(/2\/2 actividades/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/2\/2 materiales/)).toBeInTheDocument();
   });
 });
 

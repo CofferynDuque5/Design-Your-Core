@@ -1,7 +1,7 @@
-import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, guessActivityKind, materialsFromText, nextSubtopicNumber, pastedLines, subtopicLessons, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { useIsMutating } from '@tanstack/react-query';
-import { Check, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react-native';
+import { Check, ClipboardPaste, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Linking, Platform, ScrollView, View, type TextInput } from 'react-native';
 import { newId, useLegacyData, useLegacyList, type ChangeOpts } from '../lib/legacy';
@@ -85,10 +85,18 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const playedRef = played?.url ? youtubeRef(played.url) : null;
   const canPlay = Platform.OS !== 'web';
 
+  // Uno por línea: en una unidad numerada se numeran solos («1.3: …»).
+  const lines = pastedLines(title);
+  const many = lines.length > 1;
+  const nextSub = nextSubtopicNumber(unit, lessons);
+  const preview = subtopicLessons(title, unit, lessons, () => '');
   const add = () => {
-    if (!title.trim() || badUrl) return;
-    save([...lessons, { id: newId(), title: title.trim(), ...(unit.trim() ? { unit: unit.trim() } : {}), ...(link ? { url: link } : {}) }]);
-    setStatus(`Añadida «${title.trim()}».`);
+    if (!lines.length || (!many && badUrl)) return;
+    const fresh = subtopicLessons(title, unit, current(), newId);
+    if (!fresh.length) return setStatus('Ya llegaste al máximo de 500 lecciones en este curso.');
+    if (fresh.length === 1 && link && !fresh[0].url) fresh[0] = { ...fresh[0], url: link };
+    save([...current(), ...fresh]);
+    setStatus(fresh.length === 1 ? `Añadido «${fresh[0].title}». Tócalo con el lápiz para anotar sus materiales.` : `Añadidos ${fresh.length} subtemas, de «${fresh[0].title}» a «${fresh.at(-1)!.title}».`);
     setTitle('');
     setUrl('');
   };
@@ -181,7 +189,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
                   {`${g.unit.toLocaleUpperCase('es')} · ${g.items.filter((l) => l.done).length}/${g.items.length}`}
                 </T>
                 <IconButton
-                  label={`Añadir lección a «${g.unit}»`}
+                  label={`Añadir subtemas a «${g.unit}»`}
                   onPress={() => {
                     setUnit(g.unit);
                     scrollRef.current?.scrollToEnd({ animated: true });
@@ -218,7 +226,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
               <CheckRow
                 title={l.title}
                 done={!!l.done}
-                meta={[l.seconds ? formatLength(l.seconds) : '', acts.total ? `${acts.done}/${acts.total} ${acts.total === 1 ? 'actividad' : 'actividades'}` : ''].filter(Boolean).join(' · ') || undefined}
+                meta={[l.seconds ? formatLength(l.seconds) : '', acts.total ? `${acts.done}/${acts.total} ${acts.total === 1 ? 'material' : 'materiales'}` : ''].filter(Boolean).join(' · ') || undefined}
                 onToggle={() => toggle(l.id)}
                 trailing={
                   <View style={{ flexDirection: 'row' }}>
@@ -231,7 +239,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
                         <ExternalLink size={18} color={colors.inkMuted} />
                       </IconButton>
                     ) : null}
-                    <IconButton label={`Editar «${l.title}» y sus actividades`} onPress={() => setEditingLesson(editingLesson === l.id ? null : l.id)}>
+                    <IconButton label={`Editar «${l.title}» y sus materiales`} onPress={() => setEditingLesson(editingLesson === l.id ? null : l.id)}>
                       <Pencil size={18} color={editingLesson === l.id ? colors.primary : colors.inkMuted} />
                     </IconButton>
                     <IconButton
@@ -256,24 +264,44 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
       ))}
       <View style={{ gap: space[3], paddingTop: space[3], borderTopWidth: 1, borderTopColor: colors.line }}>
         <T v="label" accessibilityRole="header">
-          Añadir lección
+          Añadir subtemas o lecciones
         </T>
         <Field label="En la unidad (opcional)" value={unit} onChangeText={setUnit} maxLength={120} placeholder={`${unitWord(c.language)} 1, ${c.language === 'en' ? 'Module' : 'Módulo'} 2…`} />
         <Suggestions field="Unidad" values={units} current={unit} onPick={setUnit} />
-        <Field ref={titleRef} label="Lección o video" value={title} onChangeText={setTitle} maxLength={200} placeholder="Introducción, Clase 3…" />
         <Field
-          label="Enlace de la lección (opcional)"
-          value={url}
-          onChangeText={setUrl}
-          onBlur={() => setUrl(link)}
-          maxLength={2000}
-          placeholder="https://youtube.com/watch?v=…"
-          keyboardType="url"
-          autoCapitalize="none"
-          autoCorrect={false}
-          error={badUrl ? 'Pega un enlace completo, por ejemplo https://youtube.com/watch?v=…' : null}
+          ref={titleRef}
+          label="Subtemas, uno por línea"
+          value={title}
+          onChangeText={setTitle}
+          multiline
+          maxLength={20000}
+          placeholder={nextSub ? 'Generic Programming\nTemplates\nIterators' : 'Introducción\nClase 2\nClase 3'}
+          hint={
+            preview.length
+              ? `Se ${preview.length === 1 ? 'guarda' : 'guardan'} como ${preview
+                  .slice(0, 3)
+                  .map((l) => `«${l.title}»`)
+                  .join(', ')}${preview.length > 3 ? ` y ${preview.length - 3} más` : ''}.`
+              : nextSub
+                ? `Pega la lista de subtemas de la unidad. Los que no traen número se numeran solos desde ${nextSub}.`
+                : 'Pega varios a la vez, uno por línea. Elige una unidad numerada para que se numeren solos (1.1, 1.2…).'
+          }
         />
-        <Button label="Añadir lección" icon={<Plus size={16} color={colors.onPrimary} />} onPress={add} disabled={!title.trim() || badUrl || lessons.length >= 500} />
+        {!many && (
+          <Field
+            label="Enlace (opcional)"
+            value={url}
+            onChangeText={setUrl}
+            onBlur={() => setUrl(link)}
+            maxLength={2000}
+            placeholder="https://learn.saylor.org/…"
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            error={badUrl ? 'Pega un enlace completo, por ejemplo https://learn.saylor.org/…' : null}
+          />
+        )}
+        <Button label={many ? `Añadir ${Math.min(lines.length, 500 - lessons.length)} subtemas` : 'Añadir subtema'} icon={<Plus size={16} color={colors.onPrimary} />} onPress={add} disabled={!lines.length || (!many && badUrl) || lessons.length >= 500} />
       </View>
     </ScrollView>
   );
@@ -281,7 +309,9 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
 
 const ACTIVITY_PLACEHOLDER: Record<ActivityKind, string> = {
   video: 'Ver el video de la clase',
-  lectura: 'Leer el capítulo 2',
+  lectura: 'Read this article',
+  pagina: 'Explore this webpage',
+  ejercicio: 'Complete these exercises',
   cuestionario: 'Cuestionario de repaso',
   examen: 'Examen de la unidad',
   tarea: 'Entregar el ejercicio 3',
@@ -298,19 +328,34 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
   const [url, setUrl] = useState(lesson.url ?? '');
   const [kind, setKind] = useState<ActivityKind>('video');
   const [what, setWhat] = useState('');
+  const [whatUrl, setWhatUrl] = useState('');
+  const [pasting, setPasting] = useState(false);
+  const [pasted, setPasted] = useState('');
+  const actLink = normalizeCourseUrl(whatUrl);
+  const badActUrl = !!whatUrl.trim() && !validCourseUrl(actLink);
+  const pastedActs = materialsFromText(pasted, () => '', 60 - (lesson.activities?.length ?? 0));
   const link = normalizeCourseUrl(url);
   const badUrl = !!url.trim() && !validCourseUrl(link);
   const acts = lesson.activities ?? [];
   const changed = name.trim() !== lesson.title || unit.trim() !== (lesson.unit ?? '') || link !== (lesson.url ?? '');
   const saveActs = (next: LessonActivity[]) => onSave({ activities: next, ...(next.length ? { done: next.every((a) => a.done) } : {}) });
   const add = () => {
-    if (!what.trim() || acts.length >= 60) return;
-    saveActs([...acts, { id: newId(), kind, title: what.trim() }]);
+    if ((!what.trim() && !actLink) || badActUrl || acts.length >= 60) return;
+    const title = what.trim() || pastedLines(actLink)[0]?.title || actLink;
+    saveActs([...acts, { id: newId(), kind, title, ...(actLink ? { url: actLink } : {}) }]);
     setWhat('');
+    setWhatUrl('');
+  };
+  const addPasted = () => {
+    const fresh = materialsFromText(pasted, newId, 60 - acts.length);
+    if (!fresh.length) return;
+    saveActs([...acts, ...fresh]);
+    setPasted('');
+    setPasting(false);
   };
   return (
     <View style={{ gap: space[3], padding: space[3], marginBottom: space[2], borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surfaceSunken }}>
-      <Field label="Nombre de la lección" value={name} onChangeText={setName} maxLength={200} />
+      <Field label="Nombre del subtema o lección" value={name} onChangeText={setName} maxLength={200} />
       <Field label="Unidad" value={unit} onChangeText={setUnit} maxLength={120} placeholder="Sin unidad" />
       <Suggestions field="Unidad" values={units} current={unit} onPick={setUnit} />
       <Field
@@ -329,11 +374,11 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
         <Button small variant="ghost" label="Cerrar" onPress={onClose} />
       </View>
       <T v="label" accessibilityRole="header">
-        Actividades de la lección
+        {`Materiales y actividades${acts.length ? ` · ${activityCount(lesson).done}/${acts.length}` : ''}`}
       </T>
       {acts.length === 0 ? (
         <T v="small" tint="muted">
-          Anota todo lo que hay que hacer: ver el video, leer, responder el cuestionario, presentar el examen…
+          Anota todo lo que trae el subtema: lecturas, videos, páginas web, ejercicios, cuestionarios… Al marcarlos todos, el subtema queda visto.
         </T>
       ) : (
         acts.map((a) => (
@@ -344,16 +389,69 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
             done={!!a.done}
             onToggle={() => saveActs(acts.map((x) => (x.id === a.id ? { ...x, done: !x.done } : x)))}
             trailing={
-              <IconButton label={`Quitar la actividad «${a.title}»`} onPress={() => saveActs(acts.filter((x) => x.id !== a.id))}>
-                <Trash2 size={18} color={colors.inkMuted} />
-              </IconButton>
+              <View style={{ flexDirection: 'row' }}>
+                {!!a.url && (
+                  <IconButton label={`Abrir «${a.title}»`} onPress={() => Linking.openURL(a.url!).catch(() => undefined)}>
+                    <ExternalLink size={18} color={colors.inkMuted} />
+                  </IconButton>
+                )}
+                <IconButton label={`Quitar «${a.title}»`} onPress={() => saveActs(acts.filter((x) => x.id !== a.id))}>
+                  <Trash2 size={18} color={colors.inkMuted} />
+                </IconButton>
+              </View>
             }
           />
         ))
       )}
-      <DotChoices legend="Tipo de actividad" value={kind} onChange={setKind} options={ACTIVITY_KINDS.map((k) => ({ value: k, label: ACTIVITY_KIND_LABEL[k] }))} />
-      <Field label="Qué hay que hacer" value={what} onChangeText={setWhat} maxLength={200} placeholder={ACTIVITY_PLACEHOLDER[kind]} onSubmitEditing={add} returnKeyType="done" />
-      <Button small variant="secondary" label={`Añadir ${ACTIVITY_KIND_LABEL[kind].toLowerCase()}`} icon={<Plus size={16} color={colors.primary} />} onPress={add} disabled={!what.trim() || acts.length >= 60} />
+      {pasting ? (
+        <View style={{ gap: space[2] }}>
+          <Field
+            label="Materiales, uno por línea"
+            value={pasted}
+            onChangeText={setPasted}
+            multiline
+            autoFocus
+            maxLength={30000}
+            placeholder={'Read this: Generic Programming https://…\nWatch this lecture https://youtube.com/…\nComplete these exercises'}
+            hint={
+              pastedActs.length
+                ? `Se ${pastedActs.length === 1 ? 'añade' : 'añaden'}: ${pastedActs
+                    .slice(0, 4)
+                    .map((a) => `${ACTIVITY_KIND_LABEL[a.kind]} «${a.title.length > 40 ? `${a.title.slice(0, 40)}…` : a.title}»`)
+                    .join(', ')}${pastedActs.length > 4 ? ` y ${pastedActs.length - 4} más` : ''}.`
+                : 'Copia la lista de materiales del subtema. El tipo (lectura, video, página web, ejercicio…) se reconoce por sus palabras o su enlace.'
+            }
+          />
+          <View style={{ flexDirection: 'row', gap: space[2] }}>
+            <Button small variant="secondary" label={pastedActs.length > 1 ? `Añadir ${pastedActs.length} materiales` : 'Añadir material'} icon={<Plus size={16} color={colors.primary} />} onPress={addPasted} disabled={!pastedActs.length} />
+            <Button small variant="ghost" label="Cancelar" onPress={() => setPasting(false)} />
+          </View>
+        </View>
+      ) : (
+        <Button small variant="ghost" label="Pegar varios materiales" icon={<ClipboardPaste size={16} color={colors.primary} />} onPress={() => setPasting(true)} disabled={acts.length >= 60} style={{ alignSelf: 'flex-start' }} />
+      )}
+      <DotChoices legend="Tipo de material" value={kind} onChange={setKind} options={ACTIVITY_KINDS.map((k) => ({ value: k, label: ACTIVITY_KIND_LABEL[k] }))} />
+      <Field label="Material o actividad" value={what} onChangeText={setWhat} maxLength={200} placeholder={ACTIVITY_PLACEHOLDER[kind]} returnKeyType="next" />
+      <Field
+        label="Enlace (opcional)"
+        value={whatUrl}
+        onChangeText={(v) => {
+          setWhatUrl(v);
+          const u = normalizeCourseUrl(v);
+          // Con el enlace se reconoce el tipo, salvo que ya hayas elegido otro (ejercicio, examen…).
+          if (validCourseUrl(u) && (kind === 'video' || kind === 'pagina' || kind === 'lectura')) setKind(guessActivityKind(what, u));
+        }}
+        onBlur={() => setWhatUrl(actLink)}
+        maxLength={2000}
+        placeholder="https://…"
+        keyboardType="url"
+        autoCapitalize="none"
+        autoCorrect={false}
+        onSubmitEditing={add}
+        returnKeyType="done"
+        error={badActUrl ? 'Pega un enlace completo (https://…)' : null}
+      />
+      <Button small variant="secondary" label={`Añadir ${ACTIVITY_KIND_LABEL[kind].toLowerCase()}`} icon={<Plus size={16} color={colors.primary} />} onPress={add} disabled={(!what.trim() && !actLink) || badActUrl || acts.length >= 60} />
     </View>
   );
 }

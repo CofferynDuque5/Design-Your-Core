@@ -214,17 +214,18 @@ describe('Cursos y Horario en el móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Añadir unidad 2' }));
     await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { units: ['Unidad 1', 'Unidad 2'] } }));
     expect(await screen.findByRole('header', { name: 'UNIDAD 2 · 0/0' })).toBeOnTheScreen();
-    fireEvent.press(screen.getByRole('button', { name: 'Añadir lección a «Unidad 2»' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir subtemas a «Unidad 2»' }));
     expect(screen.getByLabelText('En la unidad (opcional)').props.value).toBe('Unidad 2');
-    fireEvent.changeText(screen.getByLabelText('Lección o video'), 'useState');
-    fireEvent.press(screen.getByRole('button', { name: 'Añadir lección' }));
-    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));
+    fireEvent.changeText(screen.getByLabelText('Subtemas, uno por línea'), 'useState\nuseEffect');
+    expect(screen.getByText('Se guardan como «2.1: useState», «2.2: useEffect».')).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir 2 subtemas' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1' }, { id: 'l2' }, { title: '2.1: useState', unit: 'Unidad 2' }, { title: '2.2: useEffect', unit: 'Unidad 2' }] } }));
     fireEvent.press(await screen.findByRole('button', { name: 'Traer los videos nuevos de la lista' }));
     const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
     await waitFor(() => expect(screen.getByTestId('webview', { includeHiddenElements: true })).toBeOnTheScreen());
     act(() => wv.__send({ type: 'length', seconds: 900, exact: true, videos: 2, items: [{ video: 'aaaaaaaaaaa', title: 'Clase 1', seconds: 300 }, { video: 'bbbbbbbbbbb', title: 'Clase 2', seconds: 600 }] }));
     expect(await screen.findByText('Listo: 2 lecciones nuevas de la lista.')).toBeOnTheScreen();
-    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{}, {}, {}, { title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabcdefghijk' }, { title: 'Clase 2' }] } }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{}, {}, {}, {}, { title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabcdefghijk' }, { title: 'Clase 2' }] } }));
   });
 
   it('Cursos: cada tema va de lo básico a lo avanzado y al terminar uno sus clases pasan al siguiente', async () => {

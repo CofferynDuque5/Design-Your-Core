@@ -762,11 +762,13 @@ export interface CourseLesson {
   activities?: LessonActivity[];
 }
 
-export const ACTIVITY_KINDS = ['video', 'lectura', 'cuestionario', 'examen', 'tarea', 'practica', 'proyecto', 'otro'] as const;
+export const ACTIVITY_KINDS = ['video', 'lectura', 'pagina', 'ejercicio', 'cuestionario', 'examen', 'tarea', 'practica', 'proyecto', 'otro'] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 export const ACTIVITY_KIND_LABEL: Record<ActivityKind, string> = {
   video: 'Video',
   lectura: 'Lectura',
+  pagina: 'Página web',
+  ejercicio: 'Ejercicio',
   cuestionario: 'Cuestionario',
   examen: 'Examen',
   tarea: 'Tarea',
