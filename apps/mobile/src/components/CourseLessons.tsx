@@ -1,7 +1,7 @@
 import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, lessonKind, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { useIsMutating } from '@tanstack/react-query';
-import { BookOpen, ChartPie, Check, Circle, CircleHelp, CirclePlay, ExternalLink, FileCheck, FolderKanban, FolderPlus, Hammer, Headphones, ListVideo, PenLine, Pencil, Play, Plus, Trash2, X, type LucideIcon } from 'lucide-react-native';
+import { AudioLines, BookOpenText, Bookmark, ChartColumnBig, Check, ClipboardCheck, ExternalLink, FolderPlus, Layers, ListChecks, ListVideo, NotebookPen, Pencil, Play, Plus, Target, Trash2, X, type LucideIcon } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Linking, Platform, ScrollView, View, type TextInput } from 'react-native';
 import { newId, useLegacyData, useLegacyList, type ChangeOpts } from '../lib/legacy';
@@ -221,7 +221,13 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
               <CheckRow
                 title={l.title}
                 done={!!l.done}
-                icon={KindIcon ? <View style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSunken }}><KindIcon size={16} color={l.done ? colors.inkMuted : colors.primary} /></View> : undefined}
+                icon={
+                  KindIcon ? (
+                    <View style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: l.done ? colors.line : colors.primary + '38', backgroundColor: l.done ? colors.surfaceSunken : colors.primarySoft }}>
+                      <KindIcon size={17} strokeWidth={1.75} color={l.done ? colors.inkMuted : colors.primary} />
+                    </View>
+                  ) : undefined
+                }
                 meta={[k ? ACTIVITY_KIND_LABEL[k] : '', l.seconds ? formatLength(l.seconds) : '', acts.total ? `${acts.done}/${acts.total} ${acts.total === 1 ? 'actividad' : 'actividades'}` : ''].filter(Boolean).join(' · ') || undefined}
                 onToggle={() => toggle(l.id)}
                 trailing={
@@ -285,16 +291,16 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
 }
 
 const ACTIVITY_ICON: Record<ActivityKind, LucideIcon> = {
-  video: CirclePlay,
-  lectura: BookOpen,
-  infografia: ChartPie,
-  audio: Headphones,
-  cuestionario: CircleHelp,
-  examen: FileCheck,
-  tarea: PenLine,
-  practica: Hammer,
-  proyecto: FolderKanban,
-  otro: Circle,
+  video: Play,
+  lectura: BookOpenText,
+  infografia: ChartColumnBig,
+  audio: AudioLines,
+  cuestionario: ListChecks,
+  examen: ClipboardCheck,
+  tarea: NotebookPen,
+  practica: Target,
+  proyecto: Layers,
+  otro: Bookmark,
 };
 
 /** Etiquetas con ícono para elegir el tipo (de lección o de actividad). */
@@ -306,7 +312,7 @@ function KindChips({ label, value, onChange }: { label: string; value: ActivityK
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         {ACTIVITY_KINDS.map((k) => {
           const Icon = ACTIVITY_ICON[k];
-          return <Chip key={k} label={ACTIVITY_KIND_LABEL[k]} selected={value === k} onPress={() => onChange(k)} icon={<Icon size={14} color={value === k ? colors.primary : colors.inkMuted} />} />;
+          return <Chip key={k} label={ACTIVITY_KIND_LABEL[k]} selected={value === k} onPress={() => onChange(k)} icon={<Icon size={15} strokeWidth={1.75} color={value === k ? colors.primary : colors.inkMuted} />} />;
         })}
       </View>
     </View>
@@ -380,8 +386,8 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
             title={a.title}
             meta={ACTIVITY_KIND_LABEL[a.kind]}
             icon={(() => {
-              const Icon = ACTIVITY_ICON[a.kind] ?? Circle;
-              return <Icon size={16} color={a.done ? colors.inkMuted : colors.primary} />;
+              const Icon = ACTIVITY_ICON[a.kind] ?? Bookmark;
+              return <Icon size={16} strokeWidth={1.75} color={a.done ? colors.inkMuted : colors.primary} />;
             })()}
             done={!!a.done}
             onToggle={() => saveActs(acts.map((x) => (x.id === a.id ? { ...x, done: !x.done } : x)))}

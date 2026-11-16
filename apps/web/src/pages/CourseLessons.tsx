@@ -1,6 +1,6 @@
 import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, lessonKind, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { useIsMutating } from '@tanstack/react-query';
-import { BookOpen, Check, ChartPie, Circle, CircleHelp, CirclePlay, ExternalLink, FileCheck, FolderKanban, FolderPlus, Hammer, Headphones, ListVideo, PenLine, Pencil, Play, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
+import { AudioLines, BookOpenText, Bookmark, ChartColumnBig, Check, ClipboardCheck, ExternalLink, FolderPlus, Layers, ListChecks, ListVideo, NotebookPen, Pencil, Play, Plus, Target, Trash2, X, type LucideIcon } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, type ChangeOpts } from '../app/legacy';
 import { TextField } from '../components/Form';
@@ -233,7 +233,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
                     <input type="checkbox" checked={!!l.done} onChange={() => toggle(l.id)} />
                     {KindIcon && k && (
                       <span className={`lesson-kind lesson-kind--${k}`} title={ACTIVITY_KIND_LABEL[k]}>
-                        <KindIcon size={16} aria-hidden="true" />
+                        <KindIcon size={17} strokeWidth={1.75} aria-hidden="true" />
                         <span className="visually-hidden">{`${ACTIVITY_KIND_LABEL[k]}: `}</span>
                       </span>
                     )}
@@ -319,16 +319,16 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
 }
 
 export const ACTIVITY_ICON: Record<ActivityKind, LucideIcon> = {
-  video: CirclePlay,
-  lectura: BookOpen,
-  infografia: ChartPie,
-  audio: Headphones,
-  cuestionario: CircleHelp,
-  examen: FileCheck,
-  tarea: PenLine,
-  practica: Hammer,
-  proyecto: FolderKanban,
-  otro: Circle,
+  video: Play,
+  lectura: BookOpenText,
+  infografia: ChartColumnBig,
+  audio: AudioLines,
+  cuestionario: ListChecks,
+  examen: ClipboardCheck,
+  tarea: NotebookPen,
+  practica: Target,
+  proyecto: Layers,
+  otro: Bookmark,
 };
 
 /** Etiquetas con ícono para elegir el tipo (de lección o de actividad). */
@@ -344,7 +344,7 @@ function KindChips({ label, value, onChange }: { label: string; value: ActivityK
           const Icon = ACTIVITY_ICON[k];
           return (
             <button key={k} type="button" className={`opt-chip${value === k ? ' is-on' : ''}`} aria-pressed={value === k} onClick={() => onChange(k)}>
-              <Icon size={14} aria-hidden="true" /> {ACTIVITY_KIND_LABEL[k]}
+              <Icon size={15} strokeWidth={1.75} aria-hidden="true" /> {ACTIVITY_KIND_LABEL[k]}
             </button>
           );
         })}
@@ -425,7 +425,7 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
       ) : (
         <ul className="lesson-acts" aria-label={`Actividades de «${lesson.title}»`}>
           {acts.map((a) => {
-            const Icon = ACTIVITY_ICON[a.kind] ?? Circle;
+            const Icon = ACTIVITY_ICON[a.kind] ?? Bookmark;
             return (
               <li key={a.id} className={`lesson-act${a.done ? ' is-done' : ''}`}>
                 <label className="lesson-act__label">
