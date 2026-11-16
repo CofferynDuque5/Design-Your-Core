@@ -1,4 +1,5 @@
 import { avatarById, type AvatarInfo, type AvatarShape } from '@dyc/core';
+import { useId } from 'react';
 
 const draw = (s: AvatarShape, i: number) => {
   const { el, ...props } = s;
@@ -9,10 +10,16 @@ const draw = (s: AvatarShape, i: number) => {
 
 /** Dibujo de un personaje de la app (AVATARS). */
 export function AvatarArt({ avatar, size = 64, label }: { avatar: AvatarInfo; size?: number; label?: string }) {
+  const clip = `avatar-clip-${useId().replace(/:/g, '')}`;
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} className="avatar-art">
+      <defs>
+        <clipPath id={clip}>
+          <circle cx={32} cy={32} r={32} />
+        </clipPath>
+      </defs>
       <circle cx={32} cy={32} r={32} fill={avatar.bg} />
-      {avatar.shapes.map(draw)}
+      <g clipPath={`url(#${clip})`}>{avatar.shapes.map(draw)}</g>
     </svg>
   );
 }

@@ -1,21 +1,30 @@
 import { avatarById, type AvatarInfo } from '@dyc/core';
+import { useId } from 'react';
 import { View } from 'react-native';
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, Ellipse, G, Path } from 'react-native-svg';
 import { useTheme } from '../lib/theme';
 import { T, fonts } from './ui';
 
 /** Dibujo de un personaje de la app (AVATARS), igual que en la web. */
 export function AvatarArt({ avatar, size = 64, label }: { avatar: AvatarInfo; size?: number; label?: string }) {
+  const clip = `avatar-clip-${useId().replace(/:/g, '')}`;
   return (
     <View accessible={!!label} accessibilityRole={label ? 'image' : undefined} accessibilityLabel={label} importantForAccessibility={label ? 'yes' : 'no-hide-descendants'}>
       <Svg width={size} height={size} viewBox="0 0 64 64">
+        <Defs>
+          <ClipPath id={clip}>
+            <Circle cx={32} cy={32} r={32} />
+          </ClipPath>
+        </Defs>
         <Circle cx={32} cy={32} r={32} fill={avatar.bg} />
+        <G clipPath={`url(#${clip})`}>
         {avatar.shapes.map((sh, i) => {
           const { el, ...p } = sh;
           if (el === 'circle') return <Circle key={i} {...(p as { cx: number; cy: number; r: number })} strokeLinecap="round" />;
           if (el === 'ellipse') return <Ellipse key={i} {...(p as { cx: number; cy: number; rx: number; ry: number })} strokeLinecap="round" />;
           return <Path key={i} {...(p as { d: string })} strokeLinecap="round" strokeLinejoin="round" />;
         })}
+        </G>
       </Svg>
     </View>
   );
