@@ -288,15 +288,16 @@ export function Segmented<V extends string>({
   );
 }
 
-export function Chip({ label, selected, onPress, color: accent }: { label: string; selected: boolean; onPress: () => void; color?: string }) {
+export function Chip({ label, selected, onPress, color: accent, icon }: { label: string; selected: boolean; onPress: () => void; color?: string; icon?: ReactNode }) {
   const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[styles.chip, { borderColor: selected ? (accent ?? colors.primary) : colors.lineStrong, backgroundColor: selected ? colors.primarySoft : colors.surface }]}
+      style={[styles.chip, icon ? { flexDirection: 'row', alignItems: 'center', gap: 6 } : null, { borderColor: selected ? (accent ?? colors.primary) : colors.lineStrong, backgroundColor: selected ? colors.primarySoft : colors.surface }]}
     >
+      {icon}
       <Text style={[type.small, { fontFamily: fonts.medium, color: selected ? (accent ?? colors.primary) : colors.inkMuted }]}>{label}</Text>
     </Pressable>
   );

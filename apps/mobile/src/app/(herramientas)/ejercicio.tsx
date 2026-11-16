@@ -1,13 +1,14 @@
-import { byDateDesc, isDay, shortDay, utcDayKey, workoutRoutine, workoutStats, WORKOUT_PLANS, type Day, type LegacyWorkout } from '@dyc/core';
+import { matchesSearch, byDateDesc, isDay, shortDay, utcDayKey, workoutRoutine, workoutStats, WORKOUT_PLANS, type Day, type LegacyWorkout } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { useRouter } from 'expo-router';
 import { CalendarPlus, Check, Dumbbell, Plus, Trash2 } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { CheckInNote, DayStepper, Dot, FormActions, IconButton, Pill, Stats, Suggestions, tint, ToolScreen } from '../../components/tools';
+import { CheckInNote, DayStepper, Dot, FormActions, IconButton, Pill, SearchBar, Stats, Suggestions, tint, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, SectionHeader, T } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
+import { useSyncCheckIn, workoutMinutes } from '../../lib/checkinSync';
 import { useTheme } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
 
@@ -28,10 +29,15 @@ export default function Exercise() {
   const stats = useMemo(() => workoutStats(workouts, today), [workouts, today]);
   const history = useMemo(() => workouts.filter((w) => isDay(w.date)).sort(byDateDesc), [workouts]);
   const [editing, setEditing] = useState<LegacyWorkout | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = history.filter((w) => matchesSearch(q, w.plan, shortDay(w.date), w.date));
   const doneToday = new Set(workouts.filter((w) => w.date === today).map((w) => w.plan));
 
+  const sync = useSyncCheckIn();
   const log = (plan: string, minutes: number) => {
-    actions.add({ id: newId(), date: today, plan, minutes });
+    const w = { id: newId(), date: today, plan, minutes };
+    actions.add(w);
+    sync(today, { activeMinutes: workoutMinutes([...workouts, w], today) });
     toast(`Entreno registrado: ${plan}, ${minutes} min.`);
   };
   // Como la app anterior: una rutina diaria a las 18:00.
@@ -41,13 +47,15 @@ export default function Exercise() {
   };
   const remove = (w: LegacyWorkout) => {
     const order = workouts.map((x) => x.id);
-    actions.remove(w.id);
+    actions.remove(w.id, { undo: false });
+    sync(w.date, { activeMinutes: workoutMinutes(workouts.filter((x) => x.id !== w.id), w.date) });
     toast('Entreno eliminado.', {
       action: {
         label: 'Deshacer',
         run: () => {
           actions.add(w);
           actions.reorder(order);
+          sync(w.date, { activeMinutes: workoutMinutes(workouts, w.date) });
         },
       },
     });
@@ -100,11 +108,12 @@ export default function Exercise() {
           </View>
           <View style={{ gap: space[3] }}>
             <SectionHeader title="Historial" right={<Pill a11yLabel={`${stats.total} en total`}>{String(stats.total)}</Pill>} />
+            {history.length > 0 && <SearchBar label="Buscar en tus entrenos" value={q} onChange={setQ} placeholder="Buscar por entreno o fecha…" count={found.length} />}
             {history.length === 0 ? (
               <EmptyState title="Aún no hay entrenos">Marca un plan como hecho o registra tu propio entreno.</EmptyState>
-            ) : (
+            ) : found.length === 0 ? null : (
               <Card style={{ paddingVertical: space[1], gap: 0 }}>
-                {history.slice(0, HISTORY_MAX).map((w, i) => {
+                {found.slice(0, HISTORY_MAX).map((w, i) => {
                   const label = `${w.plan || 'Entreno'} del ${shortDay(w.date)}`;
                   return (
                     <Fragment key={w.id}>
@@ -135,7 +144,7 @@ export default function Exercise() {
               </T>
             )}
           </View>
-          <CheckInNote>El check-in diario registra aparte tus minutos activos para el pilar Movimiento; estos entrenos aún no cambian tu puntuación.</CheckInNote>
+          <CheckInNote>Los minutos de cada entreno se suman a tu check-in de ese día (pilar Movimiento).</CheckInNote>
         </>
       )}
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Registrar entreno' : 'Editar entreno'}>
@@ -147,6 +156,8 @@ export default function Exercise() {
 
 function WorkoutForm({ workout, today, onDone }: { workout: LegacyWorkout | null; today: Day; onDone: () => void }) {
   const actions = useModule('workouts');
+  const all = useLegacyList(useLegacyData().data?.data, 'workouts');
+  const sync = useSyncCheckIn();
   const [plan, setPlan] = useState(workout?.plan ?? '');
   const [minutes, setMinutes] = useState(String(workout?.minutes ?? 30));
   const [date, setDate] = useState<Day>(workout?.date ?? today);
@@ -155,8 +166,11 @@ function WorkoutForm({ workout, today, onDone }: { workout: LegacyWorkout | null
   const submit = () => {
     if (!plan.trim() || !minutesOk || !date) return;
     const fields = { plan: plan.trim(), minutes: m, date };
-    if (workout) actions.update(workout.id, fields);
-    else actions.add({ id: newId(), ...fields });
+    const id = workout?.id ?? newId();
+    if (workout) actions.update(id, fields);
+    else actions.add({ id, ...fields });
+    const next = [...all.filter((x) => x.id !== id), { id, ...fields }];
+    for (const d of new Set([date, workout?.date].filter((x): x is string => !!x))) sync(d, { activeMinutes: workoutMinutes(next, d) });
     onDone();
   };
   return (
@@ -173,6 +187,7 @@ function WorkoutForm({ workout, today, onDone }: { workout: LegacyWorkout | null
           workout
             ? () => {
                 actions.remove(workout.id);
+                sync(workout.date, { activeMinutes: workoutMinutes(all.filter((x) => x.id !== workout.id), workout.date) });
                 onDone();
               }
             : undefined

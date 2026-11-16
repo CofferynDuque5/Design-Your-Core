@@ -1,17 +1,17 @@
-import { FOCUS_MODE_INFO, FOCUS_MODES, focusClock, focusSpoken, focusStats, hoursShort, nextFocusMode, shortDay, utcDayKey, type FocusMode } from '@dyc/core';
+import { FOCUS_MODE_INFO, FOCUS_MODES, focusClock, focusSpoken, focusStats, hoursShort, shortDay, utcDayKey, type FocusMode } from '@dyc/core';
 import { radius, space } from '@dyc/tokens';
 import { Pause, Play, RotateCcw, SkipForward } from 'lucide-react-native';
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Stats, ToolScreen } from '../../components/tools';
 import { Button, Card, ErrorState, Loading, Segmented, SectionHeader, T, fonts } from '../../components/ui';
-import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
+import { focusLeft, getFocusTimer, setFocusTimer, useFocusFinish, useFocusTimer } from '../../lib/focusTimer';
+import { useLegacyData, useLegacyList } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
 
-type Status = 'idle' | 'running' | 'paused';
 // Etiquetas cortas para que quepan las tres; los lectores oyen el nombre completo.
-const SHORT: Record<FocusMode, string> = { focus: 'Enfoque', short: 'Corto', long: 'Largo' };
+const SHORT: Record<FocusMode, string> = { focus: 'Concentrar', short: 'Corto', long: 'Largo' };
 const MODE_OPTIONS = FOCUS_MODES.map((m) => ({ value: m, label: `${SHORT[m]} · ${FOCUS_MODE_INFO[m].minutes}`, a11yLabel: `${FOCUS_MODE_INFO[m].label}, ${FOCUS_MODE_INFO[m].minutes} minutos` }));
 const totalMs = (m: FocusMode) => FOCUS_MODE_INFO[m].minutes * 60_000;
 const RING = 232;
@@ -22,68 +22,42 @@ export default function Focus() {
   const { colors } = useTheme();
   const legacy = useLegacyData();
   const records = useLegacyList(legacy.data?.data, 'focus');
-  const actions = useModule('focus');
-  const [mode, setMode] = useState<FocusMode>('focus');
-  const [status, setStatus] = useState<Status>('idle');
-  const [remaining, setRemaining] = useState(totalMs('focus'));
-  const [completed, setCompleted] = useState(0);
-  const endsAt = useRef(0);
+  // El temporizador vive fuera de la pantalla: sigue al ir a otra sección o cerrar la app.
+  const timer = useFocusTimer();
+  const finishSession = useFocusFinish();
+  const { mode, status, completed } = timer;
   const [, setTick] = useState(0);
 
-  const left = status === 'running' ? Math.max(0, endsAt.current - Date.now()) : remaining;
+  const left = focusLeft(timer);
   const total = totalMs(mode);
   const label = FOCUS_MODE_INFO[mode].label;
   const announce = (m: string) => AccessibilityInfo.announceForAccessibility(m);
 
-  const switchTo = (next: FocusMode) => {
-    setMode(next);
-    setRemaining(totalMs(next));
-    setStatus('idle');
+  const switchTo = (next: FocusMode) => setFocusTimer((t) => ({ ...t, mode: next, status: 'idle', endsAt: 0, remaining: totalMs(next) }));
+
+  const finish = (skipped: boolean) => {
+    const { next } = finishSession(skipped);
+    announce(`${skipped ? 'Sesión saltada' : '¡Sesión terminada!'} Ahora toca: ${FOCUS_MODE_INFO[next].label.toLowerCase()}, ${FOCUS_MODE_INFO[next].minutes} minutos.`);
   };
 
-  /** Termina la sesión (por tiempo o al saltar): guarda lo transcurrido si pasó al menos 1 s. */
-  const finish = useCallback(
-    (skipped: boolean) => {
-      const rest = status === 'running' ? Math.max(0, endsAt.current - Date.now()) : remaining;
-      const seconds = Math.round((total - rest) / 1000);
-      endsAt.current = Number.POSITIVE_INFINITY; // evita terminar dos veces
-      if (seconds >= 1) actions.add({ id: newId(), mode, seconds, dateKey: utcDayKey() });
-      const done = mode === 'focus' && !skipped ? completed + 1 : completed;
-      setCompleted(done);
-      // Saltar un enfoque lleva a un descanso corto; completarlo cuenta para el largo.
-      const next = mode === 'focus' && skipped ? 'short' : nextFocusMode(mode, done);
-      setMode(next);
-      setRemaining(totalMs(next));
-      setStatus('idle');
-      announce(`${skipped ? 'Sesión saltada' : '¡Sesión terminada!'} Ahora toca: ${FOCUS_MODE_INFO[next].label.toLowerCase()}, ${FOCUS_MODE_INFO[next].minutes} minutos.`);
-    },
-    [actions, completed, mode, remaining, status, total],
-  );
-
-  // Mientras corre: refresca la pantalla y termina al llegar a cero (también al volver a la app).
+  // Mientras corre: refresca la pantalla (la sesión la termina FocusWatcher).
   useEffect(() => {
     if (status !== 'running') return;
-    const t = setInterval(() => {
-      if (endsAt.current - Date.now() <= 0) finish(false);
-      else setTick((n) => n + 1);
-    }, 250);
+    const t = setInterval(() => setTick((n) => n + 1), 250);
     return () => clearInterval(t);
-  }, [status, finish]);
+  }, [status]);
 
   const start = () => {
-    endsAt.current = Date.now() + remaining;
-    setStatus('running');
-    announce(`${label} en marcha. Quedan ${focusSpoken(remaining)}.`);
+    setFocusTimer((t) => ({ ...t, status: 'running', endsAt: Date.now() + t.remaining }));
+    announce(`${label} en marcha. Quedan ${focusSpoken(timer.remaining)}.`);
   };
   const pause = () => {
-    const rest = Math.max(0, endsAt.current - Date.now());
-    setRemaining(rest);
-    setStatus('paused');
+    const rest = focusLeft(getFocusTimer());
+    setFocusTimer((t) => ({ ...t, status: 'paused', endsAt: 0, remaining: rest }));
     announce(`En pausa. Quedan ${focusSpoken(rest)}.`);
   };
   const reset = () => {
-    setRemaining(total);
-    setStatus('idle');
+    setFocusTimer((t) => ({ ...t, status: 'idle', endsAt: 0, remaining: total }));
     announce('Temporizador reiniciado.');
   };
 
@@ -95,10 +69,21 @@ export default function Focus() {
   const tint = mode === 'focus' ? colors.primary : colors.sage;
 
   return (
-    <ToolScreen title="Enfoque" refreshing={legacy.isRefetching} onRefresh={() => legacy.refetch()}>
+    <ToolScreen title="Pomodoro" refreshing={legacy.isRefetching} onRefresh={() => legacy.refetch()}>
       <Card style={{ alignItems: 'stretch', gap: space[4] }}>
         <Segmented<FocusMode> label="Tipo de sesión" options={MODE_OPTIONS} value={mode} onChange={switchTo} disabled={status === 'running'} />
-        <View style={{ alignItems: 'center', justifyContent: 'center', height: RING }}>
+        {status === 'running' && (
+          <T v="small" tint="muted">
+            Pausa para cambiar de modo.
+          </T>
+        )}
+        <View
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: RING,
+          }}
+        >
           <Svg width={RING} height={RING} viewBox="0 0 36 36" style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
             <Circle cx={18} cy={18} r={R} fill="none" stroke={colors.line} strokeWidth={1.6} />
             {progress > 0 && <Circle cx={18} cy={18} r={R} fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeDasharray={`${progress * C} ${C}`} />}
@@ -130,12 +115,12 @@ export default function Focus() {
           ))}
         </View>
         <T v="small" tint="muted" style={{ textAlign: 'center' }}>
-          Cada cuatro sesiones de enfoque toca un descanso largo. Se guarda cada sesión que termines o saltes. Si sales de esta pantalla, el temporizador se detiene.
+          Cada cuatro sesiones de enfoque toca un descanso largo. Sigue contando aunque vayas a otra sección o cierres la app, y se guarda cada sesión que termines o saltes.
         </T>
       </Card>
 
       <View style={{ gap: space[3] }}>
-        <SectionHeader title="Tu enfoque" />
+        <SectionHeader title="Tus sesiones" />
         {legacy.isPending ? (
           <Loading label="Cargando tus sesiones" />
         ) : legacy.isError ? (

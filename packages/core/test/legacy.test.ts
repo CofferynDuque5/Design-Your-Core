@@ -86,7 +86,7 @@ describe('módulos de la app anterior', () => {
 
   it('tanda 2: valores por defecto de la app anterior', () => {
     expect(legacyItemSchemas.subjects.parse({ id: 's1', name: 'Física' })).toEqual({ id: 's1', name: 'Física', teacher: '', room: '', color: '#4F7CFF', nextClass: '', topics: [] });
-    expect(legacyItemSchemas.projects.parse({ id: 'p1', title: 'Ensayo' })).toEqual({ id: 'p1', title: 'Ensayo', subject: '', deadline: '', status: 'curso', color: '#0FA968', milestones: [] });
+    expect(legacyItemSchemas.projects.parse({ id: 'p1', title: 'Ensayo' })).toEqual({ id: 'p1', title: 'Ensayo', subject: '', deadline: '', status: 'curso', priority: 'media', color: '#0FA968', milestones: [] });
     expect(legacyItemSchemas.roadmaps.parse({ id: 'r1', name: 'Ingeniería' })).toEqual({ id: 'r1', name: 'Ingeniería', color: '#8B5CF6', steps: [] });
     expect(legacyItemSchemas.notebooks.parse({ id: 'n1', category: '  ' })).toEqual({ id: 'n1', title: 'Cuaderno', category: 'General', subject: '', topic: '', color: '#4F7CFF', emoji: '📓' });
     expect(legacyItemSchemas.noteBoxes.parse({ id: 'b1', notebookId: 'n1' })).toEqual({ id: 'b1', notebookId: 'n1', title: '', text: '', color: '#FFF7D6', kind: 'text', lang: '' });
@@ -125,7 +125,8 @@ describe('módulos de la app anterior', () => {
     expect(projectProgress({ status: 'entregado' })).toBe(100);
     expect(projectProgress({ status: 'entregado', milestones: [{ done: true }, { done: false }, { done: false }] })).toBe(33);
     const now = Date.parse('2026-09-25T12:00:00Z');
-    expect(dueThisWeek('la próxima clase', now)).toBe(true); // no se entiende: cuenta, como antes
+    expect(dueThisWeek('la próxima clase', now)).toBe(false); // no se entiende: no cuenta
+    expect(dueThisWeek('zzz no es fecha', now)).toBe(false);
     expect(dueThisWeek('', now)).toBe(false);
     expect(dueThisWeek('28 SEP', now)).toBe(true);
     expect(dueThisWeek('25 sep.', now)).toBe(true);
@@ -136,6 +137,15 @@ describe('módulos de la app anterior', () => {
     expect(parseDeadline('20 SEP', new Date(now))?.getMonth()).toBe(8);
     expect(parseDeadline('5 dic 2027')?.getFullYear()).toBe(2027);
     expect(parseDeadline('31 foo')).toBeNull();
+    // 2026-09-25 es viernes.
+    const fri = new Date(2026, 8, 25, 10);
+    expect(parseDeadline('hoy', fri)?.getDate()).toBe(25);
+    expect(parseDeadline('mañana', fri)?.getDate()).toBe(26);
+    expect(parseDeadline('lunes', fri)?.getDate()).toBe(28);
+    expect(parseDeadline('Miércoles', fri)?.getDate()).toBe(30);
+    expect(parseDeadline('20/12', fri)?.getMonth()).toBe(11);
+    expect(parseDeadline('31/11/2026', fri)).toBeNull();
+    expect(dueThisWeek('lunes', fri.getTime())).toBe(true);
   });
 
   it('estados de los pasos de un roadmap y etiquetas', () => {
@@ -244,8 +254,15 @@ describe('tanda 4: notas, trabajo, respiración y bóveda cifrada', () => {
   });
 
   it('trabajo y respiración: formatos de la app anterior', () => {
-    expect(legacyItemSchemas.workItems.parse({ id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: 'p1', status: 'todo', done: false, due: '' });
-    expect(legacyItemSchemas.workItems.safeParse({ id: 'w1', title: 'x', project: 'p4' }).success).toBe(false);
+    expect(legacyItemSchemas.workItems.parse({ id: 'w1', title: 'Informe' })).toEqual({ id: 'w1', title: 'Informe', project: '', status: 'todo', done: false, due: '' });
+    // El proyecto puede ser el id de un proyecto real.
+    expect(legacyItemSchemas.workItems.safeParse({ id: 'w1', title: 'x', project: 'mabc123' }).success).toBe(true);
+    expect(legacyItemSchemas.workItems.safeParse({ id: 'w1', title: 'x', project: 'x'.repeat(81) }).success).toBe(false);
+    expect(legacyItemSchemas.courses.parse({ id: 'c1', topic: ' Inglés ' })).toEqual({ id: 'c1', topic: 'Inglés', title: '', url: '', status: 'pendiente', notes: '' });
+    expect(legacyItemSchemas.courses.parse({ id: 'c1', topic: 'x', url: 'https://youtu.be/a' }).url).toBe('https://youtu.be/a');
+    for (const url of ['javascript:alert(1)', 'ftp://a.com/x', 'no es enlace']) expect(legacyItemSchemas.courses.safeParse({ id: 'c1', topic: 'x', url }).success).toBe(false);
+    expect(legacyItemSchemas.courses.safeParse({ id: 'c1', topic: ' ' }).success).toBe(false);
+    expect(legacyPatchSchemas.courses.parse({ status: 'hecho' })).toEqual({ status: 'hecho' });
     expect(legacyItemSchemas.meditations.parse({ id: 'm1', date: '2026-09-25', minutes: 3 })).toEqual({ id: 'm1', date: '2026-09-25', minutes: 3, kind: 'respiracion' });
     expect(legacyItemSchemas.meditations.safeParse({ id: 'm1', date: '2026-09-25', minutes: 2.5 }).success).toBe(false);
   });

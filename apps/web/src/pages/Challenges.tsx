@@ -1,5 +1,5 @@
 import type { UserChallenge } from '@dyc/api-client';
-import { adjacentLevel, PILLAR_IDS, type Challenge, type PillarId } from '@dyc/core';
+import { adjacentLevel, matchesSearch, PILLAR_IDS, PILLAR_NAMES, type Challenge, type PillarId } from '@dyc/core';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useState } from 'react';
@@ -8,6 +8,7 @@ import { useToggleChallenge } from '../app/mutations';
 import { useCatalog, useChallenges, useRefresh } from '../app/queries';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { ChallengeCard } from '../components/ChallengeCard';
 import { Dialog } from '../components/Dialog';
 import { pillarShort, PillarTag } from '../components/Pillar';
@@ -21,6 +22,7 @@ export function Challenges() {
   const list = useChallenges();
   const catalog = useCatalog();
   const [filter, setFilter] = useState<PillarId | 'all'>('all');
+  const [q, setQ] = useState('');
 
   return (
     <div className="page">
@@ -49,9 +51,16 @@ export function Challenges() {
                 ))}
               </div>
             </div>
+            <SearchBox
+              label="Buscar en el catálogo de retos"
+              value={q}
+              onChange={setQ}
+              placeholder="Buscar un reto…"
+              count={catalog.data.filter((c) => (filter === 'all' || c.pillar === filter) && matchesSearch(q, c.title, c.description, PILLAR_NAMES[c.pillar])).length}
+            />
             <div className="card-grid">
               {catalog.data
-                .filter((c) => filter === 'all' || c.pillar === filter)
+                .filter((c) => (filter === 'all' || c.pillar === filter) && matchesSearch(q, c.title, c.description, PILLAR_NAMES[c.pillar]))
                 .map((c) => (
                   <CatalogCard key={c.key} c={c} active={list.data.active} />
                 ))}

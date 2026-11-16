@@ -54,7 +54,7 @@ export async function resetDb() {
     await migrate(db);
     migrated = true;
   }
-  await db.exec('TRUNCATE "User" CASCADE');
+  await db.exec('TRUNCATE "User", "AppSetting" CASCADE');
 }
 
 let counter = 0;

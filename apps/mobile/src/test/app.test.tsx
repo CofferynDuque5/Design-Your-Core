@@ -39,6 +39,22 @@ describe('app móvil', () => {
     expect(api.calls.find((c) => c.method === 'PUT')?.body).toEqual({ done: true });
   });
 
+  it('Hoy muestra el enfoque, la racha y los logros de constancia', async () => {
+    const consistency = ['2026-09-20', '2026-09-21', '2026-09-22'].map((date) => ({ date, done: 1, total: 2 }));
+    fakeFetch({
+      'POST /api/v2/auth/session': () => tokens(),
+      'GET /api/v2/profile': () => ({ profile: profile() }),
+      'GET /api/v2/dashboard': () => dashboard({ consistency }),
+    });
+    renderRouter('./src/app', { initialUrl: '/' });
+    await signIn();
+    expect(await screen.findByText('Hábitos de hoy')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Empezar 25 min de foco' })).toBeOnTheScreen();
+    expect(screen.getByText('Aún estás a tiempo: marca algo hoy y tu racha sube a 4.')).toBeOnTheScreen();
+    expect(screen.getByLabelText('3 días seguidos, conseguido')).toBeOnTheScreen();
+    expect(screen.getByLabelText('7 días seguidos, por conseguir')).toBeOnTheScreen();
+  });
+
   it('con la cuenta sin configurar empieza por la bienvenida', async () => {
     fakeFetch({
       'POST /api/v2/auth/session': () => tokens(),

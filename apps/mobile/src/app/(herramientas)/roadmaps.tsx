@@ -1,4 +1,5 @@
 import {
+  matchesSearch,
   checkItems,
   checkItemsPayload,
   donePercent,
@@ -18,7 +19,7 @@ import { ArrowRight, Check, Lock, Pencil, Plus, Sparkles, Trash2 } from 'lucide-
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { ColorSwatches, FormActions, IconButton, Meter, Pill, tint, ToolScreen } from '../../components/tools';
+import { SearchBar, ColorSwatches, FormActions, IconButton, Meter, Pill, tint, ToolScreen, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -31,6 +32,8 @@ export default function Roadmaps() {
   const raw = useLegacyList(legacy.data?.data, 'roadmaps');
   const roadmaps = useMemo<Roadmap[]>(() => raw.map((r) => ({ ...r, steps: checkItems(r.steps, newLegacySubId) })), [raw]);
   const [editing, setEditing] = useState<Roadmap | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = roadmaps.filter((r) => matchesSearch(q, r.name, ...r.steps.map((s) => s.name)));
   const steps = roadmaps.flatMap((r) => r.steps);
   const done = steps.filter((s) => s.done).length;
 
@@ -62,7 +65,8 @@ export default function Roadmaps() {
               </Pill>
             )}
           </View>
-          {roadmaps.map((r) => (
+          <SearchBar label="Buscar en tus roadmaps" value={q} onChange={setQ} placeholder="Buscar por nombre o paso…" count={found.length} />
+          {found.map((r) => (
             <RoadmapCard key={r.id} roadmap={r} onEdit={() => setEditing(r)} />
           ))}
         </>
@@ -100,19 +104,16 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
             {title}
           </T>
           <T v="small" tint="muted">
-            Ruta de materias{r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
+            Ruta por pasos{r.steps.length ? ` · ${done}/${r.steps.length}` : ''}
           </T>
         </View>
         <IconButton label={`Editar «${title}»`} onPress={onEdit} style={{ marginRight: -space[2], marginTop: -space[2] }}>
           <Pencil size={18} color={colors.inkMuted} />
         </IconButton>
+        <RemoveButton module="roadmaps" id={r.id} name={title} style={{ marginRight: -space[2], marginTop: -space[2] }} />
       </View>
       {r.steps.length > 0 && <Meter value={donePercent(r.steps)} color={color} label={`Avance de ${title}`} />}
-      {r.steps.length === 0 ? (
-        <T v="small" tint="muted">
-          Sin pasos todavía. Añade la primera materia abajo.
-        </T>
-      ) : (
+      {r.steps.length === 0 ? null : (
         <View accessibilityLabel={`Pasos de «${title}»`}>
           {r.steps.map((s, i) => (
             <Step
@@ -154,7 +155,7 @@ function RoadmapCard({ roadmap: r, onEdit }: { roadmap: Roadmap; onEdit: () => v
           </>
         ) : (
           <T v="small" tint="muted">
-            Añade materias para empezar tu ruta.
+            Sin pasos todavía: añade el primero abajo.
           </T>
         )}
       </View>
@@ -204,8 +205,8 @@ function Step({ step: s, index, state, color, last, onMark, onRemove }: { step: 
         {state === 'current' && (
           <Button
             small
-            label="Marcar como completada"
-            accessibilityLabel={`Marcar «${name}» como completada`}
+            label="Marcar como completado"
+            accessibilityLabel={`Marcar «${name}» como completado`}
             icon={<Check size={16} color={colors.onPrimary} />}
             onPress={() => onMark(true)}
             style={{ alignSelf: 'flex-start' }}

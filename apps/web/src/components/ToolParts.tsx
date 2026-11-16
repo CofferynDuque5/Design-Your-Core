@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Info, Trash2 } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { UiIcon } from './UiIcon';
+import type { LegacyKey } from '@dyc/core';
+import { useModule } from '../app/legacy';
 
 // Piezas comunes de las herramientas de la tanda 2 (Materias, Proyectos,
 // Roadmaps, Cuadernos, Contenido e Ideas).
@@ -230,6 +232,12 @@ export function MonthNav({ month, onChange, current, titleId }: { month: string;
   };
   return (
     <div className="month-nav">
+      {/* «Hoy» va a la izquierda de las flechas: al aparecer no las mueve bajo el cursor. */}
+      {month.slice(0, 7) !== current.slice(0, 7) && (
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange(`${current.slice(0, 7)}-01`)}>
+          Hoy
+        </button>
+      )}
       <button type="button" className="icon-btn" onClick={() => shift(-1)} aria-label="Mes anterior">
         <ChevronLeft size={20} aria-hidden="true" />
       </button>
@@ -239,11 +247,27 @@ export function MonthNav({ month, onChange, current, titleId }: { month: string;
       <button type="button" className="icon-btn" onClick={() => shift(1)} aria-label="Mes siguiente">
         <ChevronRight size={20} aria-hidden="true" />
       </button>
-      {month.slice(0, 7) !== current.slice(0, 7) && (
-        <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange(`${current.slice(0, 7)}-01`)}>
-          Hoy
-        </button>
-      )}
     </div>
+  );
+}
+
+/**
+ * Papelera visible en cada tarjeta o fila: borra al momento y sale «Deshacer»
+ * unos segundos (lo da useModule), así no hace falta abrir el formulario.
+ */
+export function RemoveButton<K extends LegacyKey>({ module, id, name, size = 18, onRemoved }: { module: K; id: string; name: string; size?: number; onRemoved?: () => void }) {
+  const actions = useModule(module);
+  return (
+    <button
+      type="button"
+      className="icon-btn icon-btn--danger"
+      onClick={() => {
+        actions.remove(id);
+        onRemoved?.();
+      }}
+      aria-label={`Eliminar «${name}»`}
+    >
+      <Trash2 size={size} aria-hidden="true" />
+    </button>
   );
 }

@@ -28,7 +28,7 @@ const url = (v) => v.replace(/\/+$/, '');
 const API_URL = url(process.env.DYC_API_URL || 'https://designyourcorepanel.nvcorx.com');
 const APP_URL = url(process.env.DYC_APP_URL || API_URL);
 const SITE_URL = url(process.env.DYC_SITE_URL || 'https://designyourcore.nvcorx.com');
-const CONTACT = process.env.DYC_CONTACT_EMAIL || '';
+const CONTACT = process.env.DYC_CONTACT_EMAIL || 'designyourcore@nvcorx.com';
 const API_FOLDER = process.env.DYC_API_FOLDER || 'core-api';
 const SERVER_HOME = url(process.env.DYC_SERVER_HOME || '/home/nvcorxco');
 const NODE_MAJOR = process.env.DYC_NODE_MAJOR || '20';
@@ -38,6 +38,18 @@ const LEGACY_APP_URL = url(process.env.DYC_LEGACY_APP_URL || 'https://designyour
 const LEGACY_ORIGINS = [...new Set([LEGACY_APP_URL, 'https://desingyourcore.nvcorx.com'])];
 
 const host = (u) => new URL(u).host;
+// El index.html que LiteSpeed entrega sin pasar por Node también lleva la protección
+// contra clickjacking (cuando responde Node, la pone Express).
+const FRAME_HEADERS = `
+<IfModule mod_headers.c>
+  <FilesMatch "\\.html$">
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Content-Security-Policy "frame-ancestors 'self'"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  </FilesMatch>
+</IfModule>
+`;
 const API_DOCROOT = process.env.DYC_API_DOCROOT || `public_html/${host(API_URL)}`;
 const version = `${JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version}-${execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim()}`;
 
@@ -72,7 +84,7 @@ PassengerNodejs "${SERVER_HOME}/nodevenv/${API_FOLDER}/${NODE_MAJOR}/bin/node"
 PassengerAppType node
 PassengerStartupFile dist/index.js
 # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
-`,
+${FRAME_HEADERS}`,
 );
 cpSync(join(ROOT, 'apps/api/release'), apiDir, { recursive: true });
 // Web para el mismo dominio: sin VITE_API_URL llama a /api del dominio donde se abre.
@@ -106,7 +118,8 @@ Dominio: ${API_URL} (la app web y la API van juntas en este dominio)
    Tu core-config.env no se toca: este ZIP no trae uno.
 4. La configuración va en las variables de la app en «Setup Node.js App», o en ${API_FOLDER}/core-config.env
    (guía: core-config.env.example):
-   - DATABASE_URL: la misma de siempre.
+   - DATABASE_URL: la misma de siempre (o la del PostgreSQL del hosting; ver core-config.env.example,
+     y COPY_FROM_DATABASE_URL para copiar los datos de la base anterior).
    - JWT_SECRET: pon uno NUEVO (el anterior se considera expuesto). Todos tendrán que volver a entrar una vez.
    - CLIENT_ORIGIN y PUBLIC_URL: copia las líneas del ejemplo.
 5. En «Setup Node.js App»: archivo de inicio dist/index.js. Pulsa «Start App» (o «Restart»).

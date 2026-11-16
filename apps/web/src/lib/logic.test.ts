@@ -34,8 +34,11 @@ describe('Markdown seguro', () => {
     expect(screen.getByRole('img', { name: 'Por hacer' })).toBeInTheDocument();
     expect(box.querySelector('blockquote em')).toHaveTextContent('suave');
     expect(box.querySelector('pre.md-code code')).toHaveTextContent('print("<hola>")');
-    expect(box.querySelector('code.md-math')).toHaveTextContent('E=mc^2');
-    expect(box.querySelector('pre.md-math')).toHaveTextContent('\\int x');
+    // Las fórmulas se dibujan (no como código): exponente en <sup>, símbolos en vez de comandos.
+    expect(screen.getByRole('math', { name: 'Fórmula: E=mc^2' })).toHaveTextContent('E=mc2');
+    expect(screen.getByRole('math', { name: 'Fórmula: E=mc^2' }).querySelector('sup')).toHaveTextContent('2');
+    expect(box.querySelector('.md-math--block')).toHaveTextContent('∫ x');
+    expect(box.querySelector('code.md-math, pre.md-math')).toBeNull();
     expect(box.querySelector('hr')).not.toBeNull();
     expect(box.querySelector('del')).toHaveTextContent('no');
     // snake_case no es cursiva.

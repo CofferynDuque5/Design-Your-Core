@@ -197,7 +197,7 @@ function PrivacyCard() {
       <div className="privacy-card__text">
         <Lock size={18} aria-hidden="true" />
         <p className="small">
-          Tus registros de ciclo se guardan en tu cuenta de Design Your Core y se sincronizan con tus dispositivos y con la app anterior. No se comparten con tu pareja vinculada.
+          Tus registros de ciclo se guardan en tu cuenta de Design Your Core y se sincronizan con tus dispositivos. No se comparten con tu pareja vinculada.
         </p>
       </div>
       <div className="setting-row">

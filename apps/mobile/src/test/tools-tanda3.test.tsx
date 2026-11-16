@@ -79,9 +79,9 @@ describe('herramientas de la tanda 3 en el móvil', () => {
   it('Finanzas: resumen del mes, presupuesto, añadir y editar movimientos y borrar con deshacer', async () => {
     const api = setup();
     await open('/finanzas', 'Balance del mes');
-    expect(screen.getByLabelText('Balance del mes: 1154,50')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Ingresos: 1200')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Gastos: 45,50')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Balance del mes: $1154,50')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Ingresos: $1200')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Gastos: $45,50')).toBeOnTheScreen();
     // El movimiento de otro mes no cuenta.
     expect(screen.queryByText('Cine', { exact: false })).toBeNull();
     expect(screen.getByRole('progressbar', { name: 'Comida: 100 % de los gastos' })).toBeOnTheScreen();
@@ -92,22 +92,22 @@ describe('herramientas de la tanda 3 en el móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Guardar' }));
     expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/budget')).body).toEqual({ monthly: 500 });
     expect(await screen.findByRole('progressbar', { name: 'Presupuesto gastado' })).toHaveAccessibilityValue({ now: 9 });
-    expect(screen.getByText(/Quedan 454,50/)).toBeOnTheScreen();
+    expect(screen.getByText(/Quedan \$454,50/)).toBeOnTheScreen();
 
     // Nuevo gasto: monto con coma, siempre en positivo, fecha en UTC.
     fireEvent.press(screen.getByRole('button', { name: 'Nuevo movimiento' }));
     fireEvent.changeText(await screen.findByLabelText('Monto'), '12,3O');
-    expect(screen.getByText('Escribe un monto mayor que 0, con hasta dos decimales (12,50).')).toBeOnTheScreen();
+    expect(screen.getByText('Usa un número mayor que 0, como 12,50.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Añadir movimiento' })).toBeDisabled();
     fireEvent.changeText(screen.getByLabelText('Monto'), '12,30');
     fireEvent.press(screen.getByRole('radio', { name: 'Transporte' }));
     fireEvent.changeText(screen.getByLabelText('Nota (opcional)'), ' Metro ');
     fireEvent.press(screen.getByRole('button', { name: 'Añadir movimiento' }));
     expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/transactions'))).toEqual({ id: expect.any(String), type: 'expense', amount: 12.3, category: 'Transporte', note: 'Metro', date: utc });
-    expect(await screen.findByRole('button', { name: 'Editar: Gasto de 12,30 en Transporte (Metro)' })).toBeOnTheScreen();
+    expect(await screen.findByRole('button', { name: 'Editar: Gasto de $12,30 en Transporte (Metro)' })).toBeOnTheScreen();
 
     // Editar (la app anterior no dejaba): pasar a ingreso cambia las categorías.
-    fireEvent.press(screen.getByRole('button', { name: 'Editar: Gasto de 45,50 en Comida (Mercado)' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Editar: Gasto de $45,50 en Comida (Mercado)' }));
     fireEvent.press(await screen.findByRole('radio', { name: 'Ingreso' }));
     expect(screen.queryByRole('radio', { name: 'Comida' })).toBeNull();
     fireEvent.press(screen.getByRole('radio', { name: 'Regalo' }));
@@ -117,7 +117,7 @@ describe('herramientas de la tanda 3 en el móvil', () => {
 
     // Borrar se deshace desde el aviso y vuelve a su sitio.
     const order = (api.doc().transactions ?? []).map((t) => t.id);
-    fireEvent.press(await screen.findByRole('button', { name: 'Borrar: Ingreso de 1200 en Sueldo' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Borrar: Ingreso de $1200 en Sueldo' }));
     await waitForWrite(api, 'DELETE', '/api/v2/modules/transactions/x1');
     expect(await screen.findByText('Movimiento eliminado.')).toBeOnTheScreen();
     await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Deshacer' })));

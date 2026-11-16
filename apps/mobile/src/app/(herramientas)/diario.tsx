@@ -1,11 +1,12 @@
-import { byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, moodIcon, shortDay, utcDayKey, type Day, type LegacyJournal } from '@dyc/core';
+import { matchesSearch, byDateDesc, isDay, JOURNAL_MOODS, journalStats, longDay, moodIcon, shortDay, utcDayKey, type Day, type LegacyJournal } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { Trash2 } from 'lucide-react-native';
 import { Fragment, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type ScrollView } from 'react-native';
-import { CheckInNote, DayStepper, IconButton, MoodPicker, Pill, Stats, ToolScreen } from '../../components/tools';
+import { SearchBar, CheckInNote, DayStepper, IconButton, MoodPicker, Pill, Stats, ToolScreen } from '../../components/tools';
 import { Card, ErrorState, Field, Loading, SectionHeader, T } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useModule } from '../../lib/legacy';
+import { useSyncCheckIn } from '../../lib/checkinSync';
 import { useTheme } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
 import { UiIcon } from '../../components/UiIcon';
@@ -25,12 +26,16 @@ export default function Journal() {
   const today = utcDayKey();
   const [date, setDate] = useState<Day>(today);
   const entries = useMemo(() => journal.filter((j) => isDay(j.date)).sort(byDateDesc), [journal]);
+  const [q, setQ] = useState('');
+  const found = entries.filter((j) => matchesSearch(q, j.note, j.gratitude, j.date, longDay(j.date)));
   const entry = entries.find((j) => j.date === date);
   // La app anterior creaba la entrada al abrir la sección; aquí se crea con lo primero que escribes.
   const created = useRef(new Map<string, string>());
   const stats = useMemo(() => journalStats(entries, today), [entries, today]);
 
+  const sync = useSyncCheckIn();
   const save = (fields: Fields) => {
+    if (fields.gratitude !== undefined) sync(date, { gratitude: fields.gratitude.trim().slice(0, 1000) || null });
     const id = entry?.id ?? created.current.get(date);
     if (id) return actions.update(id, fields);
     const fresh = newId();
@@ -41,7 +46,7 @@ export default function Journal() {
   const remove = (j: LegacyJournal) => {
     const order = journal.map((x) => x.id);
     created.current.delete(j.date);
-    actions.remove(j.id);
+    actions.remove(j.id, { undo: false });
     toast(`Entrada del ${shortDay(j.date)} eliminada.`, {
       action: {
         label: 'Deshacer',
@@ -76,13 +81,14 @@ export default function Journal() {
           <Editor key={date} date={date} today={today} entry={entry} onSave={save} onDate={setDate} />
           <View style={{ gap: space[3] }}>
             <SectionHeader title="Entradas" right={<Pill a11yLabel={`${entries.length} entradas`}>{String(entries.length)}</Pill>} />
+            {entries.length > 0 && <SearchBar label="Buscar en tu diario" value={q} onChange={setQ} placeholder="Buscar por texto o fecha…" count={found.length} />}
             {entries.length === 0 ? (
               <T v="small" tint="muted">
                 Tus entradas aparecerán aquí. Empieza con cómo te sientes hoy.
               </T>
             ) : (
               <Card style={{ paddingVertical: space[1], gap: 0 }}>
-                {entries.slice(0, HISTORY_MAX).map((j, i) => {
+                {found.slice(0, HISTORY_MAX).map((j, i) => {
                   const mood = moodIcon(j.mood);
                   const text = j.note?.trim() || j.gratitude?.trim() || 'Sin texto';
                   const on = j.date === date;
@@ -126,7 +132,7 @@ export default function Journal() {
               </Card>
             )}
           </View>
-          <CheckInNote>El check-in diario guarda aparte su propia reflexión y gratitud; tu diario no cambia aún tus pilares.</CheckInNote>
+          <CheckInNote>Lo que agradeces aquí también aparece en tu check-in del día. La reflexión del check-in y tus notas del diario siguen separadas.</CheckInNote>
         </>
       )}
     </ToolScreen>

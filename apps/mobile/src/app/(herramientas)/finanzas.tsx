@@ -1,24 +1,10 @@
-import {
-  money,
-  monthSummary,
-  optionsWith,
-  parseAmount,
-  shortDay,
-  TX_CATEGORIES,
-  TX_TYPE_INFO,
-  TX_TYPES,
-  txTypeOf,
-  utcDayKey,
-  type Day,
-  type LegacyTransaction,
-  type TxType,
-} from '@dyc/core';
+import { matchesSearch, money, monthSummary, optionsWith, parseAmount, shortDay, TX_CATEGORIES, TX_TYPE_INFO, TX_TYPES, txTypeOf, utcDayKey, type Day, type LegacyTransaction, type TxType } from '@dyc/core';
 import { radius, space, touchTarget } from '@dyc/tokens';
 import { Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
-import { DayStepper, DotChoices, FormActions, IconButton, Meter, MonthNav, Pill, ToolScreen } from '../../components/tools';
+import { Suggestions, SearchBar, DayStepper, DotChoices, FormActions, IconButton, Meter, MonthNav, Pill, ToolScreen } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, SectionHeader, Segmented, T, fonts } from '../../components/ui';
 import { newId, useLegacyData, useLegacyList, useLegacyObject, useModule, useModuleObject } from '../../lib/legacy';
 import { useTheme } from '../../lib/theme';
@@ -43,11 +29,13 @@ export default function Finance() {
   const [editing, setEditing] = useState<LegacyTransaction | 'new' | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const summary = useMemo(() => monthSummary(list, month.slice(0, 7)), [list, month]);
+  const [q, setQ] = useState('');
+  const found = summary.items.filter((t) => matchesSearch(q, t.category, t.note, String(Math.abs(t.amount))));
   const monthly = typeof budget.monthly === 'number' && budget.monthly > 0 ? budget.monthly : 0;
 
   const remove = (t: LegacyTransaction) => {
     const order = list.map((x) => x.id);
-    actions.remove(t.id);
+    actions.remove(t.id, { undo: false });
     toast('Movimiento eliminado.', {
       action: {
         label: 'Deshacer',
@@ -139,6 +127,7 @@ export default function Finance() {
 
           <View style={{ gap: space[3] }}>
             <SectionHeader title="Movimientos" right={<Pill a11yLabel={`${summary.items.length} este mes`}>{String(summary.items.length)}</Pill>} />
+            {summary.items.length > 0 && <SearchBar label="Buscar movimientos" value={q} onChange={setQ} placeholder="Buscar por categoría, nota o monto…" count={found.length} />}
             {summary.items.length === 0 ? (
               <EmptyState
                 title={list.length ? 'Sin movimientos este mes' : 'Aún no tienes movimientos'}
@@ -148,7 +137,7 @@ export default function Finance() {
               </EmptyState>
             ) : (
               <Card style={{ paddingVertical: space[1], gap: 0 }}>
-                {summary.items.slice(0, SHOWN_MAX).map((t, i) => (
+                {found.slice(0, SHOWN_MAX).map((t, i) => (
                   <Fragment key={t.id}>
                     {i > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.line, marginLeft: 48 }} />}
                     <TxRow tx={t} onEdit={() => setEditing(t)} onRemove={() => remove(t)} />
@@ -251,6 +240,8 @@ function TxRow({ tx, onEdit, onRemove }: { tx: LegacyTransaction; onEdit: () => 
 }
 
 function TxForm({ tx, today, month, onDone }: { tx: LegacyTransaction | null; today: Day; month: Day; onDone: () => void }) {
+  const saved = useLegacyData().data?.data;
+  const past = useLegacyList(saved, 'transactions');
   const actions = useModule('transactions');
   const [type, setType] = useState<TxType>(tx ? txTypeOf(tx) : 'expense');
   const [amount, setAmount] = useState(tx ? String(amountOf(tx)).replace('.', ',') : '');
@@ -287,11 +278,13 @@ function TxForm({ tx, today, month, onDone }: { tx: LegacyTransaction | null; to
         placeholder="0,00"
         autoFocus={!tx}
         maxLength={16}
-        error={amount.trim() && !valid ? 'Escribe un monto mayor que 0, con hasta dos decimales (12,50).' : null}
+        hint={amount.trim() && !valid ? undefined : 'En $, por ejemplo 12,50'}
+        error={!amount.trim() || valid ? null : parseAmount(amount) !== null && (parseAmount(amount) as number) > 1e12 ? 'El máximo es 1.000.000.000.000.' : 'Usa un número mayor que 0, como 12,50.'}
       />
       <DayStepper label="Fecha" value={date} onChange={(d) => d && setDate(d)} today={today} />
       <DotChoices legend="Categoría" value={category} onChange={setCategory} options={categories.map((c) => ({ value: c, label: c }))} />
       <Field label="Nota (opcional)" value={note} onChangeText={setNote} maxLength={300} placeholder={type === 'income' ? 'Pago de septiembre' : 'Supermercado'} />
+      <Suggestions field="Nota" values={past.filter((t) => t.category === category).map((t) => t.note ?? '')} current={note} onPick={setNote} />
       <FormActions
         submitLabel={tx ? 'Guardar' : 'Añadir movimiento'}
         onSubmit={submit}
@@ -331,7 +324,7 @@ function BudgetForm({ monthly, onDone }: { monthly: number; onDone: () => void }
         maxLength={16}
         placeholder="500"
         hint="Vale para todos los meses y se guarda en tu cuenta, así lo ves en todos tus dispositivos."
-        error={value.trim() && !valid ? 'Escribe una cantidad mayor que 0, con hasta dos decimales.' : null}
+        error={!value.trim() || valid ? null : parseAmount(value) !== null && (parseAmount(value) as number) > 1e12 ? 'El máximo es 1.000.000.000.000.' : 'Usa un número mayor que 0, como 500 o 499,90.'}
       />
       <View style={{ gap: space[2] }}>
         <Button label="Guardar" onPress={save} disabled={!valid} />

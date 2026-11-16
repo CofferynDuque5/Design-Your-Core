@@ -11,6 +11,7 @@ import {
   GEMINI_URL,
   loadSettings,
   planTool,
+  REQUEST_TIMEOUT_MS,
   saveSettings,
   testConnection,
   TOOLS,
@@ -84,7 +85,41 @@ describe('Asistente: petición a Gemini', () => {
     await expect(testConnection('k', DEFAULT_MODEL, net)).rejects.toThrow('No se pudo conectar con Gemini');
     const nf = vi.fn().mockResolvedValue(reply({}, 404));
     await expect(testConnection('k', 'gemini-3.6-flash', nf)).rejects.toThrow('Ese modelo no está disponible');
-    expect(bodyOf(nf)).toEqual({ model: 'gemini-3.6-flash', messages: [{ role: 'user', content: 'Responde solo: ok' }], max_tokens: 16 });
+    expect(bodyOf(nf)).toEqual({ model: 'gemini-3.6-flash', messages: [{ role: 'user', content: 'Responde solo: ok' }], max_tokens: 16, reasoning_effort: 'low' });
+  });
+
+  it('pide poco razonamiento para responder rápido', async () => {
+    const f = vi.fn().mockResolvedValue(reply({ content: 'Hola' }));
+    await chat({ apiKey: 'k', model: DEFAULT_MODEL, history: [{ role: 'user', content: 'hola' }], context: null, fetchImpl: f });
+    expect(bodyOf(f).reasoning_effort).toBe('low');
+  });
+
+  it('si Gemini tarda demasiado, corta y prueba con el modelo de reserva', async () => {
+    vi.useFakeTimers();
+    try {
+      // La primera petición no responde nunca (hasta que se corta); la segunda sí.
+      const hang = (_url: unknown, init: RequestInit) =>
+        new Promise<Response>((_, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))));
+      const f = vi.fn().mockImplementationOnce(hang).mockResolvedValueOnce(reply({ content: 'Hola' }));
+      const out = chat({ apiKey: 'k', model: DEFAULT_MODEL, history: [{ role: 'user', content: 'hola' }], context: null, fetchImpl: f });
+      await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+      await expect(out).resolves.toMatchObject({ model: FALLBACK_MODEL, fellBack: true });
+
+      const g = vi.fn().mockImplementation(hang);
+      const slow = expect(chat({ apiKey: 'k', model: FALLBACK_MODEL, history: [], context: null, fetchImpl: g })).rejects.toThrow('Gemini tardó demasiado');
+      await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+      await slow;
+
+      // «Detener» sigue funcionando: se corta sin mensaje de error ni reintento.
+      const stop = new AbortController();
+      const h = vi.fn().mockImplementation(hang);
+      const stopped = expect(chat({ apiKey: 'k', model: DEFAULT_MODEL, history: [], context: null, fetchImpl: h, signal: stop.signal })).rejects.toMatchObject({ name: 'AbortError' });
+      stop.abort();
+      await stopped;
+      expect(h).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

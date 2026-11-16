@@ -16,6 +16,7 @@ export function publicProfile(p: Profile | null) {
     bedTime: p?.bedTime ?? null,
     timezone: p?.timezone ?? 'UTC',
     baseline: (p?.baseline as Record<string, number> | undefined) ?? {},
+    avatar: p?.avatar ?? '',
     onboarded: !!p?.onboardedAt,
     onboardedAt: p?.onboardedAt ?? null,
   };

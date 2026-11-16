@@ -1,4 +1,4 @@
-import type { CheckInInput, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
+import type { CoupleCreateInput, CoupleData, CoupleItem, CoupleKind, CoupleSpace, AccountPlan, PaymentRequest, PaymentRequestInput, PaymentSettings, PlanPrices, PaymentMethod, CheckInInput, CourseLength, Day, HabitInput, HabitPatch, LegacyData, LegacyItems, LegacyKey, LegacyObjectKey, LegacyObjects, LegacyPatch, Period, ProfileInput, UserSettings, VaultItem, VaultSecure } from '@dyc/core';
 import type { AccountExport, Challenge, CheckIn, TokenPair, Dashboard, Habit, PartnerView, Profile, Recommendation, Session, User, UserChallenge } from './types.js';
 
 /** Error de la API con el mensaje listo para mostrar. */
@@ -160,6 +160,20 @@ export function createClient(opts: ClientOptions) {
       remove: (password: string) => request<{ ok: true }>('DELETE', '/api/v2/account', { password }),
     },
 
+    /** Alarmas del panel web aunque esté cerrado (Web Push). */
+    push: {
+      key: () => request<{ publicKey: string }>('GET', '/api/push/key'),
+      subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/api/push/subscription', { subscription }),
+      unsubscribe: (endpoint: string) => request<{ ok: true }>('DELETE', '/api/push/subscription', { endpoint }),
+      /** Sustituye las alarmas pendientes por estas (hora exacta en UTC). */
+      alarms: (alarms: Array<{ id: string; at: string; title: string; body: string; url: string }>) => request<{ ok: true; count: number }>('PUT', '/api/push/alarms', { alarms }),
+    },
+
+    courses: {
+      /** Cuánto dura un curso con solo su enlace (lo lee el servidor). 404 si la página no lo dice. */
+      length: (url: string) => request<CourseLength>('POST', '/api/v2/courses/length', { url }),
+    },
+
     /** Datos de la app anterior (v1): un documento JSON por persona. Para editar, usa `modules`. */
     legacy: {
       get: () => request<{ data: Record<string, unknown>; updatedAt: string | null }>('GET', '/api/sync'),
@@ -167,13 +181,15 @@ export function createClient(opts: ClientOptions) {
       images: (ids: string[]) => request<{ images: Record<string, string> }>('POST', '/api/images/fetch', { ids }),
       /** Sube imágenes `{ id: dataURL }` (máx. 50, 4 MB cada una); `count` = las que se guardaron. La app anterior las descarga igual. */
       uploadImages: (images: Record<string, string>) => request<{ ok: true; count: number }>('POST', '/api/images', { images }),
+      /** Borra imágenes o archivos propios por id (los ajenos se ignoran). */
+      deleteImages: (ids: string[]) => request<{ ok: true; count: number }>('POST', '/api/images/delete', { ids }),
     },
 
     /**
      * Módulos de la app anterior elemento a elemento (Agenda, Pendientes,
      * Calendario, Horario, Enfoque, Materias, Proyectos, Roadmaps, Cuadernos,
      * Contenido, Ideas, Finanzas, Metas, Mascotas, Ciclo, Ejercicio, Sueño,
-     * Diario, Rutina, Notas, Trabajo y Respiración) sobre el mismo documento de /api/sync. Los temas, hitos
+     * Diario, Rutina, Notas, Trabajo y las sesiones de respiración que ya existan) sobre el mismo documento de /api/sync. Los temas, hitos
      * y pasos se cambian enviando su lista completa en `update`. Las claves que
      * son un objeto (`cycle`, `dayLog`, `budget`) se guardan con `set` o `patch`.
      */
@@ -205,6 +221,23 @@ export function createClient(opts: ClientOptions) {
         request<{ migrated: number; remaining: number; updatedAt: string }>('POST', '/api/v2/modules/vaultSecure/migrate', { items, legacyIds }),
     },
 
+    /** Planes y pagos manuales. */
+    billing: {
+      get: () => request<Billing>('GET', '/api/v2/billing'),
+      pay: (b: PaymentRequestInput) => request<{ request: PaymentRequest }>('POST', '/api/v2/billing/requests', b).then((r) => r.request),
+      cancel: (id: string) => request<{ ok: true }>('DELETE', `/api/v2/billing/requests/${encodeURIComponent(id)}`),
+    },
+
+    /** Administración de pagos (solo las cuentas de ADMIN_EMAILS). */
+    admin: {
+      settings: () => request<{ settings: PaymentSettings }>('GET', '/api/v2/admin/payments/settings').then((r) => r.settings),
+      saveSettings: (settings: PaymentSettings) => request<{ settings: PaymentSettings }>('PUT', '/api/v2/admin/payments/settings', { settings }).then((r) => r.settings),
+      requests: (status?: PaymentRequest['status']) => request<{ pending: number; requests: AdminPaymentRequest[] }>('GET', `/api/v2/admin/payments/requests${q({ status })}`),
+      proof: (id: string) => request<{ proof: string }>('GET', `/api/v2/admin/payments/requests/${encodeURIComponent(id)}/proof`).then((r) => r.proof),
+      approve: (id: string, note = '') => request<{ request: PaymentRequest }>('POST', `/api/v2/admin/payments/requests/${encodeURIComponent(id)}/approve`, { note }).then((r) => r.request),
+      reject: (id: string, note = '') => request<{ request: PaymentRequest }>('POST', `/api/v2/admin/payments/requests/${encodeURIComponent(id)}/reject`, { note }).then((r) => r.request),
+    },
+
     partner: {
       get: () => request<PartnerView>('GET', '/api/partner'),
       invite: () => request<{ code: string }>('POST', '/api/partner/invite'),
@@ -212,7 +245,27 @@ export function createClient(opts: ClientOptions) {
       accept: (code: string) => request<{ ok: true; partner: { name: string } }>('POST', '/api/partner/accept', { code }),
       remove: () => request<{ ok: true }>('DELETE', '/api/partner'),
     },
+
+    /** Espacio en pareja: fotos, metas y emprendimientos compartidos (hace falta pareja vinculada). */
+    couple: {
+      get: () => request<CoupleSpace>('GET', '/api/v2/couple'),
+      add: (input: CoupleCreateInput) => request<{ item: CoupleItem }>('POST', '/api/v2/couple/items', input).then((r) => r.item),
+      update: <K extends CoupleKind>(id: string, data: Partial<CoupleData[K]>) => request<{ item: CoupleItem }>('PATCH', `/api/v2/couple/items/${encodeURIComponent(id)}`, { data }).then((r) => r.item),
+      remove: (id: string) => request<{ ok: true }>('DELETE', `/api/v2/couple/items/${encodeURIComponent(id)}`),
+      image: (id: string) => request<{ image: string }>('GET', `/api/v2/couple/items/${encodeURIComponent(id)}/image`).then((r) => r.image),
+    },
   };
 }
+
+export interface Billing {
+  plan: AccountPlan;
+  planUntil: string | null;
+  admin: boolean;
+  prices: PlanPrices;
+  methods: PaymentMethod[];
+  requests: PaymentRequest[];
+}
+
+export type AdminPaymentRequest = PaymentRequest & { user: { name: string; email: string } };
 
 export type ApiClient = ReturnType<typeof createClient>;

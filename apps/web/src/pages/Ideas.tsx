@@ -1,9 +1,10 @@
-import { IDEA_CATEGORIES, ideaCategoryOf, IDEA_CATEGORY_INFO, splitTags, type IdeaCategory, type LegacyIdea } from '@dyc/core';
+import { matchesSearch, IDEA_CATEGORIES, ideaCategoryOf, IDEA_CATEGORY_INFO, splitTags, type IdeaCategory, type LegacyIdea } from '@dyc/core';
 import { Lightbulb, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -22,24 +23,32 @@ export function Ideas() {
   const actions = useModule('ideas');
   const toast = useToast();
   const [filter, setFilter] = useState<Filter>('todas');
+  const [q, setQ] = useState('');
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<LegacyIdea | null>(null);
   const input = useRef<HTMLInputElement>(null);
   // Como la app anterior: una idea nueva toma la categoría del filtro (o App con «Todas»).
   const category: IdeaCategory = filter === 'todas' ? 'app' : filter;
-  const shown = ideas.filter((i) => filter === 'todas' || categoryOf(i) === filter);
+  const shown = ideas.filter((i) => (filter === 'todas' || categoryOf(i) === filter) && matchesSearch(q, i.title, i.body, i.tags));
 
   const add = (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    actions.add({ id: newId(), title: title.trim(), body: '', category, tags: '' });
+    actions.add({
+      id: newId(),
+      title: title.trim(),
+      body: '',
+      category,
+      tags: '',
+    });
     setTitle('');
   };
 
   const remove = (idea: LegacyIdea) => {
     const order = ideas.map((i) => i.id);
-    actions.remove(idea.id);
+    actions.remove(idea.id, { undo: false });
     toast('Idea eliminada.', {
+      key: 'undo',
       action: {
         label: 'Deshacer',
         run: () => {
@@ -61,6 +70,7 @@ export function Ideas() {
         <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
       ) : (
         <div className="stack-lg">
+          {ideas.length > 0 && <SearchBox label="Buscar en tus ideas" value={q} onChange={setQ} placeholder="Buscar por título, texto o etiqueta…" count={shown.length} />}
           <div className="chips" role="group" aria-label="Categoría">
             {(['todas', ...IDEA_CATEGORIES] as Filter[]).map((c) => (
               <button key={c} type="button" className="chip-btn" aria-pressed={filter === c} onClick={() => setFilter(c)}>
@@ -102,7 +112,9 @@ export function Ideas() {
               Anota lo que se te ocurra: apps, webs o estrategias de marketing. ¿Sin inspiración? Prueba con un ejemplo:
             </EmptyState>
           ) : shown.length === 0 ? (
-            <EmptyState title={`Aún no hay ideas de ${IDEA_CATEGORY_INFO[category].label}`}>Escribe la primera arriba.</EmptyState>
+            q.trim() ? null : (
+              <EmptyState title={`Aún no hay ideas de ${IDEA_CATEGORY_INFO[category].label}`}>Escribe la primera arriba.</EmptyState>
+            )
           ) : (
             <ul className="card-grid tool-grid" aria-label="Ideas">
               {shown.map((i) => (

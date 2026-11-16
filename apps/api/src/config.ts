@@ -29,6 +29,8 @@ export interface Config {
   /** URL pública de la API (enlaces de recuperación de contraseña). */
   publicUrl?: string;
   smtp: SmtpConfig | null;
+  /** Correos de las cuentas que administran pagos y planes (ADMIN_EMAILS, separados por comas). */
+  adminEmails: string[];
 }
 
 const DEV_SECRET = 'dev-secret-solo-local-0000000000000000';
@@ -80,6 +82,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     clientOrigins: list(env.CLIENT_ORIGIN),
     allowedRootDomains: list(env.ALLOWED_ROOT_DOMAINS ?? 'nvcorx.com'),
     publicUrl: env.PUBLIC_URL ? env.PUBLIC_URL.replace(/\/+$/, '') : undefined,
+    adminEmails: (env.ADMIN_EMAILS ?? '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
     smtp: env.SMTP_HOST
       ? {
           host: env.SMTP_HOST,

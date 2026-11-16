@@ -1,15 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyFormat, insertBlock, markdownToText, mdImageLabel, parseBlocks, parseInline } from '../src/markdown.js';
+import { applyFormat, insertBlock, markdownToText, mathRuns, mathSpoken, mdImageLabel, parseBlocks, parseInline } from '../src/markdown.js';
 import {
-  BREATH_PATTERNS,
-  breathClock,
-  breathCycleMs,
-  breathExpanded,
-  breathPhase,
   filterNotes,
   groupNotesBySubject,
-  meditationKindLabel,
-  meditationStats,
   noteColorOf,
   notePreview,
   noteSubjectOf,
@@ -20,7 +13,7 @@ import {
   workProjectOf,
   workStatusOf,
 } from '../src/tools.js';
-import type { LegacyMeditation, LegacyNote, LegacyWorkItem } from '../src/legacy.js';
+import type { LegacyNote, LegacyWorkItem } from '../src/legacy.js';
 
 describe('Markdown de las notas (sin HTML)', () => {
   it('bloques: títulos, listas, casillas, citas, código, fórmulas y separadores', () => {
@@ -70,6 +63,7 @@ describe('Markdown de las notas (sin HTML)', () => {
 
   it('texto plano y barra de formato', () => {
     expect(markdownToText('# Ondas\n- [ ] **Repasar** la _fórmula_ `f=1/T`\n![imagen](coreimg:a)')).toBe('Ondas Repasar la fórmula f=1/T [imagen]');
+    expect(markdownToText('Ver [Onda (física)](https://es.wikipedia.org/wiki/Onda_(física)) hoy')).toBe('Ver Onda (física) hoy');
     expect(applyFormat('hola mundo', 5, 10, 'bold')).toEqual({ value: 'hola **mundo**', start: 7, end: 12 });
     expect(applyFormat('- uno', 2, 2, 'task')).toEqual({ value: '- [ ] uno', start: 9, end: 9 });
     expect(applyFormat('- uno\n- dos', 0, 11, 'list').value).toBe('uno\ndos');
@@ -110,24 +104,37 @@ describe('tanda 4: Notas, Trabajo y Respiración', () => {
     expect(workBucketOf(w({}))).toBe('curso');
     expect(workBucketOf(w({ done: true }))).toBe('hecho');
   });
+});
 
-  it('respiración: fases, círculo, reloj y minutos', () => {
-    expect(breathCycleMs('caja')).toBe(16_000);
-    expect(breathCycleMs('478')).toBe(19_000);
-    expect(breathPhase('caja', 0)).toEqual({ phase: 'in', index: 0, seconds: 4, secondsLeft: 4 });
-    expect(breathPhase('caja', 5_200)).toEqual({ phase: 'hold', index: 1, seconds: 4, secondsLeft: 3 });
-    expect(breathPhase('478', 11_000)).toEqual({ phase: 'out', index: 2, seconds: 8, secondsLeft: 8 });
-    expect(breathPhase('478', 19_000 + 500).phase).toBe('in');
-    expect(BREATH_PATTERNS.caja.phases.map((_, i) => breathExpanded('caja', i))).toEqual([true, true, false, false]);
-    expect(breathClock(90_500)).toBe('1:31');
-    expect(breathClock(-5)).toBe('0:00');
-    const m = (id: string, date: string, minutes: unknown, kind = 'respiracion') => ({ id, date, minutes, kind }) as LegacyMeditation;
-    // Sábado 26 de septiembre de 2026: la semana va del lunes 21 al domingo 27.
-    const stats = meditationStats([m('a', '2026-09-26', 3), m('b', '2026-09-21', 5), m('c', '2026-09-20', 1), m('d', 'mal', 9), m('e', '2026-09-26', '2')], '2026-09-26');
-    expect(stats).toMatchObject({ todayMinutes: 3, weekMinutes: 8 });
-    expect(stats.valid.map((s) => s.id)).toEqual(['a', 'b', 'c']);
-    expect(meditationKindLabel('respiracion')).toBe('Respiración');
-    expect(meditationKindLabel('')).toBe('Respiración');
-    expect(meditationKindLabel('Yoga')).toBe('Yoga');
+describe('mathRuns (fórmulas)', () => {
+  it('separa exponentes y subíndices', () => {
+    expect(mathRuns('x^2')).toEqual([
+      { text: 'x', pos: 'base' },
+      { text: '2', pos: 'sup' },
+    ]);
+    expect(mathRuns('x_{i}^{2}')).toEqual([
+      { text: 'x', pos: 'base' },
+      { text: 'i', pos: 'sub' },
+      { text: '2', pos: 'sup' },
+    ]);
+  });
+  it('cambia comandos por símbolos, fracciones y raíces', () => {
+    expect(mathSpoken('\\alpha \\le \\sqrt{y}')).toBe('α ≤ √(y)');
+    expect(mathSpoken('\\frac{a+b}{2}')).toBe('(a+b)/2');
+    expect(mathSpoken('a \\cdot b \\neq c')).toBe('a · b ≠ c');
+  });
+  it('dibuja exponentes dentro de raíces y fracciones, y acentos', () => {
+    expect(mathRuns('\\sqrt{x_1^2}')).toEqual([
+      { text: '√(x', pos: 'base' },
+      { text: '1', pos: 'sub' },
+      { text: '2', pos: 'sup' },
+      { text: ')', pos: 'base' },
+    ]);
+    expect(mathSpoken('\\bar v')).toBe('v\u0304');
+  });
+  it('deja tal cual lo que no conoce y no se rompe con llaves sin cerrar', () => {
+    expect(mathSpoken('\\raro x')).toBe('\\raro x');
+    expect(mathSpoken('\\frac{a')).toBe('a/');
+    expect(mathRuns('')).toEqual([]);
   });
 });

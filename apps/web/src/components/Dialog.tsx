@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
 /** Diálogo modal con <dialog> nativo: foco atrapado, Esc para cerrar. */
-export function Dialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+export function Dialog({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -14,7 +14,7 @@ export function Dialog({ open, onClose, title, children }: { open: boolean; onCl
   }, [open]);
 
   return (
-    <dialog ref={ref} className="dialog" aria-labelledby={titleId} onClose={onClose} onCancel={onClose}>
+    <dialog ref={ref} className={wide ? 'dialog dialog--wide' : 'dialog'} aria-labelledby={titleId} onClose={onClose} onCancel={onClose}>
       {open && (
         <div className="dialog__body">
           <div className="dialog__header">

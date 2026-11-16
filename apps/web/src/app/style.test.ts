@@ -35,12 +35,10 @@ describe('preferencia de estilo visual', () => {
     expect(document.documentElement.dataset.style).toBe('suave');
   });
 
-  it('index.html pinta el estilo por defecto y conoce todos los estilos antes de cargar la app', () => {
+  it('index.html pinta siempre el valor por defecto y borra la elección vieja (ya no se elige en Perfil)', () => {
     const html = srcFile('../index.html');
     expect(html).toMatch(new RegExp(`<html [^>]*data-style="${DEFAULT_STYLE}"`));
-    const list = /\[([^\]]*)\]\.indexOf\(s\)/.exec(html)?.[1] ?? '';
-    const inScript = [...list.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort();
-    expect(inScript).toEqual(STYLE_OPTIONS.map((o) => o.value).sort());
+    expect(html).toContain("localStorage.removeItem('dyc.style')");
   });
 });
 

@@ -166,14 +166,19 @@ export const isNoteImageRef = (ref: string): boolean => ref.startsWith('coreimg:
 
 /** Texto sin marcas de Markdown (para extractos y búsquedas). */
 export function markdownToText(src: string): string {
-  return src
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_m, alt: string) => (alt.trim() ? `[${alt.trim()}]` : '[imagen]'))
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]\s+\[[ xX]\]|[-*+]|\d+[.)])\s+/gm, '')
-    .replace(/(\*\*|__|~~|`+|\$\$?)/g, '')
-    .replace(/(^|\W)[*_](\S[^*_]*?)[*_](?=\W|$)/g, '$1$2')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    src
+      // Enlaces con paréntesis dentro (como los de Wikipedia) se quitan enteros, sin dejar «)» suelto.
+      .replace(/!\[([^\]]*)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+"[^"]*")?\)/g, (_m, alt: string) => (alt.trim() ? `[${alt.trim()}]` : '[imagen]'))
+      .replace(/\[([^\]]+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+"[^"]*")?\)/g, '$1')
+      .replace(/^\s{0,3}(#{1,6}|>|[-*+]\s+\[[ xX]\]|[-*+]|\d+[.)])\s+/gm, '')
+      // Las fórmulas, legibles: «$\frac{a}{b}$» → «a/b».
+      .replace(/\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g, (_m, block: string | undefined, inline: string | undefined) => mathSpoken(block ?? inline ?? ''))
+      .replace(/(\*\*|__|~~|`+|\$\$?)/g, '')
+      .replace(/(^|\W)[*_](\S[^*_]*?)[*_](?=\W|$)/g, '$1$2')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 // ---------- Barra de formato de las notas ----------
@@ -251,3 +256,117 @@ export function insertBlock(value: string, start: number, end: number, block: st
   const pos = start + text.length;
   return { value: value.slice(0, start) + text + value.slice(end), start: pos, end: pos };
 }
+
+// ---------- Fórmulas ----------
+
+const MATH_SYMBOLS: Record<string, string> = {
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ',
+  nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ', phi: 'φ', varphi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω',
+  Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π', Sigma: 'Σ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
+  cdot: '·', times: '×', div: '÷', pm: '±', mp: '∓', le: '≤', leq: '≤', ge: '≥', geq: '≥', neq: '≠', ne: '≠', approx: '≈', equiv: '≡', sim: '∼', propto: '∝',
+  infty: '∞', partial: '∂', nabla: '∇', sum: 'Σ', prod: 'Π', int: '∫', oint: '∮', to: '→', rightarrow: '→', leftarrow: '←', Rightarrow: '⇒', Leftrightarrow: '⇔',
+  in: '∈', notin: '∉', subset: '⊂', subseteq: '⊆', cup: '∪', cap: '∩', emptyset: '∅', forall: '∀', exists: '∃', neg: '¬', land: '∧', lor: '∨',
+  angle: '∠', degree: '°', circ: '∘', ldots: '…', cdots: '⋯', dots: '…', lim: 'lim', sin: 'sin', cos: 'cos', tan: 'tan', log: 'log', ln: 'ln', exp: 'exp',
+  quad: ' ', qquad: '  ', ',': ' ', ';': ' ', '!': '', left: '', right: '', mathrm: '', text: '', mathbf: '', displaystyle: '',
+};
+
+/** Trozo de una fórmula: texto normal, exponente o subíndice. */
+export interface MathRun {
+  text: string;
+  pos: 'base' | 'sup' | 'sub';
+}
+
+/** Lee un grupo `{…}` (con llaves anidadas) o un solo carácter/comando desde `i`. */
+function mathGroup(src: string, i: number): { body: string; end: number } {
+  while (src[i] === ' ') i++;
+  if (src[i] === '{') {
+    let depth = 0;
+    for (let j = i; j < src.length; j++) {
+      if (src[j] === '{') depth++;
+      else if (src[j] === '}' && --depth === 0) return { body: src.slice(i + 1, j), end: j + 1 };
+    }
+    return { body: src.slice(i + 1), end: src.length };
+  }
+  if (src[i] === '\\') {
+    const m = /^\\([a-zA-Z]+|.)/.exec(src.slice(i));
+    if (m) return { body: m[0], end: i + m[0].length };
+  }
+  return { body: src[i] ?? '', end: i + 1 };
+}
+
+/** Texto plano de una fórmula LaTeX sencilla (sin exponentes, que van aparte). */
+function mathPlain(src: string): string {
+  return mathRuns(src)
+    .map((r) => (r.pos === 'base' ? r.text : r.pos === 'sup' ? `^${r.text.length > 1 ? `(${r.text})` : r.text}` : `_${r.text.length > 1 ? `(${r.text})` : r.text}`))
+    .join('');
+}
+
+const MATH_ACCENTS: Record<string, string> = { bar: '\u0304', overline: '\u0305', hat: '\u0302', widehat: '\u0302', vec: '\u20D7', dot: '\u0307', ddot: '\u0308', tilde: '\u0303' };
+
+/**
+ * Fórmula LaTeX sencilla → trozos para dibujarla: letras griegas y símbolos,
+ * `\frac{a}{b}` → a/b, `\sqrt{x}` → √(x), `\bar{v}` → v̄, `x^2`, `x_{i}`
+ * (también dentro de raíces y fracciones). No es un motor completo de LaTeX:
+ * lo que no entiende se deja tal cual, nunca como HTML.
+ */
+export function mathRuns(src: string): MathRun[] {
+  const out: MathRun[] = [];
+  const push = (text: string, pos: MathRun['pos'] = 'base') => {
+    if (!text) return;
+    const last = out[out.length - 1];
+    if (last && last.pos === pos) last.text += text;
+    else out.push({ text, pos });
+  };
+  const pushRuns = (runs: MathRun[]) => runs.forEach((r) => push(r.text, r.pos));
+  // Una parte de una fracción: sin paréntesis si es simple (una letra, un número).
+  const part = (body: string) => {
+    const runs = mathRuns(body);
+    const simple = runs.length <= 1 && /^[\w.]*$/.test(runs[0]?.text ?? '');
+    if (!simple) push('(');
+    pushRuns(runs);
+    if (!simple) push(')');
+  };
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '^' || c === '_') {
+      const g = mathGroup(src, i + 1);
+      push(mathPlain(g.body), c === '^' ? 'sup' : 'sub');
+      i = g.end;
+    } else if (c === '\\') {
+      const m = /^\\([a-zA-Z]+|.)/.exec(src.slice(i));
+      const name = m ? m[1] : '';
+      i += m ? m[0].length : 1;
+      if (name === 'frac' || name === 'dfrac' || name === 'tfrac') {
+        const a = mathGroup(src, i);
+        const b = mathGroup(src, a.end);
+        part(a.body);
+        push('/');
+        part(b.body);
+        i = b.end;
+      } else if (name === 'sqrt') {
+        const a = mathGroup(src, i);
+        push('√(');
+        pushRuns(mathRuns(a.body));
+        push(')');
+        i = a.end;
+      } else if (name in MATH_ACCENTS) {
+        const a = mathGroup(src, i);
+        const runs = mathRuns(a.body);
+        if (runs.length) runs[runs.length - 1].text += MATH_ACCENTS[name];
+        pushRuns(runs);
+        i = a.end;
+      } else if (name in MATH_SYMBOLS) push(MATH_SYMBOLS[name]);
+      else if (name === '{' || name === '}' || name === '%' || name === '$' || name === '#' || name === '&' || name === '_') push(name);
+      else push(`\\${name}`);
+    } else if (c === '{' || c === '}') i++;
+    else {
+      push(c);
+      i++;
+    }
+  }
+  return out;
+}
+
+/** La fórmula en una sola línea de texto (para lectores de pantalla y para copiar). */
+export const mathSpoken = (src: string) => mathPlain(src).replace(/\s+/g, ' ').trim();

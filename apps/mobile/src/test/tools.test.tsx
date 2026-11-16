@@ -3,6 +3,7 @@ import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testi
 import * as SecureStore from 'expo-secure-store';
 import { Linking } from 'react-native';
 import { auth } from '../lib/api';
+import { resetFocusTimer } from '../lib/focusTimer';
 import { fakeModules, tokens, type Handler } from './fakeApi';
 
 // Herramientas de la app anterior en el móvil: «Más», Agenda, Pendientes,
@@ -62,6 +63,7 @@ async function open(path: string, marker: string | RegExp) {
 describe('herramientas en el móvil', () => {
   beforeEach(async () => {
     reset();
+    resetFocusTimer();
     await auth.signIn(tokens());
   });
   afterEach(() => jest.restoreAllMocks());
@@ -71,13 +73,14 @@ describe('herramientas en el móvil', () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     await open('/mas', 'Tus herramientas');
     for (const g of ['Organización', 'Estudio y trabajo', 'Conocimiento', 'Vida personal', 'Salud']) expect(await screen.findByText(g)).toBeOnTheScreen();
-    expect(screen.getByText('Todo lo de la app anterior, con tus datos: 24 herramientas en el móvil.')).toBeOnTheScreen();
+    expect(screen.getByText('Todas tus herramientas, con tus datos: 26 en el móvil.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Agenda, 4 elementos' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Pendientes, 2 por hacer' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Enfoque, 1 sesión' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Pomodoro, 1 sesión' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Trabajo, Vacío' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Notas, Vacío' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Respiración, Vacío' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Emprendimientos, Vacío' })).toBeOnTheScreen();
+    expect(screen.queryByText('Respiración')).toBeNull();
 
     // Asistente y Bóveda ya son nativos: nada se abre en la web.
     expect(screen.queryByText('En la web')).toBeNull();
@@ -172,7 +175,7 @@ describe('herramientas en el móvil', () => {
     // El panel sigue abierto tras renombrar.
     fireEvent.press(await screen.findByRole('button', { name: 'Borrar «Ordenar la mesa»' }));
     await waitForWrite(api, 'DELETE', '/api/v2/modules/todos/d2');
-    expect(await screen.findByText('Pendiente y subtareas eliminados.')).toBeOnTheScreen();
+    expect(await screen.findByText('Eliminado.')).toBeOnTheScreen();
     await waitFor(() => expect(screen.queryByText('Ordenar la mesa')).toBeNull());
   });
 
@@ -251,6 +254,18 @@ describe('herramientas en el móvil', () => {
     fireEvent.press(await screen.findByRole('button', { name: 'Cálculo, lunes de 08:00 a 09:30, aula A-201. Editar' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Borrar clase' }));
     await waitForWrite(api, 'DELETE', '/api/v2/modules/classes/c1');
+  });
+
+  it('Enfoque: sigue contando al salir de la pantalla', async () => {
+    setup();
+    await open('/enfoque', 'Últimas sesiones');
+    fireEvent.press(screen.getByRole('button', { name: 'Empezar' }));
+    screen.unmount();
+    await open('/mas', 'Tus herramientas');
+    screen.unmount();
+    await open('/enfoque', 'Últimas sesiones');
+    expect(screen.getByRole('button', { name: 'Pausar' })).toBeOnTheScreen();
+    await waitFor(() => expect(screen.getByRole('timer')).toHaveTextContent('24:59'), { timeout: 4000 });
   });
 
   it('Enfoque: cuenta, pausa y guarda la sesión al saltar (lo más reciente primero)', async () => {
