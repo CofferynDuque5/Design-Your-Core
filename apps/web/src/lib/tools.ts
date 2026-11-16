@@ -27,14 +27,28 @@ export function useAutosave(value: string, save: (v: string) => void, delay = 60
   useLayoutEffect(() => {
     saveRef.current = save;
   });
+  // Valores enviados que el servidor aún no devolvió. Si llega primero la respuesta de un
+  // guardado anterior, no debe pisar lo que se escribió después (con red lenta se perdía texto).
+  const sent = useRef<string[]>([]);
   useEffect(() => {
-    if (pending.current === null) setDraft(value);
+    if (pending.current !== null) return;
+    const i = sent.current.indexOf(value);
+    if (i >= 0 && i < sent.current.length - 1) {
+      // Eco de un guardado viejo: se descarta y se espera el más reciente.
+      sent.current = sent.current.slice(i + 1);
+      return;
+    }
+    sent.current = [];
+    setDraft(value);
   }, [value]);
   const flush = useCallback(() => {
     window.clearTimeout(timer.current);
     const v = pending.current;
     pending.current = null;
-    if (v !== null) saveRef.current(v);
+    if (v !== null) {
+      sent.current = [...sent.current.slice(-19), v];
+      saveRef.current(v);
+    }
   }, []);
   const change = useCallback(
     (v: string) => {
