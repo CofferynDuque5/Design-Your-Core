@@ -146,7 +146,7 @@ function luminance(hex: string): number {
 }
 
 /** Casilla grande con su texto; toda la fila es el objetivo táctil. */
-export function CheckRow({ title, done, onToggle, meta, color, trailing }: { title: string; done: boolean; onToggle: () => void; meta?: string; color?: string; trailing?: ReactNode }) {
+export function CheckRow({ title, done, onToggle, meta, color, trailing, icon }: { title: string; done: boolean; onToggle: () => void; meta?: string; color?: string; trailing?: ReactNode; icon?: ReactNode }) {
   const { colors } = useTheme();
   const tone = color ?? colors.primary;
   return (
@@ -160,6 +160,7 @@ export function CheckRow({ title, done, onToggle, meta, color, trailing }: { tit
         style={({ pressed }) => [s.checkHit, pressed && { opacity: 0.7 }]}
       >
         <View style={[s.box, { borderColor: done ? tone : colors.lineStrong, backgroundColor: done ? tone : 'transparent' }]}>{done && <Check size={16} strokeWidth={2.5} color={colors.surface} />}</View>
+        {icon}
         <View style={{ flex: 1 }}>
           <T v="body" tint={done ? 'muted' : 'ink'} style={done && { textDecorationLine: 'line-through' }}>
             {title}

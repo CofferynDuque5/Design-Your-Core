@@ -758,15 +758,19 @@ export interface CourseLesson {
   done?: boolean;
   /** Duración en segundos, si se sabe. */
   seconds?: number;
+  /** Qué es la lección: video, lectura, infografía… (se ve su ícono en la lista). */
+  kind?: ActivityKind;
   /** Lo que hay que hacer dentro de la lección: videos, lecturas, cuestionarios, exámenes… */
   activities?: LessonActivity[];
 }
 
-export const ACTIVITY_KINDS = ['video', 'lectura', 'cuestionario', 'examen', 'tarea', 'practica', 'proyecto', 'otro'] as const;
+export const ACTIVITY_KINDS = ['video', 'lectura', 'infografia', 'audio', 'cuestionario', 'examen', 'tarea', 'practica', 'proyecto', 'otro'] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 export const ACTIVITY_KIND_LABEL: Record<ActivityKind, string> = {
   video: 'Video',
   lectura: 'Lectura',
+  infografia: 'Infografía',
+  audio: 'Audio',
   cuestionario: 'Cuestionario',
   examen: 'Examen',
   tarea: 'Tarea',
@@ -1251,6 +1255,7 @@ const shapes = {
           url: z.union([z.literal(''), z.string().trim().max(2000).url('Enlace no válido').refine((u) => /^https?:\/\//i.test(u), 'El enlace debe empezar por http:// o https://')]).optional(),
           done: z.boolean().optional(),
           seconds: z.number().int().min(0).max(1e6).optional(),
+          kind: z.enum(ACTIVITY_KINDS).optional(),
           activities: z
             .array(
               z.object({

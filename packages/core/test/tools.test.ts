@@ -401,3 +401,21 @@ describe('Duración de un curso', () => {
     expect(courseLengthLabel({ url: '' })).toBe('');
   });
 });
+
+describe('tipo de lección', () => {
+  it('usa el elegido o «video» si el enlace es de YouTube', async () => {
+    const { lessonKind } = await import('../src/tools.js');
+    expect(lessonKind({ kind: 'infografia', url: 'https://youtube.com/watch?v=abcdefghijk' })).toBe('infografia');
+    expect(lessonKind({ url: 'https://www.youtube.com/watch?v=abcdefghijk' })).toBe('video');
+    expect(lessonKind({ url: 'https://ejemplo.com/clase' })).toBeUndefined();
+    expect(lessonKind({})).toBeUndefined();
+  });
+
+  it('el curso guarda el tipo de cada lección', async () => {
+    const { legacyItemSchemas: legacySchemas } = await import('../src/legacy.js');
+    const ok = legacySchemas.courses.safeParse({ id: 'c1', topic: 'Python', title: 'Python', url: '', status: 'pendiente', notes: '', lessons: [{ id: 'l1', title: 'Mapa de conceptos', kind: 'infografia' }] });
+    expect(ok.success).toBe(true);
+    const bad = legacySchemas.courses.safeParse({ id: 'c1', topic: 'Python', title: 'Python', url: '', status: 'pendiente', notes: '', lessons: [{ id: 'l1', title: 'X', kind: 'pelicula' }] });
+    expect(bad.success).toBe(false);
+  });
+});

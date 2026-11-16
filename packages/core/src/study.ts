@@ -58,6 +58,7 @@ export function lessonsFromPlaylist(items: NonNullable<CourseLength['items']>, l
     id: newId(),
     title: (v.title.trim() || `Video ${i + 1}`).slice(0, 200),
     url: `https://www.youtube.com/watch?v=${v.video}&list=${list}`,
+    kind: 'video' as const,
     ...(v.seconds > 0 ? { seconds: Math.min(1e6, Math.round(v.seconds)) } : {}),
   }));
 }

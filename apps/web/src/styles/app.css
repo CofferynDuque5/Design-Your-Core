@@ -7929,6 +7929,22 @@
     white-space: nowrap;
   }
 
+  /* Ícono del tipo de lección (video, lectura, infografía…) en la lista. */
+  .lesson-kind {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-sunken);
+    color: var(--color-primary);
+  }
+
+  .lessons__row.is-done .lesson-kind {
+    color: var(--color-ink-muted);
+  }
+
   .act-kind--examen,
   .act-kind--cuestionario {
     border-color: var(--color-primary);

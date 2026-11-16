@@ -217,8 +217,10 @@ describe('Cursos y Horario en el móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Añadir lección a «Unidad 2»' }));
     expect(screen.getByLabelText('En la unidad (opcional)').props.value).toBe('Unidad 2');
     fireEvent.changeText(screen.getByLabelText('Lección o video'), 'useState');
-    fireEvent.press(screen.getByRole('button', { name: 'Añadir lección' }));
-    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));
+    fireEvent.press(screen.getAllByRole('button', { name: 'Lectura' })[0]);
+    fireEvent.press(screen.getByRole('button', { name: 'Añadir lectura' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2', kind: 'lectura' }] } }));
+    expect(await screen.findByRole('checkbox', { name: 'useState' })).toHaveProp('accessibilityHint', 'Lectura');
     fireEvent.press(await screen.findByRole('button', { name: 'Traer los videos nuevos de la lista' }));
     const wv = jest.requireMock<{ __send: (o: unknown) => void }>('react-native-webview');
     await waitFor(() => expect(screen.getByTestId('webview', { includeHiddenElements: true })).toBeOnTheScreen());

@@ -48,6 +48,7 @@ import {
   type IdeaCategory,
   type LegacyClass,
   type CourseLesson,
+  type ActivityKind,
   type LegacyCourse,
   type LegacyContent,
   type LegacyData,
@@ -1193,6 +1194,15 @@ export function coursePlaybackPatch(c: LegacyCourse, at: { position: number; dur
 }
 
 /** La primera lección sin ver. */
+/**
+ * Qué es la lección: la que eligió la persona o, si no eligió, «video» cuando
+ * el enlace es de YouTube. Sin dato, undefined (no se muestra ícono).
+ */
+export function lessonKind(l: Pick<CourseLesson, 'kind' | 'url'>): ActivityKind | undefined {
+  if (l.kind) return l.kind;
+  return l.url && youtubeRef(l.url) ? 'video' : undefined;
+}
+
 export const nextLesson = (c: Pick<LegacyCourse, 'lessons'>): CourseLesson | undefined => c.lessons?.find((l) => !l.done);
 
 /** Lecciones por unidad, en el orden en que aparece cada una (las sin unidad, donde caigan). */

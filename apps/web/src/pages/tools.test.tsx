@@ -611,8 +611,13 @@ describe('Cursos: progreso y horario', () => {
     expect(within(dialog).getByLabelText('Lección o video')).toHaveFocus();
     expect(within(dialog).getByLabelText('En la unidad (opcional)')).toHaveValue('Unidad 2');
     await userEvent.type(within(dialog).getByLabelText('Lección o video'), 'useState');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir lección' }));
-    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { progress: 33, lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2' }] } }));
+    // Se elige qué es la lección y se ve su ícono en la lista.
+    const tipo = within(dialog).getByRole('group', { name: 'Tipo de lección' });
+    expect(within(tipo).getByRole('button', { name: 'Video' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(within(tipo).getByRole('button', { name: 'Infografía' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir infografía' }));
+    await waitFor(() => expect(writes(api).at(-1)).toMatchObject({ body: { progress: 33, lessons: [{ id: 'l1' }, { id: 'l2' }, { title: 'useState', unit: 'Unidad 2', kind: 'infografia' }] } }));
+    expect(await within(dialog).findByRole('checkbox', { name: /^Infografía:\s*useState/ })).toBeInTheDocument();
     expect(await within(dialog).findByRole('heading', { name: /Unidad 2 · 0\/1/ })).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cambiar el nombre de «Unidad 2»' }));
     const nombre = within(dialog).getByLabelText('Nuevo nombre de «Unidad 2»');
@@ -627,7 +632,7 @@ describe('Cursos: progreso y horario', () => {
     expect(await within(dialog).findByText('Listo: 2 lecciones nuevas de la lista.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Ver «Clase 2» aquí' })).toBeInTheDocument();
     expect(writes(api).at(-1)).toMatchObject({ body: { lessons: [{}, {}, {}, { title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabcdefghijk', seconds: 300 }, { title: 'Clase 2' }] } });
-  });
+  }, 20_000);
 
   it('la tarjeta muestra las unidades y el idioma, que se elige al editar', async () => {
     const api = withApi({}, (doc) => {

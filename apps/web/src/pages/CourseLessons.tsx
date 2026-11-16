@@ -1,6 +1,6 @@
-import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, lessonKind, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { useIsMutating } from '@tanstack/react-query';
-import { BookOpen, Check, Circle, CircleHelp, CirclePlay, ExternalLink, FileCheck, FolderKanban, FolderPlus, Hammer, ListVideo, PenLine, Pencil, Play, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, Check, ChartPie, Circle, CircleHelp, CirclePlay, ExternalLink, FileCheck, FolderKanban, FolderPlus, Hammer, Headphones, ListVideo, PenLine, Pencil, Play, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, type ChangeOpts } from '../app/legacy';
 import { TextField } from '../components/Form';
@@ -34,6 +34,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const [title, setTitle] = useState('');
   const [unit, setUnit] = useState(() => lessons.at(-1)?.unit ?? '');
   const [url, setUrl] = useState('');
+  const [newKind, setNewKind] = useState<ActivityKind>('video');
   const [playing, setPlaying] = useState<string | null>(null);
   const [editingLesson, setEditingLesson] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -88,7 +89,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const add = (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || badUrl) return;
-    save([...lessons, { id: newId(), title: title.trim(), ...(unit.trim() ? { unit: unit.trim() } : {}), ...(link ? { url: link } : {}) }]);
+    save([...lessons, { id: newId(), title: title.trim(), kind: newKind, ...(unit.trim() ? { unit: unit.trim() } : {}), ...(link ? { url: link } : {}) }]);
     setTitle('');
     setUrl('');
     setStatus(`Añadida «${title.trim()}».`);
@@ -224,10 +225,18 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
           <ul className="lessons__list">
             {g.items.map((l) => {
               const yt = l.url ? youtubeRef(l.url) : null;
+              const k = lessonKind(l);
+              const KindIcon = k ? ACTIVITY_ICON[k] : null;
               return (
                 <li key={l.id} className={`check-row lessons__row${l.done ? ' is-done' : ''}`}>
                   <label className="check-row__label">
                     <input type="checkbox" checked={!!l.done} onChange={() => toggle(l.id)} />
+                    {KindIcon && k && (
+                      <span className={`lesson-kind lesson-kind--${k}`} title={ACTIVITY_KIND_LABEL[k]}>
+                        <KindIcon size={16} aria-hidden="true" />
+                        <span className="visually-hidden">{`${ACTIVITY_KIND_LABEL[k]}: `}</span>
+                      </span>
+                    )}
                     <span>
                       {l.title}
                       {l.seconds ? <span className="small muted"> · {formatLength(l.seconds)}</span> : null}
@@ -289,6 +298,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
             ))}
           </datalist>
         )}
+        <KindChips label="Tipo de lección" value={newKind} onChange={setNewKind} />
         <TextField
           label="Enlace de la lección (opcional)"
           type="url"
@@ -301,7 +311,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
           error={badUrl ? 'Pega un enlace completo, por ejemplo https://youtube.com/watch?v=…' : null}
         />
         <button type="submit" className="btn btn--sm" disabled={!title.trim() || badUrl || lessons.length >= 500} style={{ alignSelf: 'flex-start' }}>
-          <Plus size={16} aria-hidden="true" /> Añadir lección
+          <Plus size={16} aria-hidden="true" /> Añadir {ACTIVITY_KIND_LABEL[newKind].toLowerCase()}
         </button>
       </form>
     </div>
@@ -311,6 +321,8 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
 export const ACTIVITY_ICON: Record<ActivityKind, LucideIcon> = {
   video: CirclePlay,
   lectura: BookOpen,
+  infografia: ChartPie,
+  audio: Headphones,
   cuestionario: CircleHelp,
   examen: FileCheck,
   tarea: PenLine,
@@ -318,6 +330,28 @@ export const ACTIVITY_ICON: Record<ActivityKind, LucideIcon> = {
   proyecto: FolderKanban,
   otro: Circle,
 };
+
+/** Etiquetas con ícono para elegir el tipo (de lección o de actividad). */
+function KindChips({ label, value, onChange }: { label: string; value: ActivityKind; onChange: (k: ActivityKind) => void }) {
+  const id = useId();
+  return (
+    <div className="field">
+      <span className="field__label" id={id}>
+        {label}
+      </span>
+      <div className="opt-picker__chips" role="group" aria-labelledby={id}>
+        {ACTIVITY_KINDS.map((k) => {
+          const Icon = ACTIVITY_ICON[k];
+          return (
+            <button key={k} type="button" className={`opt-chip${value === k ? ' is-on' : ''}`} aria-pressed={value === k} onClick={() => onChange(k)}>
+              <Icon size={14} aria-hidden="true" /> {ACTIVITY_KIND_LABEL[k]}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Editar una lección: su nombre, unidad y enlace, y lo que hay que hacer
@@ -328,13 +362,14 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
   const [name, setName] = useState(lesson.title);
   const [unit, setUnit] = useState(lesson.unit ?? '');
   const [url, setUrl] = useState(lesson.url ?? '');
+  const [type, setType] = useState<ActivityKind>(lessonKind(lesson) ?? 'otro');
   const [kind, setKind] = useState<ActivityKind>('video');
   const [what, setWhat] = useState('');
   const unitList = useId();
   const link = normalizeCourseUrl(url);
   const badUrl = !!url.trim() && !validCourseUrl(link);
   const acts = lesson.activities ?? [];
-  const changed = name.trim() !== lesson.title || unit.trim() !== (lesson.unit ?? '') || link !== (lesson.url ?? '');
+  const changed = name.trim() !== lesson.title || unit.trim() !== (lesson.unit ?? '') || link !== (lesson.url ?? '') || type !== (lessonKind(lesson) ?? 'otro');
   const saveActs = (next: LessonActivity[]) => {
     const all = next.length > 0 && next.every((a) => a.done);
     onSave({ activities: next, ...(next.length ? { done: all } : {}) });
@@ -357,6 +392,7 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
           ))}
         </datalist>
       )}
+      <KindChips label="Tipo de lección" value={type} onChange={setType} />
       <TextField
         label="Enlace (opcional)"
         type="url"
@@ -373,7 +409,7 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
           className="btn btn--sm"
           disabled={!changed || !name.trim() || badUrl}
           onClick={() => {
-            onSave({ title: name.trim(), unit: unit.trim() || undefined, url: link || undefined });
+            onSave({ title: name.trim(), unit: unit.trim() || undefined, url: link || undefined, kind: type });
           }}
         >
           <Check size={16} aria-hidden="true" /> Guardar cambios
@@ -408,16 +444,7 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
         </ul>
       )}
       <div className="lesson-editor__add stack-sm">
-        <div className="opt-picker__chips" role="group" aria-label="Tipo de actividad">
-          {ACTIVITY_KINDS.map((k) => {
-            const Icon = ACTIVITY_ICON[k];
-            return (
-              <button key={k} type="button" className={`opt-chip${kind === k ? ' is-on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
-                <Icon size={14} aria-hidden="true" /> {ACTIVITY_KIND_LABEL[k]}
-              </button>
-            );
-          })}
-        </div>
+        <KindChips label="Tipo de actividad" value={kind} onChange={setKind} />
         <div className="lesson-editor__add-row">
           <TextField
             label="Qué hay que hacer"
@@ -444,6 +471,8 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
 const ACTIVITY_PLACEHOLDER: Record<ActivityKind, string> = {
   video: 'Ver el video de la clase',
   lectura: 'Leer el capítulo 2',
+  infografia: 'Revisar la infografía del tema',
+  audio: 'Escuchar el pódcast de la clase',
   cuestionario: 'Cuestionario de repaso',
   examen: 'Examen de la unidad',
   tarea: 'Entregar el ejercicio 3',

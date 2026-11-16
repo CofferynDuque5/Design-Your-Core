@@ -1,13 +1,13 @@
-import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, type CourseLesson, type LegacyCourse } from '@dyc/core';
+import { ACTIVITY_KINDS, ACTIVITY_KIND_LABEL, activityCount, type ActivityKind, type LessonActivity, unitWord, addUnitPatch, courseUnits, nextUnitNumber, numberedUnit, formatLength, lessonsByUnit, removeUnitPatch, renameUnitPatch, lessonsFromPlaylist, lessonsPatch, nextLesson, normalizeCourseUrl, validCourseUrl, youtubeRef, lessonKind, type CourseLesson, type LegacyCourse } from '@dyc/core';
 import { space } from '@dyc/tokens';
 import { useIsMutating } from '@tanstack/react-query';
-import { Check, ExternalLink, FolderPlus, ListVideo, Pencil, Play, Plus, Trash2, X } from 'lucide-react-native';
+import { BookOpen, ChartPie, Check, Circle, CircleHelp, CirclePlay, ExternalLink, FileCheck, FolderKanban, FolderPlus, Hammer, Headphones, ListVideo, PenLine, Pencil, Play, Plus, Trash2, X, type LucideIcon } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Linking, Platform, ScrollView, View, type TextInput } from 'react-native';
 import { newId, useLegacyData, useLegacyList, type ChangeOpts } from '../lib/legacy';
 import { useTheme } from '../lib/theme';
-import { CheckRow, DotChoices, IconButton, Suggestions } from './tools';
-import { Button, Field, T } from './ui';
+import { CheckRow, IconButton, Suggestions } from './tools';
+import { Button, Chip, Field, T } from './ui';
 import { YouTubeLengthReader, YouTubeView, type LengthFound } from './YouTubeView';
 
 /**
@@ -37,6 +37,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
   const [title, setTitle] = useState('');
   const [unit, setUnit] = useState(() => lessons.at(-1)?.unit ?? '');
   const [url, setUrl] = useState('');
+  const [newKind, setNewKind] = useState<ActivityKind>('video');
   const [playing, setPlaying] = useState<string | null>(null);
   const [editingLesson, setEditingLesson] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
 
   const add = () => {
     if (!title.trim() || badUrl) return;
-    save([...lessons, { id: newId(), title: title.trim(), ...(unit.trim() ? { unit: unit.trim() } : {}), ...(link ? { url: link } : {}) }]);
+    save([...lessons, { id: newId(), title: title.trim(), kind: newKind, ...(unit.trim() ? { unit: unit.trim() } : {}), ...(link ? { url: link } : {}) }]);
     setStatus(`Añadida «${title.trim()}».`);
     setTitle('');
     setUrl('');
@@ -213,12 +214,15 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
           {g.items.map((l) => {
             const yt = l.url ? youtubeRef(l.url) : null;
             const acts = activityCount(l);
+            const k = lessonKind(l);
+            const KindIcon = k ? ACTIVITY_ICON[k] : null;
             return (
               <View key={l.id}>
               <CheckRow
                 title={l.title}
                 done={!!l.done}
-                meta={[l.seconds ? formatLength(l.seconds) : '', acts.total ? `${acts.done}/${acts.total} ${acts.total === 1 ? 'actividad' : 'actividades'}` : ''].filter(Boolean).join(' · ') || undefined}
+                icon={KindIcon ? <View style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSunken }}><KindIcon size={16} color={l.done ? colors.inkMuted : colors.primary} /></View> : undefined}
+                meta={[k ? ACTIVITY_KIND_LABEL[k] : '', l.seconds ? formatLength(l.seconds) : '', acts.total ? `${acts.done}/${acts.total} ${acts.total === 1 ? 'actividad' : 'actividades'}` : ''].filter(Boolean).join(' · ') || undefined}
                 onToggle={() => toggle(l.id)}
                 trailing={
                   <View style={{ flexDirection: 'row' }}>
@@ -261,6 +265,7 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
         <Field label="En la unidad (opcional)" value={unit} onChangeText={setUnit} maxLength={120} placeholder={`${unitWord(c.language)} 1, ${c.language === 'en' ? 'Module' : 'Módulo'} 2…`} />
         <Suggestions field="Unidad" values={units} current={unit} onPick={setUnit} />
         <Field ref={titleRef} label="Lección o video" value={title} onChangeText={setTitle} maxLength={200} placeholder="Introducción, Clase 3…" />
+        <KindChips label="Tipo de lección" value={newKind} onChange={setNewKind} />
         <Field
           label="Enlace de la lección (opcional)"
           value={url}
@@ -273,15 +278,46 @@ export function CourseLessons({ course, update }: { course: LegacyCourse; update
           autoCorrect={false}
           error={badUrl ? 'Pega un enlace completo, por ejemplo https://youtube.com/watch?v=…' : null}
         />
-        <Button label="Añadir lección" icon={<Plus size={16} color={colors.onPrimary} />} onPress={add} disabled={!title.trim() || badUrl || lessons.length >= 500} />
+        <Button label={`Añadir ${ACTIVITY_KIND_LABEL[newKind].toLowerCase()}`} icon={<Plus size={16} color={colors.onPrimary} />} onPress={add} disabled={!title.trim() || badUrl || lessons.length >= 500} />
       </View>
     </ScrollView>
+  );
+}
+
+const ACTIVITY_ICON: Record<ActivityKind, LucideIcon> = {
+  video: CirclePlay,
+  lectura: BookOpen,
+  infografia: ChartPie,
+  audio: Headphones,
+  cuestionario: CircleHelp,
+  examen: FileCheck,
+  tarea: PenLine,
+  practica: Hammer,
+  proyecto: FolderKanban,
+  otro: Circle,
+};
+
+/** Etiquetas con ícono para elegir el tipo (de lección o de actividad). */
+function KindChips({ label, value, onChange }: { label: string; value: ActivityKind; onChange: (k: ActivityKind) => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel={label}>
+      <T v="label">{label}</T>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+        {ACTIVITY_KINDS.map((k) => {
+          const Icon = ACTIVITY_ICON[k];
+          return <Chip key={k} label={ACTIVITY_KIND_LABEL[k]} selected={value === k} onPress={() => onChange(k)} icon={<Icon size={14} color={value === k ? colors.primary : colors.inkMuted} />} />;
+        })}
+      </View>
+    </View>
   );
 }
 
 const ACTIVITY_PLACEHOLDER: Record<ActivityKind, string> = {
   video: 'Ver el video de la clase',
   lectura: 'Leer el capítulo 2',
+  infografia: 'Revisar la infografía del tema',
+  audio: 'Escuchar el pódcast de la clase',
   cuestionario: 'Cuestionario de repaso',
   examen: 'Examen de la unidad',
   tarea: 'Entregar el ejercicio 3',
@@ -296,12 +332,13 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
   const [name, setName] = useState(lesson.title);
   const [unit, setUnit] = useState(lesson.unit ?? '');
   const [url, setUrl] = useState(lesson.url ?? '');
+  const [type, setType] = useState<ActivityKind>(lessonKind(lesson) ?? 'otro');
   const [kind, setKind] = useState<ActivityKind>('video');
   const [what, setWhat] = useState('');
   const link = normalizeCourseUrl(url);
   const badUrl = !!url.trim() && !validCourseUrl(link);
   const acts = lesson.activities ?? [];
-  const changed = name.trim() !== lesson.title || unit.trim() !== (lesson.unit ?? '') || link !== (lesson.url ?? '');
+  const changed = name.trim() !== lesson.title || unit.trim() !== (lesson.unit ?? '') || link !== (lesson.url ?? '') || type !== (lessonKind(lesson) ?? 'otro');
   const saveActs = (next: LessonActivity[]) => onSave({ activities: next, ...(next.length ? { done: next.every((a) => a.done) } : {}) });
   const add = () => {
     if (!what.trim() || acts.length >= 60) return;
@@ -313,6 +350,7 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
       <Field label="Nombre de la lección" value={name} onChangeText={setName} maxLength={200} />
       <Field label="Unidad" value={unit} onChangeText={setUnit} maxLength={120} placeholder="Sin unidad" />
       <Suggestions field="Unidad" values={units} current={unit} onPick={setUnit} />
+      <KindChips label="Tipo de lección" value={type} onChange={setType} />
       <Field
         label="Enlace (opcional)"
         value={url}
@@ -325,7 +363,7 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
         error={badUrl ? 'Pega un enlace completo, por ejemplo https://youtube.com/watch?v=…' : null}
       />
       <View style={{ flexDirection: 'row', gap: space[2] }}>
-        <Button small label="Guardar cambios" disabled={!changed || !name.trim() || badUrl} onPress={() => onSave({ title: name.trim(), unit: unit.trim() || undefined, url: link || undefined })} />
+        <Button small label="Guardar cambios" disabled={!changed || !name.trim() || badUrl} onPress={() => onSave({ title: name.trim(), unit: unit.trim() || undefined, url: link || undefined, kind: type })} />
         <Button small variant="ghost" label="Cerrar" onPress={onClose} />
       </View>
       <T v="label" accessibilityRole="header">
@@ -341,6 +379,10 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
             key={a.id}
             title={a.title}
             meta={ACTIVITY_KIND_LABEL[a.kind]}
+            icon={(() => {
+              const Icon = ACTIVITY_ICON[a.kind] ?? Circle;
+              return <Icon size={16} color={a.done ? colors.inkMuted : colors.primary} />;
+            })()}
             done={!!a.done}
             onToggle={() => saveActs(acts.map((x) => (x.id === a.id ? { ...x, done: !x.done } : x)))}
             trailing={
@@ -351,7 +393,7 @@ function LessonEditor({ lesson, units, onSave, onClose }: { lesson: CourseLesson
           />
         ))
       )}
-      <DotChoices legend="Tipo de actividad" value={kind} onChange={setKind} options={ACTIVITY_KINDS.map((k) => ({ value: k, label: ACTIVITY_KIND_LABEL[k] }))} />
+      <KindChips label="Tipo de actividad" value={kind} onChange={setKind} />
       <Field label="Qué hay que hacer" value={what} onChangeText={setWhat} maxLength={200} placeholder={ACTIVITY_PLACEHOLDER[kind]} onSubmitEditing={add} returnKeyType="done" />
       <Button small variant="secondary" label={`Añadir ${ACTIVITY_KIND_LABEL[kind].toLowerCase()}`} icon={<Plus size={16} color={colors.primary} />} onPress={add} disabled={!what.trim() || acts.length >= 60} />
     </View>

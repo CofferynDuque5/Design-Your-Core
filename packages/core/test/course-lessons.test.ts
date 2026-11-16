@@ -45,8 +45,8 @@ describe('Lecciones de un curso', () => {
   it('una lista de YouTube se vuelve lecciones', () => {
     let n = 0;
     expect(lessonsFromPlaylist([{ video: 'aaaaaaaaaaa', title: 'Clase 1', seconds: 600.4 }, { video: 'bbbbbbbbbbb', title: '', seconds: 0 }], 'PLabc', () => `id${++n}`)).toEqual([
-      { id: 'id1', title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabc', seconds: 600 },
-      { id: 'id2', title: 'Video 2', url: 'https://www.youtube.com/watch?v=bbbbbbbbbbb&list=PLabc' },
+      { id: 'id1', title: 'Clase 1', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa&list=PLabc', kind: 'video', seconds: 600 },
+      { id: 'id2', title: 'Video 2', url: 'https://www.youtube.com/watch?v=bbbbbbbbbbb&list=PLabc', kind: 'video' },
     ]);
   });
 });
