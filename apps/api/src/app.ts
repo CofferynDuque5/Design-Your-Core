@@ -1,6 +1,7 @@
 import cors, { type CorsOptions } from 'cors';
-import express, { type ErrorRequestHandler } from 'express';
+import express, { type ErrorRequestHandler, type Request } from 'express';
 import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import { createAuth } from './auth.js';
 import type { Config } from './config.js';
@@ -34,7 +35,7 @@ export interface AppDeps {
   fetchPage?: FetchPage;
 }
 
-export function createApp({ db, config, mailer, limits = { general: 600, strict: 20 }, webRoot, fetchPage = fetchPublicPage }: AppDeps) {
+export function createApp({ db, config, mailer, limits = { general: 5000, strict: 20 }, webRoot, fetchPage = fetchPublicPage }: AppDeps) {
   const app = express();
   app.set('trust proxy', 1);
   app.use(helmet());
@@ -48,11 +49,51 @@ export function createApp({ db, config, mailer, limits = { general: 600, strict:
   app.use(cors({ origin: corsOrigin, credentials: false }));
   app.use(express.json({ limit: '8mb' })); // el documento puede llevar imágenes de notas (base64)
 
-  // Rate limiting: un límite general holgado + uno estricto para autenticación
-  // y para aceptar códigos de pareja (evita fuerza bruta y adivinación).
+  // Rate limiting. Antes se contaba por dirección IP: en el hosting, todos los que
+  // salen por la misma red (la casa, el wifi de la universidad, el proxy del
+  // hosting) compartían un solo cupo y se bloqueaban entre sí con un uso normal.
+  // Ahora:
+  // - El límite general se cuenta por cuenta (token) y es muy holgado; sin sesión,
+  //   por IP. Solo frena abusos (miles de peticiones), nunca el uso normal.
+  // - El límite estricto (contraseñas, códigos de pareja) solo cuenta los intentos
+  //   FALLIDOS, y por correo + IP: entrar bien nunca suma.
   const window = 15 * 60 * 1000;
-  const general = rateLimit({ windowMs: window, max: limits.general, standardHeaders: true, legacyHeaders: false, message: { error: 'Demasiadas peticiones, espera un momento.' } });
-  const strict = rateLimit({ windowMs: window, max: limits.strict, standardHeaders: true, legacyHeaders: false, message: { error: 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.' } });
+  const who = (req: Request) => {
+    const h = req.headers.authorization || '';
+    if (h.startsWith('Bearer ')) {
+      try {
+        const p = jwt.verify(h.slice(7), config.jwtSecret, { algorithms: ['HS256'] }) as { sub?: string };
+        if (p.sub) return `u:${p.sub}`;
+      } catch {
+        // Token viejo o inválido: se cuenta por IP.
+      }
+    }
+    return `ip:${req.ip ?? ''}`;
+  };
+  const general = rateLimit({
+    windowMs: window,
+    max: limits.general,
+    keyGenerator: who,
+    skip: (req) => req.path === '/health',
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Demasiadas peticiones seguidas. Espera un minuto y vuelve a intentarlo.' },
+  });
+  const strict = rateLimit({
+    windowMs: window,
+    max: limits.strict,
+    skipSuccessfulRequests: true,
+    // Lo que manda correos (recuperar contraseña, invitar a la pareja) cuenta siempre,
+    // para que nadie pueda llenar de correos el buzón de otra persona.
+    requestWasSuccessful: (req, res) => res.statusCode < 400 && !/forgot-password|invite\/email/.test(req.originalUrl),
+    keyGenerator: (req) => {
+      const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase().slice(0, 200) : '';
+      return `${who(req)}|${email}`;
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo, o usa «¿Olvidaste tu contraseña?».' },
+  });
   app.use('/api', general);
   // No cachear respuestas de la API (llevan token/datos personales).
   app.use('/api', (_req, res, next) => {

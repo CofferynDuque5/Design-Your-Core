@@ -63,6 +63,36 @@ describe('registro e inicio de sesión', () => {
     const res = await api.post('/api/auth/login').send({ email: 'a@example.com', password: '12345678' }).expect(429);
     expect(res.body.error).toMatch(/Demasiados intentos/);
   });
+
+  it('entrar bien no gasta intentos y cada correo tiene su propio cupo', async () => {
+    const { api } = makeApp({ strict: 2 });
+    const { email, password } = await registerUser(api);
+    for (let i = 0; i < 5; i++) await api.post('/api/auth/login').send({ email, password }).expect(200);
+    await api.post('/api/auth/login').send({ email: 'otra@example.com', password: 'mala-1234' }).expect(401);
+    await api.post('/api/auth/login').send({ email: 'otra@example.com', password: 'mala-1234' }).expect(401);
+    await api.post('/api/auth/login').send({ email: 'otra@example.com', password: 'mala-1234' }).expect(429);
+    // Los fallos con otro correo no bloquean a quien sí sabe su contraseña.
+    await api.post('/api/auth/login').send({ email, password }).expect(200);
+  });
+
+  it('recuperar contraseña cuenta siempre (no se puede llenar el buzón de nadie)', async () => {
+    const { api } = makeApp({ strict: 2 });
+    const { email } = await registerUser(api);
+    await api.post('/api/auth/forgot-password').send({ email }).expect(200);
+    await api.post('/api/auth/forgot-password').send({ email }).expect(200);
+    await api.post('/api/auth/forgot-password').send({ email }).expect(429);
+  });
+
+  it('el límite general es por cuenta: dos personas en la misma red no se bloquean', async () => {
+    const { api } = makeApp({ general: 6 });
+    const a = await registerUser(api);
+    const b = await registerUser(api);
+    for (let i = 0; i < 6; i++) await api.get('/api/me').set(bearer(a.token)).expect(200);
+    await api.get('/api/me').set(bearer(a.token)).expect(429);
+    await api.get('/api/me').set(bearer(b.token)).expect(200);
+    // La salud del servidor nunca se limita.
+    await api.get('/api/health').expect(200);
+  });
 });
 
 describe('sesiones', () => {
