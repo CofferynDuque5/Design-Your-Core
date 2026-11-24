@@ -37,6 +37,8 @@ model User {
   planUntil      DateTime?       @db.Timestamp(3)
   payments       PaymentRequest[]
   coupleItems    CoupleItem[]
+  courseItems    CourseItem[]
+  blobBackups    BlobBackup[]
 }
 
 // Imágenes de los apuntes (sincronizadas entre dispositivos). Guardadas como
@@ -53,10 +55,37 @@ model Image {
 
 // The whole app state for a user, stored as one JSON document (local-first sync).
 model Blob {
-  userId    String   @id
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  data      Json     @default("{}")
-  updatedAt DateTime @updatedAt
+  userId     String   @id
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data       Json     @default("{}")
+  updatedAt  DateTime @updatedAt
+  coursesRev BigInt   @default(0) // sube con cada cambio en CourseItem
+}
+
+// Cursos de la app anterior, una fila por curso (antes, la clave `courses` de Blob.data).
+model CourseItem {
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  key    String
+  itemId String?
+  pos    Float
+  data   Json
+
+  @@id([userId, key])
+  @@index([userId, itemId])
+  @@index([userId, pos])
+}
+
+// Copias del documento antes de mover datos fuera de él.
+model BlobBackup {
+  id      BigInt   @id @default(autoincrement())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  data    Json
+  reason  String
+  savedAt DateTime @default(now()) @db.Timestamp(3)
+
+  @@index([userId])
 }
 
 // ─────────────────────────── v2: pilares ───────────────────────────
