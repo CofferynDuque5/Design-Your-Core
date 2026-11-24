@@ -23,6 +23,7 @@ import {
   courseLanguageValue,
   detectLanguage,
   duplicateCourseGroups,
+  duplicateExtras,
   findDuplicateCourse,
   unitSummary,
   courseLevel,
@@ -48,10 +49,10 @@ import {
 } from '@dyc/core';
 import { CalendarClock, CalendarPlus, CopyCheck, Languages, ExternalLink, Gauge, GraduationCap, Link2, ListChecks, MonitorPlay, Pencil, Play, Plus } from 'lucide-react';
 import { CourseLessons } from './CourseLessons';
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api } from '../app/api';
-import { newId, useLegacyData, useLegacyList, useModule, type ChangeOpts } from '../app/legacy';
+import { newId, useLegacyData, useLegacyList, useModule, useRemoveCourses, type ChangeOpts } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
@@ -72,6 +73,9 @@ const NEXT_STATUS: Record<CourseStatus, CourseStatus> = {
   curso: 'hecho',
   hecho: 'pendiente',
 };
+/** Desde cuántos cursos los temas empiezan cerrados y se muestran por partes. */
+const BIG_LIST = 150;
+const PAGE = 25;
 const statusOf = (c: LegacyCourse): CourseStatus => (COURSE_STATUSES.includes(c.status) ? c.status : 'pendiente');
 
 export function Courses() {
@@ -82,11 +86,18 @@ export function Courses() {
   // `topic` sin curso: añadir uno nuevo a ese tema.
   const [editing, setEditing] = useState<LegacyCourse | { topic: string } | null>(null);
   const [q, setQ] = useState('');
-  const shown = courses.filter((c) => (filter === 'todos' || statusOf(c) === filter) && matchesSearch(q, c.title, c.topic, c.subtopic, c.source, c.notes, ...(c.lessons ?? []).map((l) => l.title)));
-  const groups = coursesByTopic(shown);
-  const topics = coursesByTopic(courses).map((g) => g.topic);
-  const pending = courses.filter((c) => statusOf(c) !== 'hecho').length;
-  const dups = duplicateCourseGroups(courses);
+  // Con miles de cursos todo se calcula una vez por cambio, no en cada pintada.
+  const shown = useMemo(
+    () => courses.filter((c) => (filter === 'todos' || statusOf(c) === filter) && matchesSearch(q, c.title, c.topic, c.subtopic, c.source, c.notes, ...(c.lessons ?? []).map((l) => l.title))),
+    [courses, filter, q],
+  );
+  const groups = useMemo(() => coursesByTopic(shown), [shown]);
+  const allByTopic = useMemo(() => new Map(coursesByTopic(courses).map((g) => [g.topic.toLocaleLowerCase('es'), g.items])), [courses]);
+  const topics = useMemo(() => coursesByTopic(courses).map((g) => g.topic), [courses]);
+  const pending = useMemo(() => courses.filter((c) => statusOf(c) !== 'hecho').length, [courses]);
+  const dups = useMemo(() => duplicateCourseGroups(courses), [courses]);
+  // Muchos cursos: los temas empiezan cerrados (al buscar se abren solos).
+  const many = courses.length > BIG_LIST;
   const [watching, setWatching] = useState<string | null>(null);
   const [logging, setLogging] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
@@ -181,27 +192,7 @@ export function Courses() {
             <span className="chip numeric">{plural(pending, 'por ver', 'por ver')}</span>
           </div>
           <SearchBox label="Buscar en tus cursos" value={q} onChange={setQ} placeholder="Buscar por curso, tema, canal o lección…" count={shown.length} />
-          {dups.length > 0 && (
-            <div className="dup-note" role="status">
-              <CopyCheck size={18} aria-hidden="true" />
-              <div className="stack-xs">
-                <p className="small">
-                  <strong>{dups.length === 1 ? 'Tienes un curso repetido' : `Tienes ${dups.length} cursos repetidos`}</strong> (mismo enlace o mismo nombre). Ábrelo para revisarlo o bórralo si sobra.
-                </p>
-                <ul className="small dup-note__list">
-                  {dups.map((g) => (
-                    <li key={g.map((c) => c.id).join('-')}>
-                      «{courseName(g[0])}»: {g.map((c) => (
-                        <button key={c.id} type="button" className="link-btn" onClick={() => setEditing(c)}>
-                          en {c.topic || 'Sin tema'}
-                        </button>
-                      )).reduce<ReactNode[]>((acc, el, i) => (i ? [...acc, ' y ', el] : [el]), [])}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
+          {dups.length > 0 && <DuplicatesNote groups={dups} onOpen={setEditing} />}
           {groups.length === 0 ? (
             q.trim() ? null : (
               <EmptyState title={`Nada en «${COURSE_STATUS_INFO[filter as CourseStatus].label}»`}>Cambia el estado de un curso con el botón que tiene al lado.</EmptyState>
@@ -213,7 +204,8 @@ export function Courses() {
                   key={g.topic}
                   topic={g.topic}
                   items={g.items}
-                  all={coursesByTopic(courses).find((x) => x.topic.toLocaleLowerCase('es') === g.topic.toLocaleLowerCase('es'))?.items ?? g.items}
+                  all={allByTopic.get(g.topic.toLocaleLowerCase('es')) ?? g.items}
+                  startOpen={!many || !!q.trim() || groups.length === 1}
                   classes={(c) => courseClasses(legacy.data?.data, c.id)}
                   onEdit={setEditing}
                   onAdd={() => setEditing({ topic: g.topic })}
@@ -260,12 +252,19 @@ interface RowActions {
   classes: (c: LegacyCourse) => Array<{ day: number; start: string }>;
 }
 
-function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items: LegacyCourse[]; all: LegacyCourse[]; onAdd: () => void } & RowActions) {
+function TopicCard({ topic, items, all, onAdd, startOpen, ...row }: { topic: string; items: LegacyCourse[]; all: LegacyCourse[]; onAdd: () => void; startOpen: boolean } & RowActions) {
   const id = useId();
+  const [open, setOpen] = useState(startOpen);
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setOpen(startOpen), [startOpen]);
   // Ruta del tema con todos sus cursos (aunque el filtro oculte algunos).
-  const route = courseRoute(all);
+  const route = useMemo(() => courseRoute(all), [all]);
   const next = route.find((c) => statusOf(c) !== 'hecho');
-  const shown = route.filter((c) => items.includes(c));
+  const shownAll = useMemo(() => {
+    const visible = new Set(items);
+    return route.filter((c) => visible.has(c));
+  }, [route, items]);
+  const shown = shownAll.slice(0, limit);
   const done = all.filter((c) => statusOf(c) === 'hecho').length;
   return (
     <section className="card tool-card course-card" aria-labelledby={`${id}-t`}>
@@ -276,26 +275,91 @@ function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items:
         <span className="small muted numeric">
           {done} de {all.length}
         </span>
+        <button type="button" className="link-btn small" aria-expanded={open} aria-controls={`${id}-l`} onClick={() => setOpen((v) => !v)}>
+          {open ? 'Cerrar' : 'Ver cursos'}
+        </button>
       </div>
-      {all.length > 2 && <p className="small muted course-card__route">En orden: lo que empezaste y de lo básico a lo avanzado.</p>}
-      {coursesBySubtopic(shown).map((g) => (
-        <div key={g.subtopic || '-'} className="course-sub">
-          {g.subtopic && (
-            <h3 className="course-sub__title">
-              {g.subtopic}
-            </h3>
+      {!open ? (
+        next && <p className="small muted course-card__route">Sigue: {courseName(next)}</p>
+      ) : (
+        <div id={`${id}-l`} className="stack-sm">
+          {all.length > 2 && <p className="small muted course-card__route">En orden: lo que empezaste y de lo básico a lo avanzado.</p>}
+          {coursesBySubtopic(shown).map((g) => (
+            <div key={g.subtopic || '-'} className="course-sub">
+              {g.subtopic && <h3 className="course-sub__title">{g.subtopic}</h3>}
+              <ul className="course-list" aria-label={g.subtopic ? `${topic}: ${g.subtopic}` : `Cursos de ${topic}`}>
+                {g.items.map((c) => (
+                  <CourseRow key={c.id} course={c} next={all.length > 1 && c === next} {...row} />
+                ))}
+              </ul>
+            </div>
+          ))}
+          {shownAll.length > shown.length && (
+            <button type="button" className="btn btn--secondary btn--sm" onClick={() => setLimit((n) => n + PAGE * 2)}>
+              Ver {Math.min(PAGE * 2, shownAll.length - shown.length)} más (quedan {shownAll.length - shown.length})
+            </button>
           )}
-          <ul className="course-list" aria-label={g.subtopic ? `${topic}: ${g.subtopic}` : `Cursos de ${topic}`}>
-            {g.items.map((c) => (
-              <CourseRow key={c.id} course={c} next={all.length > 1 && c === next} {...row} />
-            ))}
-          </ul>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={onAdd}>
+            <Plus size={16} aria-hidden="true" /> Añadir a {topic}
+          </button>
         </div>
-      ))}
-      <button type="button" className="btn btn--ghost btn--sm" onClick={onAdd}>
-        <Plus size={16} aria-hidden="true" /> Añadir a {topic}
-      </button>
+      )}
     </section>
+  );
+}
+
+/** Aviso de repetidos: una línea, la lista a pedido y un botón para quitar los que sobran. */
+function DuplicatesNote({ groups, onOpen }: { groups: LegacyCourse[][]; onOpen: (c: LegacyCourse) => void }) {
+  const toast = useToast();
+  const removeCourses = useRemoveCourses();
+  const [show, setShow] = useState(false);
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const extras = useMemo(() => duplicateExtras(groups), [groups]);
+  const quitar = async () => {
+    if (!sure) return setSure(true);
+    setBusy(true);
+    try {
+      const n = await removeCourses(extras.map((c) => c.id));
+      toast(n === 1 ? 'Se quitó 1 curso repetido' : `Se quitaron ${n} cursos repetidos`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'No se pudieron quitar', { tone: 'error' });
+    } finally {
+      setBusy(false);
+      setSure(false);
+    }
+  };
+  return (
+    <div className="dup-note" role="status">
+      <CopyCheck size={18} aria-hidden="true" />
+      <div className="stack-xs">
+        <p className="small">
+          <strong>{groups.length === 1 ? 'Tienes un curso repetido' : `Tienes ${groups.length} cursos repetidos`}</strong> (mismo enlace, o mismo nombre en la misma academia). Se queda la copia con más avance.
+        </p>
+        <div className="row">
+          <button type="button" className={sure ? 'btn btn--sm' : 'btn btn--secondary btn--sm'} onClick={quitar} disabled={busy}>
+            {busy ? 'Quitando…' : sure ? `Sí, quitar ${extras.length}` : `Quitar ${extras.length} que sobran`}
+          </button>
+          <button type="button" className="link-btn small" aria-expanded={show} onClick={() => setShow((v) => !v)}>
+            {show ? 'Ocultar lista' : 'Ver cuáles'}
+          </button>
+        </div>
+        {show && (
+          <ul className="small dup-note__list">
+            {groups.slice(0, 60).map((g) => (
+              <li key={g.map((c) => c.id).join('-')}>
+                «{courseName(g[0])}»: {g.map((c) => (
+                  <button key={c.id} type="button" className="link-btn" onClick={() => onOpen(c)}>
+                    en {[c.source, c.topic || 'Sin tema'].filter(Boolean).join(' · ')}
+                  </button>
+                )).reduce<ReactNode[]>((acc, el, i) => (i ? [...acc, ' y ', el] : [el]), [])}
+              </li>
+            ))}
+            {groups.length > 60 && <li>…y {groups.length - 60} más.</li>}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -579,7 +643,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
     if (!langAuto) return;
     setLanguage(detectLanguage(text) ?? '');
   };
-  const duplicate = findDuplicateCourse(courses, { url: normalizeCourseUrl(url), title }, course?.id);
+  const duplicate = findDuplicateCourse(courses, { url: normalizeCourseUrl(url), title, source: origin }, course?.id);
   const count = (pick: (c: LegacyCourse) => string | undefined, list: LegacyCourse[] = courses) => {
     const out: Record<string, number> = {};
     for (const c of list) {

@@ -1311,8 +1311,20 @@ function urlKey(url: string | undefined): string {
   }
 }
 
-/** El curso que ya tienes con el mismo enlace o el mismo nombre (sin contar `exceptId`). */
-export function findDuplicateCourse<T extends { id: string; url?: string; title?: string }>(courses: readonly T[], candidate: { url?: string; title?: string }, exceptId?: string): { course: T; by: 'enlace' | 'nombre' } | null {
+type DupCourse = { id: string; url?: string; title?: string; source?: string };
+
+/** Academia o canal para comparar nombres («» si no se sabe). */
+const sourceKey = (s: string | undefined) => plainTitle(s ?? '');
+
+/** Mismo nombre cuenta como repetido solo si es de la misma academia (o si una de las dos no la dice). */
+const sameSource = (a: string | undefined, b: string | undefined) => {
+  const x = sourceKey(a);
+  const y = sourceKey(b);
+  return !x || !y || x === y;
+};
+
+/** El curso que ya tienes con el mismo enlace, o con el mismo nombre en la misma academia (sin contar `exceptId`). */
+export function findDuplicateCourse<T extends DupCourse>(courses: readonly T[], candidate: { url?: string; title?: string; source?: string }, exceptId?: string): { course: T; by: 'enlace' | 'nombre' } | null {
   const key = urlKey(candidate.url);
   const name = plainTitle(candidate.title ?? '');
   for (const c of courses) {
@@ -1322,26 +1334,71 @@ export function findDuplicateCourse<T extends { id: string; url?: string; title?
   if (name.length >= 4)
     for (const c of courses) {
       if (c.id === exceptId) continue;
-      if (plainTitle(c.title ?? '') === name) return { course: c, by: 'nombre' };
+      if (plainTitle(c.title ?? '') === name && sameSource(c.source, candidate.source)) return { course: c, by: 'nombre' };
     }
   return null;
 }
 
-/** Grupos de cursos repetidos (mismo enlace o mismo nombre), para avisar en la lista. */
-export function duplicateCourseGroups<T extends { id: string; url?: string; title?: string }>(courses: readonly T[]): T[][] {
-  const groups = new Map<string, T[]>();
-  for (const c of courses) {
-    const keys = [urlKey(c.url) && `u:${urlKey(c.url)}`, plainTitle(c.title ?? '').length >= 4 && `t:${plainTitle(c.title ?? '')}`].filter(Boolean) as string[];
-    for (const k of keys) groups.set(k, [...(groups.get(k) ?? []), c]);
-  }
-  const seen = new Set<string>();
-  const out: T[][] = [];
-  for (const g of groups.values()) {
-    if (g.length < 2) continue;
-    const sig = g.map((c) => c.id).sort().join('|');
-    if (seen.has(sig) || g.every((c) => out.some((o) => o.includes(c)))) continue;
-    seen.add(sig);
-    out.push(g);
+/**
+ * Grupos de cursos repetidos, para avisar en la lista: mismo enlace, o mismo
+ * nombre en la misma academia. El mismo curso en AWS y en Coursera no cuenta.
+ * Lineal: sirve para miles de cursos.
+ */
+export function duplicateCourseGroups<T extends DupCourse>(courses: readonly T[]): T[][] {
+  const parent = courses.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const join = (a: number, b: number) => {
+    const x = find(a);
+    const y = find(b);
+    if (x !== y) parent[Math.max(x, y)] = Math.min(x, y);
+  };
+  const byUrl = new Map<string, number>();
+  // Por nombre: la primera de cada academia y, aparte, la primera sin academia.
+  const byName = new Map<string, { any?: number; bySource: Map<string, number> }>();
+  courses.forEach((c, i) => {
+    const u = urlKey(c.url);
+    if (u) {
+      const first = byUrl.get(u);
+      if (first === undefined) byUrl.set(u, i);
+      else join(first, i);
+    }
+    const name = plainTitle(c.title ?? '');
+    if (name.length < 4) return;
+    const entry = byName.get(name) ?? { bySource: new Map<string, number>() };
+    byName.set(name, entry);
+    const src = sourceKey(c.source);
+    if (!src) {
+      if (entry.any === undefined) entry.any = i;
+      else join(entry.any, i);
+      for (const j of entry.bySource.values()) join(j, i);
+    } else {
+      const first = entry.bySource.get(src);
+      if (first === undefined) entry.bySource.set(src, i);
+      else join(first, i);
+      if (entry.any !== undefined) join(entry.any, i);
+    }
+  });
+  const groups = new Map<number, T[]>();
+  courses.forEach((c, i) => {
+    const r = find(i);
+    groups.set(r, [...(groups.get(r) ?? []), c]);
+  });
+  return [...groups.values()].filter((g) => g.length > 1);
+}
+
+/** Cuánto se ha avanzado en un curso: se queda la copia con más avance o más datos. */
+function courseWeight(c: DupCourse & { status?: string; progress?: number; lessons?: unknown[]; units?: unknown[]; notes?: string }): number {
+  const status = c.status === 'hecho' ? 2 : c.status === 'curso' ? 1 : 0;
+  return status * 1e6 + (c.progress ?? 0) * 1e3 + (c.lessons?.length ?? 0) * 10 + (c.units?.length ?? 0) + (c.notes?.trim() ? 1 : 0);
+}
+
+/** De cada grupo de repetidos, los que sobran: se queda el que tiene más avance (o el más antiguo). */
+export function duplicateExtras<T extends DupCourse>(groups: readonly T[][]): T[] {
+  const out: T[] = [];
+  for (const g of groups) {
+    let keep = g[0];
+    for (const c of g) if (courseWeight(c) > courseWeight(keep)) keep = c;
+    for (const c of g) if (c !== keep) out.push(c);
   }
   return out;
 }

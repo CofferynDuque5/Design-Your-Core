@@ -4,7 +4,7 @@ import { coupleCreateInput, coupleProgress, pairKey } from '../src/couple.js';
 import { courseLanguageLabel, courseLanguageValue, legacyItemSchemas } from '../src/legacy.js';
 import { DEFAULT_NOTIFY, expandNotificationPlan, notificationPlan, parseNotifyPrefs, positiveMessage, waterTimes } from '../src/notify.js';
 import { profileInputSchema } from '../src/schemas.js';
-import { activityCount, detectLanguage, duplicateCourseGroups, findDuplicateCourse, numberedUnit, unitWord } from '../src/tools.js';
+import { activityCount, detectLanguage, duplicateCourseGroups, duplicateExtras, findDuplicateCourse, numberedUnit, unitWord } from '../src/tools.js';
 
 describe('idioma de los cursos', () => {
   it('detecta el idioma del título mientras se escribe', () => {
@@ -54,6 +54,24 @@ describe('cursos repetidos', () => {
   it('agrupa los repetidos para avisar en la lista', () => {
     expect(duplicateCourseGroups([...list, { id: 'd', title: 'React desde cero', url: '' }]).map((g) => g.map((c) => c.id))).toEqual([['a', 'd']]);
     expect(duplicateCourseGroups(list)).toEqual([]);
+  });
+  it('el mismo nombre en otra academia no es repetido', () => {
+    const many = [
+      { id: 'aws', title: 'Amazon Lex Getting Started', source: 'AWS', url: 'https://aws.example/lex' },
+      { id: 'cou', title: 'Amazon Lex Getting Started', source: 'Coursera', url: 'https://coursera.example/lex' },
+      { id: 'aws2', title: 'Amazon Lex getting started', source: 'aws', url: 'https://aws.example/lex-2' },
+    ];
+    expect(duplicateCourseGroups(many).map((g) => g.map((c) => c.id))).toEqual([['aws', 'aws2']]);
+    expect(findDuplicateCourse(many, { title: 'Amazon Lex Getting Started', source: 'Udemy' })).toBeNull();
+    expect(findDuplicateCourse(many, { title: 'Amazon Lex Getting Started', source: 'Coursera' })?.course.id).toBe('cou');
+  });
+  it('quitar repetidos deja la copia con más avance y sirve con miles de cursos', () => {
+    const g = [[{ id: 'x1', title: 'Curso', url: 'https://a.example/c' }, { id: 'x2', title: 'Curso', url: 'https://a.example/c', status: 'curso', progress: 40 }]];
+    expect(duplicateExtras(g).map((c) => c.id)).toEqual(['x1']);
+    const big = Array.from({ length: 20000 }, (_, i) => ({ id: `c${i}`, title: `Curso número ${i % 15000}`, url: `https://a.example/${i}` }));
+    const t = Date.now();
+    expect(duplicateCourseGroups(big)).toHaveLength(5000);
+    expect(Date.now() - t).toBeLessThan(2000);
   });
 });
 

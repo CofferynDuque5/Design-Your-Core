@@ -47,6 +47,7 @@ import {
   courseLanguageValue,
   detectLanguage,
   duplicateCourseGroups,
+  duplicateExtras,
   findDuplicateCourse,
   isCourseLanguage,
 } from '@dyc/core';
@@ -54,20 +55,23 @@ import { radius, space, touchTarget } from '@dyc/tokens';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CalendarClock, CalendarPlus, CopyCheck, ExternalLink, Gauge, GraduationCap, Link2, ListChecks, MonitorPlay, Pencil, Play, Plus } from 'lucide-react-native';
 import { CourseLessons } from '../../components/CourseLessons';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Sheet } from '../../components/Sheet';
 import { SearchBar, DotChoices, FormActions, IconButton, OptionPicker, Pill, Suggestions, TimeField, Toggle, ToolScreen, WeekdayPicker, RemoveButton } from '../../components/tools';
 import { Button, Card, EmptyState, ErrorState, Field, Loading, T, fonts } from '../../components/ui';
 import { YouTubeLengthReader, YouTubeView, type LengthFound, type YouTubeViewHandle } from '../../components/YouTubeView';
 import { api } from '../../lib/api';
-import { newId, useLegacyData, useLegacyList, useModule, type ChangeOpts } from '../../lib/legacy';
+import { newId, useLegacyData, useLegacyList, useModule, useRemoveCourses, type ChangeOpts } from '../../lib/legacy';
 import { useToast } from '../../lib/toast';
 import { useTheme } from '../../lib/theme';
 
 type Filter = 'todos' | CourseStatus;
 const NEXT_STATUS: Record<CourseStatus, CourseStatus> = { pendiente: 'curso', curso: 'hecho', hecho: 'pendiente' };
 const statusOf = (c: LegacyCourse): CourseStatus => (COURSE_STATUSES.includes(c.status) ? c.status : 'pendiente');
+/** Desde cuántos cursos los temas empiezan cerrados y se muestran por partes. */
+const BIG_LIST = 150;
+const PAGE = 25;
 const FILTER_OPTIONS: Array<{ value: Filter; label: string }> = [{ value: 'todos', label: 'Todos' }, ...COURSE_STATUSES.map((s) => ({ value: s, label: COURSE_STATUS_INFO[s].label }))];
 
 export default function Cursos() {
@@ -80,11 +84,18 @@ export default function Cursos() {
   // `topic` sin curso: añadir uno nuevo a ese tema.
   const [editing, setEditing] = useState<LegacyCourse | { topic: string } | null>(null);
   const [q, setQ] = useState('');
-  const shown = courses.filter((c) => (filter === 'todos' || statusOf(c) === filter) && matchesSearch(q, c.title, c.topic, c.subtopic, c.source, c.notes, ...(c.lessons ?? []).map((l) => l.title)));
-  const groups = coursesByTopic(shown);
-  const topics = coursesByTopic(courses).map((g) => g.topic);
-  const pending = courses.filter((c) => statusOf(c) !== 'hecho').length;
-  const dups = duplicateCourseGroups(courses);
+  // Con miles de cursos todo se calcula una vez por cambio, no en cada pintada.
+  const shown = useMemo(
+    () => courses.filter((c) => (filter === 'todos' || statusOf(c) === filter) && matchesSearch(q, c.title, c.topic, c.subtopic, c.source, c.notes, ...(c.lessons ?? []).map((l) => l.title))),
+    [courses, filter, q],
+  );
+  const groups = useMemo(() => coursesByTopic(shown), [shown]);
+  const allByTopic = useMemo(() => new Map(coursesByTopic(courses).map((g) => [g.topic.toLocaleLowerCase('es'), g.items])), [courses]);
+  const topics = useMemo(() => coursesByTopic(courses).map((g) => g.topic), [courses]);
+  const pending = useMemo(() => courses.filter((c) => statusOf(c) !== 'hecho').length, [courses]);
+  const dups = useMemo(() => duplicateCourseGroups(courses), [courses]);
+  // Muchos cursos: los temas empiezan cerrados (al buscar se abren solos).
+  const many = courses.length > BIG_LIST;
   const [watching, setWatching] = useState<string | null>(null);
   const [logging, setLogging] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
@@ -156,21 +167,7 @@ export default function Cursos() {
           </View>
           <SearchBar label="Buscar en tus cursos" value={q} onChange={setQ} placeholder="Buscar por curso, tema, canal o lección…" count={shown.length} />
           <DotChoices legend="Estado" hideLegend value={filter} onChange={setFilter} options={FILTER_OPTIONS} />
-          {dups.length > 0 && (
-            <View accessibilityRole="alert" style={{ flexDirection: 'row', gap: space[2], padding: space[3], borderRadius: 12, borderWidth: 1, borderColor: '#E5A23A99', backgroundColor: '#E5A23A1A' }}>
-              <CopyCheck size={18} color="#E5A23A" />
-              <View style={{ flex: 1, gap: space[1] }}>
-                <T v="small" style={{ fontFamily: fonts.medium }}>
-                  {dups.length === 1 ? 'Tienes un curso repetido' : `Tienes ${dups.length} cursos repetidos`}
-                </T>
-                {dups.map((g) => (
-                  <T key={g.map((c) => c.id).join('-')} v="small" tint="muted">
-                    «{courseName(g[0])}» en {g.map((c) => c.topic || 'Sin tema').join(' y ')}
-                  </T>
-                ))}
-              </View>
-            </View>
-          )}
+          {dups.length > 0 && <DuplicatesNote groups={dups} />}
           {groups.length === 0 ? (
             q.trim() ? null : (
               <EmptyState title={`Nada en «${COURSE_STATUS_INFO[filter as CourseStatus].label}»`}>Cambia el estado de un curso con el botón que tiene al lado.</EmptyState>
@@ -181,7 +178,8 @@ export default function Cursos() {
                 key={g.topic}
                 topic={g.topic}
                 items={g.items}
-                all={coursesByTopic(courses).find((x) => x.topic.toLocaleLowerCase('es') === g.topic.toLocaleLowerCase('es'))?.items ?? g.items}
+                all={allByTopic.get(g.topic.toLocaleLowerCase('es')) ?? g.items}
+                startOpen={!many || !!q.trim() || groups.length === 1}
                 onEdit={setEditing}
                 onAdd={() => setEditing({ topic: g.topic })}
                 onStatus={(c) => update(c, { status: NEXT_STATUS[statusOf(c)] })}
@@ -228,23 +226,41 @@ interface RowActions {
   classes: (c: LegacyCourse) => Array<{ day: number; start: string }>;
 }
 
-function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items: LegacyCourse[]; all: LegacyCourse[]; onAdd: () => void } & RowActions) {
+function TopicCard({ topic, items, all, onAdd, startOpen, ...row }: { topic: string; items: LegacyCourse[]; all: LegacyCourse[]; onAdd: () => void; startOpen: boolean } & RowActions) {
   const { colors } = useTheme();
+  const [open, setOpen] = useState(startOpen);
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setOpen(startOpen), [startOpen]);
   // Ruta del tema con todos sus cursos (aunque el filtro oculte algunos).
-  const route = courseRoute(all);
+  const route = useMemo(() => courseRoute(all), [all]);
   const next = route.find((c) => statusOf(c) !== 'hecho');
-  const shown = route.filter((c) => items.includes(c));
+  const shownAll = useMemo(() => {
+    const visible = new Set(items);
+    return route.filter((c) => visible.has(c));
+  }, [route, items]);
+  const shown = shownAll.slice(0, limit);
   const done = all.filter((c) => statusOf(c) === 'hecho').length;
   return (
     <Card style={[st.card, { borderLeftColor: colors.primary }]}>
-      <View style={st.head}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${topic}: ${done} de ${all.length}. ${open ? 'Cerrar' : 'Ver cursos'}`} onPress={() => setOpen((v) => !v)} style={st.head}>
         <T v="heading" accessibilityRole="header" style={{ flex: 1 }}>
           {topic}
         </T>
         <T v="small" tint="muted" style={{ fontVariant: ['tabular-nums'] }}>
           {done} de {all.length}
         </T>
-      </View>
+        <T v="small" tint="primary" style={{ fontFamily: fonts.medium }}>
+          {open ? 'Cerrar' : 'Ver'}
+        </T>
+      </Pressable>
+      {!open ? (
+        next ? (
+          <T v="small" tint="muted" numberOfLines={1}>
+            Sigue: {courseName(next)}
+          </T>
+        ) : null
+      ) : (
+      <>
       {all.length > 2 && (
         <T v="small" tint="muted">
           En orden: lo que empezaste y de lo básico a lo avanzado.
@@ -265,10 +281,69 @@ function TopicCard({ topic, items, all, onAdd, ...row }: { topic: string; items:
           ))}
         </View>
       ))}
+      {shownAll.length > shown.length && (
+        <View style={{ alignItems: 'flex-start' }}>
+          <Button small variant="secondary" label={`Ver ${Math.min(PAGE * 2, shownAll.length - shown.length)} más (quedan ${shownAll.length - shown.length})`} onPress={() => setLimit((n) => n + PAGE * 2)} />
+        </View>
+      )}
       <View style={{ alignItems: 'flex-start' }}>
         <Button small variant="ghost" label={`Añadir a ${topic}`} icon={<Plus size={16} color={colors.primary} />} onPress={onAdd} />
       </View>
+      </>
+      )}
     </Card>
+  );
+}
+
+/** Aviso de repetidos: una línea, la lista a pedido y un botón para quitar los que sobran. */
+function DuplicatesNote({ groups }: { groups: LegacyCourse[][] }) {
+  const { colors } = useTheme();
+  const toast = useToast();
+  const removeCourses = useRemoveCourses();
+  const [show, setShow] = useState(false);
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const extras = useMemo(() => duplicateExtras(groups), [groups]);
+  const quitar = async () => {
+    if (!sure) return setSure(true);
+    setBusy(true);
+    try {
+      const n = await removeCourses(extras.map((c) => c.id));
+      toast(n === 1 ? 'Se quitó 1 curso repetido' : `Se quitaron ${n} cursos repetidos`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'No se pudieron quitar', { tone: 'error' });
+    } finally {
+      setBusy(false);
+      setSure(false);
+    }
+  };
+  return (
+    <View accessibilityRole="alert" style={{ gap: space[2], padding: space[3], borderRadius: 12, borderWidth: 1, borderColor: '#E5A23A99', backgroundColor: '#E5A23A1A' }}>
+      <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'center' }}>
+        <CopyCheck size={18} color="#E5A23A" />
+        <T v="small" style={{ flex: 1, fontFamily: fonts.medium }}>
+          {groups.length === 1 ? 'Tienes un curso repetido' : `Tienes ${groups.length} cursos repetidos`}
+        </T>
+      </View>
+      <T v="small" tint="muted">
+        Mismo enlace, o mismo nombre en la misma academia. Se queda la copia con más avance.
+      </T>
+      <View style={{ flexDirection: 'row', gap: space[2], flexWrap: 'wrap' }}>
+        <Button small variant={sure ? 'primary' : 'secondary'} label={busy ? 'Quitando…' : sure ? `Sí, quitar ${extras.length}` : `Quitar ${extras.length} que sobran`} onPress={quitar} disabled={busy} />
+        <Button small variant="ghost" label={show ? 'Ocultar lista' : 'Ver cuáles'} onPress={() => setShow((v) => !v)} />
+      </View>
+      {show &&
+        groups.slice(0, 40).map((g) => (
+          <T key={g.map((c) => c.id).join('-')} v="small" tint="muted">
+            «{courseName(g[0])}» en {g.map((c) => [c.source, c.topic || 'Sin tema'].filter(Boolean).join(' · ')).join(' y ')}
+          </T>
+        ))}
+      {show && groups.length > 40 && (
+        <T v="small" tint="muted">
+          …y {groups.length - 40} más.
+        </T>
+      )}
+    </View>
   );
 }
 
@@ -553,7 +628,7 @@ function CourseForm({ course, topic: initialTopic, topics, courses, onDone }: { 
   const guessLanguage = (text: string) => {
     if (langAuto) setLanguage(detectLanguage(text) ?? '');
   };
-  const duplicate = findDuplicateCourse(courses, { url: normalizeCourseUrl(url), title }, course?.id);
+  const duplicate = findDuplicateCourse(courses, { url: normalizeCourseUrl(url), title, source: origin }, course?.id);
   const count = (pick: (c: LegacyCourse) => string | undefined, list: LegacyCourse[] = courses) => {
     const out: Record<string, number> = {};
     for (const c of list) {

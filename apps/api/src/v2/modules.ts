@@ -249,6 +249,26 @@ export function moduleRoutes({ db, requireAuth }: { db: Db; requireAuth: Request
     });
   }));
 
+  // Quitar varios cursos de una vez (los repetidos). Antes se guarda copia en "BlobBackup".
+  r.post(`/modules/${COURSES}/remove-many`, requireAuth, ah(async (req, res) => {
+    const raw = req.body?.ids;
+    const ids = Array.isArray(raw) ? [...new Set(raw.filter((x: unknown): x is string => typeof x === 'string' && x.length > 0 && x.length <= 200))] : [];
+    if (!ids.length || ids.length > 5000) return res.status(400).json({ error: 'Envía entre 1 y 5000 ids' });
+    const userId = req.userId as string;
+    const out = await withCourses(db, userId, async (t) => {
+      await t.sql.exec(
+        `INSERT INTO "BlobBackup" ("userId", "data", "reason")
+         SELECT $1, jsonb_build_object('courses', jsonb_agg("data" ORDER BY "pos")), 'cursos repetidos quitados'
+           FROM "CourseItem" WHERE "userId" = $1 AND "itemId" = ANY($2) HAVING count(*) > 0`,
+        [userId, ids],
+      );
+      const gone = await t.sql.rows<{ itemId: string }>('DELETE FROM "CourseItem" WHERE "userId" = $1 AND "itemId" = ANY($2) RETURNING "itemId"', [userId, ids]);
+      const set = new Set(ids);
+      return { result: gone.length, patchCache: (rows) => rows.filter((r) => !r.itemId || !set.has(r.itemId)) };
+    });
+    res.json({ ok: true, removed: out.result, updatedAt: out.updatedAt });
+  }));
+
   r.put(`/modules/${COURSES}/order`, requireAuth, ah(async (req, res) => {
     const input = parse(legacyReorderSchema, req.body, res);
     if (!input) return;

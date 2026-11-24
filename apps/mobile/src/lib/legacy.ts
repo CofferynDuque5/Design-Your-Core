@@ -75,6 +75,19 @@ export async function runUndo(qc: QueryClient, steps: LegacyUndoStep[], fail: (e
   return qc.invalidateQueries({ queryKey: LEGACY_QUERY });
 }
 
+/** Quita varios cursos de una vez (los repetidos). El servidor guarda una copia antes. */
+export function useRemoveCourses() {
+  const qc = useQueryClient();
+  return async (ids: string[]) => {
+    const res = await api.modules.removeCourses(ids);
+    const gone = new Set(ids);
+    qc.setQueryData<Legacy>(LEGACY_QUERY, (prev) =>
+      prev && { updatedAt: res.updatedAt ?? prev.updatedAt, data: { ...prev.data, courses: ((prev.data.courses as Array<{ id: string }> | undefined) ?? []).filter((c) => !gone.has(c.id)) } as typeof prev.data },
+    );
+    return res.removed;
+  };
+}
+
 /** Opciones de un cambio: `undo: false` para lo que se guarda solo (avance de un video, notas mientras escribes). */
 export type ChangeOpts = { undo?: boolean };
 

@@ -201,6 +201,8 @@ export function createClient(opts: ClientOptions) {
         request<{ item: LegacyItems[K]; updatedAt: string }>('PATCH', `/api/v2/modules/${key}/${encodeURIComponent(id)}`, patch),
       remove: (key: LegacyKey, id: string) => request<{ ok: true; updatedAt: string }>('DELETE', `/api/v2/modules/${key}/${encodeURIComponent(id)}`),
       reorder: (key: LegacyKey, ids: string[]) => request<{ ok: true; updatedAt: string }>('PUT', `/api/v2/modules/${key}/order`, { ids }),
+      /** Quita varios cursos de una vez (los repetidos). */
+      removeCourses: (ids: string[]) => request<{ ok: true; removed: number; updatedAt: string }>('POST', '/api/v2/modules/courses/remove-many', { ids }),
       set: <K extends LegacyObjectKey>(key: K, value: LegacyObjects[K]) => request<{ value: LegacyObjects[K]; updatedAt: string }>('PUT', `/api/v2/modules/${key}`, value),
       patch: <K extends LegacyObjectKey>(key: K, patch: Partial<LegacyObjects[K]>) => request<{ value: LegacyObjects[K]; updatedAt: string }>('PATCH', `/api/v2/modules/${key}`, patch),
     },

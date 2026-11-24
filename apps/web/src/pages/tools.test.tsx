@@ -350,6 +350,41 @@ describe('Horario', () => {
 });
 
 describe('Cursos', () => {
+  it('con miles de cursos abre rápido, con los temas cerrados, y quita los repetidos de una vez', async () => {
+    const many = Array.from({ length: 15000 }, (_, i) => ({ id: `m${i}`, topic: `Tema ${i % 200}`, title: `Curso ${i}`, url: `https://aws.example/c/${i}`, status: 'pendiente', notes: '', source: i % 2 ? 'AWS' : 'Coursera' }));
+    // Dos copias exactas y el mismo nombre en otra academia (este no cuenta).
+    many.push({ ...many[5], id: 'copia5' }, { ...many[7], id: 'copia7', url: 'https://otra.example/7' }, { ...many[8], id: 'otra8', url: 'https://x.example/8', source: 'Udemy' });
+    let removed: string[] = [];
+    const api = withApi(
+      {
+        'POST /api/v2/modules/courses/remove-many': (b) => {
+          removed = (b as { ids: string[] }).ids;
+          return { ok: true, removed: removed.length, updatedAt: '2026-09-25T10:00:00.000Z' };
+        },
+      },
+      (doc) => {
+        doc.courses = many;
+      },
+    );
+    const t = performance.now();
+    renderAt('/cursos');
+    expect(await screen.findByText('Tienes 2 cursos repetidos', {}, { timeout: 10000 })).toBeInTheDocument();
+    expect(performance.now() - t).toBeLessThan(8000);
+    // Los temas empiezan cerrados: no se pinta ningún curso hasta abrir uno.
+    expect(screen.queryAllByRole('list', { name: /^Cursos de Tema/ })).toHaveLength(0);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Ver cursos' })[0]);
+    const lista = await screen.findByRole('list', { name: /^Cursos de Tema/ });
+    expect(within(lista).getAllByRole('listitem').length).toBeLessThanOrEqual(25);
+    expect(screen.getByRole('button', { name: /Ver 50 más/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar 2 que sobran' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sí, quitar 2' }));
+    await waitFor(() => expect(removed.sort()).toEqual(['copia5', 'copia7']));
+    expect(await screen.findByText('Se quitaron 2 cursos repetidos')).toBeInTheDocument();
+    expect(screen.queryByText(/^Tienes \d+ cursos repetidos/)).toBeNull();
+    expect(api.calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);
+  }, 60000);
+
   it('agrupa por tema, abre los enlaces aparte y cambia el estado', async () => {
     const api = withApi();
     renderAt('/cursos');

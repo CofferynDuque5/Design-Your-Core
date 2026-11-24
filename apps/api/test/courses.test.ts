@@ -122,3 +122,17 @@ describe('cursos en su propia tabla', () => {
     expect(res.body.legacy.courses).toHaveLength(1);
   });
 });
+
+describe('quitar cursos repetidos de una vez', () => {
+  it('borra solo los pedidos, guarda copia y valida', async () => {
+    const { api, auth, userId, get, rows } = await setup();
+    for (const id of ['a', 'b', 'c']) await api.post('/api/v2/modules/courses').set(auth).send({ item: course(id) }).expect(201);
+    await api.post('/api/v2/modules/courses/remove-many').set(auth).send({ ids: [] }).expect(400);
+    const res = await api.post('/api/v2/modules/courses/remove-many').set(auth).send({ ids: ['a', 'c', 'no-existe'] }).expect(200);
+    expect(res.body.removed).toBe(2);
+    expect((await rows()).map((r) => r.itemId)).toEqual(['b']);
+    expect(((await get()).data.courses as Array<{ id: string }>).map((c) => c.id)).toEqual(['b']);
+    const backup = await db.row<{ data: { courses: Array<{ id: string }> } }>('SELECT "data" FROM "BlobBackup" WHERE "userId" = $1 AND "reason" = $2', [userId, 'cursos repetidos quitados']);
+    expect(backup?.data.courses.map((c) => c.id)).toEqual(['a', 'c']);
+  });
+});
