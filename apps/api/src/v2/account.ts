@@ -5,7 +5,7 @@ import type { Db } from '../db/db.js';
 import type { ChallengeLog, CheckIn, Habit, HabitLog, UserChallenge } from '../db/types.js';
 import { ah } from '../lib/http.js';
 import { findUser, publicUser } from '../routes/auth.js';
-import { findBlob } from '../routes/sync.js';
+import { readDoc } from '../db/courses.js';
 import { challengeProgress } from './challenges.js';
 import { publicCheckIn } from './checkins.js';
 import { publicHabit } from './habits.js';
@@ -22,7 +22,7 @@ export function accountRoutes({ db, requireAuth, strict }: { db: Db; requireAuth
     if (!user) return res.status(401).json({ error: 'Sesión inválida' });
     const [profile, blob, checkIns, habits, habitLogs, challenges, challengeLogs] = await Promise.all([
       findProfile(db, userId),
-      findBlob(db, userId),
+      readDoc(db, userId),
       db.rows<CheckIn>('SELECT * FROM "CheckIn" WHERE "userId" = $1 ORDER BY "date" ASC', [userId]),
       db.rows<Habit>('SELECT * FROM "Habit" WHERE "userId" = $1 ORDER BY "createdAt" ASC', [userId]),
       db.rows<HabitLog>('SELECT l.* FROM "HabitLog" l JOIN "Habit" h ON h."id" = l."habitId" WHERE h."userId" = $1 ORDER BY l."date" ASC', [userId]),
