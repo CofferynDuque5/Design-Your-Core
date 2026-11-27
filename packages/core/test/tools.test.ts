@@ -34,6 +34,7 @@ import {
   coursesByTopic,
   showableClasses,
   scheduleHours,
+  shortClassLabel,
   shiftMonth,
   TOOL_CATALOG,
   TOOL_GROUPS,
@@ -135,8 +136,17 @@ describe('herramientas compartidas', () => {
     const odd = [{ ...classes[0], id: 'a', day: '2' as unknown as number, start: '8:00', end: '9:30' }, { ...classes[0], id: 'b', day: 9 }];
     expect(showableClasses(odd)).toEqual([{ ...odd[0], day: 2, start: '08:00', end: '09:30' }]);
     expect(odd[0].start).toBe('8:00');
+    expect(shortClassLabel('Curso de Git y GitHub')).toBe('Git y GitHub');
+    expect(shortClassLabel('BUS206: Management Information Systems')).toBe('BUS206');
+    expect(shortClassLabel('CS101: Introduction to Programming')).toBe('CS101');
+    expect(shortClassLabel('Curso de Inglés para Principiantes')).toBe('Inglés para Principiantes');
+    expect(shortClassLabel('curso de la lógica')).toBe('Lógica');
+    expect(shortClassLabel('Matemáticas')).toBe('Matemáticas');
     expect(scheduleHours([])).toEqual({ from: 7, to: 21 });
-    expect(scheduleHours([{ ...classes[0], start: '06:30', end: '22:15' }])).toEqual({ from: 6, to: 23 });
+    expect(scheduleHours([{ ...classes[0], start: '06:30', end: '22:15' }])).toEqual({ from: 5, to: 24 });
+    // Clases de noche: la cuadrícula empieza cerca de ellas, no a las 7.
+    expect(scheduleHours([{ ...classes[0], start: '18:00', end: '19:00' }, { ...classes[0], start: '20:00', end: '21:00' }])).toEqual({ from: 16, to: 22 });
+    expect(scheduleHours([{ ...classes[0], start: '23:00', end: '24:00' }])).toEqual({ from: 18, to: 24 });
   });
 
   it('cursos: enlaces, plataforma y temas', () => {

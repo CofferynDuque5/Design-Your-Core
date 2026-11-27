@@ -2818,8 +2818,8 @@
   }
 
   /* Cuadrícula del Horario: siempre visible. En el teléfono se desliza de lado si no cabe. */
-  /* En un teléfono normal caben los 7 días; si la pantalla es aún más estrecha,
-     la cuadrícula se desliza y una sombra en el borde avisa de que hay más. */
+  /* En el teléfono cada día tiene al menos 68 px para que los nombres no se partan letra por letra;
+     la cuadrícula se desliza de lado y una sombra en el borde avisa de que hay más días. */
   .week-grid-card {
     display: flex;
     padding: var(--space-3) var(--space-2);
@@ -2850,8 +2850,8 @@
     --grid-line: color-mix(in srgb, var(--color-ink) 16%, transparent);
     display: grid;
     flex: 1;
-    grid-template-columns: 34px repeat(7, minmax(36px, 1fr));
-    min-width: 286px;
+    grid-template-columns: 34px repeat(7, minmax(68px, 1fr));
+    min-width: 510px;
   }
 
   .week-grid__head {
@@ -2882,8 +2882,8 @@
     position: relative;
     border-top: 1px solid var(--grid-line);
     border-left: 1px solid var(--grid-line);
-    background-image: linear-gradient(to bottom, transparent 51px, var(--grid-line) 51px);
-    background-size: 100% 52px;
+    background-image: linear-gradient(to bottom, transparent calc(var(--hour, 64px) - 1px), var(--grid-line) calc(var(--hour, 64px) - 1px));
+    background-size: 100% var(--hour, 64px);
   }
 
   .week-grid__col:last-child {
@@ -2896,11 +2896,28 @@
     border-left-width: 3px;
   }
 
+  /* El nombre ocupa las líneas que quepan (hasta 3) y termina en «…»; la hora va siempre al pie. */
   .week-grid .tl-block__label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
     font-size: var(--text-caption);
+    line-height: 1.25;
     white-space: normal;
     overflow-wrap: break-word;
     hyphens: auto;
+  }
+
+  /* En el teléfono va el nombre corto («Git y GitHub», «BUS206») en letra pequeña; el completo, en la lista de abajo. */
+  .week-grid .tl-block__label--full {
+    display: none;
+  }
+
+  .week-grid .tl-block__label--short {
+    font-size: 0.6875rem;
+    hyphens: manual;
+    overflow-wrap: break-word;
   }
 
   /* En el teléfono, el cuadro solo lleva el nombre; la hora y el aula están en la lista de abajo. */
@@ -2909,16 +2926,30 @@
   }
 
   @media (min-width: 768px) {
+    .week-grid {
+      grid-template-columns: 44px repeat(7, minmax(96px, 1fr));
+    }
+
     .week-grid .tl-block__btn {
-      padding: var(--space-1) var(--space-2);
+      justify-content: space-between;
+      padding: var(--space-2);
     }
 
     .week-grid .tl-block__label {
       font-size: var(--text-small);
     }
 
+    .week-grid .tl-block__label--full {
+      display: -webkit-box;
+    }
+
+    .week-grid .tl-block__label--short {
+      display: none;
+    }
+
     .week-grid .tl-block__meta {
       display: block;
+      flex-shrink: 0;
     }
   }
 

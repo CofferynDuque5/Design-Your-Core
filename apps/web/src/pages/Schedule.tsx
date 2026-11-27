@@ -1,7 +1,7 @@
-import { matchesSearch, CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, scheduleHours, showableClasses, type LegacyClass } from '@dyc/core';
+import { matchesSearch, CLASS_COLORS, CLASS_DAY_NAMES, CLASS_DAYS, classDescription, classWhenLabel, COLOR_NAMES, HHMM_RE, hhmmToHours, nextClass, scheduleHours, shortClassLabel, showableClasses, type LegacyClass } from '@dyc/core';
 import { Clock, MapPin, Play, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
 import { SearchBox } from '../components/SearchBox';
@@ -11,7 +11,23 @@ import { EmptyState, ErrorState, Loading } from '../components/States';
 import { isoDay, layoutLanes, nowHours, useNow } from '../lib/tools';
 
 const DAY_NAMES = CLASS_DAY_NAMES;
-const HOUR = 52; // px por hora
+/** Alto de una hora en la cuadrícula: amplio en la computadora para que se lea el nombre entero. */
+const HOUR_WIDE = 96;
+const HOUR_NARROW = 64;
+const WIDE = '(min-width: 768px)';
+
+function useHourHeight(): number {
+  const query = () => (typeof window !== 'undefined' && window.matchMedia?.(WIDE).matches ? HOUR_WIDE : HOUR_NARROW);
+  const [h, setH] = useState(query);
+  useEffect(() => {
+    const m = window.matchMedia?.(WIDE);
+    if (!m) return;
+    const on = () => setH(query());
+    m.addEventListener?.('change', on);
+    return () => m.removeEventListener?.('change', on);
+  }, []);
+  return h;
+}
 const TIME_RE = HHMM_RE;
 
 interface Subject {
@@ -32,6 +48,7 @@ export function Schedule() {
   const [editing, setEditing] = useState<LegacyClass | 'new' | null>(null);
   const now = useNow();
   const today = isoDay(now);
+  const HOUR = useHourHeight();
 
   const { from, to } = scheduleHours(classes);
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -92,7 +109,7 @@ export function Schedule() {
             <h2 id="week-title" className="visually-hidden">
               Semana
             </h2>
-            <div className="week-grid">
+            <div className="week-grid" style={{ ['--hour' as string]: `${HOUR}px` } as CSSProperties}>
               <div className="week-grid__corner" aria-hidden="true" />
               {CLASS_DAYS.map((d, i) => (
                 <div key={d} className={`week-grid__head${i + 1 === today ? ' week-grid__head--today' : ''}`} aria-hidden="true">
@@ -125,7 +142,10 @@ export function Schedule() {
                           }}
                         >
                           <button type="button" className="tl-block__btn" onClick={() => setEditing(c)} aria-label={describe(c)}>
-                            <span className="tl-block__label">{c.title}</span>
+                            <span className="tl-block__label tl-block__label--full">{c.title}</span>
+                            <span className="tl-block__label tl-block__label--short" aria-hidden="true">
+                              {shortClassLabel(c.title)}
+                            </span>
                             {end - start >= 0.75 && (
                               <span className="tl-block__meta">
                                 {c.start}

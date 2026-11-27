@@ -531,9 +531,27 @@ export function showableClasses(list: LegacyClass[]): LegacyClass[] {
 }
 
 /** Horas que muestra la cuadrícula del Horario: de 7:00 a 21:00, ampliadas para que quepan todas las clases. */
+/**
+ * Nombre corto para la cuadrícula del teléfono, donde cada día mide unos 40 px:
+ * sin «Curso de», «Clase de»… y, si empieza con un código («BUS206: …»), solo el código.
+ */
+export function shortClassLabel(title: string): string {
+  const t = title.trim();
+  const code = /^([A-Za-z]{2,5}\s?\d{2,4}[A-Za-z]?)\s*[:\-–]/.exec(t);
+  if (code) return code[1].replace(/\s/g, '');
+  const short = t.replace(/^(curso|clase|taller|diplomado|certificado|introducci[oó]n)(\s+(completo|b[aá]sico|gratis))?\s+(de|a|al|en|sobre|para)\s+(la\s+|el\s+|los\s+|las\s+)?/i, '');
+  return (short || t).replace(/^./, (c) => c.toLocaleUpperCase('es'));
+}
+
 export function scheduleHours(classes: LegacyClass[]): { from: number; to: number } {
-  const from = Math.min(7, ...classes.map((c) => Math.floor(hhmmToHours(c.start))));
-  const to = Math.max(21, ...classes.map((c) => Math.ceil(hhmmToHours(c.end))));
+  if (!classes.length) return { from: 7, to: 21 };
+  // Solo las horas con clases, con una hora libre antes y después (al menos 6 h a la vista).
+  let from = Math.max(0, Math.min(...classes.map((c) => Math.floor(hhmmToHours(c.start)))) - 1);
+  let to = Math.min(24, Math.max(...classes.map((c) => Math.ceil(hhmmToHours(c.end)))) + 1);
+  while (to - from < 6) {
+    if (from > 0) from--;
+    if (to - from < 6 && to < 24) to++;
+  }
   return { from, to };
 }
 
