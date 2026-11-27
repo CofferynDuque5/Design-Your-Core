@@ -52,13 +52,20 @@ describe('actualización de una base en producción', () => {
       // Estado de producción: tablas creadas por la versión original, con datos y sin registro de migraciones.
       for (const s of splitStatements(readFileSync('migrations/001_base.sql', 'utf8'))) await legacy.exec(s);
       await legacy.exec(`INSERT INTO "User" ("id","email","name","passwordHash") VALUES ('u1','ana@example.com','Ana','hash')`);
-      await legacy.exec(`INSERT INTO "Blob" ("userId","data") VALUES ('u1','{"habits":[{"label":"Leer"}]}')`);
+      const courses = [{ id: 'k1', title: 'Uno', extra: { a: 1 } }, { id: 'k2', title: 'Dos' }, { id: 'k1', title: 'Repetido' }, 'roto'];
+      const doc = { habits: [{ label: 'Leer' }], courses };
+      await legacy.exec(`INSERT INTO "Blob" ("userId","data") VALUES ('u1', $1::jsonb)`, [JSON.stringify(doc)]);
 
-      expect(await migrate(legacy)).toEqual(['001_base', '002_pillars', '003_sessions_devices']);
+      expect(await migrate(legacy)).toEqual(['001_base', '002_pillars', '003_sessions_devices', '004_web_push', '005_payments', '006_couple_avatar', '007_courses_table']);
 
       const user = await legacy.row<{ email: string; data: unknown }>('SELECT u."email", b."data" FROM "User" u JOIN "Blob" b ON b."userId" = u."id" WHERE u."id" = \'u1\'');
       expect(user?.email).toBe('ana@example.com');
       expect(user?.data).toEqual({ habits: [{ label: 'Leer' }] });
+      // Los cursos pasan a su tabla en el mismo orden y con todos sus campos, y queda una copia del documento.
+      const moved = await legacy.rows<{ key: string; data: unknown }>('SELECT "key", "data" FROM "CourseItem" WHERE "userId" = \'u1\' ORDER BY "pos"');
+      expect(moved.map((r) => r.data)).toEqual(courses);
+      expect(moved.map((r) => r.key)).toEqual(['k1', 'k2', '~3', '~4']);
+      expect((await legacy.row<{ data: unknown }>('SELECT "data" FROM "BlobBackup" WHERE "userId" = \'u1\''))?.data).toEqual(doc);
       await legacy.exec('INSERT INTO "CheckIn" ("id", "userId", "date", "mood", "updatedAt") VALUES (\'c1\', \'u1\', $1, 4, $2)', [new Date('2026-09-23T00:00:00Z'), new Date()]);
       expect(await legacy.rows('SELECT * FROM "CheckIn"')).toHaveLength(1);
     } finally {

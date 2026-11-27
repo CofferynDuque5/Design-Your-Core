@@ -7,9 +7,9 @@ import '../styles/tipografias.css';
 import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import { applyFont, storedFont } from './font';
-import { applyPalette, storedPalette } from './palette';
-import { applyStyle, storedStyle } from './style';
+import { applyFont, DEFAULT_FONT } from './font';
+import { applyPalette, DEFAULT_PALETTE } from './palette';
+import { applyStyle, DEFAULT_STYLE } from './style';
 import { applyTheme, storedTheme } from './theme';
 
 /**
@@ -21,9 +21,10 @@ export function start(before?: ReactNode) {
   // index.html ya aplicó tema, estilo, tipografía y paleta antes de pintar; esto cubre el caso en
   // que su script no pudo y, además, carga las fuentes de una tipografía que no sea la clásica.
   applyTheme(storedTheme());
-  applyStyle(storedStyle());
-  applyFont(storedFont());
-  applyPalette(storedPalette());
+  // Estilo, tipografía y color ya no se eligen en Perfil: siempre los de la marca.
+  applyStyle(DEFAULT_STYLE);
+  applyFont(DEFAULT_FONT);
+  applyPalette(DEFAULT_PALETTE);
 
   createRoot(document.getElementById('root') as HTMLElement).render(
     <StrictMode>

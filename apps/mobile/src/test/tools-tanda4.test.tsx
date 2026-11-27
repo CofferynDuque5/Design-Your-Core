@@ -7,17 +7,12 @@ import { queryClient } from '../lib/queryClient';
 import { fakeModules, tokens, type Handler } from './fakeApi';
 
 // Herramientas de la tanda 4 en el móvil: Notas (biblioteca, editor con
-// barra de formato y vista previa segura), Trabajo y Respiración, con el
+// barra de formato y vista previa segura) y Trabajo, con el
 // enrutador real y una API falsa que aplica cada cambio como el servidor.
 
 const reset = () => (SecureStore as unknown as { __reset: () => void }).__reset();
 const utc = utcDayKey();
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
-/**
- * Respiración avanza el reloj falso varios minutos: cerca de la medianoche UTC
- * «hoy» cambiaría a mitad de la prueba. Se fija el reloj al mediodía de hoy.
- */
-const atNoon = () => jest.setSystemTime(new Date(`${utc}T12:00:00.000Z`));
 
 function legacyDoc(): LegacyData {
   return {
@@ -37,6 +32,7 @@ function legacyDoc(): LegacyData {
       { id: 'n2', title: 'Derivadas', subject: 'Cálculo', date: '21 sept', tag: '#0FA968', excerpt: '', body: 'Regla de la cadena', commit: false, tags: 'examen', shareId: null },
       { id: 'n3', title: 'Lista de la compra', subject: '', date: '', tag: '', excerpt: '', body: '', commit: false, tags: '', shareId: null },
     ],
+    projects: [{ id: 'pr1', title: 'NV Hotel', subject: '', deadline: '', status: 'curso', color: '#4F7CFF', milestones: [] }],
     workItems: [
       { id: 'wk1', title: 'Informe mensual', project: 'p1', status: 'curso', done: false, due: 'Viernes' },
       { id: 'wk2', title: 'Revisar contrato', project: 'p2', status: 'todo', done: false, due: '' },
@@ -107,6 +103,16 @@ describe('herramientas de la tanda 4 en el móvil', () => {
 
     fireEvent.changeText(screen.getByLabelText('Buscar en tus notas'), 'nada de nada');
     expect(await screen.findByText('Ninguna nota coincide')).toBeOnTheScreen();
+  });
+
+  it('Notas: una nota nueva que no se escribe se borra al salir', async () => {
+    const api = setup();
+    await open('/notas', 'Ondas');
+    fireEvent.press(screen.getByRole('button', { name: 'Nueva nota' }));
+    const created = itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/notes'));
+    await screen.findByLabelText('Título');
+    screen.unmount();
+    await waitForWrite(api, 'DELETE', `/api/v2/modules/notes/${created.id as string}`);
   });
 
   it('Notas: una nota nueva se abre para escribir y se guarda sola, con barra de formato', async () => {
@@ -216,9 +222,10 @@ describe('herramientas de la tanda 4 en el móvil', () => {
     expect(screen.getByRole('checkbox', { name: 'Enviar factura' })).toBeChecked();
 
     fireEvent.changeText(screen.getByLabelText('Nueva tarea de trabajo'), '  Preparar reunión ');
-    fireEvent.press(screen.getByRole('radio', { name: 'Proyecto 3' }));
+    expect(screen.getByText(/3 tareas siguen en «Proyecto 1, 2 o 3»/)).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('radio', { name: 'NV Hotel' }));
     fireEvent.press(screen.getByRole('button', { name: 'Añadir' }));
-    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/workItems'))).toEqual({ id: expect.any(String), title: 'Preparar reunión', project: 'p3', status: 'todo', done: false, due: '' });
+    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/workItems'))).toEqual({ id: expect.any(String), title: 'Preparar reunión', project: 'pr1', status: 'todo', done: false, due: '' });
     expect(await screen.findByLabelText('1 de 4 completadas')).toBeOnTheScreen();
 
     fireEvent.press(screen.getByRole('checkbox', { name: 'Revisar contrato' }));
@@ -227,12 +234,12 @@ describe('herramientas de la tanda 4 en el móvil', () => {
 
     fireEvent.press(screen.getByRole('button', { name: 'Editar «Informe mensual»' }));
     fireEvent.changeText(await screen.findByLabelText('Tarea'), 'Informe trimestral');
-    fireEvent.press(screen.getAllByRole('radio', { name: 'Proyecto 2' }).at(-1)!);
+    fireEvent.press(screen.getAllByRole('radio', { name: 'NV Hotel' }).at(-1)!);
     fireEvent.press(screen.getByRole('radio', { name: 'Por hacer' }));
     fireEvent.changeText(screen.getByLabelText('Para cuándo (opcional)'), ' Lunes ');
     fireEvent.press(screen.getByRole('button', { name: 'Guardar' }));
-    expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/workItems/wk1', 1)).body).toEqual({ title: 'Informe trimestral', project: 'p2', status: 'todo', due: 'Lunes' });
-    expect(await screen.findByRole('checkbox', { name: 'Informe trimestral' })).toHaveProp('accessibilityHint', 'Proyecto 2 · Lunes');
+    expect((await waitForWrite(api, 'PATCH', '/api/v2/modules/workItems/wk1', 1)).body).toEqual({ title: 'Informe trimestral', project: 'pr1', status: 'todo', due: 'Lunes' });
+    expect(await screen.findByRole('checkbox', { name: 'Informe trimestral' })).toHaveProp('accessibilityHint', 'NV Hotel · Lunes');
     await waitFor(() => expect(screen.queryByRole('header', { name: 'En curso' })).toBeNull());
 
     fireEvent.press(screen.getByRole('button', { name: 'Editar «Enviar factura»' }));
@@ -251,74 +258,6 @@ describe('herramientas de la tanda 4 en el móvil', () => {
     expect(await screen.findByText('No se pudo guardar.')).toBeOnTheScreen();
     await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Revisar contrato' })).not.toBeChecked());
     expect(screen.getByLabelText('1 de 3 completadas')).toBeOnTheScreen();
-  });
-
-  it('Respiración: guía con texto, guarda los minutos completos y borra con deshacer', async () => {
-    const api = setup();
-    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
-    // renderRouter usa relojes falsos: el tiempo avanza con `wait`.
-    const wait = (ms: number) => act(async () => void jest.advanceTimersByTime(ms));
-    await open('/respiracion', 'Tus minutos de calma');
-    atNoon();
-    expect(await screen.findByLabelText('Esta semana: 3 min')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Hoy: 3 min')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Sesiones en total: 2')).toBeOnTheScreen();
-    expect(screen.getByText('Lista')).toBeOnTheScreen();
-    expect(screen.getByRole('timer', { name: 'Tiempo restante: 3 minutos' })).toBeOnTheScreen();
-
-    // Menos de un minuto no se guarda.
-    fireEvent.press(screen.getByRole('button', { name: 'Empezar' }));
-    expect(await screen.findByText('Inhala')).toBeOnTheScreen();
-    await waitFor(() => expect(announce).toHaveBeenCalledWith('Inhala'));
-    expect(screen.getByRole('radio', { name: '4-7-8' })).toBeDisabled();
-    await wait(5_000);
-    expect(screen.getByText('Mantén')).toBeOnTheScreen();
-    await waitFor(() => expect(announce).toHaveBeenCalledWith('Mantén'));
-    fireEvent.press(screen.getByRole('button', { name: 'Terminar' }));
-    expect(await screen.findByText('Sesión terminada. Con menos de un minuto no se guarda.')).toBeOnTheScreen();
-    expect(writes(api)).toHaveLength(0);
-
-    // 4-7-8 de 1 minuto: pausar, seguir y terminar solo al llegar al final.
-    fireEvent.press(screen.getByRole('radio', { name: '4-7-8' }));
-    fireEvent.press(screen.getByRole('radio', { name: '1 minuto' }));
-    fireEvent.press(screen.getByRole('button', { name: 'Empezar' }));
-    await wait(12_000);
-    expect(screen.getByText('Exhala')).toBeOnTheScreen();
-    fireEvent.press(screen.getByRole('button', { name: 'Pausar' }));
-    expect(await screen.findByText('En pausa.')).toBeOnTheScreen();
-    const left = screen.getByRole('timer').props.accessibilityLabel;
-    await wait(600_000); // En pausa no corre.
-    expect(screen.getByRole('timer')).toHaveProp('accessibilityLabel', left);
-    fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
-    await wait(48_000);
-    const added = itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/meditations'));
-    expect(added).toEqual({ id: expect.any(String), date: utc, minutes: 1, kind: 'respiracion' });
-    expect(await screen.findByText('¡Bien hecho! 1 minuto de respiración.')).toBeOnTheScreen();
-    expect(await screen.findByLabelText('Hoy: 4 min')).toBeOnTheScreen();
-
-    const order = (api.doc().meditations ?? []).map((m) => m.id);
-    fireEvent.press(screen.getByRole('button', { name: `Borrar la sesión de 5 min del ${shortDay('2020-01-10')}` }));
-    await waitForWrite(api, 'DELETE', '/api/v2/modules/meditations/md2');
-    expect(await screen.findByText('Sesión eliminada.')).toBeOnTheScreen();
-    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Deshacer' })));
-    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/meditations', 2))).toEqual({ id: 'md2', date: '2020-01-10', minutes: 5, kind: 'respiracion' });
-    expect((await waitForWrite(api, 'PUT', '/api/v2/modules/meditations/order')).body).toEqual({ ids: order });
-  });
-
-  it('Respiración: con «Reducir movimiento» el círculo no se mueve y, si la API falla, la sesión se deshace', async () => {
-    const api = setup({ 'POST /api/v2/modules/:key': () => [500, { error: 'No se pudo guardar la sesión.' }] });
-    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
-    const wait = (ms: number) => act(async () => void jest.advanceTimersByTime(ms));
-    await open('/respiracion', 'Tus minutos de calma');
-    atNoon();
-    expect(await screen.findByText(/Con «Reducir movimiento» activado, el círculo no se mueve\./)).toBeOnTheScreen();
-    fireEvent.press(screen.getByRole('button', { name: 'Empezar' }));
-    await wait(125_000);
-    expect(screen.getByRole('timer', { name: /^Tiempo restante: 5\d segundos$/ })).toBeOnTheScreen();
-    fireEvent.press(screen.getByRole('button', { name: 'Terminar' }));
-    expect(itemOf(await waitForWrite(api, 'POST', '/api/v2/modules/meditations'))).toMatchObject({ minutes: 2, kind: 'respiracion' });
-    expect(await screen.findByText('No se pudo guardar la sesión.')).toBeOnTheScreen();
-    await waitFor(() => expect(screen.getByLabelText('Hoy: 3 min')).toBeOnTheScreen());
   });
 
   it('Hábitos y Perfil: en el tema oscuro, los interruptores llevan el pulgar blanco como las herramientas', async () => {

@@ -1,10 +1,12 @@
-import { BLOCK_KIND_INFO, BLOCK_KINDS, hoursLabel, TASK_PRIORITIES, TASK_PRIORITY_INFO, type BlockKind, type LegacyBlock, type LegacyTask, type TaskPriority } from '@dyc/core';
+import { matchesSearch, BLOCK_KIND_INFO, BLOCK_KINDS, hoursLabel, TASK_PRIORITIES, TASK_PRIORITY_INFO, type BlockKind, type LegacyBlock, type LegacyTask, type TaskPriority } from '@dyc/core';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
+import { RemoveButton } from '../components/ToolParts';
 import { Segmented, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { durationLabel, layoutLanes, nowHours, useNow } from '../lib/tools';
@@ -97,8 +99,17 @@ function DayView({ data }: { data: Record<string, unknown> }) {
                       ['--c' as string]: info.color,
                     }}
                   >
-                    <button type="button" className="tl-block__btn" onClick={() => setEditing(b)} aria-label={`Editar «${b.label}», ${hoursLabel(b.start)} a ${hoursLabel(b.start + b.dur)}, ${info.label}`}>
-                      <span className="tl-block__label">{b.label}</span>
+                    <button
+                      type="button"
+                      className="tl-block__btn"
+                      onClick={() => setEditing(b)}
+                      title={`${b.label} · ${hoursLabel(b.start)}–${hoursLabel(b.start + b.dur)}${b.sub ? ` · ${b.sub}` : ''}`}
+                      aria-label={`Editar «${b.label}», ${hoursLabel(b.start)} a ${hoursLabel(b.start + b.dur)}, ${info.label}`}
+                    >
+                      <span className="tl-block__label">
+                        {short && <span className="tl-block__time">{hoursLabel(b.start)} </span>}
+                        {b.label}
+                      </span>
                       {!short && (
                         <span className="tl-block__meta">
                           {hoursLabel(b.start)}–{hoursLabel(b.start + b.dur)}
@@ -106,6 +117,9 @@ function DayView({ data }: { data: Record<string, unknown> }) {
                         </span>
                       )}
                     </button>
+                    <span className="tl-block__remove">
+                      <RemoveButton module="blocks" id={b.id} name={b.label} size={14} />
+                    </span>
                   </li>
                 );
               })}
@@ -130,7 +144,7 @@ function DayView({ data }: { data: Record<string, unknown> }) {
             );
           })}
         </ul>
-        <p className="muted small">Los bloques no llevan fecha: tu plan se repite cada día, igual que en la app anterior.</p>
+        <p className="muted small">Los bloques no llevan fecha: tu plan se repite cada día.</p>
       </aside>
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo bloque' : 'Editar bloque'}>
         {editing !== null && <BlockForm block={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />}
@@ -143,6 +157,8 @@ const halfHours = (from: number, to: number) => Array.from({ length: Math.round(
 
 function BlockForm({ block, onDone }: { block: LegacyBlock | null; onDone: () => void }) {
   const blocks = useModule('blocks');
+  const saved = useLegacyData().data?.data;
+  const past = useLegacyList(saved, 'blocks');
   const [label, setLabel] = useState(block?.label ?? '');
   const [sub, setSub] = useState(block?.sub ?? '');
   const [kind, setKind] = useState<BlockKind>(block && BLOCK_KINDS.includes(block.kind) ? block.kind : 'study');
@@ -165,8 +181,8 @@ function BlockForm({ block, onDone }: { block: LegacyBlock | null; onDone: () =>
 
   return (
     <form className="stack" onSubmit={submit}>
-      <TextField label="Nombre" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} required autoFocus placeholder="Estudiar cálculo" />
-      <TextField label="Detalle (opcional)" value={sub} onChange={(e) => setSub(e.target.value)} maxLength={200} placeholder="Capítulo 3" />
+      <TextField label="Nombre" suggestions={past.map((b) => b.label ?? '')} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} required autoFocus placeholder="Estudiar cálculo" />
+      <TextField label="Detalle (opcional)" suggestions={past.filter((b) => b.label === label).map((b) => b.sub ?? '')} value={sub} onChange={(e) => setSub(e.target.value)} maxLength={200} placeholder="Capítulo 3" />
       <fieldset className="field">
         <legend className="field__label">Tipo</legend>
         <div className="chips">
@@ -223,6 +239,7 @@ function TasksView({ data }: { data: Record<string, unknown> }) {
   const [title, setTitle] = useState('');
   const [pri, setPri] = useState<TaskPriority>('media');
   const [editing, setEditing] = useState<LegacyTask | null>(null);
+  const [q, setQ] = useState('');
 
   const add = (e: FormEvent) => {
     e.preventDefault();
@@ -254,12 +271,13 @@ function TasksView({ data }: { data: Record<string, unknown> }) {
         </button>
       </form>
 
+      {tasks.length > 3 && <SearchBox label="Buscar en tus tareas" value={q} onChange={setQ} placeholder="Buscar una tarea o etiqueta…" count={tasks.filter((t) => matchesSearch(q, t.title, t.tags)).length} />}
       {tasks.length === 0 ? (
         <EmptyState title="Sin tareas por ahora">Escribe la primera arriba y elige su prioridad.</EmptyState>
       ) : (
         <div className="task-groups">
           {TASK_PRIORITIES.map((p) => {
-            const group = tasks.filter((t) => priOf(t) === p);
+            const group = tasks.filter((t) => priOf(t) === p && matchesSearch(q, t.title, t.tags));
             const done = group.filter((t) => t.done).length;
             return (
               <section key={p} className="card stack-sm" aria-labelledby={`pri-${p}`} style={{ ['--c' as string]: TASK_PRIORITY_INFO[p].color }}>

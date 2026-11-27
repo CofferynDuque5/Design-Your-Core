@@ -1,9 +1,10 @@
-import { addDays, fromCheckIn, parseNumber, todayIn, toCheckInPayload, type CheckInValues, type Day, type PillarId } from '@dyc/core';
+import { addDays, fromCheckIn, legacyList, mergeToolSignals, parseNumber, PILLAR_IDS, todayIn, toCheckInPayload, toolSignals, type CheckInValues, type Day, type PillarId, type ToolSignals } from '@dyc/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api } from '../app/api';
+import { newId, useLegacyData, useModule, useModuleObject } from '../app/legacy';
 import { keys, useProfile, useRefresh } from '../app/queries';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
@@ -23,6 +24,7 @@ export function CheckIn() {
   const date: Day = param && /^\d{4}-\d{2}-\d{2}$/.test(param) && param <= today ? param : today;
 
   const existing = useQuery({ queryKey: keys.checkIns(date, date), queryFn: () => api.checkIns.list(date, date) });
+  const legacy = useLegacyData();
   const setDate = (d: Day) => setParams(d === today ? {} : { fecha: d }, { replace: true });
 
   return (
@@ -37,12 +39,20 @@ export function CheckIn() {
           </button>
         </div>
       </PageHeader>
-      {existing.isPending ? (
+      {existing.isPending || legacy.isPending ? (
         <Loading />
       ) : existing.isError ? (
         <ErrorState error={existing.error} retry={() => existing.refetch()} />
       ) : (
-        <CheckInForm key={date} date={date} initial={fromCheckIn(existing.data.checkIns[0])} isToday={date === today} />
+        <CheckInForm
+          key={date}
+          date={date}
+          initial={fromCheckIn(existing.data.checkIns[0])}
+          signals={legacy.data ? toolSignals(legacy.data.data, date) : {}}
+          journalId={legacyList(legacy.data?.data, 'journal').find((j) => j.date === date)?.id}
+          chosen={profile.data?.focusPillars ?? []}
+          isToday={date === today}
+        />
       )}
     </div>
   );
@@ -60,16 +70,27 @@ function Section({ pillar, title, children }: { pillar: PillarId; title?: string
   );
 }
 
-function CheckInForm({ date, initial, isToday }: { date: Day; initial: Values; isToday: boolean }) {
-  const [v, setV] = useState<Values>(initial);
+function CheckInForm({ date, initial, signals, journalId, chosen, isToday }: { date: Day; initial: Values; signals: ToolSignals; journalId?: string; chosen: PillarId[]; isToday: boolean }) {
+  const merged = mergeToolSignals(initial, signals);
+  const [v, setV] = useState<Values>(merged.values);
   const refresh = useRefresh();
   const toast = useToast();
   const navigate = useNavigate();
+  const dayLog = useModuleObject('dayLog');
+  const journal = useModule('journal');
   const set = <K extends keyof Values>(k: K) => (value: Values[K]) => setV((s) => ({ ...s, [k]: value }));
+  const from = (k: keyof ToolSignals, extra?: string) => [merged.from[k] && v[k] === signals[k] ? `Ya registrado en ${merged.from[k]}.` : null, extra].filter(Boolean).join(' ') || undefined;
 
   const save = useMutation({
     mutationFn: () => api.checkIns.save(date, toCheckInPayload(v)),
     onSuccess: async () => {
+      // Una sola fuente: el agua de hoy y la gratitud vuelven también a Rutina y Diario.
+      if (isToday && typeof v.water === 'number' && v.water !== signals.water) dayLog.patch({ dateKey: date, water: v.water }, { undo: false });
+      const thanks = (v.gratitude ?? '').trim();
+      if (thanks && thanks !== signals.gratitude) {
+        if (journalId) journal.update(journalId, { gratitude: thanks }, { undo: false });
+        else journal.add({ id: newId(), date, mood: '', gratitude: thanks, note: '' }, { undo: false });
+      }
       await refresh('checkins');
       toast('Check-in guardado.');
       navigate(isToday ? '/' : '/progreso');
@@ -82,16 +103,9 @@ function CheckInForm({ date, initial, isToday }: { date: Day; initial: Values; i
     save.mutate();
   };
 
-  return (
-    <form className="stack-lg" onSubmit={submit}>
-      <p className="muted">Todo es opcional. Registra lo que te sirva hoy; lo que dejes en blanco no cuenta en tu puntuación.</p>
-
-      <Section pillar="enfoque" title="Ánimo y mente">
-        <Scale legend="Ánimo" value={v.mood} onChange={set('mood')} low="Bajo" high="Muy bien" />
-        <Scale legend="Estrés" value={v.stress} onChange={set('stress')} low="Tranquila/o" high="Mucho" />
-      </Section>
-
-      <Section pillar="movimiento">
+  const sections: Record<Exclude<PillarId, 'enfoque'>, ReactNode> = {
+    movimiento: (
+      <Section key="movimiento" pillar="movimiento">
         <Scale legend="Energía" value={v.energy} onChange={set('energy')} low="Muy baja" high="Muy alta" />
         <TextField
           label="Minutos de actividad"
@@ -101,29 +115,67 @@ function CheckInForm({ date, initial, isToday }: { date: Day; initial: Values; i
           max={1440}
           value={v.activeMinutes ?? ''}
           onChange={(e) => set('activeMinutes')(parseNumber(e.target.value))}
-          hint="Caminar cuenta. La referencia son 30 minutos."
+          hint={from('activeMinutes', 'Caminar cuenta. La referencia son 30 minutos.')}
         />
       </Section>
-
-      <Section pillar="descanso">
-        <TextField label="Horas de sueño" type="number" inputMode="decimal" step={0.5} min={0} max={24} value={v.sleepHours ?? ''} onChange={(e) => set('sleepHours')(parseNumber(e.target.value))} />
+    ),
+    descanso: (
+      <Section key="descanso" pillar="descanso">
+        <TextField label="Horas de sueño" type="number" inputMode="decimal" step={0.5} min={0} max={24} value={v.sleepHours ?? ''} onChange={(e) => set('sleepHours')(parseNumber(e.target.value))} hint={from('sleepHours')} />
         <Scale legend="Calidad del sueño" value={v.sleepQuality} onChange={set('sleepQuality')} low="Mala" high="Reparador" />
       </Section>
-
-      <Section pillar="alimentacion">
+    ),
+    alimentacion: (
+      <Section key="alimentacion" pillar="alimentacion">
         <Scale legend="¿Cómo comiste?" value={v.nutrition} onChange={set('nutrition')} low="Desordenado" high="Muy bien" />
-        <TextField label="Vasos de agua" type="number" inputMode="numeric" min={0} max={40} value={v.water ?? ''} onChange={(e) => set('water')(parseNumber(e.target.value))} hint="Referencia: 8 vasos." />
+        <TextField label="Vasos de agua" type="number" inputMode="numeric" min={0} max={40} value={v.water ?? ''} onChange={(e) => set('water')(parseNumber(e.target.value))} hint={from('water', 'Referencia: 8 vasos.')} />
       </Section>
-
-      <Section pillar="relaciones">
+    ),
+    relaciones: (
+      <Section key="relaciones" pillar="relaciones">
         <Scale legend="Conexión con tu pareja" value={v.connection} onChange={set('connection')} low="Distantes" high="Muy unidos" />
       </Section>
-
-      <Section pillar="proposito" title="Propósito y reflexión">
+    ),
+    proposito: (
+      <Section key="proposito" pillar="proposito" title="Propósito y reflexión">
         <Scale legend="Sentido de lo que hiciste hoy" value={v.purpose} onChange={set('purpose')} low="Poco" high="Mucho" />
-        <TextArea label="Algo que agradeces" rows={2} maxLength={1000} value={v.gratitude ?? ''} onChange={(e) => set('gratitude')(e.target.value)} />
+        <TextArea label="Algo que agradeces" rows={2} maxLength={1000} value={v.gratitude ?? ''} onChange={(e) => set('gratitude')(e.target.value)} hint={from('gratitude', 'Se guarda también en tu Diario.')} />
         <TextArea label="Reflexión del día" rows={4} maxLength={4000} value={v.note ?? ''} onChange={(e) => set('note')(e.target.value)} hint="Solo tú la ves." />
       </Section>
+    ),
+  };
+  const rest = PILLAR_IDS.filter((p): p is Exclude<PillarId, 'enfoque'> => p !== 'enfoque');
+  // Tus pilares primero; los demás, plegados (se abren solos si ya tienen algo).
+  const mine = chosen.length ? rest.filter((p) => chosen.includes(p)) : rest;
+  const others = rest.filter((p) => !mine.includes(p));
+  const FIELDS: Record<Exclude<PillarId, 'enfoque'>, Array<keyof Values>> = {
+    movimiento: ['energy', 'activeMinutes'],
+    descanso: ['sleepHours', 'sleepQuality'],
+    alimentacion: ['nutrition', 'water'],
+    relaciones: ['connection'],
+    proposito: ['purpose', 'gratitude', 'note'],
+  };
+  const filled = others.some((p) => FIELDS[p].some((k) => v[k] !== null && v[k] !== undefined && v[k] !== ''));
+
+  return (
+    <form className="stack-lg" onSubmit={submit}>
+      <p className="muted">Todo es opcional. Registra lo que te sirva hoy; lo que dejes en blanco no cuenta en tu puntuación.</p>
+
+      <Section pillar="enfoque" title="Ánimo y mente">
+        <Scale legend="Ánimo" value={v.mood} onChange={set('mood')} low="Bajo" high="Muy bien" />
+        <Scale legend="Estrés" value={v.stress} onChange={set('stress')} low="Tranquila/o" high="Mucho" />
+      </Section>
+
+      {mine.map((p) => sections[p])}
+
+      {others.length > 0 && (
+        <details className="checkin-more" open={filled || undefined}>
+          <summary className="btn btn--ghost">
+            Otros pilares ({others.length}) <span className="muted small">· no están entre tus prioridades</span>
+          </summary>
+          <div className="stack-lg checkin-more__body">{others.map((p) => sections[p])}</div>
+        </details>
+      )}
 
       <div className="form-actions form-actions--sticky">
         <Link to="/" className="btn btn--ghost">

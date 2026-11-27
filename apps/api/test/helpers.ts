@@ -42,9 +42,9 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-export function makeApp(opts: { config?: Partial<Config>; mailer?: ReturnType<typeof fakeMailer>; strict?: number } = {}) {
+export function makeApp(opts: { config?: Partial<Config>; mailer?: ReturnType<typeof fakeMailer>; strict?: number; general?: number } = {}) {
   const mailer = opts.mailer ?? fakeMailer();
-  const app = createApp({ db, config: testConfig(opts.config), mailer, limits: { general: 10_000, strict: opts.strict ?? 10_000 } });
+  const app = createApp({ db, config: testConfig(opts.config), mailer, limits: { general: opts.general ?? 10_000, strict: opts.strict ?? 10_000 } });
   return { app, mailer, api: request(app) };
 }
 
@@ -54,7 +54,7 @@ export async function resetDb() {
     await migrate(db);
     migrated = true;
   }
-  await db.exec('TRUNCATE "User" CASCADE');
+  await db.exec('TRUNCATE "User", "AppSetting" CASCADE');
 }
 
 let counter = 0;

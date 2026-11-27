@@ -9,6 +9,9 @@ expect.extend(matchers);
 // 1 s de espera por defecto se queda corto para el primer render de un archivo.
 configure({ asyncUtilTimeout: 4000 });
 
+// jsdom no desplaza la página: AppShell sube al inicio al cambiar de sección.
+window.scrollTo = () => undefined;
+
 afterEach(() => {
   cleanup();
   localStorage.clear();

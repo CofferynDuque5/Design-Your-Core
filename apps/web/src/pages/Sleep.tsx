@@ -1,12 +1,14 @@
-import { byDateDesc, isDay, shortDay, sleepMinutes, sleepQualityLabel as qualityLabel, sleepStats, utcDayKey, type LegacySleep } from '@dyc/core';
+import { matchesSearch, byDateDesc, isDay, shortDay, sleepMinutes, sleepQualityLabel as qualityLabel, sleepStats, utcDayKey, type LegacySleep } from '@dyc/core';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { useToast } from '../app/toast';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
 import { Scale, TextArea, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
+import { useSyncCheckIn } from '../lib/checkinSync';
 import { CheckInNote, FormActions, Stats } from '../components/ToolParts';
 import { minutesLabel } from '../lib/tools';
 
@@ -24,13 +26,16 @@ export function Sleep() {
   const history = useMemo(() => [...nights].filter((n) => isDay(n.date)).sort(byDateDesc), [nights]);
   const chart = history.slice(0, CHART_NIGHTS).reverse();
   const [editing, setEditing] = useState<LegacySleep | 'new' | null>(null);
+  const [q, setQ] = useState('');
+  const found = history.filter((n) => matchesSearch(q, shortDay(n.date), n.date, n.note, qualityLabel(n.quality)));
   const last = history[0];
   const lastMinutes = last ? sleepMinutes(last.bedtime, last.waketime) : null;
 
   const remove = (n: LegacySleep) => {
     const order = nights.map((x) => x.id);
-    actions.remove(n.id);
+    actions.remove(n.id, { undo: false });
     toast('Noche eliminada.', {
+      key: 'undo',
       action: {
         label: 'Deshacer',
         run: () => {
@@ -64,7 +69,7 @@ export function Sleep() {
           >
             Apunta a qué hora te acostaste y te levantaste y cómo dormiste. Verás tu media de las últimas dos semanas.
           </EmptyState>
-          <CheckInNote>El check-in diario registra aparte tus horas de sueño para el pilar Descanso.</CheckInNote>
+          <CheckInNote>Cada noche que registras aquí pasa a tu check-in de ese día (pilar Descanso).</CheckInNote>
         </div>
       ) : (
         <div className="stack-lg">
@@ -104,8 +109,9 @@ export function Sleep() {
             <h2 id="sleep-history" className="list-count">
               Historial <span className="chip small numeric">{history.length}</span>
             </h2>
+            <SearchBox label="Buscar en tus noches" value={q} onChange={setQ} placeholder="Buscar por fecha, nota o calidad…" count={found.length} />
             <ul className="day-items">
-              {history.slice(0, HISTORY_MAX).map((n) => {
+              {found.slice(0, HISTORY_MAX).map((n) => {
                 const m = sleepMinutes(n.bedtime, n.waketime);
                 const label = `la noche del ${shortDay(n.date)}`;
                 return (
@@ -134,7 +140,7 @@ export function Sleep() {
               })}
             </ul>
           </section>
-          <CheckInNote>El check-in diario registra aparte tus horas de sueño para el pilar Descanso; estas noches aún no cambian tu puntuación.</CheckInNote>
+          <CheckInNote>Cada noche que registras aquí pasa a tu check-in de ese día (pilar Descanso).</CheckInNote>
         </div>
       )}
       <Dialog open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Registrar noche' : 'Editar noche'}>
@@ -146,6 +152,7 @@ export function Sleep() {
 
 function SleepForm({ night, today, onDone }: { night: LegacySleep | null; today: string; onDone: () => void }) {
   const actions = useModule('sleep');
+  const sync = useSyncCheckIn();
   const [date, setDate] = useState(night?.date ?? today);
   const [bedtime, setBedtime] = useState(night?.bedtime ?? '23:00');
   const [waketime, setWaketime] = useState(night?.waketime ?? '07:00');
@@ -159,6 +166,7 @@ function SleepForm({ night, today, onDone }: { night: LegacySleep | null; today:
     const fields = { date, bedtime, waketime, quality: quality as number, note: note.trim() };
     if (night) actions.update(night.id, fields);
     else actions.add({ id: newId(), ...fields });
+    if (minutes !== null) sync(date, { sleepHours: Math.round((minutes / 60) * 2) / 2, sleepQuality: quality as number });
     onDone();
   };
   return (

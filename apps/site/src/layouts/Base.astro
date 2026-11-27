@@ -2,6 +2,7 @@
 import '@fontsource/figtree/latin-400.css';
 import '@fontsource/figtree/latin-500.css';
 import '@fontsource/figtree/latin-600.css';
+import '@fontsource/figtree/latin-700.css';
 import '@fontsource/newsreader/latin-400.css';
 import '@fontsource/newsreader/latin-400-italic.css';
 import '@dyc/tokens/lima.css';
@@ -9,6 +10,7 @@ import '@dyc/tokens/components.css';
 import '../styles/site.css';
 import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
+import { SITE_STYLE, SITE_STYLES, STYLE_SWITCHER } from '../config';
 
 interface Props {
   title: string;
@@ -20,10 +22,23 @@ const fullTitle = title === 'Design Your Core' ? title : `${title} · Design You
 // Con build.format 'file' la ruta llega como /privacidad.html; la URL pública no lleva .html.
 const canonical = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ''), Astro.site);
 const ogImage = new URL('/og.png', Astro.site);
+const SWITCHER_JS = `(() => {
+            const root = document.documentElement;
+            const pick = (id) => {
+              root.dataset.siteStyle = id;
+              document.querySelectorAll('[data-style-pick]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.stylePick === id)));
+              try { localStorage.setItem('dyc.site.style', id); } catch {}
+              const u = new URL(location.href); u.searchParams.set('estilo', id); history.replaceState(null, '', u);
+            };
+            let first = new URLSearchParams(location.search).get('estilo');
+            try { first = first || localStorage.getItem('dyc.site.style'); } catch {}
+            if (first && document.querySelector('[data-style-pick="' + first + '"]')) pick(first);
+            document.querySelectorAll('[data-style-pick]').forEach((b) => b.addEventListener('click', () => pick(b.dataset.stylePick)));
+          })();`;
 ---
 
 <!doctype html>
-<html lang="es" data-theme="dark">
+<html lang="es" data-theme="dark" data-site-style={SITE_STYLE}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -50,5 +65,22 @@ const ogImage = new URL('/og.png', Astro.site);
       <slot />
     </main>
     <Footer />
+    {
+      STYLE_SWITCHER && (
+        <div class="style-switcher" role="group" aria-label="Estilo del sitio">
+          <span class="style-switcher__label">Estilo</span>
+          {SITE_STYLES.map((st) => (
+            <button type="button" data-style-pick={st.id} aria-pressed={st.id === SITE_STYLE ? 'true' : 'false'} title={st.hint}>
+              {st.label}
+            </button>
+          ))}
+        </div>
+      )
+    }
+    {
+      STYLE_SWITCHER && (
+        <script is:inline set:html={SWITCHER_JS} />
+      )
+    }
   </body>
 </html>

@@ -65,7 +65,7 @@ export default function NotebookDetail() {
           <ErrorState error={legacy.error} retry={() => legacy.refetch()} />
         ) : (
           <EmptyState title="Este cuaderno ya no existe" action={<Button small variant="secondary" label="Ver tus cuadernos" onPress={() => router.replace('/cuadernos')} />}>
-            Puede que lo hayas borrado aquí o en la app anterior.
+            Puede que lo hayas borrado.
           </EmptyState>
         )}
       </ToolScreen>

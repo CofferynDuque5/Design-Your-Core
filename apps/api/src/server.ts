@@ -3,10 +3,13 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
-import { isPlaceholderDatabaseUrl, loadConfig, loadEnvFiles } from './config.js';
+import { isPlaceholderDatabaseUrl, loadConfig, loadEnvFiles, normalizeDatabaseUrl } from './config.js';
+import { copyFromDatabase, copyStatus } from './db/copyFrom.js';
 import { createDb } from './db/db.js';
+import { lockDownPublicApi } from './db/lockdown.js';
 import { migrate } from './db/migrate.js';
 import { createMailer } from './lib/mailer.js';
+import { startAlarmScheduler } from './lib/webPush.js';
 import { databaseProblem } from './lib/safeMode.js';
 
 loadEnvFiles();
@@ -34,12 +37,35 @@ process.on('uncaughtException', (e) => console.error('[core-cloud] uncaughtExcep
 async function migrateOrRetry(): Promise<void> {
   try {
     await migrate(db);
+    // Supabase: cierra su API REST pública sobre nuestras tablas.
+    await lockDownPublicApi(db).catch((e) => console.error('[core-cloud] no se pudo cerrar la API pública de Supabase:', e instanceof Error ? e.message : e));
+    void copyOrRetry();
   } catch (e) {
     console.error('[core-cloud] error de migración:', databaseProblem(e) ?? (e instanceof Error ? e.message : e));
     setTimeout(() => void migrateOrRetry(), 60_000).unref();
   }
 }
+// Mudanza de base (COPY_FROM_DATABASE_URL): copia los datos de la base anterior
+// si la nueva aún no tiene cuentas. Si la anterior no responde, se reintenta cada 5 minutos.
+const copyFrom = normalizeDatabaseUrl(process.env.COPY_FROM_DATABASE_URL);
+async function copyOrRetry(): Promise<void> {
+  if (isPlaceholderDatabaseUrl(copyFrom) || copyFrom === config.databaseUrl) return;
+  const source = createDb(copyFrom, { max: 2 });
+  try {
+    copyStatus.value = await copyFromDatabase(db, source);
+    console.log(`[core-cloud] mudanza de base: ${copyStatus.value.detalle}`);
+  } catch (e) {
+    const why = databaseProblem(e) ?? (e instanceof Error ? e.message : String(e));
+    copyStatus.value = { estado: 'error', detalle: `No se pudo copiar desde la base anterior (se reintenta en 5 minutos): ${why}` };
+    console.error(`[core-cloud] mudanza de base: ${why}`);
+    setTimeout(() => void copyOrRetry(), 5 * 60_000).unref();
+  } finally {
+    await source.close().catch(() => undefined);
+  }
+}
 await migrateOrRetry();
+// Alarmas del panel web (Web Push): se revisan cada 30 segundos.
+startAlarmScheduler(db);
 
 const server = app.listen(config.port, () => console.log(`[core-cloud] listening on ${config.port}${serveWeb ? ' (con la app web)' : ''}`));
 

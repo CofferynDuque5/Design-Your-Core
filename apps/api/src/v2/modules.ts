@@ -26,7 +26,7 @@ import {
 } from '@dyc/core';
 import { Router, type Request, type RequestHandler, type Response } from 'express';
 import type { Db } from '../db/db.js';
-import { findBlob } from '../routes/sync.js';
+import { COURSES, courseExists, deleteCourses, findCourse, insertCourse, moveCoursesOut, readDoc, reorderCourses, updateCourse, withCourses } from '../db/courses.js';
 import { ah } from '../lib/http.js';
 import { parse } from './util.js';
 
@@ -67,6 +67,9 @@ export function moduleRoutes({ db, requireAuth }: { db: Db; requireAuth: Request
         await tx.exec('INSERT INTO "Blob" ("userId", "data", "updatedAt") VALUES ($1, \'{}\'::jsonb, $2) ON CONFLICT ("userId") DO NOTHING', [userId, new Date()]);
         rows = await lock();
       }
+      // Los cursos viven en "CourseItem"; si alguno sigue en el documento, se mueve antes.
+      const raw0 = rows[0]?.data as Doc | undefined;
+      if (raw0 && Array.isArray(raw0[COURSES]) && (await moveCoursesOut(tx, userId))) rows = await lock();
       const raw = rows[0]?.data;
       const doc: Doc = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Doc) : {};
       const { set, unset = [], result } = fn(doc);
@@ -225,8 +228,85 @@ export function moduleRoutes({ db, requireAuth }: { db: Db; requireAuth: Request
 
   // Todo el documento, igual que GET /api/sync.
   r.get('/modules', requireAuth, ah(async (req, res) => {
-    const blob = await findBlob(db, req.userId as string);
-    res.json({ data: blob?.data ?? {}, updatedAt: blob?.updatedAt ?? null });
+    const doc = await readDoc(db, req.userId as string);
+    res.json({ data: doc?.data ?? {}, updatedAt: doc?.updatedAt ?? null });
+  }));
+
+  // ---------- Cursos (tabla "CourseItem", una fila por curso) ----------
+  // Mismas reglas y respuestas que las rutas genéricas de abajo, pero cada
+  // cambio toca solo la fila de ese curso. Van antes para tener prioridad.
+
+  r.post(`/modules/${COURSES}`, requireAuth, ah(async (req, res) => {
+    const item = parse(legacyItemSchemas.courses, req.body?.item, res) as Item | null;
+    if (!item) return;
+    await run(res, async () => {
+      const out = await withCourses(db, req.userId as string, async (t) => {
+        if (await courseExists(t, item.id)) throw new HttpError(409, 'Ya existe un elemento con ese id');
+        const row = await insertCourse(t, item);
+        return { result: item, patchCache: (rows) => [...rows, row] };
+      });
+      res.status(201).json({ item: out.result, updatedAt: out.updatedAt });
+    });
+  }));
+
+  // Quitar varios cursos de una vez (los repetidos). Antes se guarda copia en "BlobBackup".
+  r.post(`/modules/${COURSES}/remove-many`, requireAuth, ah(async (req, res) => {
+    const raw = req.body?.ids;
+    const ids = Array.isArray(raw) ? [...new Set(raw.filter((x: unknown): x is string => typeof x === 'string' && x.length > 0 && x.length <= 200))] : [];
+    if (!ids.length || ids.length > 5000) return res.status(400).json({ error: 'Envía entre 1 y 5000 ids' });
+    const userId = req.userId as string;
+    const out = await withCourses(db, userId, async (t) => {
+      await t.sql.exec(
+        `INSERT INTO "BlobBackup" ("userId", "data", "reason")
+         SELECT $1, jsonb_build_object('courses', jsonb_agg("data" ORDER BY "pos")), 'cursos repetidos quitados'
+           FROM "CourseItem" WHERE "userId" = $1 AND "itemId" = ANY($2) HAVING count(*) > 0`,
+        [userId, ids],
+      );
+      const gone = await t.sql.rows<{ itemId: string }>('DELETE FROM "CourseItem" WHERE "userId" = $1 AND "itemId" = ANY($2) RETURNING "itemId"', [userId, ids]);
+      const set = new Set(ids);
+      return { result: gone.length, patchCache: (rows) => rows.filter((r) => !r.itemId || !set.has(r.itemId)) };
+    });
+    res.json({ ok: true, removed: out.result, updatedAt: out.updatedAt });
+  }));
+
+  r.put(`/modules/${COURSES}/order`, requireAuth, ah(async (req, res) => {
+    const input = parse(legacyReorderSchema, req.body, res);
+    if (!input) return;
+    const out = await withCourses(db, req.userId as string, async (t) => {
+      const pos = await reorderCourses(t, input.ids);
+      return { result: null, patchCache: (rows) => rows.map((r) => ({ ...r, pos: pos.get(r.key) ?? r.pos })) };
+    });
+    res.json({ ok: true, updatedAt: out.updatedAt });
+  }));
+
+  r.patch(`/modules/${COURSES}/:id`, requireAuth, ah(async (req, res) => {
+    const parsed = parse(legacyPatchSchemas.courses, req.body, res) as Doc | null;
+    if (!parsed) return;
+    const patch = deriveLegacyPatch(COURSES, parsed);
+    await run(res, async () => {
+      const out = await withCourses(db, req.userId as string, async (t) => {
+        const row = await findCourse(t, req.params.id);
+        if (!row) throw new HttpError(404, 'Elemento no encontrado');
+        const before = (row.data && typeof row.data === 'object' ? row.data : { id: req.params.id }) as Item;
+        const item = mergeLegacyItem(COURSES, before, patch);
+        const cross = LEGACY_CROSS.courses;
+        const msg = cross && cross.fields.some((f) => f in patch) ? cross.check(item) : null;
+        if (msg) throw new HttpError(400, `Datos inválidos: ${msg}`);
+        await updateCourse(t, row.key, item);
+        return { result: item, patchCache: (rows) => rows.map((r) => (r.key === row.key ? { ...r, data: item } : r)) };
+      });
+      res.json({ item: out.result, updatedAt: out.updatedAt });
+    });
+  }));
+
+  r.delete(`/modules/${COURSES}/:id`, requireAuth, ah(async (req, res) => {
+    await run(res, async () => {
+      const out = await withCourses(db, req.userId as string, async (t) => {
+        if (!(await deleteCourses(t, req.params.id))) throw new HttpError(404, 'Elemento no encontrado');
+        return { result: null, patchCache: (rows) => rows.filter((r) => r.itemId !== req.params.id) };
+      });
+      res.json({ ok: true, updatedAt: out.updatedAt });
+    });
   }));
 
   r.post('/modules/:key', requireAuth, ah(async (req, res) => {

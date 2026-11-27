@@ -106,7 +106,7 @@ function ProgressContent({ d, period }: { d: Dashboard; period: Period }) {
                 <Delta value={deltaOverall} />
                 {deltaOverall !== 0 && (
                   <T v="small" tint="muted">
-                    {PREVIOUS[period]}
+                    {`${Math.abs(deltaOverall) === 1 ? 'punto' : 'puntos'} ${deltaOverall > 0 ? 'más' : 'menos'} ${PREVIOUS[period]}`}
                   </T>
                 )}
               </View>

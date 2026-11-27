@@ -1,4 +1,4 @@
-import { DATA_IMAGE, isNoteImageRef, MD_MAX_QUOTE_DEPTH, mdImageLabel, parseBlocks, parseInline, SAFE_LINK, type MdBlock, type MdInline } from '@dyc/core';
+import { DATA_IMAGE, isNoteImageRef, mathRuns, mathSpoken, MD_MAX_QUOTE_DEPTH, mdImageLabel, parseBlocks, parseInline, SAFE_LINK, type MdBlock, type MdInline } from '@dyc/core';
 import { Fragment, type ReactNode } from 'react';
 
 /**
@@ -39,11 +39,7 @@ function inline(tokens: MdInline[], ctx: Ctx, key: string): ReactNode[] {
       case 'code':
         return <code key={k}>{t.text}</code>;
       case 'math':
-        return (
-          <code key={k} className="md-math">
-            {t.text}
-          </code>
-        );
+        return formula(t.text, k);
       case 'image':
         return image(t.alt, t.ref, ctx, k);
       case 'link':
@@ -120,9 +116,9 @@ function renderBlocks(blocks: MdBlock[], ctx: Ctx, headingBase: number, key: str
         );
       case 'math':
         return (
-          <pre key={k} className="md-code md-math" tabIndex={0} aria-label="Fórmula">
-            <code>{b.text}</code>
-          </pre>
+          <div key={k} className="md-formula" tabIndex={0}>
+            {formula(b.text, k, true)}
+          </div>
         );
       case 'quote':
         return <blockquote key={k}>{depth < MD_MAX_QUOTE_DEPTH ? renderBlocks(parseBlocks(b.text), ctx, headingBase, `${k}-`, depth + 1) : plain(b.text, k)}</blockquote>;
@@ -154,4 +150,13 @@ function renderBlocks(blocks: MdBlock[], ctx: Ctx, headingBase: number, key: str
 export function Markdown({ text, resolveImage = defaultResolver, headingBase = 2, className }: { text: string; resolveImage?: ImageResolver; headingBase?: number; className?: string }) {
   const ctx: Ctx = { resolve: resolveImage, images: { n: 0 } };
   return <div className={className ? `markdown ${className}` : 'markdown'}>{renderBlocks(parseBlocks(text), ctx, headingBase, 'b', 0)}</div>;
+}
+
+/** Una fórmula dibujada (no como código): símbolos, exponentes y subíndices. */
+function formula(src: string, k: string, block = false): ReactNode {
+  return (
+    <span key={k} className={`md-math${block ? ' md-math--block' : ''}`} role="math" aria-label={`Fórmula: ${mathSpoken(src)}`}>
+      {mathRuns(src).map((r, i) => (r.pos === 'sup' ? <sup key={i}>{r.text}</sup> : r.pos === 'sub' ? <sub key={i}>{r.text}</sub> : <Fragment key={i}>{r.text}</Fragment>))}
+    </span>
+  );
 }

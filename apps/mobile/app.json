@@ -33,6 +33,7 @@
       "expo-font",
       ["expo-secure-store", { "faceIDPermission": "Design Your Core usa Face ID para abrir tu Bóveda sin escribir la contraseña maestra." }],
       ["expo-notifications", { "color": "#C8F23A" }],
+      ["expo-image-picker", { "photosPermission": "Design Your Core usa tus fotos solo cuando eliges una para enviarla al Asistente o guardarla en un emprendimiento.", "cameraPermission": false, "microphonePermission": false }],
       [
         "expo-splash-screen",
         {

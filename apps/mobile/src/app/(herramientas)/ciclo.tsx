@@ -211,7 +211,7 @@ function PrivacyCard() {
       <View style={{ flexDirection: 'row', gap: space[3], alignItems: 'flex-start' }}>
         <Lock size={18} color={colors.ink} style={{ marginTop: 2 }} />
         <T v="small" tint="muted" style={{ flex: 1 }}>
-          Tus registros de ciclo se guardan en tu cuenta de Design Your Core y se sincronizan con tus dispositivos y con la app anterior. No se comparten con tu pareja vinculada.
+          Tus registros de ciclo se guardan en tu cuenta de Design Your Core y se sincronizan con tus dispositivos. No se comparten con tu pareja vinculada.
         </T>
       </View>
       <View style={[st.setting, { borderTopColor: colors.line }]}>

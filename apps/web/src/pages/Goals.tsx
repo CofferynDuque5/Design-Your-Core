@@ -1,12 +1,26 @@
-import { GOAL_CATEGORIES, GOAL_CATEGORY_INFO, goalCategoryOf as categoryOf, goalDeadlineLabel as deadlineLabel, goalPercent, goalStep, goalToggleDone, isDay, shortDay, type GoalCategory, type LegacyGoal } from '@dyc/core';
+import {
+  matchesSearch,
+  GOAL_CATEGORIES,
+  GOAL_CATEGORY_INFO,
+  goalCategoryOf as categoryOf,
+  goalDeadlineLabel as deadlineLabel,
+  goalPercent,
+  goalStep,
+  goalToggleDone,
+  isDay,
+  shortDay,
+  type GoalCategory,
+  type LegacyGoal,
+} from '@dyc/core';
 import { CalendarClock, Check, Minus, Pencil, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { newId, useLegacyData, useLegacyList, useModule } from '../app/legacy';
 import { PageHeader } from '../components/AppShell';
+import { SearchBox } from '../components/SearchBox';
 import { Dialog } from '../components/Dialog';
-import { SelectField, TextField } from '../components/Form';
+import { ChoiceField, SelectField, TextField } from '../components/Form';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { FormActions, Meter, Stats } from '../components/ToolParts';
+import { FormActions, Meter, Stats, RemoveButton } from '../components/ToolParts';
 import { localDayKey } from '../lib/tools';
 
 type Filter = 'todas' | GoalCategory;
@@ -16,14 +30,13 @@ export function Goals() {
   const legacy = useLegacyData();
   const goals = useLegacyList(legacy.data?.data, 'goals');
   const [filter, setFilter] = useState<Filter>('todas');
+  const [q, setQ] = useState('');
   const [editing, setEditing] = useState<LegacyGoal | 'new' | null>(null);
   // Las fechas límite son fechas de calendario (campo tipo fecha), en hora local.
   const today = localDayKey(new Date());
   const done = goals.filter((g) => g.done).length;
-  const next = goals
-    .filter((g) => !g.done && isDay(g.deadline) && g.deadline >= today)
-    .sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
-  const shown = goals.filter((g) => filter === 'todas' || categoryOf(g) === filter);
+  const next = goals.filter((g) => !g.done && isDay(g.deadline) && g.deadline >= today).sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
+  const shown = goals.filter((g) => (filter === 'todas' || categoryOf(g) === filter) && matchesSearch(q, g.title, g.unit, GOAL_CATEGORY_INFO[categoryOf(g)].label));
   // Primero las que están en curso; las logradas, al final.
   const ordered = [...shown.filter((g) => !g.done), ...shown.filter((g) => g.done)];
 
@@ -58,6 +71,7 @@ export function Goals() {
               { value: next ? shortDay(next.deadline) : '—', label: next ? `Próxima: ${next.title}` : 'Sin fechas próximas' },
             ]}
           />
+          <SearchBox label="Buscar en tus metas" value={q} onChange={setQ} placeholder="Buscar por nombre o unidad…" count={ordered.length} />
           <div className="chips" role="group" aria-label="Categoría">
             {(['todas', ...GOAL_CATEGORIES] as Filter[]).map((c) => (
               <button key={c} type="button" className="chip-btn" aria-pressed={filter === c} onClick={() => setFilter(c)}>
@@ -66,7 +80,9 @@ export function Goals() {
             ))}
           </div>
           {ordered.length === 0 ? (
-            <EmptyState title="Nada por aquí con este filtro" />
+            q.trim() ? null : (
+              <EmptyState title="Nada por aquí con este filtro" />
+            )
           ) : (
             <ul className="card-grid tool-grid" aria-label="Metas">
               {ordered.map((g) => (
@@ -105,6 +121,7 @@ function GoalCard({ goal: g, today, onEdit }: { goal: LegacyGoal; today: string;
         <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Editar «${title}»`}>
           <Pencil size={18} aria-hidden="true" />
         </button>
+        <RemoveButton module="goals" id={g.id} name={title} />
       </div>
       <h2 id={titleId} className="tool-card__title">
         {title}
@@ -144,6 +161,8 @@ function GoalCard({ goal: g, today, onEdit }: { goal: LegacyGoal; today: string;
 
 function GoalForm({ goal, category: initialCategory, onDone }: { goal: LegacyGoal | null; category: GoalCategory; onDone: () => void }) {
   const actions = useModule('goals');
+  const saved = useLegacyData().data?.data;
+  const units = useLegacyList(saved, 'goals').map((g) => g.unit ?? '');
   const [title, setTitle] = useState(goal?.title ?? '');
   const [target, setTarget] = useState(String(goal ? num(goal.target, 10) : 10));
   const [current, setCurrent] = useState(String(goal ? num(goal.current) : 0));
@@ -170,7 +189,7 @@ function GoalForm({ goal, category: initialCategory, onDone }: { goal: LegacyGoa
       <TextField label="Meta" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} required autoFocus placeholder="Publicar 8 videos" />
       <div className="grid-2">
         <TextField label="Objetivo" type="number" inputMode="numeric" min="1" step="1" value={target} onChange={(e) => setTarget(e.target.value)} required error={targetOk ? null : 'Un número entero, 1 o más.'} />
-        <TextField label="Unidad (opcional)" value={unit} onChange={(e) => setUnit(e.target.value)} maxLength={40} placeholder="videos, kg, libros…" />
+        <ChoiceField label="Unidad (opcional)" options={[...units, 'videos', 'libros', 'kg', 'km', 'horas', 'páginas', 'clases']} value={unit} onChange={setUnit} emptyLabel="Sin unidad" otherLabel="Otra unidad…" maxLength={40} placeholder="videos, kg, libros…" />
       </div>
       <div className="grid-2">
         <TextField label="Llevas" type="number" inputMode="numeric" min="0" step="1" value={current} onChange={(e) => setCurrent(e.target.value)} required error={currentOk ? null : 'Un número entero, 0 o más.'} />

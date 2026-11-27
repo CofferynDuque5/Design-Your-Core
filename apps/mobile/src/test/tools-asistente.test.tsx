@@ -97,7 +97,8 @@ describe('Asistente en el móvil', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Descartar: Añadir pendiente' }));
     expect(await screen.findByText('Descartado')).toBeOnTheScreen();
     await act(async () => {});
-    expect(api.calls.some((c) => c.method === 'POST' && c.path.startsWith('/api/v2/modules'))).toBe(false);
+    // Solo se guarda la conversación (en tu cuenta); el agua no se escribe.
+    expect(api.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/api/v2/modules')).map((c) => c.path)).toEqual(['/api/v2/modules/chats']);
   });
 
   it('un error de la clave se explica y el mensaje vuelve al cuadro; «Quitar» la borra del llavero', async () => {

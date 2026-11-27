@@ -1,0 +1,27 @@
+---
+/** Captura real del panel en un marco de navegador (escritorio) o de teléfono. */
+interface Props {
+  name: string;
+  alt: string;
+  kind?: 'desk' | 'phone';
+  eager?: boolean;
+  class?: string;
+}
+const { name, alt, kind = 'desk', eager = false, class: extra = '' } = Astro.props;
+const src = `/capturas/${kind === 'desk' ? 'd' : 'm'}-${name}.webp`;
+const [w, h] = kind === 'desk' ? [1600, 1000] : [640, 1385];
+---
+
+<figure class={`shot shot--${kind} ${extra}`}>
+  {
+    kind === 'desk' && (
+      <span class="shot__bar" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <span class="shot__url">designyourcorepanel.nvcorx.com</span>
+      </span>
+    )
+  }
+  <img src={src} alt={alt} width={w} height={h} loading={eager ? 'eager' : 'lazy'} decoding="async" fetchpriority={eager ? 'high' : undefined} />
+</figure>

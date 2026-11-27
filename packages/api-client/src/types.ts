@@ -1,4 +1,4 @@
-import type { Challenge, Day, Period, PillarId, PillarScores, Range, Recommendation } from '@dyc/core';
+import type { Challenge, ConsistencyDay, Day, Period, PillarId, PillarScores, Range, Recommendation } from '@dyc/core';
 
 // Formas de las respuestas de la API (ver docs/api.md).
 
@@ -33,6 +33,8 @@ export interface Profile {
   bedTime: string | null;
   timezone: string;
   baseline: Partial<Record<PillarId, number>>;
+  /** Personaje de la foto de perfil, o "" (iniciales). */
+  avatar: string;
   onboarded: boolean;
   onboardedAt: string | null;
 }
@@ -105,6 +107,8 @@ export interface Dashboard {
   challenges: UserChallenge[];
   recommendations: Recommendation[];
   onboarded: boolean;
+  /** Últimas 12 semanas para el mapa de constancia (falta en servidores antiguos). */
+  consistency?: ConsistencyDay[];
 }
 
 /** Resumen de la pareja vinculada (hábitos de la app anterior). */

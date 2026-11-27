@@ -1,3 +1,4 @@
+import { storedAttachment, userContent } from './attachments.js';
 import { isDay } from './dates.js';
 import {
   GOAL_CATEGORIES,
@@ -14,8 +15,13 @@ import {
   waterToday,
   WATER_GOAL_DEFAULT,
   workoutStats,
+  type CardStatus,
+  type LegacyChat,
   type LegacyData,
   type LegacyKey,
+  type StoredCard,
+  type StoredChatMessage,
+  type StoredToolCall,
 } from './legacy.js';
 import { PILLAR_NAMES, type PillarId } from './pillars.js';
 
@@ -34,6 +40,10 @@ export type AssistantModel = (typeof ASSISTANT_MODELS)[number];
 export const DEFAULT_MODEL: AssistantModel = 'gemini-flash-latest';
 /** Si el modelo elegido está saturado (429) o falla (5xx), se reintenta una vez con este. */
 export const FALLBACK_MODEL: AssistantModel = 'gemini-flash-lite-latest';
+/** Razonamiento mínimo: para un asistente de agenda importa más la rapidez. */
+export const REASONING_EFFORT = 'low';
+/** Si Gemini no responde en este tiempo se corta y se prueba con el modelo de reserva (en vez de esperar sin fin). */
+export const REQUEST_TIMEOUT_MS = 30_000;
 
 
 export interface AssistantSettings {
@@ -42,6 +52,30 @@ export interface AssistantSettings {
   /** Ya leyó qué datos se envían. */
   seenPrivacy: boolean;
 }
+
+/** Nota que acompaña a cada modelo en el selector. */
+export const ASSISTANT_MODEL_NOTE: Record<AssistantModel, string> = {
+  'gemini-flash-latest': 'recomendado',
+  'gemini-3.6-flash': 'rápido',
+  'gemini-flash-lite-latest': 'el más rápido',
+  'gemini-pro-latest': 'más lento, piensa más',
+};
+
+/** Nombre sencillo de cada modelo para el selector (el nombre técnico no le dice nada a casi nadie). */
+export const ASSISTANT_MODEL_LABEL: Record<AssistantModel, string> = {
+  'gemini-flash-latest': 'Equilibrado (recomendado)',
+  'gemini-3.6-flash': 'Rápido',
+  'gemini-flash-lite-latest': 'Muy rápido',
+  'gemini-pro-latest': 'Profundo (más lento, piensa más)',
+};
+
+/** Pasos para conseguir la clave, para quien nunca ha usado Google AI Studio. */
+export const GEMINI_KEY_STEPS = [
+  'Abre Google AI Studio (aistudio.google.com/apikey) e inicia sesión con tu cuenta de Google.',
+  'Pulsa «Create API key» (Crear clave). Si te pide un proyecto, elige el que te ofrece.',
+  'Copia la clave que aparece: es un texto largo que empieza por «AIza».',
+  'Pégala aquí abajo y pulsa «Guardar». Es gratis para un uso normal.',
+] as const;
 
 export const isAssistantModel = (m: unknown): m is AssistantModel => typeof m === 'string' && (ASSISTANT_MODELS as readonly string[]).includes(m);
 
@@ -88,18 +122,16 @@ export const TOOLS = [
   fn('add_routine', 'Agenda un recordatorio con hora en la rutina diaria.', { title: { type: 'string' }, time: { type: 'string', description: 'HH:MM 24 h' }, days: { type: 'string', description: 'dígitos 1-7 (1 = lunes); por defecto 1234567' } }, ['title', 'time']),
 ];
 
-export interface ToolCall {
-  id: string;
-  type: 'function';
-  function: { name: string; arguments: string };
-}
+export type ToolCall = StoredToolCall;
 
 /** Qué se escribirá si la persona pulsa «Hacer». */
 export type Plan =
   | { kind: 'add'; key: LegacyKey; item: Json & { id: string } }
   | { kind: 'update'; key: LegacyKey; id: string; patch: Json }
   /** El total se calcula al pulsar «Hacer», con lo que haya entonces. */
-  | { kind: 'water'; glasses: number; today: string };
+  | { kind: 'water'; glasses: number; today: string }
+  /** Varios elementos de una vez (por ejemplo, un pendiente y sus subtareas), en orden. */
+  | { kind: 'batch'; ops: Array<{ kind: 'add'; key: LegacyKey; item: Json & { id: string } } | { kind: 'update'; key: LegacyKey; id: string; patch: Json }> };
 
 export interface Proposal {
   callId: string;
@@ -114,6 +146,8 @@ export interface Proposal {
   error?: string;
   /** Lo que se dice al modelo cuando se hace. */
   done: string;
+  /** Por qué se sugiere (sugerencias de las secciones). */
+  reason?: string;
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '');
@@ -375,6 +409,7 @@ export function systemPrompt(context: string | null, now: Date = new Date()): st
     `La fecha de hoy es ${utcDayKey(now)}.`,
     'Cuando la persona pida añadir, registrar o agendar algo, usa la herramienta adecuada (add_todo, add_task, add_idea, add_goal, add_transaction, log_water, log_workout, log_sleep, add_journal, add_routine). Cada acción se le muestra como propuesta y solo se hace si pulsa «Hacer»: no digas que ya está hecha hasta recibir el resultado.',
     'Si faltan datos obligatorios (por ejemplo la hora o los minutos), pregunta antes de proponer la acción. No inventes datos.',
+    'La persona puede adjuntar imágenes, PDF y archivos de texto: léelos y úsalos para responder.',
   ];
   if (context) parts.push(`Resumen de los datos de la persona (lo ha compartido para esta conversación):\n${context}`);
   else parts.push('No tienes acceso a los datos de la persona: si te pregunta por ellos, dile que puede activar «Incluir un resumen de mis datos».');
@@ -383,20 +418,29 @@ export function systemPrompt(context: string | null, now: Date = new Date()): st
 
 // ---------- Mensajes y peticiones ----------
 
-export type ChatMessage =
-  | { role: 'user'; content: string }
-  | { role: 'assistant'; content: string; tool_calls?: ToolCall[] }
-  | { role: 'tool'; tool_call_id: string; content: string };
+/** Un mensaje de la conversación. Los adjuntos llevan su data: URL solo en memoria. */
+export type ChatMessage = StoredChatMessage;
 
 export function buildRequest(model: string, history: ChatMessage[], context: string | null, now?: Date) {
   return {
     model,
     messages: [
       { role: 'system', content: systemPrompt(context, now) },
-      ...history.map((m) => (m.role === 'assistant' && m.tool_calls?.length ? { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls } : m)),
+      ...history.map((m) =>
+        m.role === 'assistant'
+          ? m.tool_calls?.length
+            ? { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls }
+            : { role: 'assistant', content: m.content }
+          : m.role === 'user'
+            ? { role: 'user', content: userContent(m.content, m.attachments) }
+            : m,
+      ),
     ],
     tools: TOOLS,
     tool_choice: 'auto',
+    // Sin esto Gemini «piensa» a fondo antes de cada respuesta y tarda muchos segundos.
+    // `low` es el nivel más bajo que aceptan todos los modelos de la lista.
+    reasoning_effort: REASONING_EFFORT,
   };
 }
 
@@ -436,29 +480,49 @@ async function detailOf(res: Response): Promise<string> {
   }
 }
 
-async function post(apiKey: string, body: unknown, fetchImpl: typeof fetch, signal?: AbortSignal): Promise<Json> {
-  let res: Response;
+export async function postGemini(apiKey: string, body: unknown, fetchImpl: typeof fetch, signal?: AbortSignal, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Json> {
+  // Un controlador propio para cortar por tiempo; también sigue a la señal de quien llama («Detener»).
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, timeoutMs);
+  const follow = () => ctrl.abort();
+  if (signal?.aborted) ctrl.abort();
+  signal?.addEventListener('abort', follow);
   try {
-    res = await fetchImpl(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(body),
-      signal,
-      // En el navegador, sin cookies ni página de origen (React Native los ignora).
-      credentials: 'omit',
-      referrerPolicy: 'no-referrer',
-    });
-  } catch (e) {
-    if ((e as Error)?.name === 'AbortError') throw e;
-    throw errorFor(0);
-  }
-  if (!res.ok) throw errorFor(res.status, await detailOf(res));
-  try {
-    return (await res.json()) as Json;
-  } catch {
-    throw new AssistantError('Gemini respondió algo que no se pudo leer.', 502);
+    let res: Response;
+    try {
+      res = await fetchImpl(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+        // En el navegador, sin cookies ni página de origen (React Native los ignora).
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+      });
+    } catch (e) {
+      if (timedOut) throw tooSlow();
+      if ((e as Error)?.name === 'AbortError') throw e;
+      throw errorFor(0);
+    }
+    if (!res.ok) throw errorFor(res.status, await detailOf(res));
+    try {
+      return (await res.json()) as Json;
+    } catch (e) {
+      if (timedOut) throw tooSlow();
+      if ((e as Error)?.name === 'AbortError') throw e;
+      throw new AssistantError('Gemini respondió algo que no se pudo leer.', 502);
+    }
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', follow);
   }
 }
+
+const tooSlow = () => new AssistantError('Gemini tardó demasiado en responder. Inténtalo de nuevo o elige un modelo más rápido.', 504);
 
 export interface ChatReply {
   message: Extract<ChatMessage, { role: 'assistant' }>;
@@ -487,16 +551,87 @@ export function parseReply(data: Json): Extract<ChatMessage, { role: 'assistant'
 export async function chat(opts: { apiKey: string; model: string; history: ChatMessage[]; context: string | null; fetchImpl?: typeof fetch; signal?: AbortSignal }): Promise<ChatReply> {
   const f = opts.fetchImpl ?? fetch;
   try {
-    const data = await post(opts.apiKey, buildRequest(opts.model, opts.history, opts.context), f, opts.signal);
+    const data = await postGemini(opts.apiKey, buildRequest(opts.model, opts.history, opts.context), f, opts.signal);
     return { message: parseReply(data), model: opts.model, fellBack: false };
   } catch (e) {
     if (!(e instanceof AssistantError) || !e.retryable || opts.model === FALLBACK_MODEL) throw e;
-    const data = await post(opts.apiKey, buildRequest(FALLBACK_MODEL, opts.history, opts.context), f, opts.signal);
+    const data = await postGemini(opts.apiKey, buildRequest(FALLBACK_MODEL, opts.history, opts.context), f, opts.signal);
     return { message: parseReply(data), model: FALLBACK_MODEL, fellBack: true };
   }
 }
 
+// ---------- Historial ----------
+
+/** Acción propuesta con su estado en la conversación. */
+export type ChatCard = Proposal & { status: CardStatus; error?: string };
+
+/** Título de una conversación: el primer mensaje, o el nombre del primer archivo. */
+export function chatTitle(messages: ChatMessage[]): string {
+  const first = messages.find((m): m is Extract<ChatMessage, { role: 'user' }> => m.role === 'user');
+  const t = (first?.content || first?.attachments?.[0]?.name || '').replace(/\s+/g, ' ').trim();
+  if (!t) return 'Conversación';
+  return t.length > 60 ? `${t.slice(0, 59)}…` : t;
+}
+
+/** La conversación lista para guardarla en tu cuenta (sin las data: URL de los adjuntos). */
+export function storedChat(id: string, model: string, messages: ChatMessage[], cards: Record<string, ChatCard>, now: Date = new Date()): LegacyChat {
+  const keep: Record<string, StoredCard> = {};
+  for (const [k, c] of Object.entries(cards)) {
+    // Una acción a medias se guarda como pendiente: al volver a abrirla se puede hacer o descartar.
+    keep[k] = { callId: c.callId, tool: c.tool, title: c.title, where: c.where, fields: c.fields, plan: (c.plan as Record<string, unknown> | null) ?? null, done: c.done, status: c.status === 'running' ? 'pending' : c.status, ...(c.error ? { error: c.error.slice(0, 1000) } : {}) };
+  }
+  return {
+    id,
+    title: chatTitle(messages),
+    model,
+    updatedAt: now.toISOString(),
+    messages: messages.map((m) => (m.role === 'user' && m.attachments?.length ? { ...m, attachments: m.attachments.map(storedAttachment) } : m)),
+    cards: keep,
+  };
+}
+
+/** Cartas guardadas → cartas para la pantalla (los datos raros se quedan sin «Hacer»). */
+export function chatCards(chat: Pick<LegacyChat, 'cards'>): Record<string, ChatCard> {
+  const out: Record<string, ChatCard> = {};
+  for (const [k, c] of Object.entries(chat.cards ?? {})) {
+    if (!c || typeof c !== 'object') continue;
+    const plan = isPlan(c.plan) ? c.plan : null;
+    out[k] = { ...c, plan, status: c.status === 'running' ? 'pending' : plan || c.status !== 'pending' ? c.status : 'invalid' };
+  }
+  return out;
+}
+
+const isPlan = (p: unknown): p is Plan => {
+  const x = p as Partial<Record<string, unknown>> | null;
+  if (!x || typeof x !== 'object') return false;
+  if (x.kind === 'add') return typeof x.key === 'string' && !!x.item && typeof x.item === 'object';
+  if (x.kind === 'update') return typeof x.key === 'string' && typeof x.id === 'string' && !!x.patch && typeof x.patch === 'object';
+  if (x.kind === 'water') return typeof x.glasses === 'number' && typeof x.today === 'string';
+  if (x.kind === 'batch') return Array.isArray(x.ops) && x.ops.every((o) => isPlan(o) && (o as Plan).kind !== 'batch' && (o as Plan).kind !== 'water');
+  return false;
+};
+
+/** Ids de /api/images de los adjuntos que hay que volver a descargar al abrir una conversación. */
+export const chatAttachmentRefs = (messages: ChatMessage[]): string[] =>
+  messages.flatMap((m) => (m.role === 'user' ? (m.attachments ?? []).filter((a) => a.kind !== 'text' && a.ref && !a.data).map((a) => a.ref) : []));
+
+/** Vuelve a poner las data: URL descargadas en los adjuntos. */
+export const withAttachmentData = (messages: ChatMessage[], data: Record<string, string>): ChatMessage[] =>
+  messages.map((m) => (m.role === 'user' && m.attachments?.length ? { ...m, attachments: m.attachments.map((a) => (a.ref && data[a.ref]?.startsWith('data:') ? { ...a, data: data[a.ref] } : a)) } : m));
+
+/** «Hoy 14:05», «ayer», «12 oct». */
+export function chatWhen(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const day = (x: Date) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  if (day(d) === day(now)) return `Hoy ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const y = new Date(now);
+  y.setDate(y.getDate() - 1);
+  if (day(d) === day(y)) return 'Ayer';
+  return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) }).format(d);
+}
+
 /** «Probar conexión»: una petición mínima, sin datos ni herramientas. */
 export async function testConnection(apiKey: string, model: string, fetchImpl: typeof fetch = fetch): Promise<void> {
-  await post(apiKey, { model, messages: [{ role: 'user', content: 'Responde solo: ok' }], max_tokens: 16 }, fetchImpl);
+  await postGemini(apiKey, { model, messages: [{ role: 'user', content: 'Responde solo: ok' }], max_tokens: 16, reasoning_effort: REASONING_EFFORT }, fetchImpl);
 }

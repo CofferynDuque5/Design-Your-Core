@@ -1,0 +1,120 @@
+---
+import { Apple, Download, Globe, Laptop, Monitor, Smartphone } from '@lucide/astro';
+import Shot from '../components/Shot.astro';
+import { appLink, DOWNLOADS } from '../config';
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Descargar" description="Descarga Design Your Core para Android, iPhone, Windows, Mac y Linux. Una sola cuenta en todos tus dispositivos.">
+  <section class="hero hero--page">
+    <div class="hero__glow" aria-hidden="true"></div>
+    <div class="container">
+      <p class="eyebrow">Descargar</p>
+      <h1 class="display">Design Your Core, <em>donde estés</em>.</h1>
+      <p class="lead">Elige tu dispositivo. Entras con la misma cuenta y tus datos te siguen.</p>
+    </div>
+  </section>
+
+  <section class="section section--flush">
+    <div class="container platforms">
+      <article class="platform" id="telefono">
+        <div class="platform__head">
+          <Smartphone size={28} aria-hidden="true" />
+          <h2>Teléfono</h2>
+        </div>
+        <p class="muted">Se instala desde el navegador en segundos, con su icono en la pantalla de inicio y en su propia ventana.</p>
+        <h3>Android</h3>
+        <ol class="platform__steps">
+          <li>Abre el enlace en Chrome.</li>
+          <li>Toca «Instalar» en el aviso de arriba (o en el menú de los tres puntos, «Instalar app»).</li>
+        </ol>
+        <h3>iPhone y iPad</h3>
+        <ol class="platform__steps">
+          <li>Abre el enlace en Safari.</li>
+          <li>Toca Compartir y luego «Añadir a pantalla de inicio».</li>
+        </ol>
+        <a class="btn btn--lg" href={appLink('/?instalar')}><Download size={18} aria-hidden="true" /> Instalar en el teléfono</a>
+        <p class="muted small">Pronto también en App Store y Google Play.</p>
+      </article>
+
+      <article class="platform" id="computadora">
+        <div class="platform__head">
+          <Laptop size={28} aria-hidden="true" />
+          <h2>Computadora</h2>
+        </div>
+        <p class="muted">La app de escritorio abre tu panel en su propia ventana, con su icono en el escritorio y en la barra de tareas.</p>
+        <ul class="downloads">
+          <li>
+            <Monitor size={22} aria-hidden="true" />
+            <span><strong>{DOWNLOADS.windows.label}</strong><span class="muted small">{DOWNLOADS.windows.file} · {DOWNLOADS.windows.size} · se abre sin instalar</span></span>
+            <a class="btn btn--sm" href={DOWNLOADS.windows.href} download data-download>Descargar</a>
+          </li>
+          <li>
+            <Apple size={22} aria-hidden="true" />
+            <span><strong>{DOWNLOADS.macApple.label}</strong><span class="muted small">{DOWNLOADS.macApple.file} · {DOWNLOADS.macApple.size}</span></span>
+            <a class="btn btn--sm" href={DOWNLOADS.macApple.href} download data-download>Descargar</a>
+          </li>
+          <li>
+            <Apple size={22} aria-hidden="true" />
+            <span><strong>{DOWNLOADS.macIntel.label}</strong><span class="muted small">{DOWNLOADS.macIntel.file} · {DOWNLOADS.macIntel.size}</span></span>
+            <a class="btn btn--sm btn--secondary" href={DOWNLOADS.macIntel.href} download data-download>Descargar</a>
+          </li>
+          <li>
+            <Monitor size={22} aria-hidden="true" />
+            <span><strong>{DOWNLOADS.linux.label}</strong><span class="muted small">{DOWNLOADS.linux.file} · {DOWNLOADS.linux.size}</span></span>
+            <a class="btn btn--sm btn--secondary" href={DOWNLOADS.linux.href} download data-download>Descargar</a>
+          </li>
+        </ul>
+        <p class="muted small" data-downloads-note hidden>Las versiones para computadora llegan pronto. Mientras tanto, abre tu panel desde el navegador.</p>
+        <details class="faq__item">
+          <summary>Windows dice «Windows protegió tu PC»</summary>
+          <p class="muted">Pasa con las apps nuevas que aún no tienen firma digital. Toca «Más información» y luego «Ejecutar de todas formas».</p>
+        </details>
+        <details class="faq__item">
+          <summary>Mac dice que no puede abrir la app</summary>
+          <p class="muted">Descomprime el archivo y mueve la app a Aplicaciones. La primera vez, haz clic derecho sobre ella y elige «Abrir».</p>
+        </details>
+      </article>
+
+      <article class="platform platform--wide" id="navegador">
+        <div class="platform__head">
+          <Globe size={28} aria-hidden="true" />
+          <h2>Sin instalar nada</h2>
+        </div>
+        <p class="muted">Usa el panel en cualquier navegador, en cualquier computadora.</p>
+        <a class="btn btn--secondary btn--lg" href={appLink('/entrar')}>Abrir en el navegador</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container shots-row">
+      <Shot name="hoy" kind="phone" alt="Hoy en el teléfono" />
+      <Shot name="progreso" kind="phone" alt="Progreso en el teléfono" />
+      <Shot name="cursos" kind="phone" alt="Cursos en el teléfono" />
+      <Shot name="mas" kind="phone" alt="Todas las herramientas en el teléfono" />
+    </div>
+  </section>
+</Base>
+
+<script>
+  // Si un archivo aún no está en el servidor, el botón dice «Próximamente» en vez de llevar a una página de error.
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('a[data-download]')];
+  let missing = 0;
+  void Promise.all(
+    links.map(async (a) => {
+      const ok = await fetch(a.href, { method: 'HEAD', cache: 'no-store' })
+        .then((r) => r.ok && !(r.headers.get('content-type') ?? '').includes('text/html'))
+        .catch(() => true);
+      if (ok) return;
+      missing++;
+      const soon = document.createElement('span');
+      soon.className = 'btn btn--sm btn--secondary is-soon';
+      soon.setAttribute('aria-disabled', 'true');
+      soon.textContent = 'Próximamente';
+      a.replaceWith(soon);
+    }),
+  ).then(() => {
+    if (missing) document.querySelector<HTMLElement>('[data-downloads-note]')?.removeAttribute('hidden');
+  });
+</script>

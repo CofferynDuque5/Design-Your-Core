@@ -170,11 +170,11 @@ function LegacyNotice({ count }: { count: number }) {
       <View style={st.row}>
         <ShieldAlert size={18} color={colors.warning} />
         <T v="label" style={{ flex: 1 }}>
-          {plural(count, 'entrada', 'entradas')} de la app anterior sin cifrar
+          {plural(count, 'entrada', 'entradas')} sin cifrar
         </T>
       </View>
       <T v="small" tint="muted">
-        La app anterior las guardaba tal cual en tus datos. Puedes pasarlas a esta bóveda cifrada desde la web.
+        Están guardadas tal cual en tus datos. Puedes pasarlas a esta bóveda cifrada desde la web.
       </T>
       <Button small variant="secondary" label="Cifrarlas en la web" onPress={() => openOnWeb('/boveda')} style={{ alignSelf: 'flex-start' }} />
     </Card>

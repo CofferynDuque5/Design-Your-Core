@@ -1,0 +1,57 @@
+{
+  "name": "design-your-core-escritorio",
+  "productName": "Design Your Core",
+  "version": "1.0.0",
+  "description": "Design Your Core para la computadora (Windows, Mac y Linux)",
+  "author": "Design Your Core",
+  "homepage": "https://designyourcore.nvcorx.com",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --linux AppImage --x64 && electron-builder --mac zip --x64 && electron-builder --mac zip --arm64"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.nvcorx.designyourcore",
+    "productName": "Design Your Core",
+    "artifactName": "DesignYourCore-${version}-${os}.${ext}",
+    "files": [
+      "main.cjs",
+      "offline.html",
+      "build/icon.png"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Design Your Core",
+      "artifactName": "DesignYourCore-${version}-Windows-instalador.${ext}"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "artifactName": "DesignYourCore-${version}-Mac-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "executableName": "design-your-core"
+    },
+    "portable": {
+      "artifactName": "DesignYourCore-${version}-Windows.${ext}"
+    },
+    "publish": null
+  }
+}
